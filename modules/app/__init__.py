@@ -17,7 +17,21 @@ class JSONEnconder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 # create the flask object
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
+
+from .util import assets
+
+'''
+# Load the default configuration
+app.config.from_object('config.default')
+
+# Load the configuration from the instance folder
+app.config.from_pyfile('config.py')
+
+# Load the file specified by the APP_CONFIG_FILE environment variable
+# Variables defined here will override those in the default configuration
+app.config.from_envvar('APP_CONFIG_FILE')
+'''
 
 # add mongo url to flask config, so that flask_pymongo can use it to make connections
 app.config['MONGO_URI'] = os.environ.get('DB')
