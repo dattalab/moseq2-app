@@ -2,7 +2,7 @@
 import os
 import sys
 import requests
-from flask import jsonify, request, make_response, send_from_directory
+from flask import jsonify, request, make_response, send_from_directory, render_template
 
 ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
 os.environ.update({'ROOT_PATH': ROOT_PATH})
@@ -27,14 +27,51 @@ def not_found(error):
 @app.route('/')
 def index():
     ''' static files serve '''
-    return send_from_directory('dist', 'index.html')
+    #return send_from_directory('templates/', 'index.html')
+    return render_template('index.html')
+
+@app.route('/extract')
+def extract():
+    ''' static files serve '''
+    #return send_from_directory('templates/', 'extract.html')
+    return render_template('extract.html')
+
+@app.route('/pca')
+def pca():
+    ''' static files serve '''
+    #return send_from_directory('templates/', 'pca.html')
+    return render_template('pca.html')
+
+@app.route('/model')
+def model():
+    ''' static files serve '''
+    #return send_from_directory('templates/', 'model.html')
+    return render_template('model.html')
+
+@app.route('/viz')
+def viz():
+    ''' static files serve '''
+    #return send_from_directory('templates/', 'viz.html')
+    return render_template('viz.html')
+
+# Routing paths to static files needed to fully render html files
+@app.route('/static/js/<path:path>')
+def send_js(path):
+    #return send_from_directory('templates/static/js', path)
+    return app.send_static_file(path)
+
+@app.route('/static/css/<path:path>')
+def send_css(path):
+    #return send_from_directory('templates/static/css', path)
+    return app.send_static_file(path)
 
 @app.route('/<path:path>')
 def static_proxy(path):
     """ static folder serve """
     file_name = path.split('/')[-1]
-    dir_name = os.path.join('dist', '/'.join(path.split('/')[:-1]))
+    dir_name = os.path.join('static', '/'.join(path.split('/')[:-1]))
     return send_from_directory(dir_name, file_name)
+
 
 if __name__ == '__main__':
     LOG.info('running environment %s', os.environ.get('ENV'))
