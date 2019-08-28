@@ -34,8 +34,8 @@ app.config.from_envvar('APP_CONFIG_FILE')
 '''
 
 # add mongo url to flask config, so that flask_pymongo can use it to make connections
-app.config['MONGO_URI'] = os.environ.get('DB')
-mongo = PyMongo(app)
+#app.config['MONGO_URI'] = os.environ.get('DB')
+#mongo = PyMongo(app)
 
 # use the modified encoder class to handle ObjectId & datetime object while jsonifying the response
 app.json_encoder = JSONEnconder
