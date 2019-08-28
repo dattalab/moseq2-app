@@ -19,7 +19,7 @@ class JSONEnconder(json.JSONEncoder):
 # create the flask object
 app = Flask(__name__, instance_relative_config=True)
 
-from .util import assets
+#from .util import assets
 
 '''
 # Load the default configuration

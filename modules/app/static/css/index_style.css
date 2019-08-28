@@ -1,9 +1,89 @@
-h1 {
-    color: navajowhite;
-    font-variant-caps: all-small-caps;
-    font-size: 46px;
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-    background: firebrick;
+  margin: 0;
+}
+
+.topnav {
+  display: table;
+  margin: auto;
+  text-align: center;
+  overflow: hidden;
+  background-color: #666;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 9;
+}
+
+#horizontal-list {
+  align: center;
+  min-width: 696px;
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  margin: auto;
+  padding-top: 0px;
+}
+
+.topnav ul#horizontal-list li a{
+  float: left;
+  color: white;
+  display:inline; /* IE6/7 haslayout trip-switch */
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-size: 17px;
+}
+
+.topnav ul#horizontal-list li a:hover {
+  background-color: crimson;
+  color: black;
+}
+
+.topnav ul#horizontal-list li a:active {
+  background-color: #4CAF50;
+  color: white;
+}
+
+#main {
+    margin-top: 50px;
+}
+
+#home {
+  height: 800px;
+  background-color: crimson;
+  color: white;
+  text-align: center;
+}
+
+#extract {
+
+  height: 800px;
+  background-color: #99ccff;
+  color: white;
+  text-align: center;
+}
+
+#pca {
+  height: 800px;
+  background-color: #667fcc;
+  color: white;
+  text-align: center;
+}
+
+#model {
+  height: 800px;
+  background-color: #000080;
+  color: white;
+  text-align: center;
+}
+
+#viz {
+  height: 800px;
+  background-color: #8B0000;
+  color: white;
+  text-align: center;
 }

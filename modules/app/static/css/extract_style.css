@@ -1,5 +1,9 @@
-.align-middle{
-    background-color: royalblue;
-    font-size: larger;
-    align-content: center;
+h1 {
+    color: navajowhite;
+    font-variant-caps: all-small-caps;
+    font-size: 46px;
+}
+
+body {
+    background: crimson;
 }
