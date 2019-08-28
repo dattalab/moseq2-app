@@ -6,12 +6,37 @@ body {
   margin: 0;
 }
 
+.button1 {
+  width: 50%;
+  height: 25px;
+  background-color: #080808;
+  color: whitesmoke;
+}
+
+#fixedbutton1 {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background-color: #080808;
+    color: whitesmoke;
+    z-index: 900;
+}
+
+#fixedbutton2 {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    background-color: #080808;
+    color: whitesmoke;
+    z-index: 900;
+}
+
 .topnav {
   display: table;
   margin: auto;
   text-align: center;
   overflow: hidden;
-  background-color: #666;
+  background-color: #080808;
   position: fixed;
   top: 0;
   width: 100%;
@@ -25,7 +50,6 @@ body {
   display: flex;
   justify-content: center;
   margin: auto;
-  padding-top: 0px;
 }
 
 .topnav ul#horizontal-list li a{
@@ -53,6 +77,8 @@ body {
 }
 
 #home {
+  margin-top: 50px;
+  data-offset: 50;
   height: 800px;
   background-color: crimson;
   color: white;
@@ -60,7 +86,6 @@ body {
 }
 
 #extract {
-
   height: 800px;
   background-color: #99ccff;
   color: white;
@@ -84,6 +109,20 @@ body {
 #viz {
   height: 800px;
   background-color: #8B0000;
+  color: white;
+  text-align: center;
+}
+
+#contact {
+  height: 400px;
+  background-color: #383838;
+  color: white;
+  text-align: center;
+}
+
+#contribute {
+  height: 400px;
+  background-color: #080808;
   color: white;
   text-align: center;
 }

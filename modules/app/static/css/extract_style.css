@@ -1,9 +1,28 @@
-h1 {
-    color: navajowhite;
-    font-variant-caps: all-small-caps;
-    font-size: 46px;
+.btn-group#command-optionsE{
+  float: left;
+}
+.btn-group button {
+  float: left;
+  height: 100%;
+  background-color: #080808;
+  border: 1px ghostwhite;
+  text-align: center;
+  color: whitesmoke; /* White text */
+  padding: 20px 30px; /* Some padding */
+  cursor: pointer; /* Pointer/hand icon */
+  width: 100%; /* Set a width if needed */
+  display: block; /* Make the buttons appear below each other */
+
 }
 
-body {
-    background: crimson;
+.batch-selector {
+  padding-bottom: 50px;
+}
+.btn-group#command-optionsE button:not(:last-child) {
+  border-bottom: none; /* Prevent double borders */
+}
+
+/* Add a background color on hover */
+.btn-group#command-optionsE button:hover {
+  background-color: #99ccff;
 }

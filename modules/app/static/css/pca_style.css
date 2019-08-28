@@ -1,0 +1,25 @@
+.btn-group#command-options{
+  float: left;
+}
+.btn-group button {
+  float: left;
+  height: 100%;
+  background-color: #080808;
+  border: 1px ghostwhite;
+  text-align: center;
+  color: whitesmoke; /* White text */
+  padding: 20px 30px; /* Some padding */
+  cursor: pointer; /* Pointer/hand icon */
+  width: 100%; /* Set a width if needed */
+  display: block; /* Make the buttons appear below each other */
+
+}
+
+.btn-group#command-options button:not(:last-child) {
+  border-bottom: none; /* Prevent double borders */
+}
+
+/* Add a background color on hover */
+.btn-group#command-options button:hover {
+  background-color: #000080;
+}

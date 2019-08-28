@@ -1,0 +1,34 @@
+.btn-group#tab{
+  float: left;
+}
+.btn-group button {
+  float: left;
+  height: 100%;
+  background-color: #080808;
+  border: 1px ghostwhite;
+  text-align: center;
+  color: whitesmoke; /* White text */
+  padding: 20px 30px; /* Some padding */
+  cursor: pointer; /* Pointer/hand icon */
+  width: 100%; /* Set a width if needed */
+  display: block; /* Make the buttons appear below each other */
+
+}
+
+.btn-group button:not(:last-child) {
+  border-bottom: none; /* Prevent double borders */
+}
+
+/* Add a background color on hover */
+.btn-group button:hover {
+  background-color: #8B0000;
+}
+
+.choice-content {
+  float: right;
+  padding: 0px 0px;
+  /*border: 10px solid #ccc;*/
+  width: 70%;
+  border-left: none;
+  height: 300px;
+}
