@@ -3,4 +3,4 @@ requirements.txt
 
 *.pyc
 
-*.pyc
+data/*
