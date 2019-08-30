@@ -17,11 +17,11 @@
         <br>
         <div class="btn-group" id="command-options">
             <div class="batch-selector">
-                <button class="choice" id="batch-mode">Batch Mode?</button>
+                <button class="choice" id="batch-modeM" onclick="toggleBatchModeModel(event)">Batch Mode?</button>
             </div>
             <br>
-            <button class="choice" onclick="openTab(event, 'model-init-tab')" id="model-init-button">Init Step</button>
-            <script>document.getElementById("model-init-button").click();</script>
+            <button class="choice" onclick="openTab(event, 'model-init-tab')" id="init-step-button">Init Step</button>
+            <script>document.getElementById("init-step-button").click();</script>
             <br>
             <button class="choice" onclick="openTab(event, 'train-model-tab')" id="learn-model">Train ARHMM</button>
             <br>

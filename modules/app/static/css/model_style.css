@@ -32,6 +32,15 @@
     background-color: #4CAF50;
 }
 
+/* Add a background color on hover */
+.btn-group#command-options button#batch-modeM:hover {
+  background-color: orange;
+}
+
+.btn-group#command-options button#batch-modeM.active {
+    background-color: orange;
+}
+
 .c-box {
     height: 25px;
     width: 25px;

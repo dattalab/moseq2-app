@@ -29,6 +29,15 @@
   background-color: #99ccff;
 }
 
+.tab#command-optionsE button#batch-modeE:hover {
+  background-color: orange;
+}
+
+.tab#command-optionsE button#batch-modeE.active {
+    background-color: orange;
+}
+
+
 .tab#command-optionsE button.active {
     background-color: #4CAF50;
 }
@@ -98,26 +107,6 @@
 #copy-op {
     background-color: #080808;
     font-size: 25px;
-}
-
-.help-button{
-    position: fixed;
-    background-color: #080808;
-    font-size: 25px;
-    float: left;
-    left: 30px;
-    top: 12px;
-    z-index: 900;
-}
-
-.param-select{
-    position: fixed;
-    background-color: #080808;
-    font-size: 25px;
-    right: 30px;
-    top: 12px;
-    float: right;
-    z-index: 900;
 }
 
 

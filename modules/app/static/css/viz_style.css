@@ -33,6 +33,11 @@
     width: 25px;
 }
 
+.plots1 {
+    height: 500px;
+    weight: 500px;
+}
+
 .choice-content {
   float: right;
   padding: 0px 0px;

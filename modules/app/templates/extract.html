@@ -15,20 +15,15 @@
     </head>
 
     <body>
-        <div class="helper-buttons">
-            <button class="help-button">Help</button>
-            <button class="param-select">Select Parameters</button>
-        </div>
-
         <h1>Welcome to MoSeq2 Extract</h1>
 
         <div class="tab" id="command-optionsE">
             <div class="batch-selector">
-                <button class="choice" id="batch-mode">Batch Mode?</button>
+                <button class="choice" id="batch-modeE" onclick="toggleBatchModeExtract(event)">Batch Mode?</button>
             </div>
             <br>
-            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-button">Initialization Step</button>
-            <script>document.getElementById("init-button").click();</script>
+            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-step-button">Initialization Step</button>
+            <script>document.getElementById("init-step-button").click();</script>
             <br>
             <button class="choice" onclick="openTab(event, 'extract-tab')" id="extract-button">Extract Raw Data</button>
             <br>

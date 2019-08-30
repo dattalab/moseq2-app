@@ -38,7 +38,7 @@
                 <br><br>
                 <div>
                     <h2 id="extraction-title">Crowd Movie Example</h2>
-                    <video id="crowd-movie" width="500" height="500" controls>
+                    <video id="crowd-movie" width="500" height="500" loop controls>
                         <source src="/static/img/crowd_movie.mp4" type="video/mp4">
                     </video>
                 </div>
@@ -47,14 +47,22 @@
             <section class="choice-content" id="plot-scalars-tab">
                 <h1>Plot Scalar Summary Graphs</h1>
                 <button onclick="plotScalars()" id="scalar-op">Plot Scalars</button>
+                <br><br>
+                <img class="plots1" src="/static/img/scalar_summary.png">
+                <br><br>
+                <img class="plots1" src="/static/img/scalar_position.png">
             </section>
             <section class="choice-content" id="plot-transitions-tab">
                 <h1>Plot Syllable Transition Graphs</h1>
                 <button onclick="plotTransitionGraphs()" id="trans-op">Plot Transition Graphs</button>
+                <br><br>
+                <img class="plots1" src="/static/img/transition.png">
             </section>
             <section class="choice-content" id="plot-usages-tab">
                 <h1>Make Crowd Movies</h1>
                 <button onclick="plotUsages()" id="usage-op">Plot Syllable Usages</button>
+                <br><br>
+                <img class="plots1" src="/static/img/usages.png">
             </section>
         </div>
     </body>

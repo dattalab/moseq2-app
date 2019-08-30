@@ -68,12 +68,33 @@ function downloadFlip(event) {
     });
 }
 
+function toggleBatchModeExtract(evt) {
+    if (evt.currentTarget.className == "choice") {
+        evt.currentTarget.className += " active";
+        console.log(evt.currentTarget);
+        var d = document.getElementsByClassName('choice');
+        for(var i = 0; i < d.length; i++) {
+            if (d[i].id == 'extract-button') {
+                console.log(d[i].id);
+                document.getElementById(d[i].id).innerHTML = 'Batch Extract';
+                document.getElementById(d[i].id).value = 'batch-extract';
+                document.getElementById(d[i].id).style.borderRight = '3px solid orange';
+            }
+        }
+    } else {
+        evt.currentTarget.className = evt.currentTarget.className.replace(" active", "");
 
-/*
-
-*/
-
-
+        var d = document.getElementsByClassName('choice');
+        for(var i = 0; i < d.length; i++) {
+            if (d[i].id == 'extract-button') {
+                console.log(d[i].id);
+                document.getElementById(d[i].id).value = 'extract-button';
+                document.getElementById(d[i].id).innerHTML = 'Extract Raw Data';
+                document.getElementById(d[i].id).style.borderRight = '';
+            }
+        }
+    }
+}
 
 function openTab(evt, tabName) {
     var i, tabcontent, tablinks;
@@ -88,4 +109,7 @@ function openTab(evt, tabName) {
     }
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
+    if (evt.currentTarget.id == 'init-step-button') {
+        //checkLocalDir();
+    }
 }
