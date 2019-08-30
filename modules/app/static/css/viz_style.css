@@ -1,5 +1,7 @@
 .btn-group#tab{
   float: left;
+  height: 12%;
+  font-size: 20px;
 }
 .btn-group button {
   float: left;
@@ -12,7 +14,6 @@
   cursor: pointer; /* Pointer/hand icon */
   width: 100%; /* Set a width if needed */
   display: block; /* Make the buttons appear below each other */
-
 }
 
 .btn-group button:not(:last-child) {
@@ -24,6 +25,10 @@
   background-color: #8B0000;
 }
 
+.btn-group#tab button.active {
+    background-color: #4CAF50;
+}
+
 .choice-content {
   float: right;
   padding: 0px 0px;
@@ -31,4 +36,28 @@
   width: 70%;
   border-left: none;
   height: 300px;
+}
+
+#crowd-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#scalar-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#trans-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#usage-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
 }

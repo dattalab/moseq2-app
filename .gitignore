@@ -1,2 +1,6 @@
 
 requirements.txt
+
+*.pyc
+
+*.pyc

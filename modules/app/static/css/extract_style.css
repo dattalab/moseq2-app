@@ -1,7 +1,9 @@
-.btn-group#command-optionsE{
+.tab#command-optionsE{
   float: left;
+  height: 12%;
+  font-size: 20px;
 }
-.btn-group button {
+.tab button {
   float: left;
   height: 100%;
   background-color: #080808;
@@ -12,17 +14,109 @@
   cursor: pointer; /* Pointer/hand icon */
   width: 100%; /* Set a width if needed */
   display: block; /* Make the buttons appear below each other */
-
 }
 
 .batch-selector {
   padding-bottom: 50px;
 }
-.btn-group#command-optionsE button:not(:last-child) {
+
+.tab#command-optionsE button:not(:last-child) {
   border-bottom: none; /* Prevent double borders */
 }
 
 /* Add a background color on hover */
-.btn-group#command-optionsE button:hover {
+.tab#command-optionsE button:hover {
   background-color: #99ccff;
+}
+
+.tab#command-optionsE button.active {
+    background-color: #4CAF50;
+}
+
+#dircheck-button{
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#genconfig-button{
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+.check-list{
+    border: 1px solid black;
+    float: left;
+    text-align: center;
+    display: block;
+    width: auto;
+}
+
+#extraction-title {
+    text-align: center;
+}
+
+#roi-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#extraction {
+    float:center;
+}
+
+#extract-op {
+    background-color: #080808;
+    font-size: 25px;
+    top: 75px;
+}
+
+#convert-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#download-flip {
+    background-color: #080808;
+    font-size: 25px;
+    float: left;
+}
+
+#copy-op {
+    background-color: #080808;
+    font-size: 25px;
+}
+
+.help-button{
+    position: fixed;
+    background-color: #080808;
+    font-size: 25px;
+    float: left;
+    left: 30px;
+    top: 12px;
+    z-index: 900;
+}
+
+.param-select{
+    position: fixed;
+    background-color: #080808;
+    font-size: 25px;
+    right: 30px;
+    top: 12px;
+    float: right;
+    z-index: 900;
+}
+
+
+/* Style the tab content */
+.choice-content {
+  float: left;
+  text-align: center;
+  padding: 0px 12px;
+
+  width: 100%;
+  border-left: none;
 }

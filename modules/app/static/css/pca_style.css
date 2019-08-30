@@ -1,5 +1,7 @@
 .btn-group#command-options{
   float: left;
+  height: 12%;
+  font-size: 20px;
 }
 .btn-group button {
   float: left;
@@ -12,7 +14,6 @@
   cursor: pointer; /* Pointer/hand icon */
   width: 100%; /* Set a width if needed */
   display: block; /* Make the buttons appear below each other */
-
 }
 
 .btn-group#command-options button:not(:last-child) {
@@ -22,4 +23,34 @@
 /* Add a background color on hover */
 .btn-group#command-options button:hover {
   background-color: #000080;
+}
+
+.btn-group#command-options button.active {
+    background-color: #4CAF50;
+    border:3px solid white;
+    border-right:3px solid white;
+}
+
+#load-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#train-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#apply-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#compute-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
 }

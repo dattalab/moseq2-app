@@ -17,18 +17,43 @@
         <br>
         <div class="btn-group" id="command-options">
 
-            <button class="choice" id="dir-select-button">Select Data Directory</button>
+            <button class="choice" onclick="openTab(event, 'dir-select-tab')" id="dir-select-button">Init Step</button>
+            <script>document.getElementById("dir-select-button").click();</script>
             <br>
-            <button class="choice" id="load-pca-button">Load PCA Model</button>
+            <button class="choice" onclick="openTab(event, 'load-pca-tab')" id="load-pca-button">Load PCA Model</button>
             <br>
-            <button class="choice" id="train-button">Train PCA Model</button>
+            <button class="choice" onclick="openTab(event, 'train-pca-tab')" id="train-button">Train PCA Model</button>
             <br>
-            <button class="choice" id="apply-pca-button">Apply PCA Model</button>
+            <button class="choice" onclick="openTab(event, 'apply-pca-tab')" id="apply-pca-button">Apply PCA Model</button>
             <br>
-            <button class="choice" id="compute-cp-button">Compute Changepoints</button>
+            <button class="choice" onclick="openTab(event, 'compute-cp-tab')" id="compute-cp-button">Compute Changepoints</button>
         </div>
         <div>
-            <h1>Right Tab</h1>
+            <section class="choice-content" id="dir-select-tab">
+                <h1>Directory Selection Check</h1>
+                <p>Ensure your files are in the correct directory.</p>
+                <input type="checkbox" id="dir-check" disabled>
+            </section>
+            <section class="choice-content" id="load-pca-tab">
+                <h2>Load Previously Trained PCA into context</h2>
+                <br>
+                <button id="load-op">Load PCA</button>
+            </section>
+            <section class="choice-content" id="train-pca-tab">
+                <h2>Train new PCA using previously extracted data</h2>
+                <br>
+                <button id="train-op">Train PCA</button>
+            </section>
+            <section class="choice-content" id="apply-pca-tab">
+                <h2>Apply Trained PCA</h2>
+                <br>
+                <button id="apply-op">Apply PCA</button>
+            </section>
+            <section class="choice-content" id="compute-cp-tab">
+                <h2>Compute Syllable Changepoints</h2>
+                <br>
+                <button id="compute-op">Compute Changepoints</button>
+            </section>
         </div>
     </body>
 </html>

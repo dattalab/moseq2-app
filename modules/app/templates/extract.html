@@ -7,7 +7,7 @@
         <link rel="icon" href="data:;base64,iVBORw0KGgo="> <!-- suppress GET error -->
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
         <link rel="stylesheet" href="/static/css/extract_style.css">
-        <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
         <script src="/static/js/extract_script.js"></script>
         <meta name="description" content="MoSeq2 Data Extraction Page">
         <meta name="author" content="Ayman Zeine">
@@ -15,27 +15,86 @@
     </head>
 
     <body>
+        <div class="helper-buttons">
+            <button class="help-button">Help</button>
+            <button class="param-select">Select Parameters</button>
+        </div>
+
         <h1>Welcome to MoSeq2 Extract</h1>
-        <br>
-        <div class="btn-group" id="command-optionsE">
+
+        <div class="tab" id="command-optionsE">
             <div class="batch-selector">
                 <button class="choice" id="batch-mode">Batch Mode?</button>
             </div>
             <br>
-            <button class="choice" id="dir-select-button">Select Data Directory</button>
+            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-button">Initialization Step</button>
+            <script>document.getElementById("init-button").click();</script>
             <br>
-            <button class="choice" id="extract-button">Extract Raw Data</button>
+            <button class="choice" onclick="openTab(event, 'extract-tab')" id="extract-button">Extract Raw Data</button>
             <br>
-            <button class="choice" id="copy-slice-button">Copy Slice</button>
+            <button class="choice" onclick="openTab(event, 'copy-slice-tab')" id="copy-slice-button">Copy Slice</button>
             <br>
-            <button class="choice" id="find-roi-button">Find ROI</button>
+            <button class="choice" onclick="openTab(event, 'find-roi-tab')" id="find-roi-button">Find ROI</button>
             <br>
-            <button class="choice" id="converter">Convert .dat to .avi</button>
+            <button class="choice" onclick="openTab(event, 'converter-tab')" id="converter-button">Convert .dat to .avi</button>
         </div>
-        <div class="choice-content">
-            <h1>Right tab</h1>
-        </div>
+        <div>
+            <section class="choice-content" id="genconfig-tab">
+                <h1>Generate Configuration File/Setup</h1>
+                <br>
+                <button id="dircheck-button" onclick="checkLocalDir()">Check Data Directory</button>
+                <input type="checkbox" id="dir-check" disabled>
+                <br>
+                <button id="genconfig-button" onclick="genLocalConfig()">Generate Configuration File</button>
+                <input type="checkbox" id="gen-exists" disabled>
+            </section>
 
+            <section class="choice-content" id="extract-tab">
+                <h1>Extract Raw Data</h1>
+                <div class="check-list">
+                    <h2>Check List</h2>
+                    <ul>
+                        <li>
+                            Depth files found?
+                            <input type="checkbox" id="dir-check2" disabled>
+                        </li>
+                        <li>
+                            Configuration File
+                            <input type="checkbox" id="gen-exists2" disabled>
+                        </li>
+                        <li>
+                            Flip-file-downloaded?
+                            <input type="checkbox" id="flip-exists2" disabled>
+                        </li>
+                    </ul>
+                </div>
+                <div class="extraction-canvas">
+                    <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
+                    <br><br>
+                    <div>
+                        <h2 id="extraction-title">Latest Extraction</h2>
+                        <video id="extraction" width="500" height="500" controls>
+                           <source src="/static/img/results_00.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                </div>
+                <button id="download-flip" onclick="downloadFlip()">Download Flip-File</button>
+            </section>
+
+            <section class="choice-content" id="copy-slice-tab">
+                <h1>Copy Slices</h1>
+                <button id="copy-op">Create slice copy</button>
+            </section>
+
+            <section class="choice-content" id="find-roi-tab">
+                <h1>Find ROI</h1>
+                <button id="roi-op" onclick="findROI()">Run ROI Analysis</button>
+            </section>
+
+            <section class="choice-content" id="converter-tab">
+                <h1>Convert Raw '.dat' to '.avi'</h1>
+                <button id="convert-op" onclick="convertRaw()">Convert Raw Video</button>
+            </section>
+        </div>
     </body>
-
 </html>

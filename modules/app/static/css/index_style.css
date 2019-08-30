@@ -7,16 +7,18 @@ body {
 }
 
 .button1 {
-  width: 50%;
-  height: 25px;
+  width: 40%;
+  height: 50px;
   background-color: #080808;
   color: whitesmoke;
+  font-size: 27px;
 }
 
 #fixedbutton1 {
     position: fixed;
-    bottom: 30px;
+    bottom: 20px;
     right: 30px;
+    font-size: 20px;
     background-color: #080808;
     color: whitesmoke;
     z-index: 900;
@@ -24,8 +26,9 @@ body {
 
 #fixedbutton2 {
     position: fixed;
-    bottom: 30px;
+    bottom: 20px;
     left: 30px;
+    font-size: 20px;
     background-color: #080808;
     color: whitesmoke;
     z-index: 900;
@@ -41,6 +44,10 @@ body {
   top: 0;
   width: 100%;
   z-index: 9;
+  -webkit-transition: all 0.3s ease;
+  -moz-transition: all 0.3s ease;
+  -o-transition: all 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 #horizontal-list {
@@ -55,10 +62,11 @@ body {
 .topnav ul#horizontal-list li a{
   float: left;
   color: white;
-  display:inline; /* IE6/7 haslayout trip-switch */
+  display:block; /* IE6/7 haslayout trip-switch */
   text-align: center;
   padding: 14px 16px;
   text-decoration: none;
+  transition:all 0.3s ease-in-out;
   font-size: 17px;
 }
 
@@ -69,59 +77,67 @@ body {
 
 .topnav ul#horizontal-list li a:active {
   background-color: #4CAF50;
-  color: white;
+  color: black;
+  border-bottom:3px solid white;
+}
+
+.active {
+  background-color: #4CAF50;
+  color: black;
+  border-bottom:3px solid white;
 }
 
 #main {
     margin-top: 50px;
 }
 
+section {
+    height: 1200px;
+}
+
 #home {
+  top:40px;
   margin-top: 50px;
   data-offset: 50;
-  height: 800px;
+
   background-color: crimson;
   color: white;
   text-align: center;
 }
 
 #extract {
-  height: 800px;
   background-color: #99ccff;
   color: white;
   text-align: center;
 }
 
 #pca {
-  height: 800px;
   background-color: #667fcc;
   color: white;
   text-align: center;
 }
 
 #model {
-  height: 800px;
   background-color: #000080;
   color: white;
   text-align: center;
 }
 
 #viz {
-  height: 800px;
   background-color: #8B0000;
   color: white;
   text-align: center;
 }
 
 #contact {
-  height: 400px;
+  height: 700px;
   background-color: #383838;
   color: white;
   text-align: center;
 }
 
 #contribute {
-  height: 400px;
+  height: 700px;
   background-color: #080808;
   color: white;
   text-align: center;

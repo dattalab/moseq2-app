@@ -20,16 +20,32 @@
                 <button class="choice" id="batch-mode">Batch Mode?</button>
             </div>
             <br>
-            <button class="choice" id="dir-select-button">Select Data Directory</button>
+            <button class="choice" onclick="openTab(event, 'model-init-tab')" id="model-init-button">Init Step</button>
+            <script>document.getElementById("model-init-button").click();</script>
             <br>
-            <button class="choice" id="learn-model">Train ARHMM</button>
+            <button class="choice" onclick="openTab(event, 'train-model-tab')" id="learn-model">Train ARHMM</button>
             <br>
-            <button class="choice" id="separate-trans-button">Separate Transition Graphs?</button>
-            <br>
-            <button class="choice" id="count-frames">Count Frames</button>
+            <button class="choice" onclick="openTab(event, 'count-frames-tab')" id="count-frames">Count Frames</button>
         </div>
-        <div class="choice-content">
-            <h1>Right tab</h1>
+        <div class="right-tab">
+            <section class="choice-content" id="model-init-tab">
+                <h1>Directory Selection Check</h1>
+                <p>Ensure your files are in the correct directory.</p>
+                <input type="checkbox" id="dir-check" disabled>
+                <br>
+                <h2>Alternatively, load a previously trained model.</h2>
+                <button id="load-op">Load Trained ARHMM</button>
+            </section>
+            <section class="choice-content" id="train-model-tab">
+                <h1>Train ARHMM</h1>
+                <h2>Select Model Parameters</h2>
+                <button id="train-op">Train ARHMM</button>
+            </section>
+            <section class="choice-content" id="count-frames-tab">
+                <h1>Count Frames in Video</h1>
+                <h2>Select Video</h2>
+                <button id="count-op">Count Frames</button>
+            </section>
         </div>
     </body>
 </html>
