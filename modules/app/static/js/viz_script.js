@@ -25,6 +25,7 @@ function crowdMovies() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }
 
 function plotScalars() {
@@ -35,6 +36,7 @@ function plotScalars() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }
 
 function plotTransitionGraphs() {
@@ -45,6 +47,7 @@ function plotTransitionGraphs() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }
 
 function generateIndex() {
@@ -55,6 +58,7 @@ function generateIndex() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }
 
 function plotUsages() {
@@ -65,5 +69,6 @@ function plotUsages() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }
 

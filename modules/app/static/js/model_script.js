@@ -15,7 +15,6 @@ function openTab(evt, tabName) {
     }
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
-
     if (evt.currentTarget.id == 'init-step-button') {
         //implement auto directory check
     }
@@ -55,6 +54,7 @@ function learnModel() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }
 
 function countFrames() {
@@ -65,4 +65,5 @@ function countFrames() {
             alert(resp.message);
         }
     });
+    window.location.reload();
 }

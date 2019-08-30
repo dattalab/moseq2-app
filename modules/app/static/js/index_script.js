@@ -31,11 +31,13 @@ function displayParamModal(ev) {
     // Get the modal
     var modal = document.getElementById("paramModal");
 
-    // Get the button that opens the modal
-    var btn = document.getElementById("param-op");
-
     // Get the <span> element that closes the modal
     var span = document.getElementsByClassName("close")[1];
+
+    // Get command user is requesting parameter modal for
+    var helpMethod = document.getElementsByClassName("choice active")[0].innerHTML;
+    console.log(document.getElementsByClassName("choice active")[0].baseURI);
+    var header = modal.children[0].children[0].children[1].innerHTML = helpMethod;
 
     // When the user clicks the button, open the modal
     modal.style.display = "block";
@@ -49,6 +51,7 @@ function displayParamModal(ev) {
     window.onclick = function(event) {
       if (event.target == modal) {
         modal.style.display = "none";
+        window.location.reload();
       }
     }
 }
@@ -57,11 +60,12 @@ function displayHelpModal(ev) {
     // Get the modal
     var modal = document.getElementById("helperModal");
 
-    // Get the button that opens the modal
-    var btn = document.getElementById("help-op");
-
     // Get the <span> element that closes the modal
     var span = document.getElementsByClassName("close")[0];
+
+    // Get command user is requesting help information modal for
+    var helpMethod = document.getElementsByClassName("choice active")[0].innerHTML;
+    var header = modal.children[0].children[0].children[1].innerHTML = helpMethod;
 
     // When the user clicks the button, open the modal
     modal.style.display = "block";
@@ -73,9 +77,10 @@ function displayHelpModal(ev) {
 
     // When the user clicks anywhere outside of the modal, close it
     window.onclick = function(event) {
-      if (event.target == modal) {
-        modal.style.display = "none";
-      }
+        if (event.target == modal) {
+            modal.style.display = "none";
+            window.location.reload();
+        }
     }
 }
 

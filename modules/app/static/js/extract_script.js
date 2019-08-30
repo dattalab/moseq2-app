@@ -34,6 +34,7 @@ function extractRaw() {
     $.get('/extract-raw', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
+            window.location.reload();
         } else {
             alert(resp.message);
         }
@@ -44,6 +45,7 @@ function findROI() {
     $.get('/find-roi', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
+            window.location.reload();
         } else {
             alert(resp.message);
         }
@@ -97,6 +99,7 @@ function toggleBatchModeExtract(evt) {
 }
 
 function openTab(evt, tabName) {
+
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("choice-content");
     for (i = 0; i < tabcontent.length; i++) {

@@ -25,16 +25,19 @@ function trainPCA() {
     $.get('/train-pca', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
+            window.location.reload();
         } else {
             alert(resp.message);
         }
     });
+
 }
 
 function clipScores() {
     $.get('/clip-pca-scores', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
+            window.location.reload();
         } else {
             alert(resp.message);
         }
@@ -45,6 +48,7 @@ function applyPCA() {
     $.get('/apply-pca', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
+            window.location.reload();
         } else {
             alert(resp.message);
         }
@@ -55,6 +59,7 @@ function computeCP() {
     $.get('/compute-changepoints', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
+            window.location.reload();
         } else {
             alert(resp.message);
         }
