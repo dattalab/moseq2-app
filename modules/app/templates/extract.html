@@ -43,10 +43,10 @@
                 <h1>Generate Configuration File/Setup</h1>
                 <br>
                 <button id="dircheck-button" onclick="checkLocalDir()">Check Data Directory</button>
-                <input type="checkbox" id="dir-check" disabled>
+                <input type="checkbox" class="c-box" id="dir-check" disabled>
                 <br>
                 <button id="genconfig-button" onclick="genLocalConfig()">Generate Configuration File</button>
-                <input type="checkbox" id="gen-exists" disabled>
+                <input type="checkbox" class="c-box" id="gen-exists" disabled>
             </section>
 
             <section class="choice-content" id="extract-tab">
@@ -56,15 +56,15 @@
                     <ul>
                         <li>
                             Depth files found?
-                            <input type="checkbox" id="dir-check2" disabled>
+                            <input type="checkbox" class="c-box" id="dir-check2" disabled>
                         </li>
                         <li>
                             Configuration File
-                            <input type="checkbox" id="gen-exists2" disabled>
+                            <input type="checkbox" class="c-box" id="gen-exists2" disabled>
                         </li>
                         <li>
                             Flip-file-downloaded?
-                            <input type="checkbox" id="flip-exists2" disabled>
+                            <input type="checkbox" class="c-box" id="flip-exists2" disabled>
                         </li>
                     </ul>
                 </div>
@@ -78,7 +78,10 @@
                         </video>
                     </div>
                 </div>
-                <button id="download-flip" onclick="downloadFlip()">Download Flip-File</button>
+                <button id="download-flip" onclick="showButtons()">Download Flip-File</button>
+                <button class="flip-file" id="0" onclick="downloadFlip(event)" hidden>Large Mice with Fibers</button>
+                <button class="flip-file" id="1" onclick="downloadFlip(event)" hidden>Adule Male c57s</button>
+                <button class="flip-file" id="2" onclick="downloadFlip(event)" hidden>Mice with Inscopix Cables</button>
             </section>
 
             <section class="choice-content" id="copy-slice-tab">

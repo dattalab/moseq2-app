@@ -53,6 +53,16 @@
     width: auto;
 }
 
+.flip-file {
+    background-color: #080808;
+    font-size: 25px;
+}
+
+.c-box {
+    height: 25px;
+    width: 25px;
+}
+
 #extraction-title {
     text-align: center;
 }

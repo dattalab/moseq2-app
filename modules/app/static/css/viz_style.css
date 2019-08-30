@@ -28,6 +28,10 @@
 .btn-group#tab button.active {
     background-color: #4CAF50;
 }
+.c-box {
+    height: 25px;
+    width: 25px;
+}
 
 .choice-content {
   float: right;
@@ -36,6 +40,18 @@
   width: 70%;
   border-left: none;
   height: 300px;
+}
+
+#gen-index-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#movie-select-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
 }
 
 #crowd-op {

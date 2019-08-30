@@ -16,3 +16,54 @@ function openTab(evt, tabName) {
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
 }
+
+function crowdMovies() {
+    $.get('/make-crowd-movies', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function plotScalars() {
+    $.get('/plot-scalar-summary', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function plotTransitionGraphs() {
+    $.get('/plot-transition-graph', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function generateIndex() {
+    $.get('/generate-viz-index', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function plotUsages() {
+    $.get('/plot-usages', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+

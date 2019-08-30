@@ -30,22 +30,31 @@
         <div id="right-tab">
             <section class="choice-content" id="init-step-tab">
                 <h1>(Optional) Configure files/models used</h1>
+                <button onclick="generateIndex()" id="gen-index-op">Generate Index File</button>
             </section>
             <section class="choice-content" id="make-crowd-movies-tab">
                 <h1>Make Crowd Movies</h1>
-                <button id="crowd-op">Make Create Movies</button>
+                <button onclick="crowdMovies()" id="crowd-op">Make Create Movies</button>
+                <br><br>
+                <div>
+                    <h2 id="extraction-title">Crowd Movie Example</h2>
+                    <video id="crowd-movie" width="500" height="500" controls>
+                        <source src="/static/img/crowd_movie.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <button onclick="selectMovie()" id="movie-select-op">Select Movie</button>
             </section>
             <section class="choice-content" id="plot-scalars-tab">
                 <h1>Plot Scalar Summary Graphs</h1>
-                <button id="scalar-op">Plot Scalars</button>
+                <button onclick="plotScalars()" id="scalar-op">Plot Scalars</button>
             </section>
             <section class="choice-content" id="plot-transitions-tab">
                 <h1>Plot Syllable Transition Graphs</h1>
-                <button id="trans-op">Plot Transition Graphs</button>
+                <button onclick="plotTransitionGraphs()" id="trans-op">Plot Transition Graphs</button>
             </section>
             <section class="choice-content" id="plot-usages-tab">
                 <h1>Make Crowd Movies</h1>
-                <button id="usage-op">Plot Syllable Usages</button>
+                <button onclick="plotUsages()" id="usage-op">Plot Syllable Usages</button>
             </section>
         </div>
     </body>

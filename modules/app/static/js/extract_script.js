@@ -50,8 +50,16 @@ function findROI() {
     });
 }
 
-function downloadFlip() {
-        $.get('/download-flip-file', {}, function(resp) {
+function showButtons() {
+    var flipFiles = document.getElementsByClassName('flip-file');
+    for(var i = 0; i < flipFiles.length; i++) {
+        flipFiles[i].hidden = false;
+    }
+}
+
+function downloadFlip(event) {
+    var clickedId = event.target.id;
+    $.get('/download-flip-file', {"flip-id": clickedId}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
         } else {
@@ -59,6 +67,13 @@ function downloadFlip() {
         }
     });
 }
+
+
+/*
+
+*/
+
+
 
 function openTab(evt, tabName) {
     var i, tabcontent, tablinks;

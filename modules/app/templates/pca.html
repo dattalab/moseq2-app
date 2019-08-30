@@ -32,27 +32,36 @@
             <section class="choice-content" id="dir-select-tab">
                 <h1>Directory Selection Check</h1>
                 <p>Ensure your files are in the correct directory.</p>
-                <input type="checkbox" id="dir-check" disabled>
+                <input type="checkbox"  class="c-box" id="dir-check" disabled>
             </section>
             <section class="choice-content" id="load-pca-tab">
                 <h2>Load Previously Trained PCA into context</h2>
                 <br>
-                <button id="load-op">Load PCA</button>
+                <button id="load-op" onclick="loadPCA()">Load PCA</button>
             </section>
             <section class="choice-content" id="train-pca-tab">
                 <h2>Train new PCA using previously extracted data</h2>
                 <br>
-                <button id="train-op">Train PCA</button>
+                <button id="train-op" onclick="trainPCA()">Train PCA</button>
+                <br><br>
+                <img class="plots" src="/static/img/pca_components.png">
+                <br><br>
+                <img class="plots" src="/static/img/pca_scree.png">
             </section>
             <section class="choice-content" id="apply-pca-tab">
                 <h2>Apply Trained PCA</h2>
                 <br>
-                <button id="apply-op">Apply PCA</button>
+                <button id="apply-op" onclick="applyPCA()">Apply PCA</button>
+                <button id="score-view-op" onclick="displayScores()">View PCs</button>
+                <button id="clip-op" onclick="clipScores()">Clip Scores</button>
             </section>
             <section class="choice-content" id="compute-cp-tab">
                 <h2>Compute Syllable Changepoints</h2>
                 <br>
-                <button id="compute-op">Compute Changepoints</button>
+                <button id="compute-op" onclick="computeCP()">Compute Changepoints</button>
+                <br><br>
+                <img class="plots1" src="/static/img/changpoints_dist.png">
+
             </section>
         </div>
     </body>

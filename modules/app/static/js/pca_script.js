@@ -16,3 +16,47 @@ function openTab(evt, tabName) {
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
 }
+
+function loadPCA() {
+    alert('clicked');
+}
+
+function trainPCA() {
+    $.get('/train-pca', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function clipScores() {
+    $.get('/clip-pca-scores', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function applyPCA() {
+    $.get('/apply-pca', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function computeCP() {
+    $.get('/compute-changepoints', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}

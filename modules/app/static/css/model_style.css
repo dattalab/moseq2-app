@@ -32,6 +32,11 @@
     background-color: #4CAF50;
 }
 
+.c-box {
+    height: 25px;
+    width: 25px;
+}
+
 #load-op {
     background-color: #080808;
     color: white;

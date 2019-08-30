@@ -16,3 +16,23 @@ function openTab(evt, tabName) {
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
 }
+
+function learnModel() {
+    $.get('/learn-model', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function countFrames() {
+    $.get('/count-frames', {}, function(resp) {
+        if (resp.ok) {
+            alert(resp.message);
+        } else {
+            alert(resp.message);
+        }
+    });
+}

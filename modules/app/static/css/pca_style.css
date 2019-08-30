@@ -31,6 +31,23 @@
     border-right:3px solid white;
 }
 
+.c-box {
+    height: 25px;
+    width: 25px;
+}
+
+#score-view-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#clip-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
 #load-op {
     background-color: #080808;
     color: white;
@@ -41,6 +58,16 @@
     background-color: #080808;
     color: white;
     font-size: 25px;
+}
+
+.plots {
+    height: 450px;
+    weight: 450px;
+}
+
+.plots1 {
+    height: 500px;
+    weight: 500px;
 }
 
 #apply-op {

@@ -31,7 +31,7 @@
             <section class="choice-content" id="model-init-tab">
                 <h1>Directory Selection Check</h1>
                 <p>Ensure your files are in the correct directory.</p>
-                <input type="checkbox" id="dir-check" disabled>
+                <input type="checkbox" class="c-box" id="dir-check" disabled>
                 <br>
                 <h2>Alternatively, load a previously trained model.</h2>
                 <button id="load-op">Load Trained ARHMM</button>
@@ -39,12 +39,12 @@
             <section class="choice-content" id="train-model-tab">
                 <h1>Train ARHMM</h1>
                 <h2>Select Model Parameters</h2>
-                <button id="train-op">Train ARHMM</button>
+                <button id="train-op" onclick="learnModel()">Train ARHMM</button>
             </section>
             <section class="choice-content" id="count-frames-tab">
                 <h1>Count Frames in Video</h1>
                 <h2>Select Video</h2>
-                <button id="count-op">Count Frames</button>
+                <button id="count-op" onclick="countFrames()">Count Frames</button>
             </section>
         </div>
     </body>

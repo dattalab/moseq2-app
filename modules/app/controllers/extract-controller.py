@@ -1,6 +1,4 @@
 import os
-from moseq2_extract.cli import extract
-from moseq2_batch.cli import *
 from flask import request, jsonify
 from app import app, data_path#, mongo
 import logger
@@ -109,12 +107,16 @@ def extract_download_flip(path=None):
 
         query = request.args
 
-        if query == {}:
-            os.system(f'moseq2-extract download-flip-file --output-dir {cwd1}/')
+        if query is not None:
+            print(query)
+            index = query["flip-id"]
+            print(index)
+
+            os.system(f'moseq2-extract download-flip-file -s {index} --output-dir {cwd1}/')
 
             return jsonify({'ok': True, 'message': "flip file downloaded!"}), 200
-
-    return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
+        else:
+            return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
 @app.route('/find-roi', methods=['GET', 'POST', 'PATCH'])
 def extract_find_roi(path=None):
@@ -136,6 +138,6 @@ def extract_find_roi(path=None):
 
     return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
-@app.route('/copy-slice', methods=['GET', 'POST', 'PATCH'])
+@app.route('/copy-slice', methods=['GET'])
 def extract_copy_slice(path=None):
     return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
