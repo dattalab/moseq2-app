@@ -16,6 +16,54 @@
   display: block; /* Make the buttons appear below each other */
 }
 
+.row {
+    float: left;
+  border: 1px ghostwhite;
+}
+
+.param {
+    color: black;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+.param2 {
+    color: black;
+    width: 70px;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+.param3 {
+    color: black;
+    width: 40px;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+#l {
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 70%;
+
+}
+#r {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 70%;
+}
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+  overflow: hidden;
+}
+
 .batch-selector {
   padding-bottom: 50px;
 }
@@ -83,7 +131,7 @@
 }
 
 #extraction {
-    float:center;
+    float:none;
 }
 
 #extract-op {

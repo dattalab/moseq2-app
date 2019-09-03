@@ -22,7 +22,7 @@
                 <button class="choice" id="batch-modeE" onclick="toggleBatchModeExtract(event)">Batch Mode?</button>
             </div>
             <br>
-            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-step-button">Initialization Step</button>
+            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-step-button">Configuration</button>
             <script>document.getElementById("init-step-button").click();</script>
             <br>
             <button class="choice" onclick="openTab(event, 'extract-tab')" id="extract-button">Extract Raw Data</button>
@@ -35,34 +35,70 @@
         </div>
         <div>
             <section class="choice-content" id="genconfig-tab">
-                <h1>Generate Configuration File/Setup</h1>
+                <h1>Extraction Configuration Options</h1>
                 <br>
-                <button id="dircheck-button" onclick="checkLocalDir()">Check Data Directory</button>
-                <input type="checkbox" class="c-box" id="dir-check" disabled>
-                <br>
+                <p>
+                    The parameters listed below allow you to configure the resulting data you will be extracting from your raw files.
+                </p>
                 <button id="genconfig-button" onclick="genLocalConfig()">Generate Configuration File</button>
                 <input type="checkbox" class="c-box" id="gen-exists" disabled>
+                <div class="row">
+                    <form class="extract-params">
+                      <div class="column" id="l">
+                          <p>left</p>
+                          <!-- Insert 'placeholder' attributes to further intuitively guide the user to understanding the parameter inputs -->
+                          Crop Size: <input class="param2" type="number" value="80"><input class="param2" type="number" value="80"><br>
+                          Chunk Size: <input class="param" type="number" value="3000" ><br>
+                          Chunk Overlap: <input class="param" type="number" value="0"><br>
+                          BG ROI Dilate: <input class="param2" type="number" value="10" ><input class="param2" type="number" value="10"><br>
+                          BG ROI Shape: <input class="param" type="text" value="ellipse"><br>
+                          BG ROI Weights: <input class="param3" type="number" value="1"><input class="param3" type="number" value="0.1"><input class="param3" type="text" value="1"><br>
+                          BG ROI Gradient Depth Range: <input class="param2" type="number" value="650"><input class="param2" type="number" value="750"><br>
+                          BG ROI Gradient Filter: <input class="param" type="checkbox"><br>
+                          BG ROI Gradient Threshold: <input class="param" type="number" value="3000"><br>
+                          BG ROI Gradient Kernel: <input class="param" type="number" value="7"><br>
+                          BG ROI Fill Holes: <input class="param" type="checkbox"><br>
+                          BG Min Height: <input class="param" type="number" value="10"><br>
+                          BG Max Height: <input class="param" type="number" value="100"><br>
+                          Flip Classifier: <input class="param" type="checkbox"><br>
+                          <!-- If checked, expose a dropdown menu to pre select the flip file -->
+                          Flip Classifier Smoothing: <input class="param" type="number" value="51"><br>
+                          Model Smoothing Clips: <input class="param2" type="number" value="0"><input class="param2" type="number" value="0"><br>
+                          Centroid Hampel Span: <input class="param" type="number" value="0"><br>
+                          Centroid Hampel Signal: <input class="param" type="number" value="3"><br>
+                          Angle Hampel Span: <input class="param" type="number" value="0"><br>
+                          Angle Hampel Signal: <input class="param" type="text" value="3"><br>
+                      </div>
+                      <div class="column" id="r">
+                          <p>right</p>
+                          Use Tracking Model: <input class="param" type="checkbox" ><br>
+                          Tracking Model LL Threshold: <input class="param" type="number" value="-100"><br>
+                          Tracking Model Mask Threshold: <input class="param" type="number" value="-16"><br>
+                          Segment Tracking Model: <input class="param" type="checkbox" checked><br>
+                          Tracking Model Init: <input class="param" type="text" value="raw"><br>
+                          Cable Filter Iterations: <input class="param" type="number" value="0"><br>
+                          Cable Filter Size: <input class="param2" type="number" value="5"><input class="param2" type="number" value="5"><br>
+                          Cable Filter Shape: <input class="param" type="text" value="rectangle"><br>
+                          Tail Filter Iterations: <input class="param" type="number" value="1"><br>
+                          Tail Filter Size: <input class="param2" type="number" value="9"><input class="param2" type="number" value="9"><br>
+                          Tail Filter Shape: <input class="param" type="text" value="ellipse"><br>
+                          Spatial Filter Size: <input class="param" type="number" value="3"><br>
+                          Temporal Filter Size: <input class="param" type="text" value="0"><br>
+                          Write Movie: <input class="param" type="checkbox"><br>
+                          FPS: <input class="param" type="number" value="30"><br>
+                          Use Plane BG: <input class="param" type="checkbox" ><br>
+                          Frame Trim: <input class="param2" type="number" value="0"><input class="param2" type="number" value="0"><br>
+                          Compress: <input class="param" type="checkbox"><br>
+                          Number of Compress Threads: <input class="param" type="number" value="3"><br>
+                      </div>
+                      <button onclick="uploadExParams()">Confirm Parameters</button>
+                    </form>
+
+                </div>
             </section>
 
             <section class="choice-content" id="extract-tab">
                 <h1>Extract Raw Data</h1>
-                <div class="check-list">
-                    <h2>Check List</h2>
-                    <ul>
-                        <li>
-                            Depth files found?
-                            <input type="checkbox" class="c-box" id="dir-check2" disabled>
-                        </li>
-                        <li>
-                            Configuration File
-                            <input type="checkbox" class="c-box" id="gen-exists2" disabled>
-                        </li>
-                        <li>
-                            Flip-file-downloaded?
-                            <input type="checkbox" class="c-box" id="flip-exists2" disabled>
-                        </li>
-                    </ul>
-                </div>
                 <div class="extraction-canvas">
                     <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
                     <br><br>
@@ -73,10 +109,13 @@
                         </video>
                     </div>
                 </div>
+                <!--
                 <button id="download-flip" onclick="showButtons()">Download Flip-File</button>
                 <button class="flip-file" id="0" onclick="downloadFlip(event)" hidden>Large Mice with Fibers</button>
                 <button class="flip-file" id="1" onclick="downloadFlip(event)" hidden>Adule Male c57s</button>
                 <button class="flip-file" id="2" onclick="downloadFlip(event)" hidden>Mice with Inscopix Cables</button>
+
+                -->
             </section>
 
             <section class="choice-content" id="copy-slice-tab">

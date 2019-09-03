@@ -27,6 +27,107 @@ $(document).ready(function () {
     });
 });
 
+window.onload = function(){
+
+    let dropArea = document.getElementById('drop-area');
+    let dropArea2 = document.getElementById('drop-area2');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false)
+      dropArea2.addEventListener(eventName, preventDefaults, false)
+    });
+
+    function preventDefaults (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, highlight, false)
+      dropArea2.addEventListener(eventName, highlight, false)
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, unhighlight, false)
+      dropArea2.addEventListener(eventName, unhighlight, false)
+    });
+
+    function highlight(e) {
+      dropArea.classList.add('highlight');
+      dropArea2.classList.add('highlight');
+    }
+
+    function unhighlight(e) {
+      dropArea.classList.remove('highlight');
+      dropArea2.classList.remove('highlight');
+    }
+
+    dropArea.addEventListener('drop', handleDrop, false)
+    dropArea2.addEventListener('drop', handleDrop, false)
+
+    function handleDrop(e) {
+      let dt = e.dataTransfer
+      let files = dt.files
+
+      selDiv = document.getElementById("selectedFiles");
+      selDiv.innerHTML = "";
+
+      for(var i=0; i<files.length; i++) {
+        var f = files[i];
+        selDiv.innerHTML += f.name + "<br/>";
+      }
+
+      handleFiles(files)
+    }
+
+    function handleFiles(files) {
+      ([...files]).forEach(uploadFile); //converting the FileList to an array to be handled
+    }
+
+    function uploadFile(file) {
+        let url = '/uploadFile';
+        let formData = new FormData();
+
+        formData.append("file", file);
+        fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then((resp) => {
+            // Done: inform user that upload is finished.
+            //Change to sessions
+            //selDiv.innerHTML += "Total number of files identified: " + files.length + " <br/>"
+            console.log(file.name+' uploaded');
+
+        })
+        .catch(() => {
+            // Error: inform user of upload error reponse.
+        });
+    }
+}
+
+
+function loadDiv(id) {
+    var x = document.getElementById(id);
+
+    var otherDivs = document.getElementsByClassName("acc-div");
+    var otherDiv;
+    for(var i = 0; i < otherDivs.length; i++) {
+        if (otherDivs[i].id != id) {
+            otherDiv = document.getElementById(otherDivs[i].id);
+            break;
+        }
+    }
+    if (x.className.indexOf("hidden") >= 0) {
+        x.className = x.className.replace(" hidden", "");
+        if (otherDiv.className.indexOf("hidden") == -1) {
+            otherDiv.className += " hidden";
+        }
+    } else {
+        x.className += " hidden";
+    }
+}
+
 function displayParamModal(ev) {
     // Get the modal
     var modal = document.getElementById("paramModal");
