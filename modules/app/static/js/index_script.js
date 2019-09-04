@@ -62,8 +62,8 @@ window.onload = function(){
       dropArea2.classList.remove('highlight');
     }
 
-    dropArea.addEventListener('drop', handleDrop, false)
-    dropArea2.addEventListener('drop', handleDrop, false)
+    dropArea.addEventListener('drop', handleDrop, true)
+    dropArea2.addEventListener('drop', handleDrop, true)
 
     function handleDrop(e) {
       let dt = e.dataTransfer
@@ -77,6 +77,7 @@ window.onload = function(){
         selDiv.innerHTML += f.name + "<br/>";
       }
 
+
       handleFiles(files)
     }
 
@@ -88,7 +89,10 @@ window.onload = function(){
         let url = '/uploadFile';
         let formData = new FormData();
 
-        formData.append("file", file);
+
+        // Check if file is directory
+        //console.log(window.FileSystemDirectoryEntry(file));
+        formData.append("files", file);
         fetch(url, {
             method: 'POST',
             body: formData
@@ -101,11 +105,36 @@ window.onload = function(){
 
         })
         .catch(() => {
-            // Error: inform user of upload error reponse.
+        console.log('error :(');
+            // Error: inform user of upload error response.
         });
     }
 }
 
+function handleFiles(files) {
+      ([...files]).forEach(uploadFile); //converting the FileList to an array to be handled
+}
+
+function uploadFile(file) {
+    let url = '/uploadFile';
+    let formData = new FormData();
+
+    formData.append("file", file);
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then((resp) => {
+        // Done: inform user that upload is finished.
+        //Change to sessions
+        //selDiv.innerHTML += "Total number of files identified: " + files.length + " <br/>"
+        console.log(file.name+' uploaded');
+
+    })
+    .catch(() => {
+        // Error: inform user of upload error reponse.
+    });
+}
 
 function loadDiv(id) {
     var x = document.getElementById(id);
@@ -127,6 +156,7 @@ function loadDiv(id) {
         x.className += " hidden";
     }
 }
+
 
 function displayParamModal(ev) {
     // Get the modal

@@ -17,8 +17,60 @@
 }
 
 .row {
-    float: left;
   border: 1px ghostwhite;
+  width: 75%;
+}
+
+.col_row {
+    justify: center;
+}
+
+.columnL {
+  font-size: 15px;
+  text-align: center;
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 70%;
+
+}
+
+.paramC {
+    height: 25px;
+    width: 25px;
+}
+
+
+.columnR {
+  float: left;
+  width: 50%;
+  background-color: #48B0000;
+  justify-content: center;
+  height: 70%;
+}
+
+.rColumnR {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 70%;
+}
+
+.rColumnL {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 70%;
+}
+
+#confirmParams {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+    float: left;
 }
 
 .param {
@@ -29,14 +81,14 @@
 
 .param2 {
     color: black;
-    width: 70px;
+    width: 75px;
     padding: 10px 5px;
     text-align: center;
 }
 
 .param3 {
     color: black;
-    width: 40px;
+    width: 55px;
     padding: 10px 5px;
     text-align: center;
 }

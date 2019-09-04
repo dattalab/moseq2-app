@@ -12,9 +12,12 @@ def save_uploaded_file():
         os.system(cd_cmd)
 
         f = request.files['file']
-        print(f.filename)
-        f.save(os.path.join(cwd1, secure_filename(f.filename)))
+        if not os.path.exists(os.path.join(cwd1, os.path.split(f.filename)[0])):
+            os.mkdir(os.path.join(cwd1, os.path.split(f.filename)[0]))
+
+
+        f.save(os.path.join(cwd1, f.filename))
         if os.path.exists(cwd1+f.filename):
-            return jsonify({'ok': True, 'message': 'Files have been successfully uploaded.'}), 200
+            return jsonify({'ok': True, 'message': f'{f.filename} have been successfully uploaded.'}), 200
         else:
             return jsonify({'ok': False, 'message': 'Files failed to upload.'}), 400
