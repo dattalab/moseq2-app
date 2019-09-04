@@ -144,7 +144,7 @@ a {text-decoration: none; }
   border-bottom-style: solid;
 }
 
-.paramC {
+.paramC{
     height: 40px;
     width: 40px;
 }
@@ -153,7 +153,7 @@ a {text-decoration: none; }
   float: left;
   width: 50%;
   background-color: #4CAF50;
-  justify-content: center;
+  align-content: center;
   height: 45px;
   border-left-style: solid;
   border-right-style: solid;
@@ -258,14 +258,14 @@ a {text-decoration: none; }
     background-color: #4CAF50;
 }
 
-#extraction-title {
-    text-align: center;
-}
-
 #roi-op {
     background-color: #080808;
     color: white;
     font-size: 25px;
+}
+
+#extraction-title {
+    float: left;
 }
 
 #extraction {
