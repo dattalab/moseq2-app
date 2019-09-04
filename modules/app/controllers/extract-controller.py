@@ -20,23 +20,22 @@ def check_local_data_dir():
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
 @app.route('/generate-config', methods=['GET', 'POST', 'PATCH'])
-def extract_generate_conf(path=None):
-    if request.method == 'GET':
-        # check if it exists
-        cwd = os.getcwd()
-        cwd1 = cwd + data_path
+def extract_generate_conf():
+    cwd = os.getcwd()
+    cwd1 = cwd + data_path
+    if request.method == 'POST':
+        # start cli command with default params unless get dict is not empty
+        cd_cmd = 'cd ' + cwd
+        os.system(cd_cmd)
+        data = request.form.to_dict()
+        print(data)
 
-        if request.method == 'GET':
-            # start cli command with default params unless get dict is not empty
-            cd_cmd = 'cd ' + cwd
-            os.system(cd_cmd)
+        query = request.args
 
-            query = request.args
-
-            if query == {}:
-                os.system(f'moseq2-extract generate-config -o {cwd1}/config.yaml')
-                if os.path.exists(cwd1+'config.yaml'):
-                    return jsonify({'ok': True, 'message': cwd1+'/config.yaml'}), 200
+        if query == {}:
+            os.system(f'moseq2-extract generate-config -o {cwd1}/config.yaml')
+            if os.path.exists(cwd1+'config.yaml'):
+                return jsonify({'ok': True, 'message': cwd1+'/config.yaml'}), 200
 
         # if yes, send json warning, if accepted will receive a future PATCH request
 

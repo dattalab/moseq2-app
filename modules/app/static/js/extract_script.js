@@ -13,6 +13,9 @@ function getLocalDir() {
             benchFiles = fileList;
             for(var i = 0; i < fileList.length; i++) {
                 $('#filelist').append('<option>'+fileList[i]+'</option>');
+                if(fileList[i] == 'session1/depth.dat') {
+                    $('#extractedlist').append('<option>'+fileList[i]+'</option>');
+                }
             }
         } else {
             alert(resp.message);
@@ -20,15 +23,36 @@ function getLocalDir() {
     });
 }
 
-function genLocalConfig() {
-    $.get('/generate-config', {}, function(resp) {
-        if (resp.ok) {
-            alert(resp.message);
-            document.getElementById('gen-exists').checked = true;
-            document.getElementById('gen-exists2').checked = true;
-        } else {
-            alert(resp.message);
+function uploadExParams() {
+    var formData = new FormData();
+    let url = '/generate-config'
+    $('#extract-params input, #extract-params select').each(
+        function(index){
+            var input = $(this);
+            if (formData.get(input.attr('name'))) {
+                var prev = formData.get(input.attr('name'));
+                let newVal = [prev, input.val()];
+                formData.set(input.attr('name'), newVal);
+            } else{
+                formData.append(input.attr('name'), input.val());
+            }
         }
+    );
+
+    fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then((resp) => {
+            // Done: inform user that upload is finished.
+            //Change to sessions
+            //selDiv.innerHTML += "Total number of files identified: " + files.length + " <br/>"
+            console.log('config successfully generated');
+
+        })
+        .catch(() => {
+            console.log('error :(');
+            // Error: inform user of upload error response.
     });
 }
 
@@ -54,10 +78,27 @@ function findROI() {
     });
 }
 
-function showButtons() {
-    var flipFiles = document.getElementsByClassName('flip-file');
-    for(var i = 0; i < flipFiles.length; i++) {
-        flipFiles[i].hidden = false;
+
+function displayFlipModal(event) {
+    // Get the modal
+    var modal = document.getElementById("flipModal");
+
+    // Get the <span> element that closes the modal
+    var span = document.getElementsByClassName("close")[2];
+
+    // When the user clicks the button, open the modal
+    modal.style.display = "block";
+
+    // When the user clicks on <span> (x), close the modal
+    span.onclick = function() {
+      modal.style.display = "none";
+    }
+
+    // When the user clicks anywhere outside of the modal, close it
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
     }
 }
 
@@ -107,14 +148,14 @@ function openNav() {
       openNavBool = !openNavBool;
   } else {
       document.getElementById("mySidebar").style.width = "0";
-      document.getElementById("extract-tab").style.marginRight= "0";
+      document.getElementById("extract-tab").style.marginRight = "0";
       openNavBool = !openNavBool;
   }
 }
 
 function closeNav() {
   document.getElementById("mySidebar").style.width = "0";
-  document.getElementById("extract-tab").style.marginRight= "0";
+  document.getElementById("extract-tab").style.marginRight = "0";
   openNavBool = !openNavBool;
 }
 

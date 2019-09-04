@@ -15,7 +15,14 @@
   width: 100%; /* Set a width if needed */
   display: block; /* Make the buttons appear below each other */
 }
+.tabs {
 
+}
+
+#extract{
+  margin-top: -70px;
+  padding-top: 70px;
+}
 
 .sidebar {
   height: 100%;
@@ -41,7 +48,7 @@
 }
 
 .sidebar a select{
-  margin-top: 100px;
+  margin-top: 20px;
   padding: 8px 8px 32px 8px;
 }
 
@@ -82,22 +89,48 @@
     padding: 16px;
 }
 
+.modal-headerText {
+    color: black;
+}
+
+.close {
+    height: 25px;
+    width: 25px;
+}
+
+a {text-decoration: none; }
+
 /* On smaller screens, where height is less than 450px, change the style of the sidenav (less padding and a smaller font size) */
 @media screen and (max-height: 450px) {
   .sidebar {padding-top: 15px;}
   .sidebar a {font-size: 18px;}
 }
 
-.row {
-  border: 1px ghostwhite;
-  width: 75%;
-
+#param-preview {
+  position: absolute;
+  z-index: 9;
+  background-color: #f1f1f1;
+  border: 1px solid #d3d3d3;
+  text-align: center;
 }
 
-.col_row {
+#param-previewheader {
+  padding: 10px;
+  cursor: move;
+  z-index: 10;
+  background-color: #2196F3;
+  color: #fff;
+}
+
+.row {
+  border: 5px ghostwhite;
+  width: 75%;
+}
+
+.column {
     justify: center;
     margin-bottom: 50px;
-    margin-top: 50px;
+    margin-top: 20px;
 }
 
 .columnL {
@@ -107,22 +140,24 @@
   width: 50%;
   background-color: #4CAF50;
   justify-content: center;
-  height: 70%;
-
+  height: 45px;
+  border-bottom-style: solid;
 }
 
 .paramC {
-    height: 25px;
-    width: 25px;
+    height: 40px;
+    width: 40px;
 }
-
 
 .columnR {
   float: left;
   width: 50%;
   background-color: #4CAF50;
   justify-content: center;
-  height: 70%;
+  height: 45px;
+  border-left-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
 }
 
 .rColumnR {
@@ -130,7 +165,9 @@
   width: 50%;
   background-color: #8B0000;
   justify-content: center;
-  height: 70%;
+  height: 45px;
+  border-left-style: solid;
+  border-bottom-style: solid;
 }
 
 .rColumnL {
@@ -138,14 +175,14 @@
   width: 50%;
   background-color: #8B0000;
   justify-content: center;
-  height: 70%;
+  height: 45px;
+  border-bottom-style: solid;
 }
 
 #confirmParams {
     background-color: #080808;
     color: white;
     font-size: 25px;
-    float: left;
 }
 
 .param {
@@ -232,13 +269,14 @@
 }
 
 #extraction {
-    float:none;
+    float:left;
 }
 
 #extract-op {
     background-color: #080808;
     font-size: 25px;
     top: 75px;
+    float:right;
 }
 
 #convert-op {
@@ -252,12 +290,11 @@
     font-size: 25px;
 }
 
-
 /* Style the tab content */
-.choice-content {
-  float: left;
+#extract-tab .choice-content {
+  float: initial;
   text-align: center;
-  padding: 0px 12px;
+  padding: 0px 0px 0px 275px;
 
   width: 100%;
   border-left: none;

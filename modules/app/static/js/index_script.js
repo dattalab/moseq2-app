@@ -105,7 +105,7 @@ window.onload = function(){
 
         })
         .catch(() => {
-        console.log('error :(');
+            console.log('error :(');
             // Error: inform user of upload error response.
         });
     }
