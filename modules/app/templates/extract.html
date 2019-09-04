@@ -33,7 +33,8 @@
             <br>
             <button class="choice" onclick="openTab(event, 'converter-tab')" id="converter-button">Convert .dat to .avi</button>
         </div>
-        <div>
+
+        <div class="tabs">
             <section class="choice-content" id="genconfig-tab">
                 <h1>Extraction Configuration Options</h1>
                 <br>
@@ -99,7 +100,7 @@
 
                           <div class="col-row">
                               <div class="columnL">
-                          BG ROI Gradient Depth Range:
+                          BG ROI Depth Range:
                               </div>
                               <div class="columnR">
                             <input class="param2" type="number" value="650"><input class="param2" type="number" value="750">
@@ -408,6 +409,12 @@
 
             <section class="choice-content" id="extract-tab">
                 <h1>Extract Raw Data</h1>
+                <button class="openbtn" onclick="openNav()">☰ Toggle File Select List</button>
+                <div id="mySidebar" class="sidebar">
+                    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
+                    <a><select id="filelist" size="10" multiple></select></a>
+                </div>
+
                 <div class="extraction-canvas">
                     <div>
                         <h2 id="extraction-title">Latest Extraction</h2>
@@ -442,5 +449,6 @@
                 <button id="convert-op" onclick="convertRaw()">Convert Raw Video</button>
             </section>
         </div>
+
     </body>
 </html>

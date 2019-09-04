@@ -2,16 +2,18 @@ $(document).onchange(function() {
     $("#extract").load("../templates/extract.html");
 });
 
-var datapath = '/';
+var benchFiles = []
+var openNavBool = false;
 
-function checkLocalDir() {
-    $.get('/check-local-dir', {}, function(resp) {
+function getLocalDir() {
+    $.get('/get-local-dir', {}, function(resp) {
         if (resp.ok) {
             // change button color to green and display extract button
-            datapath = resp.message;
-            alert(resp.message);
-            document.getElementById('dir-check').checked = true;
-            document.getElementById('dir-check2').checked = true;
+            var fileList = resp.files;
+            benchFiles = fileList;
+            for(var i = 0; i < fileList.length; i++) {
+                $('#filelist').append('<option>'+fileList[i]+'</option>');
+            }
         } else {
             alert(resp.message);
         }
@@ -98,6 +100,24 @@ function toggleBatchModeExtract(evt) {
     }
 }
 
+function openNav() {
+  if (!openNavBool) {
+      document.getElementById("mySidebar").style.width = "300px";
+      document.getElementById("extract-tab").style.marginRight = "300px";
+      openNavBool = !openNavBool;
+  } else {
+      document.getElementById("mySidebar").style.width = "0";
+      document.getElementById("extract-tab").style.marginRight= "0";
+      openNavBool = !openNavBool;
+  }
+}
+
+function closeNav() {
+  document.getElementById("mySidebar").style.width = "0";
+  document.getElementById("extract-tab").style.marginRight= "0";
+  openNavBool = !openNavBool;
+}
+
 function openTab(evt, tabName) {
 
     var i, tabcontent, tablinks;
@@ -113,6 +133,6 @@ function openTab(evt, tabName) {
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
     if (evt.currentTarget.id == 'init-step-button') {
-        //checkLocalDir();
+        getLocalDir();
     }
 }

@@ -8,6 +8,7 @@ from flask_pymongo import PyMongo
 
 data_test = '/data/local/'
 data_path = '/data/server/'
+data_config = '/data/config/'
 class JSONEnconder(json.JSONEncoder):
     ''' extend json-encoder class '''
 

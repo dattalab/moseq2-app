@@ -16,13 +16,88 @@
   display: block; /* Make the buttons appear below each other */
 }
 
+
+.sidebar {
+  height: 100%;
+  width: 0;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  background-color: #111;
+  overflow-x: hidden;
+  transition: 0.5s;
+  padding-top: 60px;
+}
+
+.sidebar a {
+  top: 150px;
+  padding: 8px 8px 32px 8px;
+  text-decoration: none;
+  font-size: 25px;
+  color: #818181;
+  display: block;
+  transition: 0.3s;
+}
+
+.sidebar a select{
+  margin-top: 100px;
+  padding: 8px 8px 32px 8px;
+}
+
+.sidebar a:hover {
+  color: #f1f1f1;
+}
+
+.sidebar a:hover select{
+  color: coral;
+  transition: 0.3s;
+}
+
+.sidebar .closebtn {
+  position: absolute;
+  top: 50px;
+  left: 25px;
+  font-size: 36px;
+  margin-right: 50px;
+}
+
+.openbtn {
+  float: right;
+
+  font-size: 20px;
+  cursor: pointer;
+  background-color: #111;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+}
+
+.openbtn:hover {
+  background-color: #444;
+}
+
+#extract-tab {
+    transition: margin-right 0.5s;
+    padding: 16px;
+}
+
+/* On smaller screens, where height is less than 450px, change the style of the sidenav (less padding and a smaller font size) */
+@media screen and (max-height: 450px) {
+  .sidebar {padding-top: 15px;}
+  .sidebar a {font-size: 18px;}
+}
+
 .row {
   border: 1px ghostwhite;
   width: 75%;
+
 }
 
 .col_row {
     justify: center;
+    margin-bottom: 50px;
+    margin-top: 50px;
 }
 
 .columnL {
@@ -45,7 +120,7 @@
 .columnR {
   float: left;
   width: 50%;
-  background-color: #48B0000;
+  background-color: #4CAF50;
   justify-content: center;
   height: 70%;
 }
@@ -137,39 +212,13 @@
     background-color: orange;
 }
 
+.filelist {
+    background-color: white;
+    color: black;
+}
 
 .tab#command-optionsE button.active {
     background-color: #4CAF50;
-}
-
-#dircheck-button{
-    background-color: #080808;
-    color: white;
-    font-size: 25px;
-}
-
-#genconfig-button{
-    background-color: #080808;
-    color: white;
-    font-size: 25px;
-}
-
-.check-list{
-    border: 1px solid black;
-    float: left;
-    text-align: center;
-    display: block;
-    width: auto;
-}
-
-.flip-file {
-    background-color: #080808;
-    font-size: 25px;
-}
-
-.c-box {
-    height: 25px;
-    width: 25px;
 }
 
 #extraction-title {
@@ -196,12 +245,6 @@
     background-color: #080808;
     color: white;
     font-size: 25px;
-}
-
-#download-flip {
-    background-color: #080808;
-    font-size: 25px;
-    float: left;
 }
 
 #copy-op {

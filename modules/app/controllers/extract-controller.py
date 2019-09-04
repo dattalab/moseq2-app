@@ -1,10 +1,11 @@
 import os
+import glob
 from flask import request, jsonify
 from app import app, data_path#, mongo
 import logger
 import subprocess
 
-@app.route('/check-local-dir', methods=['GET'])
+@app.route('/get-local-dir', methods=['GET'])
 def check_local_data_dir():
     if request.method == 'GET':
         cwd = os.getcwd()
@@ -13,8 +14,8 @@ def check_local_data_dir():
         if len(os.listdir(cwd)) == 0:
             return jsonify({'ok': False, 'message': 'No data files found!'}), 400
         else:
-            if ('depth.dat' in os.listdir(cwd)) and ('depth_ts.txt' in os.listdir(cwd)) and ('metadata.json' in os.listdir(cwd)):
-                return jsonify({'ok': True, 'message': cwd}), 200
+            files = [f.replace(cwd, '') for f in glob.glob(cwd + "**/*.*", recursive=True)]
+            return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files}), 200
     else:
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
