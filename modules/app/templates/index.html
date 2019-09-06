@@ -16,8 +16,7 @@
     </head>
 
     <body>
-
-        <div class="topnav">
+        <nav class="topnav">
             <ul id="horizontal-list">
                 <li><a class="active" href="#home">Home</a></li>
                 <li><a href="#extract">Extract</a></li>
@@ -27,35 +26,110 @@
                 <li><a href="#contact">Contact</a></li>
                 <li><a href="#contribute">Contribute</a></li>
             </ul>
+        </nav>
+        <div class="helper-buttons">
+            <button class="help-button" id="help-op" onclick="displayHelpModal(event)">Help</button>
+            <button class="param-select" id="param-op" onclick="displayParamModal(event)">Select Parameters</button>
         </div>
+        <!-- The Helper Modal -->
+        <div id="helperModal" class="modal">
+          <!-- Modal content -->
+          <div class="modal-content">
+              <div class="help-modal-header">
+                <span class="close">&times;</span>
+                <h2 class="help-func-label">Help Modal Header</h2>
+              </div>
+              <div class="model-body">
+                  <p>Some text in the Modal Body</p>
+                  <p>Some other text...</p>
+              </div>
+              <div class="modal-footer">
+                <h3>Modal Footer</h3>
+              </div>
+          </div>
+        </div>
+        <!-- The Parameter Selection Modal -->
+        <div id="paramModal" class="modal">
+          <!-- Modal content -->
+          <div class="modal-content">
+              <div class="param-modal-header">
+                <span class="close">&times;</span>
+                <h2 id="param-name-label">Parameter Selection Header</h2>
+              </div>
+              <div class="model-body">
+                  <p>Some text in the Modal Body</p>
+                  <p>Some other text...</p>
+              </div>
+              <div class="modal-footer">
+                <h3>Modal Footer</h3>
+              </div>
+          </div>
+        </div>
+
         <div id="main">
-            <div id="home">
+
+            <section id="home">
+                <br>
                 <h1>Welcome to the MoSeq2 Application Home Page</h1>
-            </div>
+                <div class="container">
+                  <div class="gallery-wrap">
+                    <div class="item item-1"><div class="item_head">Extract</div></div>
+                    <div class="item item-2"><div class="item_head">PCA</div></div>
+                    <div class="item item-3"><div class="item_head">Model</div></div>
+                    <div class="item item-4"><div class="item_head">Visualize</div></div>
+                    <div class="item item-5"><div class="item_head">Statistical Analysis</div></div>
+                  </div>
+                </div>
+                <div id="ux-begin">
+                    <h2>Get Started</h2>
+                    <button class="starter-button" onclick="loadDiv('start-exp')">Start New Experiment</button>
+                    <button class="starter-button" onclick="loadDiv('load-exp')">Continue Previous Experiment</button>
+                </div>
 
-            <div id="extract">
+                <div id="start-exp" class="acc-div hidden">
+                    <h2>MoSeq2-Application Setup</h2>
+                    <h3>
+                        Upload your collected session recording depth files in separated folders per acquisition session.
+                        You may also upload each session file individually.
+                    </h3>
+                    <div id="drop-area" webkitdirectory mozdirectory>
+                      <form class="my-form" enctype="multipart/form-data">
+                        <h4>Upload multiple files with the file dialog or by dragging and dropping images onto the dashed region</h4>
+                        <input type="file" id="fileElem" webkitdirectory mozdirectory onchange="handleFiles(this.files)" multiple>
+                        <label class="button" for="fileElem">Select some files</label>
+                        <div id="selectedFiles"></div>
+                      </form>
+                    </div>
+                </div>
 
-            </div>
+                <div id="load-exp" class="acc-div hidden">
+                    <h2>Upload Previous Experiment Session File</h2>
+                    <div id="drop-area2">
+                      <form class="my-form">
+                        <p>Upload your previous saved session file</p>
+                        <input type="file" id="fileSession" onchange="handleFiles(this.files)">
+                        <label class="button" for="fileSession">Select a file Session</label>
+                        <div id="selectedSession"></div>
+                      </form>
+                    </div>
+                </div>
 
-            <div id="pca">
+                <button class="button load-session" id="fixedbutton1">Next Step</button>
+                <button class="button save-session" id="fixedbutton2">Previous Step</button>
+            </section>
 
-            </div>
+            <section id="extract"></section>
+            <section id="pca"></section>
+            <section id="model"></section>
+            <section id="viz"></section>
 
-            <div id="model">
+            <section id="contact">
+                <h1>Contact Us</h1>
+            </section>
 
-            </div>
-
-            <div id="viz">
-
-            </div>
-
-            <div id="contact">
-
-            </div>
-
-            <div id="contribute">
-
-            </div>
+            <section id="contribute">
+                <h1>Contribute</h1>
+            </section>
         </div>
 
     </body>

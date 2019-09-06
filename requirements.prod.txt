@@ -1,0 +1,10 @@
+Flask==1.1.1
+requests==2.22.0
+pymongo==3.9.0
+Flask-PyMongo==2.3.0
+Flask-Assets==0.12
+git+https://{username}:{password}@github.com/dattalab/moseq2-extract.git@app
+git+https://{username}:{password}@github.com/dattalab/moseq2-pca.git@app
+git+https://{username}:{password}@github.com/dattalab/moseq2-model.git@app
+git+https://{username}:{password}@github.com/dattalab/moseq2-viz.git@app
+git+https://{username}:{password}@github.com/dattalab/moseq2-batch.git@app

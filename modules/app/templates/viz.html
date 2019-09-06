@@ -14,5 +14,56 @@
     </head>
     <body>
         <h1>Welcome to MoSeq2 Viz</h1>
+        <br>
+        <div class="btn-group" id="tab">
+            <button class="choice" onclick="openTab(event, 'init-step-tab')" id="init-step-button">Init Step</button>
+            <script>document.getElementById("init-step-button").click();</script>
+            <br><br>
+            <button class="choice" onclick="openTab(event, 'make-crowd-movies-tab')" id="make-crowd-movies-button">Make Crowd Movies</button>
+            <br><br>
+            <button class="choice" onclick="openTab(event, 'plot-scalars-tab')" id="plot-scalar-button">Plot Scalar Summary</button>
+            <br><br>
+            <button class="choice" onclick="openTab(event, 'plot-transitions-tab')" id="plot-trans-button">Plot Transition Graph(s)</button>
+            <br><br>
+            <button class="choice" onclick="openTab(event, 'plot-usages-tab')" id="plot-usages-button">Plot Syllable Usages</button>
+        </div>
+        <div id="right-tab">
+            <section class="choice-content" id="init-step-tab">
+                <h1>(Optional) Configure files/models used</h1>
+                <button onclick="generateIndex()" id="gen-index-op">Generate Index File</button>
+            </section>
+            <section class="choice-content" id="make-crowd-movies-tab">
+                <h1>Make Crowd Movies</h1>
+                <button onclick="crowdMovies()" id="crowd-op">Make Create Movies</button>
+                <br><br>
+                <div>
+                    <h2 id="extraction-title">Crowd Movie Example</h2>
+                    <video id="crowd-movie" width="500" height="500" loop controls>
+                        <source src="/static/img/crowd_movie.mp4" type="video/mp4">
+                    </video>
+                </div>
+                <button onclick="selectMovie()" id="movie-select-op">Select Movie</button>
+            </section>
+            <section class="choice-content" id="plot-scalars-tab">
+                <h1>Plot Scalar Summary Graphs</h1>
+                <button onclick="plotScalars()" id="scalar-op">Plot Scalars</button>
+                <br><br>
+                <img class="plots1" src="/static/img/scalar_summary.png">
+                <br><br>
+                <img class="plots1" src="/static/img/scalar_position.png">
+            </section>
+            <section class="choice-content" id="plot-transitions-tab">
+                <h1>Plot Syllable Transition Graphs</h1>
+                <button onclick="plotTransitionGraphs()" id="trans-op">Plot Transition Graphs</button>
+                <br><br>
+                <img class="plots1" src="/static/img/transition.png">
+            </section>
+            <section class="choice-content" id="plot-usages-tab">
+                <h1>Make Crowd Movies</h1>
+                <button onclick="plotUsages()" id="usage-op">Plot Syllable Usages</button>
+                <br><br>
+                <img class="plots1" src="/static/img/usages.png">
+            </section>
+        </div>
     </body>
 </html>

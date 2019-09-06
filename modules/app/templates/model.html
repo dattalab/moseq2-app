@@ -14,5 +14,38 @@
     </head>
     <body>
         <h1>Welcome to MoSeq2 Model</h1>
+        <br>
+        <div class="btn-group" id="command-options">
+            <div class="batch-selector">
+                <button class="choice" id="batch-modeM" onclick="toggleBatchModeModel(event)">Batch Mode?</button>
+            </div>
+            <br>
+            <button class="choice" onclick="openTab(event, 'model-init-tab')" id="init-step-button">Init Step</button>
+            <script>document.getElementById("init-step-button").click();</script>
+            <br>
+            <button class="choice" onclick="openTab(event, 'train-model-tab')" id="learn-model">Train ARHMM</button>
+            <br>
+            <button class="choice" onclick="openTab(event, 'count-frames-tab')" id="count-frames">Count Frames</button>
+        </div>
+        <div class="right-tab">
+            <section class="choice-content" id="model-init-tab">
+                <h1>Directory Selection Check</h1>
+                <p>Ensure your files are in the correct directory.</p>
+                <input type="checkbox" class="c-box" id="dir-check" disabled>
+                <br>
+                <h2>Alternatively, load a previously trained model.</h2>
+                <button id="load-op">Load Trained ARHMM</button>
+            </section>
+            <section class="choice-content" id="train-model-tab">
+                <h1>Train ARHMM</h1>
+                <h2>Select Model Parameters</h2>
+                <button id="train-op" onclick="learnModel()">Train ARHMM</button>
+            </section>
+            <section class="choice-content" id="count-frames-tab">
+                <h1>Count Frames in Video</h1>
+                <h2>Select Video</h2>
+                <button id="count-op" onclick="countFrames()">Count Frames</button>
+            </section>
+        </div>
     </body>
 </html>

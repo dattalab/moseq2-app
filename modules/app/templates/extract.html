@@ -7,7 +7,8 @@
         <link rel="icon" href="data:;base64,iVBORw0KGgo="> <!-- suppress GET error -->
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
         <link rel="stylesheet" href="/static/css/extract_style.css">
-        <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
         <script src="/static/js/extract_script.js"></script>
         <meta name="description" content="MoSeq2 Data Extraction Page">
         <meta name="author" content="Ayman Zeine">
@@ -15,8 +16,520 @@
     </head>
 
     <body>
+        <div class="tab" id="command-optionsE">
+            <div class="batch-selector">
+                <button class="choice" id="batch-modeE" onclick="toggleBatchModeExtract(event)">Batch Mode?</button>
+            </div>
+            <br>
+            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-step-button">Configuration</button>
+            <br>
+            <button class="choice" onclick="openTab(event, 'extract-tab')" id="extract-button">Extract Raw Data</button>
+            <br>
+            <button class="choice" onclick="openTab(event, 'find-roi-tab')" id="find-roi-button">Find ROI</button>
+            <br>
+            <button class="choice" onclick="openTab(event, 'copy-slice-tab')" id="copy-slice-button">Copy Slice</button>
+            <br>
+            <button class="choice" onclick="openTab(event, 'converter-tab')" id="converter-button">Convert .dat to .avi</button>
+        </div>
 
-        <h1>Welcome to MoSeq2 Extract</h1>
+        <div class="tabs">
+            <section class="choice-content" id="genconfig-tab">
+                <h1>Extraction Configuration Options</h1>
+                <br>
+                <h3>
+                    The parameters listed below allow you to configure the resulting data you will be extracting from your raw files.
+                </h3>
+                <div class="row">
+                    <form id="extract-params">
+                      <div class="column" id="l">
+                          <!-- Insert 'placeholder' attributes to further intuitively guide the user to understanding the parameter inputs -->
+                          <div class="col-row">
+                              <div class="columnL">
+                                  Crop Size:
+                              </div>
+                              <div class="columnR">
+                                <input class="param2" name="crop_size" type="number" value="80"><input class="param2" name="crop_size" type="number" value="80">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                                  Chunk Size:
+                              </div>
+                              <div class="columnR">
+                                <input class="param" name="chunk_size" type="number" value="3000" >
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                                  Chunk Overlap:
+                              </div>
+                              <div class="columnR">
+                                <input class="param" name="chunk_overlap" type="number" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                                  BG ROI Dilate:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param2" name="bg_roi_dilate" type="number" value="10" ><input class="param2" name="bg_roi_dilate" type="number" value="10">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Shape:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="bg_roi_shape" type="text" value="ellipse">
+                              </div>
+                          </div>
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Index:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="bg_roi_index" type="number" value="0">
+                              </div>
+                          </div>
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Weights:
+                              </div>
+                              <div class="columnR">
+                                <input class="param3" name="bg_roi_weights" type="number" value="1"><input class="param3" name="bg_roi_weights" type="number" value="0.1"><input class="param3" name="bg_roi_weights" type="text" value="1">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Depth Range:
+                              </div>
+                              <div class="columnR">
+                            <input class="param2" name="bg_roi_depth_range" type="number" value="650"><input class="param2" name="bg_roi_depth_range" type="number" value="750">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Gradient Filter:
+                              </div>
+                              <div class="columnR">
+                                  <input class="paramC" name="bg_roi_gradient_filter" type="checkbox">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Gradient Threshold:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="bg_roi_gradient_threshold" type="number" value="3000">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Gradient Kernel:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="bg_roi_gradient_kernel" type="number" value="7">
+                              </div>
+                          </div>
+
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG ROI Fill Holes:
+                              </div>
+                              <div class="columnR">
+                                  <input class="paramC" name="bg_roi_fill_holes" type="checkbox">
+                              </div>
+                          </div>
+
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG Min Height:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="min_height" type="number" value="10">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          BG Max Height:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="max_height" type="number" value="100">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          Flip Classifier Smoothing:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="flip_classifier_smoothing" type="number" value="51">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          Model Smoothing Clips:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param2" name="model_smoothing_clips" type="number" value="0"><input class="param2" name="model_smoothing_clips" type="number" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          Centroid Hampel Span:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="centroid_hampel_span" type="number" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          Centroid Hampel Signal:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="centroid_hampel_sig" type="number" value="3">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                                  Angle Hampel Span:
+                              </div>
+                              <div class="columnR">
+                                <input class="param" name="angle_hampel_span" type="number" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="columnL">
+                          Angle Hampel Signal:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param"  name="angle_hampel_sig" type="text" value="3">
+                              </div>
+                          </div>
+
+                      </div>
+                      <div class="column" id="r">
+                          <div class="col-row">
+                              <div class="rColumnL">
+                          Use Tracking Model:
+                              </div>
+                              <div class="rColumnR">
+                                <input class="paramC" name="use_tracking_model" type="checkbox">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                          Flip Classifier:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="paramC" name="flip_classifier" id="flip-select" onclick="displayFlipModal(event)" type="checkbox">
+                              </div>
+                          </div>
+                          <!-- If checked, expose a dropdown menu to pre select the flip file -->
+                            <div id="flipModal" class="modal">
+                              <!-- Modal content -->
+                              <div class="modal-content">
+                                  <div class="flip-modal-header">
+                                    <span class="close">&times;</span>
+                                    <h2 class="modal-headerText">Select a Flip Classifier to use</h2>
+                                  </div>
+                                  <div class="modal-body">
+                                    <button class="flip-file" id="0" onclick="downloadFlip(event)">Large Mice with Fibers</button>
+                                    <button class="flip-file" id="1" onclick="downloadFlip(event)">Adule Male c57s</button>
+                                    <button class="flip-file" id="2" onclick="downloadFlip(event)">Mice with Inscopix Cables</button>
+                                  </div>
+                                  <div class="modal-footer">
+                                    Flip Classifiers
+                                  </div>
+                              </div>
+                            </div>
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tracking Model LL Threshold:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tracking_model_ll_threshold" type="number" value="-100">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tracking Model Mask Threshold:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tracking_model_mask_threshold" type="number" value="-16">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tracking Model LL Clip:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tracking_model_ll_clip" type="number" value="-100">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Segment Tracking Model:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="paramC" name="tracking_model_segment" type="checkbox" checked>
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tracking Model Init:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tracking_model_init" type="text" value="raw">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Cable Filter Iterations:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="cable_filter_iters" type="number" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Cable Filter Size:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param2" name="cable_filter_size" type="number" value="5"><input class="param2" name="cable_filter_size" type="number" value="5">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Cable Filter Shape:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="cable_filter_shape" type="text" value="rectangle">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tail Filter Iterations:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tail_filter_iters" type="number" value="1">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tail Filter Size:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param2" name="tail_filter_size" type="number" value="9"><input class="param2" name="tail_filter_size" type="number" value="9">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Tail Filter Shape:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tail_filter_shape" type="text" value="ellipse">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Spatial Filter Size:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="spatial_filter_size" type="number" value="3">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Temporal Filter Size:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="temporal_filter_size" type="text" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Write Movie:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="paramC" name="write_movie" type="checkbox">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  FPS:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="fps" type="number" value="30">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Use Plane BG:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="paramC" name="use_plane_bground" type="checkbox">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Frame Trim:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param2" name="frame_trim" type="number" value="0"><input class="param2" name="frame_trim" type="number" value="0">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  Compress:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="paramC" name="compress" type="checkbox">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
+                                  No. of Compress Threads:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="num_compress_threads" type="number" value="3">
+                              </div>
+                          </div>
+                        <button id="confirmParams" onclick="uploadExParams()">Confirm Parameters</button>
+                      </div>
+                    </form>
+                </div>
+                <!-- Draggable DIV -->
+                <!--  Include a header DIV with the same name as the draggable DIV, followed by "header"
+                <div id="param-preview" class="ui-widget-content">
+                  <div id="param-previewheader">Click here to move</div>
+                  <p>Move</p>
+                  <p>this</p>
+                  <p>DIV</p>
+                </div>
+                 -->
+            </section>
+
+            <section class="choice-content" id="extract-tab">
+                <h2 id="extract-prompt">Select the depth files you would like to extract in the right-hand menu.</h2>
+                <button class="openbtn" onclick="openNav()">☰ Toggle File Select List</button>
+                <div id="mySidebar" class="sidebar">
+                    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a><br><br>
+                    <h2>Found Files</h2>
+                    <a><select id="filelist" size="6" multiple required></select></a>
+                    <h2>Extracted Files</h2>
+                    <a><select id="extractedlist" size="6" multiple></select></a><br><br><br>
+                </div>
+                <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
+                <div id="selectedfiles">
+                    <h2>Files to Extract:</h2>
+                    <ul id="selected-list"></ul>
+                </div><br>
+                <!--
+                <div class="extraction-canvas">
+                    <div>
+                        <h2 id="extraction-title">Latest Extraction</h2><br><br><br><br>
+                        <video id="extraction" width="500" height="500" controls>
+                           <source src="/static/img/results_00.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <br><br>
+                </div>
+                -->
+                <h2 id='gal-head' style="float:left;">Extraction Gallery</h2><br><br><br><br><br>
+                <div class="gallery" id="gal" onclick="loadImageModal(event)">
+                    <!--
+                    <figure class="gallery__item gallery__item--1">
+                        <img src="/static/img/changpoints_dist.png" id="img1" class="gallery__img" alt="Image 1">
+                    </figure>
+                    <figure class="gallery__item gallery__item--2">
+                        <img src="/static/img/crowd_movie.gif"  id="img2" class="gallery__img" alt="Image 2">
+                    </figure>
+                    <figure class="gallery__item gallery__item--3">
+                        <img src="/static/img/moseq2_pipeline.png"  id="img3" class="gallery__img" alt="Image 3">
+                    </figure>
+                    <figure class="gallery__item gallery__item--4">
+                        <img src="/static/img/pca_scree.png" id="img4" class="gallery__img" alt="Image 4">
+                    </figure>
+                    <figure class="gallery__item gallery__item--5">
+                        <img src="/static/img/usages.png" id="img5" class="gallery__img" alt="Image 5">
+                    </figure>
+                    <figure class="gallery__item gallery__item--6">
+                        <img src="/static/img/pca_components.png" id="img6" class="gallery__img" alt="Image 6">
+                    </figure>
+                    -->
+                </div>
+
+                <!-- The Modal -->
+                <div id="imageModal" class="modal">
+
+                  <!-- The Close Button -->
+                  <span class="close">&times;</span>
+
+                  <!-- Modal Content (The Image) -->
+                  <img class="modal-content" id="img01">
+
+                  <!-- Modal Caption (Image Text) -->
+                  <div id="caption"></div>
+                </div>
+            </section>
+
+            <section class="choice-content" id="find-roi-tab">
+                <h1>(Debugging Step) Find ROI</h1>
+                <div class="curr-roi">
+                    <h2 id="roi-title">Currently Computed ROI</h2>
+
+                </div>
+                <button id="roi-op" onclick="findROI()">Find ROI</button>
+            </section>
+
+            <section class="choice-content" id="copy-slice-tab">
+                <h1>(Debugging Step) Copy Slices</h1>
+                <button id="copy-op" onclick="copySlices()">Create slice copy</button>
+            </section>
+
+
+
+            <section class="choice-content" id="converter-tab">
+                <h1>Convert Raw '.dat' to '.avi'</h1>
+                <button id="convert-op" onclick="convertRaw()">Convert Raw Video</button>
+            </section>
+        </div>
+
     </body>
-
 </html>

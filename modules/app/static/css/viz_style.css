@@ -1,0 +1,84 @@
+.btn-group#tab{
+  float: left;
+  height: 12%;
+  font-size: 20px;
+}
+.btn-group button {
+  float: left;
+  height: 100%;
+  background-color: #080808;
+  border: 1px ghostwhite;
+  text-align: center;
+  color: whitesmoke; /* White text */
+  padding: 20px 30px; /* Some padding */
+  cursor: pointer; /* Pointer/hand icon */
+  width: 100%; /* Set a width if needed */
+  display: block; /* Make the buttons appear below each other */
+}
+
+.btn-group button:not(:last-child) {
+  border-bottom: none; /* Prevent double borders */
+}
+
+/* Add a background color on hover */
+.btn-group button:hover {
+  background-color: #8B0000;
+}
+
+.btn-group#tab button.active {
+    background-color: #4CAF50;
+}
+.c-box {
+    height: 25px;
+    width: 25px;
+}
+
+.plots1 {
+    height: 500px;
+    weight: 500px;
+}
+
+.choice-content {
+  float: right;
+  padding: 0px 0px;
+  /*border: 10px solid #ccc;*/
+  width: 70%;
+  border-left: none;
+  height: 300px;
+}
+
+#gen-index-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#movie-select-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#crowd-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#scalar-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#trans-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
+#usage-op {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}

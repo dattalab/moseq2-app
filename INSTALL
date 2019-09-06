@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "INSTALLING AND SETTING UP APP"
+cp requirements.prod.txt requirements.txt
+
+docker-compose up --build
