@@ -1,6 +1,16 @@
 #!/bin/bash
 
-echo "INSTALLING AND SETTING UP APP"
-cp requirements.prod.txt requirements.txt
+echo "Installing moseq2-app dependencies, and setting up application"
+cp requirements.prod.txt temp.txt
+
+echo "To get started, input your GitHub information to clone the MoSeq2 Repositories."
+echo "Input your GitHub username: "
+read username
+read -sp "Input your GitHub password: " passvar
+echo ''
+
+sed -e "s/{username}/$username/g" -e "s/{password}/$passvar/g" temp.txt > requirements.txt
+rm temp.txt
 
 docker-compose up --build
+rm requirements.txt
