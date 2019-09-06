@@ -24,4 +24,4 @@ services:
   command: mongod --logpath=/dev/null # --quiet
 networks:
  default:
-  name: web_dev
+  name: moseq2_app
