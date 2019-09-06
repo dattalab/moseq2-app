@@ -2,13 +2,8 @@ $(document).onchange(function() {
     $("#extract").load("../templates/extract.html");
 });
 
-var benchFiles = []
+var benchFiles = [];
 var openNavBool = false;
-
-window.onload = function() {
-
-}
-
 
 function loadImageModal(event) {
 
@@ -39,36 +34,6 @@ function loadImageModal(event) {
             modal.style.display = "none";
         }
     }
-}
-
-function getLocalDir() {
-    $.get('/get-local-dir', {}, function(resp) {
-        if (resp.ok) {
-            // change button color to green and display extract button
-            var fileList = resp.files;
-            benchFiles = fileList;
-            var e = document.querySelector("#filelist");
-            var child = e.lastElementChild;
-            while (child) {
-                e.removeChild(child);
-                child = e.lastElementChild;
-            }
-            var f = document.querySelector("#extractedlist");
-            var child = f.lastElementChild;
-            while (child) {
-                f.removeChild(child);
-                child = f.lastElementChild;
-            }
-            for(var i = 0; i < fileList.length; i++) {
-                $('#filelist').append('<option onclick="selectFile(event)">'+fileList[i]+'</option>');
-                if(fileList[i] == 'sample1/depth.dat') {
-                    $('#extractedlist').append('<option>'+fileList[i]+'</option>');
-                }
-            }
-        } else {
-            alert(resp.message);
-        }
-    });
 }
 
 function uploadExParams() {
@@ -154,6 +119,7 @@ function extractRaw() {
                 }
                 gallery.appendChild(figure);
             }
+            getLocalDir();
             console.log('extraction successfully performed');
 
         })
@@ -165,6 +131,7 @@ function extractRaw() {
 }
 
 function findROI() {
+
     $.get('/find-roi', {}, function(resp) {
         if (resp.ok) {
             alert(resp.message);
@@ -248,23 +215,42 @@ function toggleBatchModeExtract(evt) {
     }
 }
 
-function openNav() {
-  if (!openNavBool) {
-      getLocalDir();
-      document.getElementById("mySidebar").style.width = "300px";
-      document.getElementById("extract-tab").style.marginRight = "300px";
-      openNavBool = !openNavBool;
-  } else {
-      document.getElementById("mySidebar").style.width = "0";
-      document.getElementById("extract-tab").style.marginRight = "0";
-      openNavBool = !openNavBool;
-  }
-}
+function selectFile(event) {
+    var clickedOpt = event.target;
+    var clickedOptName = event.target.innerHTML;
+    var ul = document.getElementById("selected-list");
+    var clickedOptId = clickedOptName.replace('/','-');
 
-function closeNav() {
-  document.getElementById("mySidebar").style.width = "0";
-  document.getElementById("extract-tab").style.marginRight = "0";
-  openNavBool = !openNavBool;
+    if (clickedOpt.selected) {
+        var li = document.createElement("li");
+        li.setAttribute('id', clickedOptId);
+        li.appendChild(document.createTextNode(clickedOptName));
+        var children = $('#selected-list').children();
+
+        //base case
+        if (children.length == 0) {
+            ul.appendChild(li);
+        } else {
+            // contains at least 1 child
+            //console.log(clickedOptId);
+            var removed = false;
+            // check if target id == any existing child
+            for(var i = 0; i < children.length; i++) {
+                console.log(children[i].id);
+                if (children[i].id == clickedOptId) {
+                    // child exists, delete
+                    var item = document.getElementById(children[i].id);
+                    item.remove();
+                    removed = true;
+                }
+            }
+            // check if the target id was removed
+            if (!removed) {
+                // target did not already exist, adding
+                ul.appendChild(li);
+            }
+        }
+    }
 }
 
 function openTab(evt, tabName) {
@@ -282,24 +268,6 @@ function openTab(evt, tabName) {
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " active";
     if (evt.currentTarget.id == 'init-step-button') {
-        getLocalDir();
-    }
-}
-
-function selectFile(event) {
-    var clickedOpt = event.target;
-    var clickedOptName = event.target.innerHTML;
-    var ul = document.getElementById("selected-list");
-    var clickedOptId = clickedOptName.replace('/','-');
-    //clickedOptId = clickedOptId.replace('.', '_');
-
-    if (clickedOpt.selected) {
-        var li = document.createElement("li");
-        li.setAttribute('id',clickedOptId);
-        li.appendChild(document.createTextNode(clickedOptName));
-        ul.appendChild(li);
-    } else {
-        var item = document.getElementById(clickedOptId);
-        ul.removeChild(item);
+        //getLocalDir();
     }
 }

@@ -268,17 +268,6 @@ button {
     z-index: 900;
 }
 
-.param-select{
-    position: fixed;
-    background-color: #080808;
-    font-size: 25px;
-    right: 30px;
-    top: 12px;
-    color: white;
-    float: right;
-    z-index: 900;
-}
-
 
 .topnav {
   display: table;
@@ -333,8 +322,86 @@ button {
   border-bottom:3px solid white;
 }
 
+
+.sidebar {
+  height: 100%;
+  width: 0;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  background-color: #111;
+  overflow-x: hidden;
+  transition: 0.5s;
+  padding-top: 60px;
+}
+
+.sidebar a {
+  top: 150px;
+  padding: 8px 8px 32px 8px;
+  text-decoration: none;
+  font-size: 25px;
+  color: #818181;
+  display: block;
+  transition: 0.3s;
+}
+
+.sidebar a select{
+  margin-top: 20px;
+  padding: 8px 8px 32px 8px;
+  font-size: 15px;
+}
+
+.sidebar a:hover {
+  color: #f1f1f1;
+}
+
+.sidebar a:hover select{
+  color: coral;
+  transition: 0.3s;
+}
+
+.sidebar .closebtn {
+  position: absolute;
+  top: 50px;
+  left: 25px;
+  font-size: 36px;
+  margin-right: 50px;
+}
+
+.openbtn {
+    position: fixed;
+    background-color: #080808;
+    font-size: 25px;
+    right: 0px;
+    top: 12px;
+    color: white;
+    float: right;
+    z-index: 900;
+    float: right;
+    cursor: pointer;
+
+    border: none;
+}
+
+.openbtn:hover {
+  background-color: #444;
+}
+
+#filelist {
+    background-color: white;
+    color: black;
+}
+
+#extractedlist {
+    background-color: white;
+    color: black;
+}
+
+
 #main {
     margin-top: 50px;
+    transition: margin-right 0.5s;
 }
 
 section {

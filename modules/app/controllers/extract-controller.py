@@ -1,29 +1,11 @@
 import os
-import glob
 from flask import request, jsonify
 from app import app, data_path, data_config#, mongo
-import logger
-import subprocess
 from ast import literal_eval
 from moseq2_extract.gui import *
 import pickle
-
-
-global config_dict
-
-@app.route('/get-local-dir', methods=['GET'])
-def check_local_data_dir():
-    if request.method == 'GET':
-        cwd = os.getcwd()
-        cwd = cwd+data_path
-
-        if len(os.listdir(cwd)) == 0:
-            return jsonify({'ok': False, 'message': 'No data files found!'}), 400
-        else:
-            files = [f.replace(cwd, '') for f in glob.glob(cwd + "**/*.*", recursive=True)]
-            return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files}), 200
-    else:
-        return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
+import json
+import glob
 
 @app.route('/generate-config', methods=['GET', 'POST', 'PATCH'])
 def extract_generate_conf():
@@ -79,9 +61,9 @@ def extract_raw():
         cd_cmd = 'cd '+cwd
         os.system(cd_cmd)
 
-        input_files = request.form.to_dict()
+        input_params = request.form.to_dict()
 
-        if input_files == {}:
+        if input_params == {}:
             # run extract with default cmd
             filepath = cwd1+'depth.dat'
             configfile = 'config.yaml'
@@ -99,7 +81,7 @@ def extract_raw():
                 data = pickle.load(handle)
 
             # Update to support multiple files
-            extract_command(cwd1+input_files['depth-file'], data['crop_size'], data['bg_roi_dilate'], data['bg_roi_shape'], data['bg_roi_index'], data['bg_roi_weights'],
+            extract_command(cwd1+input_params['depth-file'], data['crop_size'], data['bg_roi_dilate'], data['bg_roi_shape'], data['bg_roi_index'], data['bg_roi_weights'],
                             data['bg_roi_depth_range'], data['bg_roi_gradient_filter'], data['bg_roi_gradient_threshold'], data['bg_roi_gradient_kernel'], data['bg_roi_fill_holes'],
                             data['min_height'], data['max_height'], data['fps'], data['flip_classifier'], data['flip_classifier_smoothing'],data['use_tracking_model'], 
                             data['tracking_model_ll_threshold'], data['tracking_model_mask_threshold'], data['tracking_model_ll_clip'], data['tracking_model_segment'],
@@ -115,7 +97,25 @@ def extract_raw():
                 os.system(f'cp {cwd1}proc/roi_00.tiff {cwd}/modules/app/static/output_imgs/roi_00.png')
                 os.system(f'cp {cwd1}proc/results_00.mp4 {cwd}/modules/app/static/output_imgs/results_00.mp4')
 
-                return jsonify({'ok': True, 'message': 'Extraction successful'}), 200
+                extras = [f.replace(cwd, '') for f in glob.glob(cwd + "**/*.*", recursive=True)]
+                for extra in extras:
+                    with open(cwd + data_config + 'sidebar-progress.json') as json_file:
+                        data = json.load(json_file)
+                        if extra not in data['local_files']:
+                            data['local_files'].append(extra)
+
+                with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
+                    json.dump(data, outfile)
+
+                with open(cwd + data_config + 'sidebar-progress.json') as json_file:
+                    data = json.load(json_file)
+                    if input_params['depth-file'] not in data['extracted_files']:
+                        data['extracted_files'].append(input_params['depth-file'])
+
+                with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
+                    json.dump(data, outfile)
+
+                return jsonify({'ok': True, 'message': 'Extraction successful', 'local_files': data['local_files'], 'extracted_files': data['extracted_files']}), 200
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
 @app.route('/extract-batch', methods=['GET', 'POST', 'DELETE', 'PATCH'])

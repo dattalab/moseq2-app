@@ -89,9 +89,6 @@ window.onload = function(){
         let url = '/uploadFile';
         let formData = new FormData();
 
-
-        // Check if file is directory
-        //console.log(window.FileSystemDirectoryEntry(file));
         formData.append("files", file);
         fetch(url, {
             method: 'POST',
@@ -125,11 +122,7 @@ function uploadFile(file) {
         body: formData
     })
     .then((resp) => {
-        // Done: inform user that upload is finished.
-        //Change to sessions
-        //selDiv.innerHTML += "Total number of files identified: " + files.length + " <br/>"
         console.log(file.name+' uploaded');
-
     })
     .catch(() => {
         // Error: inform user of upload error reponse.
@@ -213,6 +206,73 @@ function displayHelpModal(ev) {
             window.location.reload();
         }
     }
+}
+
+function getLocalDir() {
+    $.get('/get-local-dir', {}, function(resp) {
+        if (resp.ok) {
+            // change button color to green and display extract button
+            var fileList = resp.files;
+            var extractedFiles = resp.extracted;
+
+            benchFiles = fileList;
+            var e = document.querySelector("#filelist");
+            var child = e.lastElementChild;
+            while (child) {
+                e.removeChild(child);
+                child = e.lastElementChild;
+            }
+            for(var i = 0; i < fileList.length; i++) {
+                $('#filelist').append('<option onclick="selectFile(event)">'+fileList[i]+'</option>');
+            }
+
+            if (extractedFiles.length > 0) {
+                var h2 = document.getElementById('e-file-title').hidden = false;
+                var exSelect = document.getElementById('extractedlist').hidden = false;
+                var g = document.querySelector("#extractedlist");
+                var child = g.lastElementChild;
+                while (child) {
+                    g.removeChild(child);
+                    child = e.lastElementChild;
+                }
+                for(var i = 0; i < extractedFiles.length; i++) {
+                    $('#extractedlist').append('<option>'+extractedFiles[i]+'</option>');
+                }
+            } else {
+                var h2 = document.getElementById('e-file-title').hidden = true;
+                var exSelect = document.getElementById('extractedlist').hidden = true;
+
+                var g = document.querySelector("#extractedlist");
+                var child = g.lastElementChild;
+                while (child) {
+                    g.removeChild(child);
+                    child = e.lastElementChild;
+                }
+            }
+
+        } else {
+            alert(resp.message);
+        }
+    });
+}
+
+function openNav() {
+  if (!openNavBool) {
+      getLocalDir();
+      document.getElementById("mySidebar").style.width = "300px";
+      document.getElementById("main").style.marginRight = "300px";
+      openNavBool = !openNavBool;
+  } else {
+      document.getElementById("mySidebar").style.width = "0";
+      document.getElementById("main").style.marginRight = "0";
+      openNavBool = !openNavBool;
+  }
+}
+
+function closeNav() {
+  document.getElementById("mySidebar").style.width = "0";
+  document.getElementById("main").style.marginRight = "0";
+  openNavBool = !openNavBool;
 }
 
 function onScroll(event){

@@ -34,7 +34,7 @@
 
         <div class="tabs">
             <section class="choice-content" id="genconfig-tab">
-                <h1>Extraction Configuration Options</h1>
+                <h1 class="tab-title">Extraction Configuration Options</h1>
                 <br>
                 <h3>
                     The parameters listed below allow you to configure the resulting data you will be extracting from your raw files.
@@ -446,19 +446,12 @@
             </section>
 
             <section class="choice-content" id="extract-tab">
-                <h2 id="extract-prompt">Select the depth files you would like to extract in the right-hand menu.</h2>
-                <button class="openbtn" onclick="openNav()">☰ Toggle File Select List</button>
-                <div id="mySidebar" class="sidebar">
-                    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a><br><br>
-                    <h2>Found Files</h2>
-                    <a><select id="filelist" size="6" multiple required></select></a>
-                    <h2>Extracted Files</h2>
-                    <a><select id="extractedlist" size="6" multiple></select></a><br><br><br>
-                </div>
+                <h2 id="extract-prompt">Select the depth files you would like to extract in the right-hand menu.</h2><br><br><br>
+
                 <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
-                <div id="selectedfiles">
+                <div class="filecheck" id="selectedfiles">
                     <h2>Files to Extract:</h2>
-                    <ul id="selected-list"></ul>
+                    <ul class="fileUL" id="selected-list"></ul>
                 </div><br>
                 <!--
                 <div class="extraction-canvas">
@@ -511,11 +504,17 @@
 
             <section class="choice-content" id="find-roi-tab">
                 <h1>(Debugging Step) Find ROI</h1>
-                <div class="curr-roi">
+
+                <div class="filecheck" id="roifiles">
+                    <h2>Files to Compute ROI:</h2>
+                    <ul class="fileUL" id="roi-list"></ul>
+                </div><br>
+                <button id="roi-op" onclick="findROI()">Find ROI</button>
+
+                <div class="filecheck" id="roi-preview">
                     <h2 id="roi-title">Currently Computed ROI</h2>
 
                 </div>
-                <button id="roi-op" onclick="findROI()">Find ROI</button>
             </section>
 
             <section class="choice-content" id="copy-slice-tab">
