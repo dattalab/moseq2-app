@@ -57,6 +57,10 @@ body {
       white-space: nowrap;
 }
 
+.starter-button {
+    font-size: 30px;
+}
+
 .item-1 {
   background-image: url('/static/img/good_recording.gif');
 }

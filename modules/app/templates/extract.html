@@ -18,19 +18,18 @@
     <body>
         <div class="tab" id="command-optionsE">
             <div class="batch-selector">
-                <a href="#extract"><button class="choice" id="batch-modeE" onclick="toggleBatchModeExtract(event)">Batch Mode?</button></a>
+                <button class="choice" id="batch-modeE" onclick="toggleBatchModeExtract(event)">Batch Mode?</button>
             </div>
             <br>
-            <a href="#extract"><button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-step-button">Configuration</button></a>
-            <script>document.getElementById("init-step-button").click();</script>
+            <button class="choice" onclick="openTab(event, 'genconfig-tab')" id="init-step-button">Configuration</button>
             <br>
-            <a href="#extract"><button class="choice" onclick="openTab(event, 'extract-tab')" id="extract-button">Extract Raw Data</button></a>
+            <button class="choice" onclick="openTab(event, 'extract-tab')" id="extract-button">Extract Raw Data</button>
             <br>
-            <a href="#extract"><button class="choice" onclick="openTab(event, 'copy-slice-tab')" id="copy-slice-button">Copy Slice</button></a>
+            <button class="choice" onclick="openTab(event, 'find-roi-tab')" id="find-roi-button">Find ROI</button>
             <br>
-            <a href="#extract"><button class="choice" onclick="openTab(event, 'find-roi-tab')" id="find-roi-button">Find ROI</button></a>
+            <button class="choice" onclick="openTab(event, 'copy-slice-tab')" id="copy-slice-button">Copy Slice</button>
             <br>
-            <a href="#extract"><button class="choice" onclick="openTab(event, 'converter-tab')" id="converter-button">Convert .dat to .avi</button></a>
+            <button class="choice" onclick="openTab(event, 'converter-tab')" id="converter-button">Convert .dat to .avi</button>
         </div>
 
         <div class="tabs">
@@ -90,6 +89,14 @@
                           </div>
                           <div class="col-row">
                               <div class="columnL">
+                          BG ROI Index:
+                              </div>
+                              <div class="columnR">
+                                  <input class="param" name="bg_roi_index" type="number" value="0">
+                              </div>
+                          </div>
+                          <div class="col-row">
+                              <div class="columnL">
                           BG ROI Weights:
                               </div>
                               <div class="columnR">
@@ -102,7 +109,7 @@
                           BG ROI Depth Range:
                               </div>
                               <div class="columnR">
-                            <input class="param2" name="roi_depth_range" type="number" value="650"><input class="param2" name="roi_depth_range" type="number" value="750">
+                            <input class="param2" name="bg_roi_depth_range" type="number" value="650"><input class="param2" name="bg_roi_depth_range" type="number" value="750">
                               </div>
                           </div>
 
@@ -149,7 +156,7 @@
                           BG Min Height:
                               </div>
                               <div class="columnR">
-                                  <input class="param" name="bg_min_height" type="number" value="10">
+                                  <input class="param" name="min_height" type="number" value="10">
                               </div>
                           </div>
 
@@ -158,7 +165,7 @@
                           BG Max Height:
                               </div>
                               <div class="columnR">
-                                  <input class="param" name="bg_max_height" type="number" value="100">
+                                  <input class="param" name="max_height" type="number" value="100">
                               </div>
                           </div>
 
@@ -194,7 +201,7 @@
                           Centroid Hampel Signal:
                               </div>
                               <div class="columnR">
-                                  <input class="param" name="centroid_hampel_signal" type="number" value="3">
+                                  <input class="param" name="centroid_hampel_sig" type="number" value="3">
                               </div>
                           </div>
 
@@ -203,7 +210,7 @@
                                   Angle Hampel Span:
                               </div>
                               <div class="columnR">
-                                <input class="param" name="angel_hampel_span" type="number" value="0">
+                                <input class="param" name="angle_hampel_span" type="number" value="0">
                               </div>
                           </div>
 
@@ -212,7 +219,7 @@
                           Angle Hampel Signal:
                               </div>
                               <div class="columnR">
-                                  <input class="param"  name="angle_hampel_signal" type="text" value="3">
+                                  <input class="param"  name="angle_hampel_sig" type="text" value="3">
                               </div>
                           </div>
 
@@ -232,7 +239,7 @@
                           Flip Classifier:
                               </div>
                               <div class="rColumnR">
-                                  <input class="paramC" name="use_flip_classifier" id="flip-select" onclick="displayFlipModal(event)" type="checkbox">
+                                  <input class="paramC" name="flip_classifier" id="flip-select" onclick="displayFlipModal(event)" type="checkbox">
                               </div>
                           </div>
                           <!-- If checked, expose a dropdown menu to pre select the flip file -->
@@ -273,10 +280,19 @@
 
                           <div class="col-row">
                               <div class="rColumnL">
+                                  Tracking Model LL Clip:
+                              </div>
+                              <div class="rColumnR">
+                                  <input class="param" name="tracking_model_ll_clip" type="number" value="-100">
+                              </div>
+                          </div>
+
+                          <div class="col-row">
+                              <div class="rColumnL">
                                   Segment Tracking Model:
                               </div>
                               <div class="rColumnR">
-                                  <input class="paramC" name="segment_tracking_model" type="checkbox" checked>
+                                  <input class="paramC" name="tracking_model_segment" type="checkbox" checked>
                               </div>
                           </div>
 
@@ -384,7 +400,7 @@
                                   Use Plane BG:
                               </div>
                               <div class="rColumnR">
-                                  <input class="paramC" name="use_plane_bg" type="checkbox">
+                                  <input class="paramC" name="use_plane_bground" type="checkbox">
                               </div>
                           </div>
 
@@ -408,7 +424,7 @@
 
                           <div class="col-row">
                               <div class="rColumnL">
-                                  Number of Compress Threads:
+                                  No. of Compress Threads:
                               </div>
                               <div class="rColumnR">
                                   <input class="param" name="num_compress_threads" type="number" value="3">
@@ -430,15 +446,21 @@
             </section>
 
             <section class="choice-content" id="extract-tab">
+                <h2 id="extract-prompt">Select the depth files you would like to extract in the right-hand menu.</h2>
                 <button class="openbtn" onclick="openNav()">☰ Toggle File Select List</button>
                 <div id="mySidebar" class="sidebar">
                     <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a><br><br>
                     <h2>Found Files</h2>
-                    <a><select id="filelist" size="6" multiple></select></a><br><br><br>
+                    <a><select id="filelist" size="6" multiple required></select></a>
                     <h2>Extracted Files</h2>
                     <a><select id="extractedlist" size="6" multiple></select></a><br><br><br>
                 </div>
-
+                <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
+                <div id="selectedfiles">
+                    <h2>Files to Extract:</h2>
+                    <ul id="selected-list"></ul>
+                </div><br>
+                <!--
                 <div class="extraction-canvas">
                     <div>
                         <h2 id="extraction-title">Latest Extraction</h2><br><br><br><br>
@@ -447,19 +469,61 @@
                         </video>
                     </div>
                     <br><br>
-                    <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
+                </div>
+                -->
+                <h2 id='gal-head' style="float:left;">Extraction Gallery</h2><br><br><br><br><br>
+                <div class="gallery" id="gal" onclick="loadImageModal(event)">
+                    <!--
+                    <figure class="gallery__item gallery__item--1">
+                        <img src="/static/img/changpoints_dist.png" id="img1" class="gallery__img" alt="Image 1">
+                    </figure>
+                    <figure class="gallery__item gallery__item--2">
+                        <img src="/static/img/crowd_movie.gif"  id="img2" class="gallery__img" alt="Image 2">
+                    </figure>
+                    <figure class="gallery__item gallery__item--3">
+                        <img src="/static/img/moseq2_pipeline.png"  id="img3" class="gallery__img" alt="Image 3">
+                    </figure>
+                    <figure class="gallery__item gallery__item--4">
+                        <img src="/static/img/pca_scree.png" id="img4" class="gallery__img" alt="Image 4">
+                    </figure>
+                    <figure class="gallery__item gallery__item--5">
+                        <img src="/static/img/usages.png" id="img5" class="gallery__img" alt="Image 5">
+                    </figure>
+                    <figure class="gallery__item gallery__item--6">
+                        <img src="/static/img/pca_components.png" id="img6" class="gallery__img" alt="Image 6">
+                    </figure>
+                    -->
+                </div>
+
+                <!-- The Modal -->
+                <div id="imageModal" class="modal">
+
+                  <!-- The Close Button -->
+                  <span class="close">&times;</span>
+
+                  <!-- Modal Content (The Image) -->
+                  <img class="modal-content" id="img01">
+
+                  <!-- Modal Caption (Image Text) -->
+                  <div id="caption"></div>
                 </div>
             </section>
 
-            <section class="choice-content" id="copy-slice-tab">
-                <h1>Copy Slices</h1>
-                <button id="copy-op">Create slice copy</button>
+            <section class="choice-content" id="find-roi-tab">
+                <h1>(Debugging Step) Find ROI</h1>
+                <div class="curr-roi">
+                    <h2 id="roi-title">Currently Computed ROI</h2>
+
+                </div>
+                <button id="roi-op" onclick="findROI()">Find ROI</button>
             </section>
 
-            <section class="choice-content" id="find-roi-tab">
-                <h1>Find ROI</h1>
-                <button id="roi-op" onclick="findROI()">Run ROI Analysis</button>
+            <section class="choice-content" id="copy-slice-tab">
+                <h1>(Debugging Step) Copy Slices</h1>
+                <button id="copy-op" onclick="copySlices()">Create slice copy</button>
             </section>
+
+
 
             <section class="choice-content" id="converter-tab">
                 <h1>Convert Raw '.dat' to '.avi'</h1>

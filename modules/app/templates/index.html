@@ -82,14 +82,15 @@
                 </div>
                 <div id="ux-begin">
                     <h2>Get Started</h2>
-                    <button onclick="loadDiv('start-exp')">Start New Experiment</button>
-                    <button onclick="loadDiv('load-exp')">Continue Previous Experiment</button>
+                    <button class="starter-button" onclick="loadDiv('start-exp')">Start New Experiment</button>
+                    <button class="starter-button" onclick="loadDiv('load-exp')">Continue Previous Experiment</button>
                 </div>
 
                 <div id="start-exp" class="acc-div hidden">
                     <h2>MoSeq2-Application Setup</h2>
                     <h3>
-                        Upload your collected session recording depth files in a compressed folder, or upload each session files individually.
+                        Upload your collected session recording depth files in separated folders per acquisition session.
+                        You may also upload each session file individually.
                     </h3>
                     <div id="drop-area" webkitdirectory mozdirectory>
                       <form class="my-form" enctype="multipart/form-data">
