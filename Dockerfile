@@ -8,7 +8,8 @@ ENV STATIC_PATH /moseq2-app/modules/app/static
 COPY ./requirements.txt /moseq2-app/requirements.txt
 RUN export CC=/usr/local/bin/gcc-7
 RUN export CC=/usr/local/bin/g++-7
-RUN pip install --upgrade pip
-RUN pip install -q --progress-bar emoji --upgrade-strategy only-if-needed -r requirements.txt
+RUN apt-get update && apt-get install -y ffmpeg
+RUN pip install -q --upgrade pip
+RUN pip install --upgrade-strategy only-if-needed -r requirements.txt
 ENTRYPOINT ["python", "index.py"]
 
