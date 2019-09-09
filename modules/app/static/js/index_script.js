@@ -256,9 +256,18 @@ function getLocalDir() {
     });
 }
 
-function openNav() {
+function openNav(event) {
+  var options = document.getElementsByClassName("choice active");
+  var currOp = options[0].innerHTML;
+  var currH2 = document.getElementById("curr-op");
+  currH2.style.marginTop = "34px";
+  currH2.style.marginLeft = "10px";
+  currH2.style.color = "white";
+
+
   if (!openNavBool) {
       getLocalDir();
+      currH2.innerHTML = 'Current op: ' + currOp;
       document.getElementById("mySidebar").style.width = "300px";
       document.getElementById("main").style.marginRight = "300px";
       openNavBool = !openNavBool;

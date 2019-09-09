@@ -23,7 +23,7 @@ def pca_train(path=None):
             else:
                 return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
         else:
-            return jsonify({'ok': False, 'message': 'Cannot find input directory!'}), 400
+            return jsonify({'ok': False, 'message': 'Cannot find input directory!'}), 400   
 
 @app.route('/apply-pca', methods=['GET'])
 def pca_apply(path=None):

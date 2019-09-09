@@ -34,13 +34,34 @@ def save_uploaded_file():
 def check_local_data_dir():
     if request.method == 'GET':
         cwd = os.getcwd()
+        cd_cmd = 'cd ' + cwd + data_path
+        os.system(cd_cmd)
 
         if len(os.listdir(cwd)) == 0:
             return jsonify({'ok': False, 'message': 'No data files found!'}), 400
         else:
-            with open(cwd + data_config + 'sidebar-progress.json') as json_file:
-                data = json.load(json_file)
-            files = data['local_files']
-            return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files, 'extracted': data['extracted_files']}), 200
+            # if json not found, create it
+            if not os.path.exists(cwd+data_config+'sidebar-progress.json'):
+                tempJSON = {'local_files': [], "extracted_files": [], "roi_files": []}
+                with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
+                    json.dump(tempJSON, outfile)
+            else:
+                # populate/update json with current data env information
+                with open(cwd + data_config + 'sidebar-progress.json') as json_file:
+                    data = json.load(json_file)
+                extras = [f.replace(cwd+data_path, '') for f in glob.glob(cwd+data_path + "**/*.*", recursive=True)]
+
+                files = []
+                for extra in extras:
+                    files.append(extra)
+                    if extra not in data['local_files']:
+                        data['local_files'].append(extra)
+                        print(data['local_files'])
+
+                data['local_files'] = files
+                with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
+                    json.dump(data, outfile)
+
+                return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files, 'extracted': data['extracted_files']}), 200
     else:
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400

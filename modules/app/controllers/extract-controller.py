@@ -1,4 +1,5 @@
-import os
+import os, sys
+from PIL import Image
 from flask import request, jsonify
 from app import app, data_path, data_config#, mongo
 from ast import literal_eval
@@ -136,8 +137,6 @@ def extract_download_flip(path=None):
         cd_cmd = 'cd ' + cwd
         os.system(cd_cmd)
 
-        filepath = cwd1 + 'depth.dat'
-
         query = request.args
 
         if query is not None:
@@ -156,21 +155,76 @@ def extract_find_roi(path=None):
     cwd = os.getcwd()
     cwd1 = cwd + data_path
 
-    if request.method == 'GET':
+    if request.method == 'POST':
         # start cli command with default params unless get dict is not empty
         cd_cmd = 'cd ' + cwd
         os.system(cd_cmd)
 
-        filepath = cwd1 + 'depth.dat'
+        query =  request.form.to_dict()
 
-        query = request.args
+        if query != {}:
+            # Get filename to perform roi compute
+            roifile = query['depth-file']
+            with open(cwd+data_config+'param_data.pkl', 'rb') as handle:
+                data = pickle.load(handle)
+                # False 1 == bg-sort-roi-by-position
+                # 2 == bg-sort-roi-by-position-max-rois
+                if not os.path.exists(cwd1+'rois/'):
+                    os.mkdir(cwd1+'rois/')
 
-        if query == {}:
-            os.system(f'moseq2-extract find-roi {filepath}')
-            return jsonify({'ok': True, 'message': filepath}), 200
+                ret = find_roi_command(cwd1+roifile, data['bg_roi_dilate'], data['bg_roi_shape'], data['bg_roi_index'], data['bg_roi_weights'], data['bg_roi_depth_range'],
+                                 data['bg_roi_gradient_filter'], data['bg_roi_gradient_threshold'], data['bg_roi_gradient_kernel'], data['bg_roi_fill_holes'],
+                                 False, 2, cwd1+'rois/', data['use_plane_bground'], data['config_file'])
+                if ret:
+                    files = ""
+                    for infile in os.listdir(cwd1+'rois/'):
+                        print("file : " + cwd1+'rois/'+infile)
+                        if infile[-4:] == "tiff":
+                            outfile = infile[:-4] + "jpeg"
+                            im = Image.open(cwd1+'rois/'+infile)
+                            print("new filename : " + cwd1+'rois/'+outfile)
+                            out = im.convert("RGB")
+                            files += ('/static/img/rois/'+outfile)
+                            files += ' || '
+                            print(files)
+                            out.save(cwd+'/modules/app/static/img/rois/'+outfile, "JPEG", quality=90)
+                    return jsonify({'ok': True, 'message': "ROIs calculated and saved successfully!",
+                                    'files': files}), 200
 
     return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
-@app.route('/copy-slice', methods=['GET'])
+@app.route('/copy-slice', methods=['POST'])
 def extract_copy_slice(path=None):
-    return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
+    cwd = os.getcwd()
+    cwd1 = cwd + data_path
+
+    if request.method == 'POST':
+        # start cli command with default params unless get dict is not empty
+        cd_cmd = 'cd ' + cwd
+        os.system(cd_cmd)
+
+        query = request.form.to_dict()
+        if query != {}:
+            if not os.path.exists(cwd1 + 'slices/'):
+                os.mkdir(cwd1 + 'slices/')
+
+            for k, v in query.items():
+                if ',' in v:
+                    query[k] = literal_eval('('+v+')')
+                elif v == 'on':
+                    query[k] = True
+                elif v == 'off':
+                    query[k] = False
+                elif v.isdigit() or '-' in v:
+                    query[k] = int(v)
+            print(query)
+            ret = copy_slice_command(cwd1+query['depth-file'], cwd1+f'slices/slice_{query["copy_slice"][1]}.avi', query['copy_slice'], query['chunk_size'], query['fps'], query['delete'], query['threads'])
+
+            if ret:
+                files = ""
+                # Copy slices to static img slices folder to be displayed
+                for infile in os.listdir(cwd1 + 'slices/'):
+                    print(infile)
+                return jsonify({'ok': True, 'message': "ROIs calculated and saved successfully!", 'files': files}), 200
+
+            return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400

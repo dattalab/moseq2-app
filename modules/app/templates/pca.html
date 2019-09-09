@@ -16,37 +16,26 @@
         <h1>Welcome to MoSeq2 PCA</h1>
         <br>
         <div class="btn-group" id="command-options">
-
-            <button class="choice" onclick="openTab(event, 'dir-select-tab')" id="init-step-button">Init Step</button>
-            <script>document.getElementById("init-step-button").click();</script>
-            <br>
-            <button class="choice" onclick="openTab(event, 'load-pca-tab')" id="load-pca-button">Load PCA Model</button>
-            <br>
             <button class="choice" onclick="openTab(event, 'train-pca-tab')" id="train-button">Train PCA Model</button>
             <br>
             <button class="choice" onclick="openTab(event, 'apply-pca-tab')" id="apply-pca-button">Apply PCA Model</button>
             <br>
             <button class="choice" onclick="openTab(event, 'compute-cp-tab')" id="compute-cp-button">Compute Changepoints</button>
+            <br>
+            <button class="choice" onclick="openTab(event, 'gallery-tab')" id="gallery-button">PCA Gallery</button>
         </div>
         <div>
-            <section class="choice-content" id="dir-select-tab">
-                <h1>Directory Selection Check</h1>
-                <p>Ensure your files are in the correct directory.</p>
-                <input type="checkbox"  class="c-box" id="dir-check" disabled>
-            </section>
-            <section class="choice-content" id="load-pca-tab">
-                <h2>Load Previously Trained PCA into context</h2>
-                <br>
-                <button id="load-op" onclick="loadPCA()">Load PCA</button>
-            </section>
             <section class="choice-content" id="train-pca-tab">
                 <h2>Train new PCA using previously extracted data</h2>
                 <br>
                 <button id="train-op" onclick="trainPCA()">Train PCA</button>
                 <br><br>
-                <img class="plots" src="/static/img/pca_components.png">
-                <br><br>
-                <img class="plots" src="/static/img/pca_scree.png">
+                <div class="grid-container" style="margin-left: 450px;">
+                    <img class="plots" src="/static/img/pca_components.png">
+                    <br>
+                    <img class="plots" src="/static/img/pca_scree.png">
+                </div>
+
             </section>
             <section class="choice-content" id="apply-pca-tab">
                 <h2>Apply Trained PCA</h2>
@@ -61,6 +50,10 @@
                 <button id="compute-op" onclick="computeCP()">Compute Changepoints</button>
                 <br><br>
                 <img class="plots1" src="/static/img/changpoints_dist.png">
+
+            </section>
+            <section class="choice-content" id="gallery-tab">
+                <h2>PCA Gallery</h2>
 
             </section>
         </div>

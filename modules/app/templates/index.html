@@ -28,11 +28,12 @@
             </ul>
         </nav>
         <div class="helper-buttons">
-            <button class="help-button" id="help-op" onclick="openNav()">Help</button>
-            <button class="openbtn" onclick="openNav()">☰ Toggle File Select List</button>
+            <button class="help-button" id="help-op" onclick="displayHelpModal(event)">Help</button>
+            <button class="openbtn" onclick="openNav(event)">☰ Toggle File Select List</button>
         </div>
         <div id="mySidebar" class="sidebar">
-            <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a><br><br>
+            <h2 id="curr-op">Current op: </h2>
+            <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
             <h2 style="color:white; padding-left: 10px;">Found Files</h2>
             <a><select id="filelist" size="6" multiple required></select></a>
             <h2 style="color:white; padding-left: 10px;" id="e-file-title" hidden>Extracted Files</h2>

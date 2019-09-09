@@ -132,26 +132,109 @@ function extractRaw() {
 
 function findROI() {
 
-    $.get('/find-roi', {}, function(resp) {
-        if (resp.ok) {
-            alert(resp.message);
-        } else {
-            alert(resp.message);
-        }
+    var url = '/find-roi';
+    var formData = new FormData();
+
+    $('#roi-list li').each(function(i)
+    {
+       var filename = $(this).attr('id');
+       filename = filename.replace('-', '/');
+
+       formData.append('depth-file', filename);
+    });
+
+    fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+
+            var grid = document.getElementsByClassName('grid-container')[0];
+            var files = response.files.split(" || ")
+
+            for(var i=0; i < files.length-1; i++) {
+
+                filename = files[i].split('/')
+                filename = filename[filename.length-1]
+
+                var computedDiv = document.createElement('div');
+                computedDiv.setAttribute('style', 'justify-content:center;')
+                computedDiv.setAttribute('class', 'computed-roi');
+
+                var title = document.createElement('a');
+                title.setAttribute('class', 'img-title');
+                var t = document.createTextNode(filename);
+                title.appendChild(t)
+                computedDiv.appendChild(title);
+
+                var aImg = document.createElement('a');
+                aImg.setAttribute('class', 'roi-img');
+                computedDiv.appendChild(aImg);
+
+                var imgHolder = document.createElement('div');
+                imgHolder.setAttribute('class', 'img-holder');
+                aImg.appendChild(imgHolder);
+
+                var img = document.createElement('img');
+                img.setAttribute('src', files[i]);
+                img.setAttribute('id', files[i].replace('/','_'));
+                imgHolder.appendChild(img);
+
+                var downloadingImage = new Image();
+                downloadingImage.onload = function(){
+                    img.src = this.src;
+                };
+
+                downloadingImage.src = files[i];
+                console.log(files[i]);
+                grid.appendChild(computedDiv);
+            }
+        })
+        .catch(() => {
+            console.log('error :(');
+            // Error: inform user of upload error response.
     });
 }
 
 function copySlices() {
-    $.get('/copy-slice', {}, function(resp) {
-        if (resp.ok) {
-            alert(resp.message);
+    var url = '/copy-slice';
+    var formData = new FormData();
 
-        } else {
-            alert(resp.message);
+    $('#slice-list li').each(function(i)
+    {
+       var filename = $(this).attr('id');
+       filename = filename.replace('-', '/');
+
+       formData.append('depth-file', filename);
+    });
+
+    $('#params input, #params select').each(
+        function(index){
+            var input = $(this);
+            if (formData.get(input.attr('name'))) {
+                var prev = formData.get(input.attr('name'));
+                let newVal = [prev, input.val()];
+                formData.set(input.attr('name'), newVal);
+            } else{
+                formData.append(input.attr('name'), input.val());
+            }
         }
+    );
+
+    fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            alert(response.files.split(' || '));
+        })
+        .catch(() => {
+            console.log('error :(');
+            // Error: inform user of upload error response.
     });
 }
-
 
 function displayFlipModal(event) {
     // Get the modal
@@ -218,14 +301,37 @@ function toggleBatchModeExtract(evt) {
 function selectFile(event) {
     var clickedOpt = event.target;
     var clickedOptName = event.target.innerHTML;
-    var ul = document.getElementById("selected-list");
+    var listname;
+    var ul;
+
+
+    // Get current selected operation
+    var options = document.getElementsByClassName("choice active")[0].id;
+    switch(options){
+        case "extract-button":
+            listname = "selected-list";
+            ul = document.getElementById(listname);
+            break;
+        case "find-roi-button":
+            listname = "roi-list";
+            ul = document.getElementById(listname);
+            break;
+        case "copy-slice-button":
+            listname = "slice-list";
+            ul = document.getElementById(listname);
+            break;
+        default:
+            break;
+    }
+
+
     var clickedOptId = clickedOptName.replace('/','-');
 
     if (clickedOpt.selected) {
         var li = document.createElement("li");
         li.setAttribute('id', clickedOptId);
         li.appendChild(document.createTextNode(clickedOptName));
-        var children = $('#selected-list').children();
+        var children = $('#'+listname).children();
 
         //base case
         if (children.length == 0) {

@@ -8,7 +8,8 @@
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
         <link rel="stylesheet" href="/static/css/extract_style.css">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+        <script src="//code.jquery.com/jquery-1.10.2.js"></script>
+        <script src="//code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
         <script src="/static/js/extract_script.js"></script>
         <meta name="description" content="MoSeq2 Data Extraction Page">
         <meta name="author" content="Ayman Zeine">
@@ -505,24 +506,73 @@
             <section class="choice-content" id="find-roi-tab">
                 <h1>(Debugging Step) Find ROI</h1>
 
-                <div class="filecheck" id="roifiles">
+                <div class="filecheckR" id="roifiles">
                     <h2>Files to Compute ROI:</h2>
                     <ul class="fileUL" id="roi-list"></ul>
                 </div><br>
                 <button id="roi-op" onclick="findROI()">Find ROI</button>
 
-                <div class="filecheck" id="roi-preview">
-                    <h2 id="roi-title">Currently Computed ROI</h2>
+                <div id="roi-preview">
+                    <h2 id="roi-title">Currently Computed ROIs</h2>
+                    <div class="grid-container">
 
+                    </div>
                 </div>
             </section>
 
             <section class="choice-content" id="copy-slice-tab">
                 <h1>(Debugging Step) Copy Slices</h1>
-                <button id="copy-op" onclick="copySlices()">Create slice copy</button>
+                <br>
+                <form id="params">
+                    <div class="col-row">
+                        <div class="columnL">
+                              Chunk Size:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="chunk_size" type="number" value="3000" >
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                              Slice Range:
+                        </div>
+                        <div class="columnR">
+                            <input class="param2" name="copy_slice" type="number" value="0" ><input class="param2" name="copy_slice" type="number" value="1000" >
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                              FPS:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="fps" type="number" value="30" >
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                            Delete original?
+                        </div>
+                        <div class="columnR">
+                            <input class="paramC" name="delete" type="checkbox">
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                              Number of Encoding Threads:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="threads" type="number" value="3">
+                        </div>
+                    </div>
+                    <button id="copy-op" onclick="copySlices()">Create slice copy</button>
+                </form>
+
+                <div class="filecheckR" id="slicefiles">
+                    <h2>Files to Copy Slices:</h2>
+                    <ul class="fileUL" id="slice-list"></ul>
+                </div>
+
             </section>
-
-
 
             <section class="choice-content" id="converter-tab">
                 <h1>Convert Raw '.dat' to '.avi'</h1>
