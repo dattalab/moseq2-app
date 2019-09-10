@@ -270,6 +270,48 @@ function downloadFlip(event) {
     });
 }
 
+function convertRaw() {
+    var url = '/copy-slice';
+    var formData = new FormData();
+
+     $('#convert-list li').each(function(i)
+    {
+       var filename = $(this).attr('id');
+       filename = filename.replace('-', '/');
+
+       formData.append('depth-file', filename);
+    });
+
+     $('#Cparams input, #Cparams select').each(
+        function(index){
+            var input = $(this);
+            if (formData.get(input.attr('name'))) {
+                var prev = formData.get(input.attr('name'));
+                let newVal = [prev, input.val()];
+                formData.set(input.attr('name'), newVal);
+            } else{
+                formData.append(input.attr('name'), input.val());
+            }
+        }
+    );
+
+
+    fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+            alert(response.files.split(' || '));
+        })
+        .catch(() => {
+            console.log('error :(');
+            // Error: inform user of upload error response.
+    });
+
+
+}
+
 function toggleBatchModeExtract(evt) {
     if (evt.currentTarget.className == "choice") {
         evt.currentTarget.className += " active";
@@ -318,6 +360,13 @@ function selectFile(event) {
             break;
         case "copy-slice-button":
             listname = "slice-list";
+            ul = document.getElementById(listname);
+            break;
+        case "converter-button":
+            listname = "convert-list"
+            ul = document.getElementById(listname);
+        case "train-button":
+            listname = "train-list";
             ul = document.getElementById(listname);
             break;
         default:

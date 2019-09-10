@@ -16,35 +16,250 @@
         <h1>Welcome to MoSeq2 PCA</h1>
         <br>
         <div class="btn-group" id="command-options">
-            <button class="choice" onclick="openTab(event, 'train-pca-tab')" id="train-button">Train PCA Model</button>
+            <div class="batch-selector">
+                <button class="choice" id="batch-modeP" onclick="toggleBatchModePCA(event)">Batch Mode?</button>
+            </div>
             <br>
-            <button class="choice" onclick="openTab(event, 'apply-pca-tab')" id="apply-pca-button">Apply PCA Model</button>
+            <button class="choice" onclick="openTabPCA(event, 'train-pca-tab')" id="train-button">Train PCA Model</button>
             <br>
-            <button class="choice" onclick="openTab(event, 'compute-cp-tab')" id="compute-cp-button">Compute Changepoints</button>
+            <button class="choice" onclick="openTabPCA(event, 'apply-pca-tab')" id="apply-pca-button">Apply PCA Model</button>
             <br>
-            <button class="choice" onclick="openTab(event, 'gallery-tab')" id="gallery-button">PCA Gallery</button>
+            <button class="choice" onclick="openTabPCA(event, 'clip-scores-tab')" id="clip-scores-button">Clip Scores</button>
+            <br>
+            <button class="choice" onclick="openTabPCA(event, 'compute-cp-tab')" id="compute-cp-button">Compute Changepoints</button>
+            <br>
+            <button class="choice" onclick="openTabPCA(event, 'gallery-tab')" id="gallery-button">PCA Gallery</button>
         </div>
         <div>
-            <section class="choice-content" id="train-pca-tab">
-                <h2>Train new PCA using previously extracted data</h2>
-                <br>
-                <button id="train-op" onclick="trainPCA()">Train PCA</button>
-                <br><br>
-                <div class="grid-container" style="margin-left: 450px;">
-                    <img class="plots" src="/static/img/pca_components.png">
-                    <br>
-                    <img class="plots" src="/static/img/pca_scree.png">
+            <section class="choice-contentP" id="train-pca-tab">
+                <div class="train-row">
+                     <form id="train-params">
+                         <div class="train-column" id="tPl">
+                            <div class="col-train-row">
+                              <div class="train-columnL">
+                                  Gaussian Filter-Space:
+                              </div>
+                              <div class="train-columnR">
+                                <input class="param2" name="gaussian_filter_space" type="number" value="1.5"><input class="param2" name="gaussian_filter_space" type="number" value="1">
+                              </div>
+                              </div>
+                            <div class="col-train-row">
+                                <div class="train-columnL">
+                                  Gaussian Filter-Time:
+                                </div>
+                                <div class="train-columnR">
+                                    <input class="param" name="gaussian_filter_time" type="number" value="0">
+                                </div>
+                             </div>
+                            <div class="col-train-row">
+                                <div class="train-columnL">
+                                  Median Filter-Space:
+                                </div>
+                                <div class="train-columnR">
+                                    <input class="param" name="med_filter_space" type="number" value="0">
+                                </div>
+                             </div>
+                            <div class="col-train-row">
+                                <div class="train-columnL">
+                                  Median Filter-Time:
+                                </div>
+                                <div class="train-columnR">
+                                    <input class="param" name="med_filter_time" type="number" value="0">
+                                </div>
+                             </div>
+                            <div class="col-train-row">
+                                <div class="train-columnL">
+                                  Missing Data:
+                                </div>
+                                <div class="train-columnR">
+                                    <input class="paramC" name="missing_data" type="checkbox">
+                                </div>
+                             </div>
+                            <div class="col-train-row">
+                            <div class="train-columnL">
+                              Missing Data Iterations:
+                            </div>
+                            <div class="train-columnR">
+                                <input class="param" name="missing_data_iters" type="number" value="10">
+                            </div>
+                         </div>
+                            <div class="col-train-row">
+                            <div class="train-columnL">
+                              Mask Threshold:
+                            </div>
+                            <div class="train-columnR">
+                                <input class="param" name="mask_threshold" type="number" value="-16">
+                            </div>
+                         </div>
+                            <div class="col-train-row">
+                            <div class="train-columnL">
+                              Mask Height Threshold:
+                            </div>
+                            <div class="train-columnR">
+                                <input class="param" name="gaussian_filter_time" type="number" value="5">
+                            </div>
+                         </div>
+                            <div class="col-train-row">
+                            <div class="train-columnL">
+                              Minimum Height:
+                            </div>
+                            <div class="train-columnR">
+                                <input class="param" name="min_height" type="number" value="10">
+                            </div>
+                         </div>
+                            <div class="col-train-row">
+                            <div class="train-columnL">
+                              Maximum Height:
+                            </div>
+                            <div class="train-columnR">
+                                <input class="param" name="max_height" type="number" value="100">
+                            </div>
+                         </div>
+                            <div class="col-train-row">
+                            <div class="train-columnL">
+                              Tail Filter Size:
+                            </div>
+                            <div class="train-columnR">
+                                <input class="param2" name="tailfilter_size" type="number" value="9"><input class="param2" name="tailfilter_size" type="number" value="9">
+                            </div>
+                         </div>
+                            <div class="col-train-row">
+                                <div class="train-columnL">
+                                  Tail Filter Shape:
+                                </div>
+                                <div class="train-columnR">
+                                    <input class="param" name="tailfilter_shape" type="text" value="ellipse">
+                                </div>
+                            </div>
+                         </div>
+                         <div class="train-column" id="tPr">
+                             <div class="col-train-row">
+                                <div class="rtrain-columnL">
+                                  Use FFT:
+                                </div>
+                                <div class="rtrain-columnR">
+                                    <input class="paramC" name="use_fft" type="checkbox">
+                                </div>
+                             </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Recon PCs:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="recon_pcs" type="number" value="10">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Chunk Size:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="chunk_size" type="number" value="4000">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Rank:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="rank" type="number" value="50">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Visualize Results:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="paramC" name="visualize_results" type="checkbox" value="on">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Queue:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="paramC" name="queue" type="text" value="on">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Number of Workers:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="nworkers" type="number" value="10">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Number of Cores:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="cores" type="number" value="1">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Number of Processes:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="processes" type="number" value="1">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Memory:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="memory" type="text" value="4GB">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Wall Time:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="param" name="wall_time" type="time" value="06:00:00">
+                              </div>
+                            </div>
+                            <div class="col-train-row">
+                              <div class="rtrain-columnL">
+                                Timeout:
+                              </div>
+                              <div class="rtrain-columnR">
+                                  <input class="paramC" name="timeout" type="number" value="5">
+                              </div>
+                            </div>
+                         </div>
+                     </form>
                 </div>
-
+                <br>
+                <div class="filecheckP" id="trainfiles">
+                    <h2>Sample(s) to Train PCA on:</h2>
+                    <ul class="fileUL" id="train-list"></ul>
+                </div><br>
+                <button id="train-op" onclick="trainPCA()">Train PCA</button>
             </section>
-            <section class="choice-content" id="apply-pca-tab">
+            <section class="choice-contentP" id="apply-pca-tab">
+                <button id="score-view-op" onclick="displayScores()">View PCs</button>
                 <h2>Apply Trained PCA</h2>
                 <br>
                 <button id="apply-op" onclick="applyPCA()">Apply PCA</button>
-                <button id="score-view-op" onclick="displayScores()">View PCs</button>
-                <button id="clip-op" onclick="clipScores()">Clip Scores</button>
+
+
             </section>
-            <section class="choice-content" id="compute-cp-tab">
+            <section class="choice-contentP" id="clip-scores-tab">
+                <button id="clip-op" onclick="clipScores()">Clip Scores</button>
+                <br>
+                <div id="displays">
+                    <div class="before">
+
+                    </div>
+                    <div class="after">
+
+                    </div>
+                </div>
+            </section>
+            <section class="choice-contentP" id="compute-cp-tab">
                 <h2>Compute Syllable Changepoints</h2>
                 <br>
                 <button id="compute-op" onclick="computeCP()">Compute Changepoints</button>
@@ -52,7 +267,7 @@
                 <img class="plots1" src="/static/img/changpoints_dist.png">
 
             </section>
-            <section class="choice-content" id="gallery-tab">
+            <section class="choice-contentP" id="gallery-tab">
                 <h2>PCA Gallery</h2>
 
             </section>

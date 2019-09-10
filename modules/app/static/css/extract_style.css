@@ -35,7 +35,7 @@
 }
 
 /* Style the tab content */
-#extract-tab .choice-content {
+#train-pca-tab .choice-content {
   text-align: center;
   height: 100%;
   width: 100%;
@@ -81,7 +81,19 @@
 }
 
 #roifiles.filecheckR {
+    display: inline-block;
+    margin: 15px;
+}
 
+
+#slicefiles.filecheckR {
+    display: inline-block;
+    margin: 15px;
+}
+
+#convertfiles.filecheckR {
+    display: inline-block;
+    margin: 15px;
 }
 
 #roi-preview.filecheckR  {
@@ -100,7 +112,6 @@
 #gal-head {
     position:relative;
     top: 150px;
-    left: 25%;
 }
 
 .gallery {
@@ -372,6 +383,7 @@ a {text-decoration: none; }
   height: 70%;
 
 }
+
 #r {
   float: left;
   width: 50%;
@@ -379,6 +391,7 @@ a {text-decoration: none; }
   justify-content: center;
   height: 70%;
 }
+
 /* Clear floats after the columns */
 .row:after {
   content: "";
@@ -409,7 +422,6 @@ a {text-decoration: none; }
 }
 
 
-
 .tab#command-optionsE button.active {
     background-color: #4CAF50;
 }
@@ -427,10 +439,12 @@ a {text-decoration: none; }
     background-color: #080808;
     color: white;
     font-size: 25px;
+    margin: 15px;
 }
 
 #copy-op {
     background-color: #080808;
     font-size: 25px;
+    margin-top: 15px;
 }
 

@@ -3,6 +3,7 @@
   height: 12%;
   font-size: 20px;
 }
+
 .btn-group button {
   float: left;
   height: 100%;
@@ -31,15 +32,52 @@
     border-right:3px solid white;
 }
 
-.c-box {
-    height: 25px;
-    width: 25px;
+
+.tab#command-options button#batch-modeP:hover {
+  background-color: orange;
 }
 
+.tab#command-options button#batch-modeP.active {
+    background-color: orange;
+}
+
+.batch-selector {
+  padding-bottom: 50px;
+}
+
+.tabs {
+  margin-left: 250px;
+}
+
+/* Style the tab content */
+#pca-tab .choice-content {
+  text-align: center;
+  height: 100%;
+  width: 100%;
+  border-left: none;
+}
+
+
+element.style {
+    display: block;
+}
+
+
 #score-view-op {
+    float:right;
+    margin-right: 75px;
     background-color: #080808;
     color: white;
-    font-size: 25px;
+    font-size: 40px;
+}
+
+#trainfiles.filecheckP {
+    display: inline-block;
+    width: 500px;
+    height: 300px;
+    border: 1px solid #000;
+    margin-left: 50px;
+    margin: 15px;
 }
 
 #clip-op {
@@ -54,26 +92,151 @@
     font-size: 25px;
 }
 
+#train-params {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+}
+
 #train-op {
     background-color: #080808;
     color: white;
     font-size: 25px;
 }
 
-.plots {
-    height: 450px;
-    weight: 450px;
+.train-row {
+    display: table;
+    flex-direction: row;
+    width: 75%;
 }
 
-.plots1 {
-    height: 500px;
-    weight: 500px;
+.train-row:after {
+  content: "";
+  display: table;
+  clear: both;
+  overflow: hidden;
+}
+
+.train-column {
+    float: left;
+    margin-bottom: 0px;
+    margin-top: 0px;
+}
+
+.train-columnL {
+  font-size: 25px;
+  text-align: center;
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 45px;
+  border-bottom-style: solid;
+}
+
+.train-columnR {
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  align-content: center;
+  height: 45px;
+  border-left-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
+}
+
+.rtrain-columnR {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 45px;
+  border-left-style: solid;
+  border-bottom-style: solid;
+}
+
+.rtrain-columnL {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  font-size: 25px;
+  display: flex;
+  justify-content: center;
+  height: 45px;
+  border-bottom-style: solid;
+}
+
+#tPl {
+  float: left;
+  margin-left: 15px;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 70%;
+
+}
+
+#tPr {
+  width: 49%;
+  background-color: #8B0000;
+  justify-content: center;
+  margin-left: 0px;
+  height: 70%;
+  float:right;
+}
+
+.param {
+    color: black;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+.param2 {
+    color: black;
+    width: 75px;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+.param3 {
+    color: black;
+    width: 55px;
+    padding: 10px 5px;
+    text-align: center;
+}
+
+.paramC{
+    height: 35px;
+    width: 35px;
 }
 
 #apply-op {
     background-color: #080808;
     color: white;
     font-size: 25px;
+}
+
+#displays {
+    display:flex;
+    flex-direction:row;
+    justify-content: center;
+}
+
+.before {
+    float: left;
+    margin-top: 15px;
+    margin-right: 50px;
+    border: 1px solid black;
+    height: 500px;
+    width: 500px;
+
+}
+
+.after {
+    margin-top: 15px;
+    border: 1px solid white;
+    height: 500px;
+    width: 500px;
 }
 
 #compute-op {

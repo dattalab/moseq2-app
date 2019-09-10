@@ -225,6 +225,39 @@ def extract_copy_slice(path=None):
                 # Copy slices to static img slices folder to be displayed
                 for infile in os.listdir(cwd1 + 'slices/'):
                     print(infile)
-                return jsonify({'ok': True, 'message': "ROIs calculated and saved successfully!", 'files': files}), 200
+                return jsonify({'ok': True, 'message': "Slices copied and saved successfully!", 'files': files}), 200
 
             return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
+
+@app.route('/convert-raw', methods=['POST'])
+def convert_uploaded_raw():
+    cwd = os.getcwd()
+    cwd1 = cwd + data_path
+
+    if request.method == 'POST':
+        # start cli command with default params unless get dict is not empty
+        cd_cmd = 'cd ' + cwd
+        os.system(cd_cmd)
+
+        query = request.form.to_dict()
+
+        if query != {}:
+
+            for k, v in query.items():
+                if ',' in v:
+                    query[k] = literal_eval('('+v+')')
+                elif v == 'on':
+                    query[k] = True
+                elif v == 'off':
+                    query[k] = False
+                elif v.isdigit() or '-' in v:
+                    query[k] = int(v)
+
+
+            ret = convert_raw_to_avi_command(query['depth-file'], cwd1+query[depth-file][-3:]+'.mp4', query['chunk_size'],
+                                             query['fps'], query['delete'], query['threads'])
+
+            if ret:
+                return jsonify({'ok': True, 'message': "Slices copied and saved successfully!", 'files': files}), 200
+
+    return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400

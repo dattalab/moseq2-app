@@ -447,13 +447,13 @@
             </section>
 
             <section class="choice-content" id="extract-tab">
-                <h2 id="extract-prompt">Select the depth files you would like to extract in the right-hand menu.</h2><br><br><br>
+                <h2 id="extract-prompt">Select the depth files you would like to extract in the right-hand menu.</h2>
 
                 <button id="extract-op" onclick="extractRaw()">Perform Data Extraction</button>
                 <div class="filecheck" id="selectedfiles">
                     <h2>Files to Extract:</h2>
                     <ul class="fileUL" id="selected-list"></ul>
-                </div><br>
+                </div>
                 <!--
                 <div class="extraction-canvas">
                     <div>
@@ -465,7 +465,7 @@
                     <br><br>
                 </div>
                 -->
-                <h2 id='gal-head' style="float:left;">Extraction Gallery</h2><br><br><br><br><br>
+                <h2 id='gal-head'>Extraction Gallery</h2>
                 <div class="gallery" id="gal" onclick="loadImageModal(event)">
                     <!--
                     <figure class="gallery__item gallery__item--1">
@@ -576,7 +576,47 @@
 
             <section class="choice-content" id="converter-tab">
                 <h1>Convert Raw '.dat' to '.avi'</h1>
-                <button id="convert-op" onclick="convertRaw()">Convert Raw Video</button>
+
+                <form id="Cparams">
+                    <div class="col-row">
+                        <div class="columnL">
+                              Chunk Size:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="chunk_size" type="number" value="3000" >
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                              FPS:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="fps" type="number" value="30" >
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                            Delete original?
+                        </div>
+                        <div class="columnR">
+                            <input class="paramC" name="delete" type="checkbox">
+                        </div>
+                    </div>
+                    <div class="col-row">
+                        <div class="columnL">
+                              Number of Encoding Threads:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="threads" type="number" value="3">
+                        </div>
+                    </div>
+                    <button id="convert-op" onclick="convertRaw()">Convert Raw Video</button>
+                </form>
+
+                 <div class="filecheckR" id="convertfiles">
+                    <h2>Raw Depth Files to Convert:</h2>
+                    <ul class="fileUL" id="convert-list"></ul>
+                </div>
             </section>
         </div>
 

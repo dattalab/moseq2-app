@@ -56,7 +56,6 @@ def check_local_data_dir():
                     files.append(extra)
                     if extra not in data['local_files']:
                         data['local_files'].append(extra)
-                        print(data['local_files'])
 
                 data['local_files'] = files
                 with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
