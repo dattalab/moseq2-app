@@ -42,7 +42,7 @@ def check_local_data_dir():
         else:
             # if json not found, create it
             if not os.path.exists(cwd+data_config+'sidebar-progress.json'):
-                tempJSON = {'local_files': [], "extracted_files": [], "roi_files": []}
+                tempJSON = {'local_files': [], "extracted_files": [], "roi_files": [], "pca_files": []}
                 with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
                     json.dump(tempJSON, outfile)
             else:
