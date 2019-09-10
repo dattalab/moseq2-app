@@ -47,23 +47,83 @@ function toggleBatchModeModel(evt) {
 }
 
 function learnModel() {
-    $.get('/learn-model', {}, function(resp) {
-        if (resp.ok) {
-            alert(resp.message);
-        } else {
-            alert(resp.message);
-        }
+    var url = '/learn-model';
+    var formData = new FormData();
+
+
+    $('#learn-list li').each(function(i)
+    {
+       var filename = $(this).attr('id');
+       filename = filename.replace('-', '/');
+
+       formData.append('score-file', filename);
     });
-    window.location.reload();
+
+
+    $('#model-params input, #model-params select').each(
+        function(index){
+            var input = $(this);
+            if (formData.get(input.attr('name'))) {
+                var prev = formData.get(input.attr('name'));
+                let newVal = [prev, input.val()];
+                formData.set(input.attr('name'), newVal);
+            } else{
+                formData.append(input.attr('name'), input.val());
+            }
+        }
+    );
+
+    fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+
+        })
+        .catch(() => {
+            console.log('error :(');
+            // Error: inform user of upload error response.
+    });
 }
 
 function countFrames() {
-    $.get('/count-frames', {}, function(resp) {
-        if (resp.ok) {
-            alert(resp.message);
-        } else {
-            alert(resp.message);
-        }
+    var url = '/count-frames';
+    var formData = new FormData();
+
+
+    $('#count-list li').each(function(i)
+    {
+       var filename = $(this).attr('id');
+       filename = filename.replace('-', '/');
+
+       formData.append('video-file', filename);
     });
-    window.location.reload();
+
+
+    $('#count-params input, #count-params select').each(
+        function(index){
+            var input = $(this);
+            if (formData.get(input.attr('name'))) {
+                var prev = formData.get(input.attr('name'));
+                let newVal = [prev, input.val()];
+                formData.set(input.attr('name'), newVal);
+            } else{
+                formData.append(input.attr('name'), input.val());
+            }
+        }
+    );
+
+    fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(response => {
+
+        })
+        .catch(() => {
+            console.log('error :(');
+            // Error: inform user of upload error response.
+    });
 }

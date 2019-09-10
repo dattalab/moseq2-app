@@ -175,7 +175,7 @@ function displayParamModal(ev) {
     window.onclick = function(event) {
       if (event.target == modal) {
         modal.style.display = "none";
-        window.location.reload();
+        //window.location.reload();
       }
     }
 }
@@ -203,7 +203,7 @@ function displayHelpModal(ev) {
     window.onclick = function(event) {
         if (event.target == modal) {
             modal.style.display = "none";
-            window.location.reload();
+            //window.location.reload();
         }
     }
 }
@@ -214,6 +214,7 @@ function getLocalDir() {
             // change button color to green and display extract button
             var fileList = resp.files;
             var extractedFiles = resp.extracted;
+            var pcaFiles = resp.pca;
 
             benchFiles = fileList;
             var e = document.querySelector("#filelist");
@@ -223,7 +224,9 @@ function getLocalDir() {
                 child = e.lastElementChild;
             }
             for(var i = 0; i < fileList.length; i++) {
-                $('#filelist').append('<option onclick="selectFile(event)">'+fileList[i]+'</option>');
+                if(!fileList[i].includes('_pca/') && !fileList[i].includes('tmp/') && !fileList[i].includes('.lock')) {
+                    $('#filelist').append('<option onclick="selectFile(event)">' + fileList[i] + '</option>');
+                }
             }
 
             if (extractedFiles.length > 0) {
@@ -233,16 +236,40 @@ function getLocalDir() {
                 var child = g.lastElementChild;
                 while (child) {
                     g.removeChild(child);
-                    child = e.lastElementChild;
+                    child = g.lastElementChild;
                 }
                 for(var i = 0; i < extractedFiles.length; i++) {
-                    $('#extractedlist').append('<option>'+extractedFiles[i]+'</option>');
+                    $('#extractedlist').append('<option onclick="selectFile(event)">'+extractedFiles[i]+'</option>');
                 }
             } else {
                 var h2 = document.getElementById('e-file-title').hidden = true;
                 var exSelect = document.getElementById('extractedlist').hidden = true;
 
                 var g = document.querySelector("#extractedlist");
+                var child = g.lastElementChild;
+                while (child) {
+                    g.removeChild(child);
+                    child = g.lastElementChild;
+                }
+            }
+
+            if (pcaFiles.length > 0) {
+                document.getElementById('p-file-title').hidden = false;
+                document.getElementById('pcalist').hidden = false;
+                var g = document.querySelector("#pcalist");
+                var child = g.lastElementChild;
+                while (child) {
+                    g.removeChild(child);
+                    child = g.lastElementChild;
+                }
+                for(var i = 0; i < pcaFiles.length; i++) {
+                    $('#pcalist').append('<option onclick="selectFile(event)">'+pcaFiles[i]+'</option>');
+                }
+            } else {
+                document.getElementById('p-file-title').hidden = true;
+                document.getElementById('pcalist').hidden = true;
+
+                var g = document.querySelector("#pcalist");
                 var child = g.lastElementChild;
                 while (child) {
                     g.removeChild(child);

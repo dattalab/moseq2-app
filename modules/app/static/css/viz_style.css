@@ -28,18 +28,60 @@
 .btn-group#tab button.active {
     background-color: #4CAF50;
 }
-.c-box {
-    height: 25px;
-    width: 25px;
+
+
+.Vrow {
+  border: 5px ghostwhite;
+  width: 75%;
+  margin: 20px;
+  margin-left: 20%;
 }
 
-.plots1 {
-    height: 500px;
-    weight: 500px;
+.Vcolumn {
+    justify: center;
+    margin-bottom: 50px;
+    margin-top: 20px;
+}
+
+#vl {
+  float: left;
+  width: 100%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 70%;
+}
+
+.columnL {
+  font-size: 25px;
+  text-align: center;
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 45px;
+  border-bottom-style: solid;
+}
+
+
+.columnR {
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  align-content: center;
+  height: 45px;
+  border-left-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
+}
+
+
+.paramC{
+    height: 35px;
+    width: 35px;
 }
 
 .choice-content {
-  float: right;
+  float: none;
   padding: 0px 0px;
   /*border: 10px solid #ccc;*/
   width: 100%;
@@ -51,6 +93,7 @@
     background-color: #080808;
     color: white;
     font-size: 25px;
+    margin-left: 15%;
 }
 
 #movie-select-op {

@@ -25,8 +25,45 @@
         </div>
         <div id="right-tab">
             <section class="choice-content" id="init-step-tab">
-                <h1>(Optional) Configure files/models used</h1>
-                <button onclick="generateIndex()" id="gen-index-op">Generate Index File</button>
+                <div class="Vrow">
+                    <form id="index-params">
+                        <div class="Vcolumn" id="vl">
+                            <div class="col-row">
+                                <div class="columnL">
+                                    Input Sample(s):
+                                </div>
+                                <div class="columnR">
+                                    <input class="param" name="input_dir" type="text" value="cwd()">
+                                </div>
+                            </div>
+                            <div class="col-row">
+                                <div class="columnL">
+                                    PCA File:
+                                </div>
+                                <div class="columnR">
+                                    <input class="param" name="pca_file" type="text" value="cwd()">
+                                </div>
+                            </div>
+                            <div class="col-row">
+                                <div class="columnL">
+                                    Filter:
+                                </div>
+                                <div class="columnR">
+                                    <input class="param2" name="filter" type="text" value=""><input class="param2" name="filter" type="text" value="">
+                                </div>
+                            </div>
+                            <div class="col-row">
+                                <div class="columnL">
+                                    Use All UUIDs?
+                                </div>
+                                <div class="columnR">
+                                    <input class="paramC" name="all_uuids" type="checkbox">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div><br><br><br><br><br><br><br><br><br><br><br>
+                <button onclick="generateIndex()" id="gen-index-op">Confirm Index File</button>
             </section>
             <section class="choice-content" id="make-crowd-movies-tab">
                 <h1>Make Crowd Movies</h1>

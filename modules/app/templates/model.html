@@ -28,11 +28,189 @@
             <section class="choice-content" id="train-model-tab">
                 <h1>Train ARHMM</h1>
                 <h2>Select Model Parameters</h2>
+                <div class="model-row">
+                     <form id="model-params">
+                         <div class="model-column" id="mPl">
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Hold Out?
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="paramC" name="hold_out" type="checkbox">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Hold Out Seed:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="hold_out_seed" type="number" value="-1">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Number of Folds:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="nfolds" type="number" value="5">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Number of Iterations:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="num_iter" type="number" value="100">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Number of Restarts:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="restarts" type="number" value="100">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Variable Name:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="var_name" type="text" value="scores">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Save Every:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="save_every" type="number" value="-1">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Save Model?
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="paramC" name="save_model" type="checkbox">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="model-columnL">
+                                    Max Number of States:
+                                </div>
+                                <div class="model-columnR">
+                                    <input class="param" name="max_states" type="number" value="100">
+                                </div>
+                             </div>
+                         </div>
+                         <div class="model-column" id="mPr">
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Number of PCs:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="npcs" type="number" value="10">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Whiten:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="whiten" type="text" value="all">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Kappa:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="kappa" type="number" value="1e24">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Gamma:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="gamma" type="number" value="1000">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Alpha:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="alpha" type="number" value="5.7">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Nu:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="nu" type="number" value="4">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Noise Level:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="noise_level" type="number" value="0">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Number of Lags:
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="param" name="nlags" type="number" value="3">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Separate Transition Graphs?
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="paramC" name="separate_trans" type="checkbox">
+                                </div>
+                             </div>
+                             <div class="col-model-row">
+                                <div class="rmodel-columnL">
+                                    Robust?
+                                </div>
+                                <div class="rmodel-columnR">
+                                    <input class="paramC" name="robust" type="checkbox">
+                                </div>
+                             </div>
+                         </div>
+                     </form>
+                </div>
+                <div class="filecheckM" id="learnfiles">
+                    <h2>Score Files to Train ARHMM:</h2>
+                    <ul class="fileUL" id="learn-list"></ul>
+                </div><br>
                 <button id="train-op" onclick="learnModel()">Train ARHMM</button>
             </section>
             <section class="choice-content" id="count-frames-tab">
-                <h1>Count Frames in Video</h1>
-                <h2>Select Video</h2>
+                <h1>Count Frames in Video</h1><br>
+                <form id="count-params">
+                    <div class="col-row">
+                        <div class="columnL">
+                              Variable Name:
+                        </div>
+                        <div class="columnR">
+                            <input class="param" name="var_name" type="text" value="scores">
+                        </div>
+                    </div>
+                </form><br><br><br>
+                <h2>Select Video</h2><br>
+                <div class="filecheckM" id="countfiles">
+                    <h2>Videos to Count Frames:</h2>
+                    <ul class="fileUL" id="count-list"></ul>
+                </div><br>
                 <button id="count-op" onclick="countFrames()">Count Frames</button>
             </section>
         </div>

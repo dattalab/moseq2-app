@@ -3,3 +3,9 @@ requirements.txt
 *.pyc
 
 data/*
+
+*.lock
+
+modules/app/static/img/pca/pca_components.png
+
+modules/app/static/img/pca/pca_scree.png

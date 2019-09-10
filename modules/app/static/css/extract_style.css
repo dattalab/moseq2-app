@@ -143,6 +143,8 @@
   justify-content: center;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   grid-gap: 1em;
+  margin-left: 20%;
+  margin-right: 20%;
 }
 
 #find-roi-tab img {

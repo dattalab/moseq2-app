@@ -61,6 +61,6 @@ def check_local_data_dir():
                 with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
                     json.dump(data, outfile)
 
-                return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files, 'extracted': data['extracted_files']}), 200
+                return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files, 'extracted': data['extracted_files'], 'pca': data['pca_files']}), 200
     else:
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400

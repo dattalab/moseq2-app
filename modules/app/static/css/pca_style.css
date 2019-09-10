@@ -50,13 +50,41 @@
 }
 
 /* Style the tab content */
-#pca-tab .choice-content {
+#train-pca-tab.choice-content {
+  float: none;
   text-align: center;
   height: 100%;
   width: 100%;
   border-left: none;
 }
-
+#apply-pca-tab.choice-content {
+  float: none;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+  border-left: none;
+}
+#clip-scores-tab.choice-content {
+  float: none;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+  border-left: none;
+}
+#compute-cp-tab.choice-content {
+  float: none;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+  border-left: none;
+}
+#gallery-tab.choice-content {
+  float: none;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+  border-left: none;
+}
 
 element.style {
     display: block;
@@ -64,14 +92,32 @@ element.style {
 
 
 #score-view-op {
-    float:right;
-    margin-right: 75px;
+    float:left;
+    margin-left: 75px;
     background-color: #080808;
     color: white;
     font-size: 40px;
 }
 
 #trainfiles.filecheckP {
+    display: inline-block;
+    width: 500px;
+    height: 300px;
+    border: 1px solid #000;
+    margin-left: 50px;
+    margin: 15px;
+}
+
+#applyfiles.filecheckP {
+    display: inline-block;
+    width: 500px;
+    height: 300px;
+    border: 1px solid #000;
+    margin-left: 50px;
+    margin: 15px;
+}
+
+#cpfiles.filecheckP {
     display: inline-block;
     width: 500px;
     height: 300px;
@@ -96,6 +142,21 @@ element.style {
     background-color: #080808;
     color: white;
     font-size: 25px;
+    margin-left: 15%;
+}
+
+#apply-params {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+    margin-left: 15%;
+}
+
+#cp-params {
+    background-color: #080808;
+    color: white;
+    font-size: 25px;
+    margin-left: 15%;
 }
 
 #train-op {
@@ -108,6 +169,7 @@ element.style {
     display: table;
     flex-direction: row;
     width: 75%;
+    margin: 20px;
 }
 
 .train-row:after {
@@ -185,6 +247,45 @@ element.style {
   float:right;
 }
 
+#tPl1 {
+  float: left;
+  margin-left: 15px;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 70%;
+
+}
+
+#tPr1 {
+  width: 49%;
+  background-color: #8B0000;
+  justify-content: center;
+  margin-left: 0px;
+  height: 70%;
+  float:right;
+}
+
+
+#tPl2 {
+  float: left;
+  margin-left: 15px;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 70%;
+
+}
+
+#tPr2 {
+  width: 49%;
+  background-color: #8B0000;
+  justify-content: center;
+  margin-left: 0px;
+  height: 70%;
+  float:right;
+}
+
 .param {
     color: black;
     padding: 10px 5px;
@@ -243,4 +344,57 @@ element.style {
     background-color: #080808;
     color: white;
     font-size: 25px;
+}
+
+
+.pca-grid-container {
+  display: grid;
+  justify-content: center;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-gap: 1em;
+  margin: 20px;
+  margin-left: 20%;
+  margin-right: 20%;
+}
+
+
+#gallery-tab img {
+  width: 100%;
+  height: auto;
+}
+
+.pca-images:hover .img-title {
+  opacity: 1;
+}
+
+.pca-images {
+  position: relative;
+}
+
+.img-title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: rgba(90,0,10,0.4);
+
+  /* typographic styles */
+  color: white;
+  font-size: 1.5em;
+  font-weight: bold;
+  text-decoration: none;
+
+  /* position the text centrally*/
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* hide the title by default */
+  opacity: 0;
+  transition: opacity .5s;
+}
+
+.pca-img {
+    line-height: 0;
 }

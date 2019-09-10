@@ -151,15 +151,15 @@ function findROI() {
         .then(response => {
 
             var grid = document.getElementsByClassName('grid-container')[0];
-            var files = response.files.split(" || ")
+            var files = response.files.split(" || ");
 
             for(var i=0; i < files.length-1; i++) {
 
-                filename = files[i].split('/')
-                filename = filename[filename.length-1]
+                filename = files[i].split('/');
+                filename = filename[filename.length-1];
 
                 var computedDiv = document.createElement('div');
-                computedDiv.setAttribute('style', 'justify-content:center;')
+                computedDiv.setAttribute('style', 'justify-content:center;');
                 computedDiv.setAttribute('class', 'computed-roi');
 
                 var title = document.createElement('a');
@@ -367,6 +367,22 @@ function selectFile(event) {
             ul = document.getElementById(listname);
         case "train-button":
             listname = "train-list";
+            ul = document.getElementById(listname);
+            break;
+        case "apply-pca-button":
+            listname = "apply-list";
+            ul = document.getElementById(listname);
+            break;
+        case "compute-cp-button":
+            listname = "cp-list";
+            ul = document.getElementById(listname);
+            break;
+        case "learn-model":
+            listname = "learn-list";
+            ul = document.getElementById(listname);
+            break;
+        case "count-frames":
+            listname = "count-list";
             ul = document.getElementById(listname);
             break;
         default:
