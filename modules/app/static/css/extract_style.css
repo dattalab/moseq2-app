@@ -293,6 +293,8 @@ a {text-decoration: none; }
 }
 
 .row {
+  display: table;
+  flex-direction: row;
   border: 5px ghostwhite;
   width: 75%;
 }
@@ -315,8 +317,8 @@ a {text-decoration: none; }
 }
 
 .paramC{
-    height: 35px;
-    width: 35px;
+    height: 50px;
+    width: 50px;
 }
 
 .columnR {

@@ -2,7 +2,8 @@ requirements.txt
 
 *.pyc
 
-data/*
+data/server/*
+data/local/server/*
 
 *.lock
 

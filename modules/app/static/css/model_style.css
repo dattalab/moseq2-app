@@ -135,7 +135,7 @@
     margin: 15px;
 }
 
-.columnR {
+.McolumnR {
   float: left;
   width: 30%;
   background-color: #4CAF50;
@@ -146,7 +146,7 @@
   border-bottom-style: solid;
 }
 
-.columnL {
+.McolumnL {
   font-size: 25px;
   text-align: center;
   width: 30%;

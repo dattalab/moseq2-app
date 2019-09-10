@@ -142,21 +142,21 @@ element.style {
     background-color: #080808;
     color: white;
     font-size: 25px;
-    margin-left: 15%;
+    margin-left: 5%;
 }
 
 #apply-params {
     background-color: #080808;
     color: white;
     font-size: 25px;
-    margin-left: 15%;
+    margin-left: 5%;
 }
 
 #cp-params {
     background-color: #080808;
     color: white;
     font-size: 25px;
-    margin-left: 15%;
+    margin-left: 5%;
 }
 
 #train-op {
