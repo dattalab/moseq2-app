@@ -30,6 +30,7 @@ def pca_train(path=None):
                 elif v.isdigit() or '-' in v:
                     input_params[k] = int(v)
 
+            print(input_params)
             ret = train_pca_command(cwd1, 'local', cwd1+'_pca', input_params['gaussian_filter_space'], input_params['gaussian_filter_time'],
                               input_params['med_filter_space'], input_params['med_filter_time'], False, input_params['missing_data_iters'],
                               input_params['mask_threshold'], input_params['mask_height_threshold'], input_params['min_height'], input_params['max_height'],
@@ -49,6 +50,7 @@ def pca_train(path=None):
                 with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
                     json.dump(data, outfile)
 
+                # finally copy generated images to static folder for view
                 return jsonify({'ok': True, 'message': 'Training was successful'}), 200
         else:
             return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
@@ -84,6 +86,7 @@ def pca_apply(path=None):
 
             if os.path.exists(cwd1+'/_pca/pca_scores.h5') and ret:
                 pca_files = [f.replace(cwd1, '') for f in glob.glob(cwd1 + "_pca/*", recursive=True)]
+
                 # save pca model path in sidebar.json
                 with open(cwd + data_config + 'sidebar-progress.json') as json_file:
                     data = json.load(json_file)

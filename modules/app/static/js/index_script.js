@@ -215,6 +215,7 @@ function getLocalDir() {
             var fileList = resp.files;
             var extractedFiles = resp.extracted;
             var pcaFiles = resp.pca;
+            var modelFiles = resp.models;
 
             benchFiles = fileList;
             var e = document.querySelector("#filelist");
@@ -270,6 +271,30 @@ function getLocalDir() {
                 document.getElementById('pcalist').hidden = true;
 
                 var g = document.querySelector("#pcalist");
+                var child = g.lastElementChild;
+                while (child) {
+                    g.removeChild(child);
+                    child = e.lastElementChild;
+                }
+            }
+
+            if (modelFiles.length > 0) {
+                document.getElementById('m-file-title').hidden = false;
+                document.getElementById('modellist').hidden = false;
+                var g = document.querySelector("#modellist");
+                var child = g.lastElementChild;
+                while (child) {
+                    g.removeChild(child);
+                    child = g.lastElementChild;
+                }
+                for(var i = 0; i < modelFiles.length; i++) {
+                    $('#modellist').append('<option onclick="selectFile(event)">'+modelFiles[i]+'</option>');
+                }
+            } else {
+                document.getElementById('m-file-title').hidden = true;
+                document.getElementById('modellist').hidden = true;
+
+                var g = document.querySelector("#modellist");
                 var child = g.lastElementChild;
                 while (child) {
                     g.removeChild(child);

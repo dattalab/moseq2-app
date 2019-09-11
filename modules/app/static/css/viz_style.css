@@ -75,6 +75,75 @@
 }
 
 
+.rVcolumnR {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 45px;
+  border-left-style: solid;
+  border-bottom-style: solid;
+}
+
+.rVcolumnL {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  font-size: 25px;
+  display: flex;
+  justify-content: center;
+  height: 45px;
+  border-bottom-style: solid;
+}
+
+#vl2 {
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 60%;
+}
+
+#vr2 {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 60%;
+}
+
+#vl3 {
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 60%;
+}
+
+#vl4 {
+  float: left;
+  width: 50%;
+  background-color: #4CAF50;
+  justify-content: center;
+  height: 60%;
+}
+
+#vr4 {
+  float: left;
+  width: 50%;
+  background-color: #8B0000;
+  justify-content: center;
+  height: 60%;
+}
+
+#crowd-title {
+
+}
+
+#gen-crowd-title {
+    margin-left: 10%;
+}
+
 .paramC{
     height: 35px;
     width: 35px;
@@ -106,6 +175,57 @@
     background-color: #080808;
     color: white;
     font-size: 25px;
+    margin-left: 10%;
+}
+
+/* Style the tab */
+.viz-tab {
+  overflow: hidden;
+  color: white;
+  background-color: #080808;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Style the buttons inside the tab */
+.viz-tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.viz-tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.viz-tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.viz-tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border-top: none;
+}
+
+.viz-tabcontent {
+  animation: fadeEffect 1s; /* Fading effect takes 1 second */
+}
+
+/* Go from zero to full opacity */
+@keyframes fadeEffect {
+  from {opacity: 0;}
+  to {opacity: 1;}
 }
 
 #scalar-op {

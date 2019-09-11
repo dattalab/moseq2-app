@@ -1,51 +1,57 @@
-from moseq2_viz.cli import *
+from moseq2_viz.gui import *
 import os
 from flask import request, jsonify
-from app import app, data_path#, mongo
+from app import app, data_path, data_config #, mongo
 import logger
+import json
 
 @app.route('/viz-add-group', methods=['GET'])
 def viz_add_group(path=None):
     return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
 @app.route('/generate-viz-index', methods=['GET', 'POST', 'PATCH'])
-def viz_gen_index(path=None):
-    if request.method == 'GET':
-        cwd = os.getcwd()
-        cwd1 = cwd + data_path
+def viz_gen_index():
+    cwd = os.getcwd()
+    cwd1 = cwd + data_path
+    if request.method == 'POST':
+        # start cli command with default params unless get dict is not empty
+        cd_cmd = 'cd ' + cwd1
+        os.system(cd_cmd)
 
-        os.system(f'cd {cwd1}')
+        index_name = 'moseq2-index.yaml'
+        data = request.form.to_dict()
+        print(data)
+        if data != {}:
 
-        if os.path.exists(cwd1):
-            os.system(f'moseq2-viz generate-index -i {cwd1} -p {cwd1}_pca/pca_scores.h5 -o {cwd1}moseq2-index.yaml')
+            ret = generate_index_command(cwd1, cwd1+'_pca/pca_scores.h5', cwd1+index_name, None, False)
 
-            if os.path.exists(cwd1 + 'moseq2-index.yaml'):
+            if os.path.exists(cwd1 + index_name) and ret:
+                with open(cwd + data_config + 'sidebar-progress.json') as json_file:
+                    data = json.load(json_file)
+                    if index_name not in data['model_files']:
+                        data['model_files'].append(index_name)
+
+                with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
+                    json.dump(data, outfile)
                 return jsonify({'ok': True, 'message': 'Index file successfully generated!'}), 200
-            else:
-                return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
-        else:
-            return jsonify({'ok': False, 'message': 'Cannot find input directory!'}), 400
+
     return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
 
 @app.route('/make-crowd-movies', methods=['GET', 'POST', 'PATCH'])
-def viz_make_crowd_movies(path=None):
-    if request.method == 'GET':
-        cwd = os.getcwd()
-        cwd1 = cwd+data_path
+def viz_make_crowd_movies():
+    cwd = os.getcwd()
+    cwd1 = cwd + data_path
+    if request.method == 'POST':
+        # start cli command with default params unless get dict is not empty
+        cd_cmd = 'cd ' + cwd1
+        os.system(cd_cmd)
 
-        output_path = cwd1 + 'crowd_movies/'
-        index_path = cwd1+'moseq2-index.yaml'
-        model_path = cwd1+'model.p'
-
-        os.system(f'cd {cwd1}')
-
-        if os.path.exists(cwd1):
-            print(index_path, model_path)
-            os.system(f'moseq2-viz make-crowd-movies -o {output_path} {index_path} {model_path}')
-
+        index_name = 'moseq2-index.yaml'
+        data = request.form.to_dict()
+        print(data)
+        if data != {}:
             if os.path.exists(cwd1+'/crowd_movies/'):
-
-                os.system(f'cp {output_path}syllable_sorted-id-0* {cwd}modules/app/static/img/crowd_movie.mp4')
+                #os.system(f'cp {output_path}syllable_sorted-id-0* {cwd}modules/app/static/img/crowd_movie.mp4')
                 return jsonify({'ok': True, 'message': 'Crowd movies successfully created!'}), 200
             else:
                 return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400

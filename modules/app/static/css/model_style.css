@@ -63,8 +63,6 @@
 
 
 .model-row {
-    display: table;
-    flex-direction: row;
     width: 75%;
     margin: 20px;
     margin-left: 15%;

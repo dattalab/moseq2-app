@@ -42,7 +42,7 @@ def check_local_data_dir():
         else:
             # if json not found, create it
             if not os.path.exists(cwd+data_config+'sidebar-progress.json'):
-                tempJSON = {'local_files': [], "extracted_files": [], "roi_files": [], "pca_files": []}
+                tempJSON = {"local_files": [], "extracted_files": [], "roi_files": [], "pca_files": [], "model_files": []}
                 with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
                     json.dump(tempJSON, outfile)
             else:
@@ -58,9 +58,14 @@ def check_local_data_dir():
                         data['local_files'].append(extra)
 
                 data['local_files'] = files
+                if 'pca_files' not in data.keys():
+                    data['pca_files'] = []
+                if 'model_files' not in data.keys():
+                    data['model_files'] = []
+
                 with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
                     json.dump(data, outfile)
 
-                return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files, 'extracted': data['extracted_files'], 'pca': data['pca_files']}), 200
+                return jsonify({'ok': True, 'message': 'Successfully found files.', 'files': files, 'extracted': data['extracted_files'], 'pca': data['pca_files'], 'models': data['model_files']}), 200
     else:
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400

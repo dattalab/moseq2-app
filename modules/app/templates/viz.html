@@ -19,8 +19,6 @@
             <button class="choice" onclick="openTab(event, 'init-step-tab')" id="init-step-button">Index Configuration</button>
             <script>document.getElementById("init-step-button").click();</script>
             <br><br>
-            <button class="choice" onclick="openTab(event, 'make-crowd-movies-tab')" id="make-crowd-movies-button">Make Crowd Movies</button>
-            <br><br>
             <button class="choice" onclick="openTab(event, 'plot-analysis-tab')" id="plot-scalar-button">Plot Analysis</button>
         </div>
         <div id="right-tab">
@@ -65,25 +63,317 @@
                 </div><br><br><br><br><br><br><br><br><br><br><br>
                 <button onclick="generateIndex()" id="gen-index-op">Confirm Index File</button>
             </section>
-            <section class="choice-content" id="make-crowd-movies-tab">
-                <h1>Make Crowd Movies</h1>
-                <button onclick="crowdMovies()" id="crowd-op">Make Create Movies</button>
-                <br><br>
-                <div>
-                    <h2 id="extraction-title">Crowd Movie Example</h2>
-                    <video id="crowd-movie" width="500" height="500" loop controls>
-                        <source src="/static/img/crowd_movie.mp4" type="video/mp4">
-                    </video>
-                </div>
-                <button onclick="selectMovie()" id="movie-select-op">Select Movie</button>
-            </section>
             <section class="choice-content" id="plot-analysis-tab">
                 <h1>Plot Scalar Summary Graphs</h1>
-                <button onclick="plotScalars()" id="scalar-op">Plot Scalars</button>
-                <br><br>
-                <img class="plots1" src="/static/img/scalar_summary.png">
-                <br><br>
-                <img class="plots1" src="/static/img/scalar_position.png">
+                <div class="viz-tab">
+                    <button class="viz-tablinks" onclick="openGraph(event, 'crowds')" id="defaultOpen">Crowd Movies</button>
+                    <button class="viz-tablinks" onclick="openGraph(event, 'scalars')">Scalars</button>
+                    <button class="viz-tablinks" onclick="openGraph(event, 'transition')">Transition Graphs</button>
+                    <button class="viz-tablinks" onclick="openGraph(event, 'usages')">Usages</button>
+                </div>
+                <div id="scalars" class="viz-tabcontent">
+                    <h3>Scalar Summary</h3>
+                    <button onclick="plotScalars()" id="scalar-op">Plot Scalars</button>
+                </div>
+
+                <div id="transition" class="viz-tabcontent">
+                    <h3>Syllable Transition Graphs</h3>
+                    <div class="Vrow">
+                        <form id="trans-params">
+                            <div class="Vcolumn" id="vl2">
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Max Number of Syllables:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="max_syllable" type="number" value="40">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Group:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="group" type="text" value="">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Normalize:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="normalize" type="text" value="bigram">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Edge Threshold:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="edge_threshold" type="number" value="0.001">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Usage Threshold:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="usage_threshold" type="number" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Layout:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="layout" type="text" value="spring">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Keep Orphan Nodes?
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="paramC" name="keep_orphans" type="checkbox">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="Vcolumn" id="vr2">
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Arrows?
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="paramC" name="arrows" type="checkbox">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Sort Syllables by Usage?
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="paramC" name="sort" type="checkbox" checked>
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Count:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="count" type="text" value="usage">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Edge Scaling:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="edge_scaling" type="number" value="250">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Node Scaling:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="node_scaling" type="number" value="10000.0">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Scale Node By Usage?
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="paramC" name="scale_node_by_usage" type="checkbox" checked>
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Width Per Group:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="width_per_group" type="number" value="8">
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div><br><br><br><br><br><br><br><br><br><br><br>
+                    <button onclick="plotTransitionGraphs()" id="trans-op">Plot Transition Graphs</button>
+                </div>
+
+                <div id="usages" class="viz-tabcontent">
+                    <h3>Syllable Usages</h3>
+                    <div class="Vrow">
+                        <form id="usage-params">
+                            <div class="Vcolumn" id="vl3">
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Sort Syllables?
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="paramC" name="sort" type="checkbox" checked>
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Count:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="count" type="text" value="usage">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Max Number of Syllables:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="max_syllable" type="number" value="40">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Group:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="group" type="text" value="">
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <button onclick="plotUsages()" id="usage-op">Plot Usage Graphs</button>
+                </div>
+                <div id="crowds" class="viz-tabcontent">
+                    <div class="Vrow">
+                        <form id="crowd-params">
+                            <div class="Vcolumn" id="vl4">
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Max Number of Syllables:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="max_syllable" type="number" value="40">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Max Number of Examples:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="max_examples" type="number" value="40">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Number of Worker Threads:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="threads" type="number" value="-1">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Sort Syllables?
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="paramC" name="sort" type="checkbox" checked>
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Gaussian Spatial Filter:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param2" name="gaussianfilter_space" type="number" value="0"><input class="param2" name="gaussianfilter_space" type="number" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Median Spatial Filter:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param" name="medfilter_space" type="number" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="VcolumnL">
+                                        Raw Video Size:
+                                    </div>
+                                    <div class="VcolumnR">
+                                        <input class="param2" name="raw_size" type="number" value="512"><input class="param2" name="raw_size" type="number" value="424">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="Vcolumn" id="vr4">
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Min Height:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="min_height" type="number" value="10">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Max Height:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="max_height" type="number" value="80">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Scale:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="scale" type="number" value="1">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Color Map:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="cmap" type="text" value="jet">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Clip Duration Limit (frames):
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="dur_clip" type="number" value="300">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Legacy Jitter Fix?
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="paramC" name="legacy_jitter_fix" type="checkbox">
+                                    </div>
+                                </div>
+                                <div class="col-row">
+                                    <div class="rVcolumnL">
+                                        Model:
+                                    </div>
+                                    <div class="rVcolumnR">
+                                        <input class="param" name="model_path" type="text">
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div><br><br><br><br><br><br><br><br><br><br><br>
+                    <button onclick="crowdMovies()" id="crowd-op">Make Create Movies</button>
+                    <br><br>
+                    <div>
+                        <h2 id="gen-crowd-title">Crowd Movie Example</h2>
+                        <video id="crowd-movie" width="500" height="500" loop controls>
+                            <source src="/static/img/crowd_movie.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <button onclick="selectMovie()" id="movie-select-op">Select Movie</button>
+                </div>
             </section>
         </div>
     </body>

@@ -29,17 +29,23 @@
         </nav>
         <div class="helper-buttons">
             <button class="help-button" id="help-op" onclick="displayHelpModal(event)">Help</button>
-            <button class="openbtn" onclick="openNav(event)">☰ Toggle File Select List</button>
+            <button class="openbtn" onclick="openNav(event)">☰ Toggle File Browser</button>
         </div>
         <div id="mySidebar" class="sidebar">
-            <h2 id="curr-op">Current op: </h2>
+            <h2 id="curr-op">Current op: </h2><br>
             <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
+
             <h2 style="color:white; padding-left: 10px;">Local Files</h2>
-            <a><select id="filelist" size="6" multiple required></select></a>
+            <a><select id="filelist" size="6" multiple required></select></a><br>
+
             <h2 style="color:white; padding-left: 10px;" id="e-file-title" hidden>Extracted Files</h2>
             <a><select id="extractedlist" size="6" multiple hidden></select></a><br>
+
             <h2 style="color:white; padding-left: 10px;" id="p-file-title" hidden>PCA Files</h2>
-            <a><select id="pcalist" size="6" multiple hidden></select></a><br><br><br>
+            <a><select id="pcalist" size="6" multiple hidden></select></a><br>
+
+            <h2 style="color:white; padding-left: 10px;" id="m-file-title" hidden>Model Files</h2>
+            <a><select id="modellist" size="6" multiple hidden></select></a><br><br><br>
         </div>
         <!-- The Helper Modal -->
         <div id="helperModal" class="modal">

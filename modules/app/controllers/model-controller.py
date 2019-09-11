@@ -1,6 +1,6 @@
 import os
 from flask import request, jsonify
-from app import app, data_path#, mongo
+from app import app, data_path, data_config#, mongo
 import logger
 import json
 from moseq2_model.gui import *
@@ -38,15 +38,26 @@ def model_learn(path=None):
                 elif isfloat(v):
                     input_params[k] = float(v)
 
-            ret = learn_model_command(cwd1+input_params['score-file'], cwd1+'model.p', input_params['hold_out'],
-                                      input_params['hold_out_seed'], input_params['nfolds'], 0,
+            modelname = "model.p"
+            ret = learn_model_command(cwd1+input_params['score-file'], cwd1+modelname, input_params['hold_out'],
+                                      input_params['hold_out_seed'], input_params['nfolds'], 4,
                                       input_params['num_iter'], input_params['restarts'], input_params['var_name'],
                                       input_params['save_every'], input_params['save_model'], input_params['max_states'],
                                       True, input_params['npcs'], input_params['whiten'], input_params['kappa'], input_params['gamma'],
                                       input_params['alpha'], input_params['noise_level'], input_params['nu'], input_params['nlags'],
                                       input_params['separate_trans'], input_params['robust'], "", "n/a")
 
-    if os.path.exists(cwd1 + 'model.p') and ret:
+    if os.path.exists(cwd1 + modelname) and ret:
+        # save pca model path in sidebar.json
+        with open(cwd + data_config + 'sidebar-progress.json') as json_file:
+            data = json.load(json_file)
+            if 'model_files' not in data.keys():
+                data['model_files'] = []
+            if modelname not in data['model_files']:
+                data["model_files"].append(modelname)
+
+        with open(cwd + data_config + 'sidebar-progress.json', 'w') as outfile:
+            json.dump(data, outfile)
         return jsonify({'ok': True, 'message': 'Model trained.'}), 200
     else:
         return jsonify({'ok': False, 'message': 'Bad request parameters!'}), 400
