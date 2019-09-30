@@ -1,5 +1,5 @@
-git+https://{username}:{password}@github.com/dattalab/moseq2-extract.git@app
-git+https://{username}:{password}@github.com/dattalab/moseq2-pca.git@app
-git+https://{username}:{password}@github.com/dattalab/moseq2-model.git@app
-git+https://{username}:{password}@github.com/dattalab/moseq2-viz.git@app
-git+https://{username}:{password}@github.com/dattalab/moseq2-batch.git@app
+git+https://{username}:{password}@github.com/dattalab/moseq2-extract.git@dev
+git+https://{username}:{password}@github.com/dattalab/moseq2-pca.git@dev
+git+https://{username}:{password}@github.com/dattalab/moseq2-model.git@dev
+git+https://{username}:{password}@github.com/dattalab/moseq2-viz.git@dev
+git+https://{username}:{password}@github.com/dattalab/moseq2-batch.git@dev
