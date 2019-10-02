@@ -2,8 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="48633984-cc81-4af0-909f-3288fe4b23ad" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/data/config/sidebar-progress.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/app/static/img/rois/roi_00.jpeg" beforeDir="false" afterPath="$PROJECT_DIR$/modules/app/static/img/rois/roi_00.jpeg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.ipynb_checkpoints/MoSeq2-Notebook-checkpoint.ipynb" beforeDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -134,6 +135,9 @@
       <workItem from="1568125429150" duration="142000" />
       <workItem from="1568125603272" duration="28122000" />
       <workItem from="1568218064015" duration="7846000" />
+      <workItem from="1569524098188" duration="6000" />
+      <workItem from="1569855450095" duration="6000" />
+      <workItem from="1570024150040" duration="96000" />
     </task>
     <servers />
   </component>
