@@ -1,0 +1,162 @@
+crop_size:
+- 80
+- 80
+bg_roi_dilate:
+- 10
+- 10
+bg_roi_shape: ellipse
+bg_roi_index: 0
+bg_roi_weights:
+- 1
+- 0.1
+- 1
+bg_roi_depth_range:
+- 650
+- 750
+bg_roi_gradient_filter: false
+bg_roi_gradient_threshold: 3000
+bg_roi_gradient_kernel: 7
+bg_roi_fill_holes: true
+min_height: 10
+max_height: 100
+fps: 30
+flip_classifier: ./flip_classifier_k2_c57_10to13weeks.pkl
+flip_classifier_smoothing: 51
+use_tracking_model: false
+tracking_model_ll_threshold: -100
+tracking_model_mask_threshold: -16
+tracking_model_ll_clip: -100
+tracking_model_segment: true
+tracking_model_init: raw
+cable_filter_iters: 0
+cable_filter_shape: rectangle
+cable_filter_size:
+- 5
+- 5
+tail_filter_iters: 1
+tail_filter_size:
+- 9
+- 9
+tail_filter_shape: ellipse
+spatial_filter_size:
+- 3
+temporal_filter_size:
+- 0
+chunk_size: 1000
+chunk_overlap: 0
+output_dir:
+write_movie: true
+use_plane_bground: false
+frame_dtype: uint8
+centroid_hampel_span: 0
+centroid_hampel_sig: 3
+angle_hampel_span: 0
+angle_hampel_sig: 3
+model_smoothing_clips: &id001
+- 0
+- 0
+frame_trim: *id001
+compress: false
+compress_chunk_size: 3000
+compress_threads: 3
+config_file:
+input_file:
+bg_sort_roi_by_position: false
+bg_sort_roi_by_position_max_rois: 2
+input_dir: /Users/wgillis/dev/lab/moseq2-app
+cluster_type: local
+gaussfilter_space:
+- 1.5
+- 1
+gaussfilter_time: 0
+medfilter_space:
+- 0
+medfilter_time:
+- 0
+missing_data: false
+missing_data_iters: 10
+mask_threshold: -16
+mask_height_threshold: 5
+tailfilter_size:
+- 9
+- 9
+tailfilter_shape: ellipse
+use_fft: false
+recon_pcs: 10
+rank: 50
+output_file: pca
+visualize_results: true
+dask_cache_path: /Users/wgillis/moseq2_pca
+local_processes: true
+queue: debug
+nworkers: 10
+cores: 1
+processes: 1
+memory: 15GB
+wall_time: 06:00:00
+timeout: 5
+h5_path: /frames
+h5_mask_path: /frames_mask
+pca_path: /components
+pca_file:
+fill_gaps: true
+detrend_window: 0
+pca_file_components:
+pca_file_scores:
+neighbors: 1
+threshold: 0.5
+klags: 6
+sigma: 3.5
+dims: 300
+dest_file:
+hold_out: false
+hold_out_seed: -1
+nfolds: 5
+ncpus: 0
+num_iter: 100
+var_name: scores
+e_step: false
+save_every: -1
+save_model: false
+max_states: 100
+npcs: 10
+whiten: all
+progressbar: true
+kappa:
+gamma: 1000.0
+alpha: 5.7
+noise_level: 0
+nlags: 3
+separate_trans: false
+robust: false
+checkpoint_freq: -1
+index: ''
+default_group: n/a
+index_file:
+model_path:
+max_syllable: 40
+max_examples: 40
+threads: -1
+sort: true
+count: usage
+raw_size:
+- 512
+- 424
+scale: 1
+cmap: jet
+dur_clip: 300
+legacy_jitter_fix: false
+frame_path: frames
+model_fit:
+group:
+normalize: bigram
+edge_threshold: 0.001
+usage_threshold: 0
+layout: spring
+keep_orphans: false
+orphan_weight: 0
+arrows: false
+edge_scaling: 250
+node_scaling: 10000.0
+scale_node_by_usage: true
+width_per_group: 8
