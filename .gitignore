@@ -16,8 +16,8 @@
 
 *.lock
 
-.ipynb_checkpoints/
 .idea/
 .ipynb_checkpoints/MoSeq2-Notebook-checkpoint.ipynb
+.ipynb_checkpoints
 
 .idea/workspace.xml
