@@ -3,10 +3,6 @@ MoSeq2 Web Application Platform used to run all of the MoSeq2 tools in a GUI.
 
 ** Follow the installation and set up steps outlined in this README to ensure your jupyter notebooks will run smoothly. **
 
-## MoSeq2 Usage Pipeline
-<img src="https://raw.githubusercontent.com/dattalab/moseq2-app/jupyter/media/Full_Pipeline.png?token=ACRN4H2NAM273ZDASQPFJDK5T6EBS" alt="Sequential MoSeq2 Usage Pattern" title="MoSeq2 Pipeline" />
-
-
 # MoSeq2 Software Requirements
 
 In order to successfully install MoSeq2, we recommend you ensure you have the following libraries and packages already installed:
