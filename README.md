@@ -172,10 +172,15 @@ export CXX=/usr/local/bin/g++-7
 Once you have set up your environment and installed all the prerequisite packages, you are now ready to install the MoSeq2 tools.
 
 source activate moseq2dev
+
 pip install --upgrade pip
+
 pip install git+https://github.com/dattalab/moseq2-extract.git@dev
+
 pip install git+https://github.com/dattalab/moseq2-pca.git@dev
+
 pip install git+https://github.com/dattalab/moseq2-model.git@dev
+
 pip install git+https://github.com/dattalab/moseq2-viz.git@dev
 
 
