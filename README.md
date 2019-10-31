@@ -3,6 +3,8 @@ MoSeq2 Web Application Platform used to run all of the MoSeq2 tools in a GUI.
 
 **Follow the installation and set up steps outlined in this README to ensure your jupyter notebooks will run smoothly.**
 
+__NOTE: you can skip the conda environment setup if you already have one. Simply install the latest dev branches in your activated environment (install commands found at the bottom of this page).__ 
+
 # MoSeq2 Software Requirements
 
 In order to successfully install MoSeq2, we recommend you ensure you have the following libraries and packages already installed:
@@ -29,7 +31,9 @@ In order to successfully install MoSeq2, we recommend you ensure you have the fo
 ```bash
 
 curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+
 chmod +x $HOME/miniconda3_latest.sh
+
 $HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
 
 ```
@@ -38,7 +42,9 @@ $HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
 ```bash
 
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+
 chmod +x $HOME/miniconda3_latest.sh
+
 $HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
 
 ```
@@ -53,9 +59,13 @@ Once it is set up, copy the following commands into your terminal:
 ```bash
 
 sudo apt-get update
+
 sudo apt-get install git build-essential curl libxrender-dev libsm6 libglib2.0-0
+
 curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+
 chmod +x $HOME/miniconda3_latest.sh
+
 $HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
 
 ```
@@ -120,7 +130,7 @@ conda install -n moseq2dev -c conda-forge ffmpeg
 
 Now that your conda environment is set up, lets ensure your C/C++ compiler versions are correct in order to install all the tools successfully.
 
-### Setting a default gcc/g++ compiler
+### Setting a default gcc/g++ compiler (Very Important)
 
 MoSeq2 requires using a legacy version of gcc/g++: version 7 or 8.
 
@@ -168,5 +178,5 @@ Once successfully completed installation, you are now ready to use MoSeq2!
 
 To get started,
 - Copy the moseq2-notebook jupyter (`.ipynb`) file to a parent directory that contains your recorded sessions folders.
-- Start your specified conda environment.
+- Start your specified conda environment (if you haven't already).
 - Run the Jupyter Notebook.
