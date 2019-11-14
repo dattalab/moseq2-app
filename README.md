@@ -1,9 +1,28 @@
 # MoSeq2-Notebook Setup
-MoSeq2 Web Application Platform used to run all of the MoSeq2 tools in a GUI.
+MoSeq2 Web Application Platform used to run all of the MoSeq2 tools in a Jupyter Notebook.
 
 **Follow the installation and set up steps outlined in this README to ensure your jupyter notebooks will run smoothly.**
 
-__NOTE: you can skip the conda environment setup if you already have one. Simply install the latest dev branches in your activated environment (install commands found at the bottom of this page).__ 
+__NOTE: If you already have anaconda installed AND have an environment setup: simply install the latest dev branches in your activated environment, and run the commands below sequentially.__ 
+
+```bash
+conda activate moseq2dev # moseq2dev being a pre-existing conda environment 
+
+export CC=/usr/local/bin/gcc-7
+export CXX=/usr/local/bin/g++-7
+
+conda install -c conda-forge ffmpeg
+
+pip install --upgrade pip
+
+pip install git+https://github.com/dattalab/moseq2-extract.git@dev
+
+pip install git+https://github.com/dattalab/moseq2-pca.git@dev
+
+pip install git+https://github.com/dattalab/moseq2-model.git@dev
+
+pip install git+https://github.com/dattalab/moseq2-viz.git@dev
+```
 
 # MoSeq2 Software Requirements
 
