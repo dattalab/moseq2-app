@@ -196,6 +196,5 @@ pip install git+https://github.com/dattalab/moseq2-viz.git@dev
 Once successfully completed installation, you are now ready to use MoSeq2! 
 
 To get started,
-- Copy the moseq2-notebook jupyter (`.ipynb`) file to a parent directory that contains your recorded sessions folders.
 - Start your specified conda environment (if you haven't already).
 - Run the Jupyter Notebook.
