@@ -1,0 +1,13 @@
+name: moseq2dev
+channels:
+  - conda-forge
+  - default
+dependencies:
+  - python=3.6
+  - pip
+  - jupyter
+  - ffmpeg
+  - pip:
+    - git+https://github.com/dattalab/moseq2-extract.git@dev
+    - git+https://github.com/dattalab/moseq2-pca.git@dev
+    - git+https://github.com/dattalab/moseq2-viz.git@dev
