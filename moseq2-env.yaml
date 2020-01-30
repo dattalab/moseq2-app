@@ -8,6 +8,9 @@ dependencies:
   - jupyter
   - ffmpeg
   - pip:
-    - git+https://github.com/dattalab/moseq2-extract.git@release
-    - git+https://github.com/dattalab/moseq2-pca.git@release
-    - git+https://github.com/dattalab/moseq2-viz.git@release
+    - jupyter_contrib_nbextensions
+    - https://github.com/ipython-contrib/jupyter_contrib_nbextensions/tarball/master
+    - jupyter_nbextensions_configurator
+    - git+https://github.com/dattalab/moseq2-extract.git@dev
+    - git+https://github.com/dattalab/moseq2-pca.git@dev
+    - git+https://github.com/dattalab/moseq2-viz.git@dev
