@@ -18,7 +18,7 @@ In order to successfully install MoSeq2, we recommend you ensure you have the fo
      - anaconda3/miniconda3
      - python3.6 (top right-hand side of the jupyter notebook will indicate the python version for you)
      - git
-     - gcc-7 and g++-7 (ensure this version is default)
+     - gcc-7 and g++-7 (ensure this version is installed and defaulted)
      - numpy
      - pip
      - Conda Environment:

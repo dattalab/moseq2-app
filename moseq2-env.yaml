@@ -1,4 +1,4 @@
-name: moseq2dev
+name: moseq2dummy
 channels:
   - conda-forge
   - default
