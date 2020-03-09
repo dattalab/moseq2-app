@@ -34,6 +34,9 @@ To install and set up your MoSeq environment using `easy_install.sh`, ensure you
 
 Once both are installed, simply execute the easy install shell file: `./easy_install.sh`
 
+The install script will also automatically try to ensure GCC is being installed for the 
+following operating systems: Darwin (Mac), Linux, Cygwin (Windows).
+
 # Get Started
 
 After the easy_install is complete, activate your new conda environment and launch the jupyter notebook to get started.
