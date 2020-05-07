@@ -87,6 +87,8 @@ Once both are installed, simply execute the easy install shell file: `./easy_ins
 The install script will also automatically try to ensure GCC is being installed for the 
 following operating systems: Darwin (Mac), Linux, Cygwin (Windows).
 
+If you experience any issues with the easy_install, check the `manual_install.md` file.
+
 # Get Started
 
 After the easy_install is complete, activate your new conda environment and launch the jupyter notebook to get started.
