@@ -1,5 +1,7 @@
 # MoSeq2-Notebook: An interactive Jupyter Notebook for animal behavior sequencing
 
+Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
+
 This package contains a jupyter notebook that is tailored for novice programmers to process
 their depth videos of rodents, and segment their behavior into what is denoted as "syllables".
 
