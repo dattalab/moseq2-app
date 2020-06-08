@@ -65,6 +65,8 @@ $HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
 ```
 
 ### Ensure the Correct Version of GCC-7/G++-7 is defaulted
+__Note: gcc version `6.2.0` is also acceptable.__
+
 To check if you have gcc-7/g++-7 is installed, run this command: `which gcc-7`.
 You should expect to see an outputted path to your gcc-7 installation, like this: `/usr/local/bin/gcc-7`
 
@@ -74,7 +76,7 @@ For MacOS:
  - You can use [brew](https://brew.sh/) to install gcc by running these commands:
 ```bash
 xcode-select --install # Download the latest version of Xcode if you don't already have it
-brew install gcc@7
+brew install gcc@7å
 ```
 
 For WSL/Ubuntu/Linux: [follow this link](https://gist.github.com/jlblancoc/99521194aba975286c80f93e47966dc5).
