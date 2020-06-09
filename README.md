@@ -119,7 +119,7 @@ git clone -b release https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ./easy_install.sh
 conda activate moseq2-app
-pip install git+https://github.com/dattalab/moseq2-model.git@release
+pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 ```
 ***
  
