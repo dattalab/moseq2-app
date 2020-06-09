@@ -64,6 +64,15 @@ chmod +x $HOME/miniconda3_latest.sh
 $HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
 ```
 
+OR
+
+```bash
+wget https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
+chmod +x $HOME/Anaconda3-2020.02-Linux-x86_64.sh
+$HOME/Anaconda3-2020.02-Linux-x86_64.sh -b -p $HOME/anaconda3
+```
+
+
 ### Ensure the Correct Version of GCC-7/G++-7 is defaulted
 __Note: gcc version `6.2.0` is also acceptable.__
 
@@ -79,7 +88,18 @@ xcode-select --install # Download the latest version of Xcode if you don't alrea
 brew install gcc@7
 ```
 
-For WSL/Ubuntu/Linux: [follow this link](https://gist.github.com/jlblancoc/99521194aba975286c80f93e47966dc5).
+For WSL/Ubuntu/Linux, run the following commands:
+```bash
+sudo apt-get install -y software-properties-common
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt update
+sudo apt install g++-7 -y
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 \
+                         --slave /usr/bin/g++ g++ /usr/bin/g++-7 
+sudo update-alternatives --config gcc
+gcc --version
+g++ --version
+```
 
 Finally, for all platforms:
  - Once you have gcc-7 installed and is confirmed by running `which gcc-7`/`which g++-7`, run the next 2 commands
@@ -92,11 +112,15 @@ export CXX="$(which g++-7)"
 
 ### Create MoSeq2 Conda Environment and Install Dependencies  
 
+
 Once conda is operational and gcc-7 is installed, set up and install your MoSeq environment by running the following commands:
- 1. `./easy_install.sh`
- 2. `conda activate moseq2-app`
- 3. `pip install git+https://github.com/dattalab/moseq2-model.git@release`
- 
+```bash
+git clone -b release https://github.com/dattalab/moseq2-app.git
+cd moseq2-app
+./easy_install.sh
+conda activate moseq2-app
+pip install git+https://github.com/dattalab/moseq2-model.git@release
+```
 ***
  
 # Get Started
