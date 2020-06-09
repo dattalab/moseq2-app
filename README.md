@@ -76,7 +76,7 @@ For MacOS:
  - You can use [brew](https://brew.sh/) to install gcc by running these commands:
 ```bash
 xcode-select --install # Download the latest version of Xcode if you don't already have it
-brew install gcc@7å
+brew install gcc@7
 ```
 
 For WSL/Ubuntu/Linux: [follow this link](https://gist.github.com/jlblancoc/99521194aba975286c80f93e47966dc5).
