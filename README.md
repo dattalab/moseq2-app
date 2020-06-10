@@ -1,5 +1,7 @@
 # MoSeq2-Notebook: An interactive Jupyter Notebook for animal behavior sequencing
 
+Last Updated: 06/10/2020
+
 Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 
 This package contains a jupyter notebook that is tailored for novice programmers to process
@@ -41,10 +43,10 @@ MoSeq2 requires the following platform dependencies to be installed:
          - latest version of XCode
 
 Below is a list of all the required minimum versions of each repository to ensure are installed:
- - moseq2-extract==0.5.0
- - moseq2-pca==0.3.0
- - moseq2-model==0.4.0
- - moseq2-viz==0.3.0
+ - `moseq2-extract==0.5.0`
+ - `moseq2-pca==0.3.0`
+ - `moseq2-model==0.4.0`
+ - `moseq2-viz==0.3.0`
 
 # Installation
 
@@ -122,11 +124,28 @@ conda activate moseq2-app
 pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 ```
 ***
+
+# Download a Test Dataset
+
+To try MoSeq2 on some sample data, we have provided 2 bash script files to either download the complete 48 session dataset,
+or 10 total sessions with 5 of each experimental group. Download your chosen dataset using either of the following command:
+```bash
+./download_5n5.sh # 10 total session; 5 saline, 5 amphetamine
+
+./download_full_dataset.sh # all 48 sessions [24 sessions per group]
+```
+The shell scripts will create a new directory in this cloned repo with a copy of the `MoSeq2-Notebook`. 
+Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the newly created conda env). 
+
+__Note: while using this dataset, you may use all the default parameter settings in the Notebook as they were previously 
+configured to match this dataset.__
  
 # Get Started
 
 Once everything is installed, it is recommended that you copy the jupyter notebook to the directory containing 
 your data to analyze and run the notebook from there, such that you preserve the original copy in your cloned directory.
+
+__Note: ensure that the `jupyter notebook` command is being run from the same directory as the notebook itself.__
 
 ```bash
 conda activate moseq2-app
