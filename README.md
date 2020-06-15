@@ -128,9 +128,9 @@ pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 # Download a Test Dataset
 
 To try MoSeq2 on some sample data, we have provided 2 bash script files to either download the complete 48 session dataset,
-or 10 total sessions with 5 of each experimental group. Download your chosen dataset using either of the following command:
+or 20 total sessions with 10 of each experimental group. Download your chosen dataset using either of the following command:
 ```bash
-./download_5n5.sh # 10 total session; 5 saline, 5 amphetamine
+./download_10n10.sh # 20 total session; 10 saline, 10 amphetamine
 
 ./download_full_dataset.sh # all 48 sessions [24 sessions per group]
 ```
