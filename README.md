@@ -138,7 +138,7 @@ The shell scripts will create a new directory in this cloned repo with a copy of
 Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the newly created conda env). 
 
 __Note: while using this dataset, you may use all the default parameter settings in the Notebook as they were previously 
-configured to match this dataset.__
+configured to match this dataset. I.e. you can click 'Run all cells' in the beginning and wait for the analysis pipeline to complete.__
  
 # Get Started
 
