@@ -13,7 +13,7 @@ It includes examples of what to expect at each step, and what to do if things do
 The MoSeq2 toolkit enables users to model rodent behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.
 
-__Note: The Notebook is currently in a testing phase and is utilizing the `release` branch from all of the MoSeq2
+__Note: The Notebook is currently in a testing phase and is utilizing the `test-suite` branch from all of the MoSeq2
 utility repositories.__
 
 ***
