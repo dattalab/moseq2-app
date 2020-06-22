@@ -117,7 +117,7 @@ export CXX="$(which g++-7)"
 
 Once conda is operational and gcc-7 is installed, set up and install your MoSeq environment by running the following commands:
 ```bash
-git clone -b release https://github.com/dattalab/moseq2-app.git
+git clone -b feat-refactor https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ./easy_install.sh
 conda activate moseq2-app
