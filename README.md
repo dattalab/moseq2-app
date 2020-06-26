@@ -1,6 +1,6 @@
 # MoSeq2-Notebook: An interactive Jupyter Notebook for animal behavior sequencing
 
-Last Updated: 06/10/2020
+Last Updated: 06/25/2020
 
 Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 
@@ -32,6 +32,7 @@ MoSeq2 requires the following platform dependencies to be installed:
      - anaconda3/miniconda3 __(FOR LINUX)__
      - python3.6 (top right-hand side of the jupyter notebook will indicate the python version for you)
      - git
+     - wget
      - gcc-7 and g++-7 (ensure this version is installed and defaulted)
      - numpy
      - pip
@@ -43,10 +44,10 @@ MoSeq2 requires the following platform dependencies to be installed:
          - latest version of XCode
 
 Below is a list of all the required minimum versions of each repository to ensure are installed:
- - `moseq2-extract==0.5.0`
- - `moseq2-pca==0.3.0`
- - `moseq2-model==0.4.0`
- - `moseq2-viz==0.3.0`
+ - [`moseq2-extract==0.5.0`](https://github.com/dattalab/moseq2-extract/blob/test-suite/Documentation.pdf)
+ - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/test-suite/Documentation.pdf)
+ - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/test-suite/Documentation.pdf)
+ - [`moseq2-viz==0.3.0`](https://github.com/dattalab/moseq2-viz/blob/test-suite/Documentation.pdf)
 
 # Installation
 
@@ -76,15 +77,29 @@ $HOME/Anaconda3-2020.02-Linux-x86_64.sh -b -p $HOME/anaconda3
 
 
 ### Ensure the Correct Version of GCC-7/G++-7 is defaulted
-__Note: gcc version `6.2.0` is also acceptable.__
+__Note: gcc versions `6.2.0`, `7.5` and `gcc-9` are also acceptable. 
+Ensure to make the necessary adjustments in the respective following commands.__
 
-To check if you have gcc-7/g++-7 is installed, run this command: `which gcc-7`.
-You should expect to see an outputted path to your gcc-7 installation, like this: `/usr/local/bin/gcc-7`
+To check if you have gcc-7/g++-7 is installed, run this command:
+```bash
+which gcc-7
+```
+You should expect to see an outputted path to your gcc-7 installation, like this:
+```bash
+/usr/local/bin/gcc-7
+```
 
 If gcc-7/g++-7 cannot be found, then follow these steps to install them for your respective OS:
 
 For MacOS:
  - You can use [brew](https://brew.sh/) to install gcc by running these commands:
+ 
+To install Homebrew:
+```bash
+ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+```
+
+GCC Install Command:
 ```bash
 xcode-select --install # Download the latest version of Xcode if you don't already have it
 brew install gcc@7
@@ -104,38 +119,75 @@ g++ --version
 ```
 
 Finally, for all platforms:
- - Once you have gcc-7 installed and is confirmed by running `which gcc-7`/`which g++-7`, run the next 2 commands
-to set them as default gcc versions.
 
+Confirm you have `gcc-7` installed by running:
+```bash
+which gcc-7
+which g++-7
+```
+
+The following step is important installing the `moseq2-model` dependency.
+
+Once you have confirmed gcc-7 is installed, run the next 2 commands to set them as default gcc versions.
+It is also recommended to copy these two commands to your `~/.bashrc` file (for Linux and Windows)  
+or `~/.bash_profile` file (for MacOS) to preserve this setting from now on. 
 ```bash
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
 ```
 
-### Create MoSeq2 Conda Environment and Install Dependencies  
+### Create MoSeq2 Conda Environment and Install or Update Dependencies  
 
-
-Once conda is operational and gcc-7 is installed, set up and install your MoSeq environment by running the following commands:
+Once conda is operational and gcc-7 is installed, clone this repository and run the install script (line 3 below).
+The install script gives the option to either create a new conda environment for moseq2-app, or to install the latest versions
+of the required dependencies into a pre-existing __(activated)__ conda environment.
 ```bash
 git clone -b feat-refactor https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ./easy_install.sh
+source ~/.bashrc # or ~/.bash_profile  [OPTIONAL: depending on whether env can be found after creation
 conda activate moseq2-app
-pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 ```
+
+You may need to restart your shell in order for the newly created environment to become visible. 
+This is done in the 4th line in the command block above `source ~/.bashrc`. 
+
+If for whatever reason the environment creation is interrupted, restart the shell and check if the environment `moseq2-app` exists.
+If so, activate the environment and run the install script again but enter `2` to only install the latest dependency versions.
+
+You can list your currently existing conda environments by running the following command:
+```bash
+conda env list
+```
+
 ***
 
 # Download a Test Dataset
 
 To try MoSeq2 on some sample data, we have provided 2 bash script files to either download the complete 48 session dataset,
-or 20 total sessions with 10 of each experimental group. Download your chosen dataset using either of the following command:
+or 20 total sessions with 10 of each experimental group.
+
+`wget` is required in order to download the datasets. Installation commands for different operating systems are listed below.
+
+For MacOS:
+```bash
+brew install wget
+```
+
+For Ubuntu/Debian:
+```bash
+sudo apt-get install wget
+```
+
+Download your chosen dataset using either of the following command:
 ```bash
 ./download_10n10.sh # 20 total session; 10 saline, 10 amphetamine
 
 ./download_full_dataset.sh # all 48 sessions [24 sessions per group]
 ```
+
 The shell scripts will create a new directory in this cloned repo with a copy of the `MoSeq2-Notebook`. 
-Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the newly created conda env). 
+Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the activated conda env). 
 
 __Note: while using this dataset, you may use all the default parameter settings in the Notebook as they were previously 
 configured to match this dataset. I.e. you can click 'Run all cells' in the beginning and wait for the analysis pipeline to complete.__
@@ -145,10 +197,10 @@ configured to match this dataset. I.e. you can click 'Run all cells' in the begi
 Once everything is installed, it is recommended that you copy the jupyter notebook to the directory containing 
 your data to analyze and run the notebook from there, such that you preserve the original copy in your cloned directory.
 
-__Note: ensure that the `jupyter notebook` command is being run from the same directory as the notebook itself.__
+__Note: ensure that the `jupyter notebook` command is being run from the same directory as the notebook and the folders containing your data.__
 
 ```bash
 conda activate moseq2-app
 
 jupyter notebook
-```  
+```

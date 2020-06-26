@@ -11,3 +11,4 @@ dependencies:
     - git+https://github.com/dattalab/moseq2-extract.git@test-suite
     - git+https://github.com/dattalab/moseq2-pca.git@test-suite
     - git+https://github.com/dattalab/moseq2-viz.git@test-suite
+    - git+https://github.com/dattalab/moseq2-model.git@test-suite
