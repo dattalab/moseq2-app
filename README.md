@@ -51,6 +51,14 @@ Below is a list of all the required minimum versions of each repository to ensur
 
 # Installation
 
+#### Update Pre-existing MoSeq2 Installation
+If you already have a previous version of MoSeq2 installed in a pre-existing conda environment, 
+run the following cell block to install the latest versions of MoSeq2:
+```bash
+conda activate [ENV_NAME]
+./easy_install.sh # then enter '2'
+```
+
 ### Ensure Anaconda for Linux is Installed
 The reason it is recommended to use Mini/Anaconda for Linux instead of installing a separate Conda application is due
  to the need to set environmental variables relating to respective OS dependencies. Using Linux provides more control
@@ -154,6 +162,12 @@ This is done in the 4th line in the command block above `source ~/.bashrc`.
 
 If for whatever reason the environment creation is interrupted, restart the shell and check if the environment `moseq2-app` exists.
 If so, activate the environment and run the install script again but enter `2` to only install the latest dependency versions.
+
+### Update Dependencies in Existing Conda Environment
+```bash
+conda activate [ENV_NAME]
+./easy_install.sh # then enter '2'
+```
 
 You can list your currently existing conda environments by running the following command:
 ```bash

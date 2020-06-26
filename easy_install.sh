@@ -32,16 +32,16 @@ if [ $option == $two ]; then
   conda install -c conda-forge ffmpeg -y
   pip install git+https://github.com/dattalab/moseq2-extract.git@test-suite
   pip install git+https://github.com/dattalab/moseq2-pca.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
   pip install git+https://github.com/dattalab/moseq2-viz.git@test-suite
+  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 } ||
 {
   pip install --upgrade jupyter
   conda install -c conda-forge ffmpeg -y
   pip install git+https://github.com/dattalab/moseq2-extract.git@test-suite
   pip install git+https://github.com/dattalab/moseq2-pca.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
   pip install git+https://github.com/dattalab/moseq2-viz.git@test-suite
+  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 } ||
 {
   conda update pip -y
@@ -49,7 +49,7 @@ if [ $option == $two ]; then
   conda install -c conda-forge ffmpeg -y
   pip install git+https://github.com/dattalab/moseq2-extract.git@test-suite
   pip install git+https://github.com/dattalab/moseq2-pca.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
   pip install git+https://github.com/dattalab/moseq2-viz.git@test-suite
+  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
 }
 fi
