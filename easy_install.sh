@@ -36,17 +36,14 @@ if [ $option == $two ]; then
   pip install git+https://github.com/dattalab/moseq2-model.git@release
 } ||
 {
-  pip install --upgrade jupyter
-  conda install -c conda-forge ffmpeg -y
+  export CC="$(which gcc)"
+  export CXX="$(which g++)"
   pip install git+https://github.com/dattalab/moseq2-extract.git@release
   pip install git+https://github.com/dattalab/moseq2-pca.git@release
   pip install git+https://github.com/dattalab/moseq2-viz.git@release
   pip install git+https://github.com/dattalab/moseq2-model.git@release
 } ||
 {
-  conda update pip -y
-  pip install --upgrade jupyter
-  conda install -c conda-forge ffmpeg -y
   pip install git+https://github.com/dattalab/moseq2-extract.git@release
   pip install git+https://github.com/dattalab/moseq2-pca.git@release
   pip install git+https://github.com/dattalab/moseq2-viz.git@release
