@@ -153,7 +153,7 @@ of the required dependencies into a pre-existing __(activated)__ conda environme
 git clone -b feat-refactor https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ./easy_install.sh
-source ~/.bashrc # or ~/.bash_profile  [OPTIONAL: depending on whether env can be found after creation
+source ~/.bashrc # or ~/.bash_profile  [OPTIONAL: depending on whether env can be found after creation]
 conda activate moseq2-app
 ```
 
