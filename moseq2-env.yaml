@@ -8,7 +8,7 @@ dependencies:
   - jupyter
   - ffmpeg
   - pip:
-    - git+https://github.com/dattalab/moseq2-extract.git@test-suite
-    - git+https://github.com/dattalab/moseq2-pca.git@test-suite
-    - git+https://github.com/dattalab/moseq2-viz.git@test-suite
-    - git+https://github.com/dattalab/moseq2-model.git@test-suite
+    - git+https://github.com/dattalab/moseq2-extract.git@release
+    - git+https://github.com/dattalab/moseq2-pca.git@release
+    - git+https://github.com/dattalab/moseq2-viz.git@release
+    - git+https://github.com/dattalab/moseq2-model.git@release

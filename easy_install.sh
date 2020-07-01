@@ -30,26 +30,26 @@ if [ $option == $two ]; then
   export CXX="$(which g++-7)"
   pip install --upgrade jupyter
   conda install -c conda-forge ffmpeg -y
-  pip install git+https://github.com/dattalab/moseq2-extract.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-pca.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-viz.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
+  pip install git+https://github.com/dattalab/moseq2-extract.git@release
+  pip install git+https://github.com/dattalab/moseq2-pca.git@release
+  pip install git+https://github.com/dattalab/moseq2-viz.git@release
+  pip install git+https://github.com/dattalab/moseq2-model.git@release
 } ||
 {
   pip install --upgrade jupyter
   conda install -c conda-forge ffmpeg -y
-  pip install git+https://github.com/dattalab/moseq2-extract.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-pca.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-viz.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
+  pip install git+https://github.com/dattalab/moseq2-extract.git@release
+  pip install git+https://github.com/dattalab/moseq2-pca.git@release
+  pip install git+https://github.com/dattalab/moseq2-viz.git@release
+  pip install git+https://github.com/dattalab/moseq2-model.git@release
 } ||
 {
   conda update pip -y
   pip install --upgrade jupyter
   conda install -c conda-forge ffmpeg -y
-  pip install git+https://github.com/dattalab/moseq2-extract.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-pca.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-viz.git@test-suite
-  pip install git+https://github.com/dattalab/moseq2-model.git@test-suite
+  pip install git+https://github.com/dattalab/moseq2-extract.git@release
+  pip install git+https://github.com/dattalab/moseq2-pca.git@release
+  pip install git+https://github.com/dattalab/moseq2-viz.git@release
+  pip install git+https://github.com/dattalab/moseq2-model.git@release
 }
 fi

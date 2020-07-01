@@ -1,6 +1,6 @@
 # MoSeq2-Notebook: An interactive Jupyter Notebook for animal behavior sequencing
 
-Last Updated: 06/25/2020
+Last Updated: 07/01/2020
 
 Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 
@@ -13,7 +13,7 @@ It includes examples of what to expect at each step, and what to do if things do
 The MoSeq2 toolkit enables users to model rodent behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.
 
-__Note: The Notebook is currently in a testing phase and is utilizing the `test-suite` branch from all of the MoSeq2
+__Note: The Notebook is currently in a testing phase and is utilizing the `release` branch from all of the MoSeq2
 utility repositories.__
 
 ***
@@ -44,10 +44,10 @@ MoSeq2 requires the following platform dependencies to be installed:
          - latest version of XCode
 
 Below is a list of all the required minimum versions of each repository to ensure are installed:
- - [`moseq2-extract==0.5.0`](https://github.com/dattalab/moseq2-extract/blob/test-suite/Documentation.pdf)
- - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/test-suite/Documentation.pdf)
- - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/test-suite/Documentation.pdf)
- - [`moseq2-viz==0.3.0`](https://github.com/dattalab/moseq2-viz/blob/test-suite/Documentation.pdf)
+ - [`moseq2-extract==0.5.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
+ - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
+ - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
+ - [`moseq2-viz==0.3.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
 
 # Installation
 
