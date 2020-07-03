@@ -149,7 +149,7 @@ Once conda is operational and gcc-7 is installed, clone this repository and run 
 The install script gives the option to either create a new conda environment for moseq2-app, or to install the latest versions
 of the required dependencies into a pre-existing __(activated)__ conda environment.
 ```bash
-git clone -b feat-refactor https://github.com/dattalab/moseq2-app.git
+git clone -b release https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ./easy_install.sh
 source ~/.bashrc # or ~/.bash_profile  [OPTIONAL: depending on whether env can be found after creation]
