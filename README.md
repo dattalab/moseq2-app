@@ -98,7 +98,7 @@ You should expect to see an outputted path to your gcc-7 installation, like this
 
 If gcc-7/g++-7 cannot be found, then follow these steps to install them for your respective OS:
 
-For MacOS:
+#### For MacOS:
  - You can use [brew](https://brew.sh/) to install gcc by running these commands:
  
 To install Homebrew:
@@ -108,11 +108,11 @@ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/
 
 GCC Install Command:
 ```bash
-xcode-select --install # Download the latest version of Xcode if you don't already have it
+xcode-select --install || softwareupdate -i -a # Download the latest version of Xcode if you don't already have it
 brew install gcc@7
 ```
 
-For WSL/Ubuntu/Linux, run the following commands:
+#### For WSL/Ubuntu/Linux:
 ```bash
 sudo apt-get install -y software-properties-common
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
@@ -192,7 +192,7 @@ For Ubuntu/Debian:
 sudo apt-get install wget
 ```
 
-Download your chosen dataset using either of the following command:
+Download your chosen dataset using either of the following command (might take >30 minutes):
 ```bash
 ./download_10n10.sh # 20 total session; 10 saline, 10 amphetamine
 

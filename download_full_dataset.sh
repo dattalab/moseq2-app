@@ -51,3 +51,4 @@ wget -O saline_example_20.zip https://www.dropbox.com/sh/6dq91ddl40x4vsq/AAAN395
 wget -O saline_example_21.zip https://www.dropbox.com/sh/fwnyq3gldwnq8z2/AAB_LXiubF292dTDTLqah2oUa?dl=1 && unzip saline_example_21.zip -d saline_example_21
 wget -O saline_example_22.zip https://www.dropbox.com/sh/sw6hg3qui5ej8fe/AACVQXbY3fUOUOVT2Rafq3cNa?dl=1 && unzip saline_example_22.zip -d saline_example_22
 wget -O saline_example_23.zip https://www.dropbox.com/sh/fsmglj82yo0anl3/AAAOcWkoTp3pIrDzv_QzgEwFa?dl=1 && unzip saline_example_23.zip -d saline_example_23
+rm *.zip

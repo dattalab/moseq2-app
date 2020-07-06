@@ -23,3 +23,4 @@ wget -O saline_example_6.zip https://www.dropbox.com/sh/kpfec602vq8tt2x/AAC7A1H9
 wget -O saline_example_7.zip https://www.dropbox.com/sh/9ghc0ksm7s2bip1/AABPyyA7wsZSjybHh0OjbAf6a?dl=1 && unzip saline_example_7.zip -d saline_example_7
 wget -O saline_example_8.zip https://www.dropbox.com/sh/j08a0do8tresa4r/AADXQ6SdUI1Ux6DZNzr2tOBVa?dl=1 && unzip saline_example_8.zip -d saline_example_8
 wget -O saline_example_9.zip https://www.dropbox.com/sh/o4j4iznywl7fkwq/AABvP6U7EEc6VqsdH8rDgpk6a?dl=1 && unzip saline_example_9.zip -d saline_example_9
+rm *.zip
