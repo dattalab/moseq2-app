@@ -5,13 +5,16 @@ import joblib
 import warnings
 import numpy as np
 import pandas as pd
+from bokeh.io import show
 import ruamel.yaml as yaml
 import ipywidgets as widgets
+from ipywidgets import interactive_output
 from moseq2_app.util import index_to_dataframe
 from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.viz.controller import SyllableLabeler
 from moseq2_app.gui.widgets import GroupSettingWidgets
+from moseq2_app.stat.controller import InteractiveSyllableStats
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_viz.model.util import get_syllable_usages, relabel_by_usage, parse_model_results
 from moseq2_app.roi.validation import (make_session_status_dicts, get_iqr_anomaly_sessions, get_scalar_df,
@@ -242,3 +245,41 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
     # Update view when user selects new syllable from DropDownMenu
     output.observe(on_syll_change, names='value')
+
+def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path=None, max_syllables=None):
+    '''
+    Wrapper function to launch the interactive syllable statistics API. Users will be able to view different
+    syllable statistics, sort them according to their metric of choice, and dynamically group the data to
+    view individual sessions or group averages.
+
+    Parameters
+    ----------
+    index_path (str): Path to index file.
+    model_path (str): Path to trained model file.
+    info_path (str): Path to syllable information file.
+    max_syllables (int): Maximum number of syllables to plot.
+
+    Returns
+    -------
+    '''
+
+    # Initialize the statistical grapher context
+    istat = InteractiveSyllableStats(index_path=index_path, model_path=model_path, df_path=df_path,
+                                     info_path=info_path, max_sylls=max_syllables)
+
+    # Compute the syllable dendrogram values
+    istat.compute_dendrogram()
+
+    # Plot the Bokeh graph with the currently selected data.
+    out = interactive_output(istat.interactive_syll_stats_grapher, {
+        'stat': istat.stat_dropdown,
+        'sort': istat.sorting_dropdown,
+        'groupby': istat.grouping_dropdown,
+        'errorbar': istat.errorbar_dropdown,
+        'sessions': istat.session_sel,
+        'ctrl_group': istat.ctrl_dropdown,
+        'exp_group': istat.exp_dropdown
+    })
+
+    display(istat.clear_button, istat.stat_widget_box, out)
+    show(istat.cladogram)

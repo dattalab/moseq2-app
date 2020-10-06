@@ -1,7 +1,8 @@
 from bokeh.io import output_notebook
 from moseq2_extract.helpers.data import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
-     validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper
+     validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
+     interactive_syllable_stat_wrapper
 
 def view_extraction(extractions, default=0):
     '''
@@ -117,3 +118,26 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=90):
     interactive_syllable_labeler_wrapper(model_path, config_file,
                                          index_file, crowd_dir, syll_info_path,
                                          max_syllables=max_syllables, n_explained=n_explained)
+
+def interactive_syllable_stats(progress_paths, max_syllable=None):
+    '''
+
+    Parameters
+    ----------
+    progress_paths
+    max_syllable
+
+    Returns
+    -------
+
+    '''
+
+    # Get proper input parameters
+    index_file = progress_paths['index_file']
+    model_path = progress_paths['model_path']
+    syll_info_path = progress_paths['syll_info']
+    syll_info_df_path = progress_paths['df_info_path']
+
+    output_notebook()
+    interactive_syllable_stat_wrapper(index_file, model_path, syll_info_path,
+                                      syll_info_df_path, max_syllables=max_syllable)
