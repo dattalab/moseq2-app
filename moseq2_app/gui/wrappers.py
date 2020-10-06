@@ -14,9 +14,9 @@ from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_viz.helpers.wrappers import init_wrapper_function
-from moseq2_app.stat.controller import InteractiveSyllableStats
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
+from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
 from moseq2_viz.model.util import get_syllable_usages, relabel_by_usage, parse_model_results
 from moseq2_app.roi.validation import (make_session_status_dicts, get_iqr_anomaly_sessions, get_scalar_df,
                                        get_anomaly_dict, print_validation_results)
@@ -329,3 +329,35 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
                                                               'groupby': cm_compare.cm_sources_dropdown,
                                                               'nexamples': cm_compare.num_examples})
     display(cm_compare.clear_button, out)
+
+
+def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, max_syllables=None):
+    '''
+    Wrapper function that works as a background process that prepares the data
+    for the interactive graphing function.
+
+    Parameters
+    ----------
+    model_path (str): Path to trained model.
+    index_path (str): Path to index file containined trained data metadata.
+    info_path (str): Path to user-labeled syllable information file.
+
+    Returns
+    -------
+    '''
+
+    # Initialize Transition Graph data structure
+    i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index_path=index_path,
+                                               info_path=info_path, df_path=df_path, max_sylls=max_syllables)
+
+    # Make graphs
+    out = interactive_output(i_trans_graph.interactive_transition_graph_helper,
+                             {'layout': i_trans_graph.graph_layout_dropdown,
+                              'scalar_color': i_trans_graph.color_nodes_dropdown,
+                              'edge_threshold': i_trans_graph.edge_thresholder,
+                              'usage_threshold': i_trans_graph.usage_thresholder,
+                              'speed_threshold': i_trans_graph.speed_thresholder,
+                              })
+
+    # Display widgets and bokeh network plots
+    display(i_trans_graph.clear_button, i_trans_graph.thresholding_box, out)

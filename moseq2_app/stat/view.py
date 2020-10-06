@@ -1,12 +1,18 @@
 import random
+import warnings
 import itertools
 import numpy as np
+import networkx as nx
+from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
-from bokeh.plotting import figure, show
+from bokeh.palettes import Spectral4
+from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Category10_10 as palette
-from bokeh.models import (ColumnDataSource, BoxSelectTool, HoverTool, TapTool, ColorPicker)
+from bokeh.plotting import figure, show, from_networkx
+from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar,
+                          Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
 
 def graph_dendrogram(obj):
     '''
@@ -332,3 +338,368 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     show(graph_n_pickers)
 
     return p
+
+def format_graphs(graphs, group):
+    '''
+    Formats multiple transition graphs to be stacked in vertical column-order with graph positions
+    corresponding to the difference graphs.
+
+    For example for 3 groups output would look like this:
+    [ a  b-a c-a ]
+    [    b   c-b ]
+    [        c   ]
+
+    Parameters
+    ----------
+    graphs (list): list of generated Bokeh figures.
+    group (list): list of unique groups
+
+    Returns
+    -------
+    formatted_plots (2D list): list of lists corresponding to rows of figures being plotted.
+    '''
+
+    # formatting plots into diagonal grid format
+    ncols = len(group)
+
+    group_grid = np.array([[None] * ncols] * ncols)
+
+    # Draw main graphs on diagonal
+    counter = 0
+    for i in range(0, ncols):
+        group_grid[i, i] = graphs[counter]
+        counter += 1
+
+    # Populate remainder of grid with network difference graphs
+    for b in range(1, ncols):
+        i = 0
+        for j in range(b, ncols):
+            group_grid[i, j] = graphs[counter]
+            counter += 1
+            i += 1
+
+    # Use a rotating stack to align the grid difference plots in their appropriate row-column position
+    for e, i in enumerate(range(ncols - 1, 1, -1)):
+        col_items = deque(group_grid[:, i][::-1])
+
+        for _ in range(e + 1):
+            col_items.rotate(-1)
+
+        tmp = list(col_items)
+        # Moving empty plots to the bottom of the column list/beginning of the row list
+        if None in tmp:
+            tmp.append(tmp.pop(tmp.index(None)))
+
+        group_grid[:, i] = tmp
+
+    return list(group_grid)
+
+def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, group_name):
+    '''
+    Computes the incoming and outgoing syllable entropies and
+     neighboring nodes for all the nodes included in node_indices.
+
+    Parameters
+    ----------
+    graph
+    node_indices
+    entropies
+    entropy_rates
+    group_name
+
+    Returns
+    -------
+    entropy_in
+    entropy_out
+    prev_states
+    next_states
+    neighbor_edge_colors
+    '''
+
+    # get selected node neighboring edge colors
+    neighbor_edge_colors = {}
+
+    # get node directed neighbors
+    prev_states, next_states = [], []
+
+    # get average entropy_in and out
+    entropy_in, entropy_out = [], []
+    for n in node_indices:
+        try:
+            # Get predecessor and neighboring states
+            pred = np.array(list(graph.predecessors(n)))
+            neighbors = np.array(list(graph.neighbors(n)))
+
+            e_ins, e_outs = [], []
+            for p in pred:
+                e_in = entropy_rates[p][n] + (entropies[n] + entropies[p])
+                e_ins.append(e_in)
+
+                neighbor_edge_colors[(p, n)] = 'orange'
+
+            for nn in neighbors:
+                e_out = entropy_rates[n][nn] + (entropies[nn] + entropies[n])
+                e_outs.append(e_out)
+
+                neighbor_edge_colors[(n, nn)] = 'purple'
+
+            # Get predecessor and next state transition weights
+            pred_weights = [graph.edges()[(p, n)]['weight'] for p in pred]
+            next_weights = [graph.edges()[(n, p)]['weight'] for p in neighbors]
+
+            # Get descending order of weights
+            pred_sort_idx = np.argsort(pred_weights)[::-1]
+            next_sort_idx = np.argsort(next_weights)[::-1]
+
+            # Get transition likelihood-sorted previous and next states
+            prev_states.append(pred[pred_sort_idx])
+            next_states.append(neighbors[next_sort_idx])
+
+            entropy_in.append(np.nanmean(e_ins))
+            entropy_out.append(np.nanmean(e_outs))
+        except nx.NetworkXError:
+            # handle orphans
+            print('missing', group_name, n)
+            pass
+
+    return entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors
+
+def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
+                                      syll_info, entropies, entropy_rates,
+                                      scalars, scalar_color='default'):
+    '''
+
+    Converts the computed networkx transition graphs to Bokeh glyph objects that can be interacted with
+    and updated throughout run-time.
+
+    Parameters
+    ----------
+    graphs (list of nx.DiGraphs): list of created networkx graphs.
+    pos (nx.Layout): shared node position coordinates layout object.
+    group (list): list of unique group names.
+    group_names (list): list of names for all the generated transition graphs + difference graphs
+    usages (list of OrdreredDicts): list of OrderedDicts containing syllable usages.
+    syll_info (dict): dict of syllable label information to display with HoverTool
+    scalars (dict): dict of syllable scalar information to display with HoverTool
+
+    Returns
+    -------
+    '''
+
+    warnings.filterwarnings('ignore')
+
+    rendered_graphs, plots = [], []
+
+    for i, graph in enumerate(graphs):
+
+        node_indices = [n for n in graph.nodes if n in usages[i].keys()]
+
+        if len(plots) == 0:
+            plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2))
+        else:
+            # Connecting pan-zoom interaction across plots
+            plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
+
+        tooltips = """
+                        <div>
+                            <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
+                            <div><span style="font-size: 12px;">label: @label</span></div>
+                            <div><span style="font-size: 12px;">description: @desc</span></div>
+                            <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                            <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
+                            <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
+                            <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                            <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
+                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
+                            <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
+                            <div>
+                                <video
+                                    src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                                    style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
+                                    border="2"; autoplay loop
+                                ></video>
+                            </div>
+                        </div>
+                   """
+
+        # adding interactive tools
+        plot.add_tools(HoverTool(tooltips=tooltips, line_policy='interp'),
+                       TapTool(),
+                       BoxSelectTool())
+
+        entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors = \
+            get_neighbors_and_entropies(graph, node_indices, entropies[i], entropy_rates[i], group_names[i])
+
+        # edge colors for difference graphs
+        if i >= len(group):
+            edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
+            edge_width = {e: graph.edges()[e]['weight'] * 350 for e in graph.edges()}
+        else:
+            edge_color = {e: 'black' for e in graph.edges()}
+            edge_width = {e: graph.edges()[e]['weight'] * 200 for e in graph.edges()}
+
+        selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
+
+        # setting edge attributes
+        nx.set_edge_attributes(graph, edge_color, "edge_color")
+        nx.set_edge_attributes(graph, selected_edge_colors, "line_color")
+        nx.set_edge_attributes(graph, edge_width, "edge_width")
+
+        # get usages
+        group_usage = [usages[i][j] for j in node_indices if j in usages[i].keys()]
+
+        # get speeds
+        group_speed = [scalars['speed'][i][j] for j in node_indices if j in scalars['speed'][i].keys()]
+        group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i].keys()]
+        group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i].keys()]
+
+        # get average height
+        group_height = [scalars['heights'][i][j] for j in node_indices if j in scalars['heights'][i].keys()]
+
+        # get mean distances to bucket centers
+        group_dist = [scalars['dists'][i][j] for j in node_indices if j in scalars['dists'][i].keys()]
+
+        # node colors for difference graphs
+        if i >= len(group):
+            node_color = {s: 'red' if usages[i][s] > 0 else 'blue' for s in node_indices}
+            node_size = {s: max(15., 10 + abs(usages[i][s] * 500)) for s in node_indices}
+        else:
+            node_color = {s: 'red' for s in node_indices}
+            node_size = {s: max(15., abs(usages[i][s] * 500)) for s in node_indices}
+
+        # setting node attributes
+        nx.set_node_attributes(graph, node_color, "node_color")
+        nx.set_node_attributes(graph, node_size, "node_size")
+
+        # create bokeh-fied networkx transition graph
+        graph_renderer = from_networkx(graph, pos, scale=1, center=(0, 0))
+
+        # getting hovertool info
+        labels, descs, cm_paths = [], [], []
+
+        for n in node_indices:
+            labels.append(syll_info[str(n)]['label'])
+            descs.append(syll_info[str(n)]['desc'])
+            cm_paths.append(syll_info[str(n)]['crowd_movie_path'])
+
+        # setting common data source to display via HoverTool
+        graph_renderer.node_renderer.data_source.add(node_indices, 'number')
+        graph_renderer.node_renderer.data_source.add(labels, 'label')
+        graph_renderer.node_renderer.data_source.add(descs, 'desc')
+        graph_renderer.node_renderer.data_source.add(cm_paths, 'movies')
+        graph_renderer.node_renderer.data_source.add(prev_states, 'prev')
+        graph_renderer.node_renderer.data_source.add(next_states, 'next')
+        graph_renderer.node_renderer.data_source.add(group_usage, 'usage')
+        graph_renderer.node_renderer.data_source.add(group_speed, 'speed')
+        graph_renderer.node_renderer.data_source.add(group_speed_2d, 'speed_2d')
+        graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
+        graph_renderer.node_renderer.data_source.add(group_height, 'height')
+        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center')
+        graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_in), 'ent_in')
+        graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_out), 'ent_out')
+
+        text_color = 'white'
+
+        # node interactions
+        if scalar_color == 'Centroid Speed':
+            fill_color = linear_cmap('speed', "Spectral4", 0, max(group_speed))
+        elif scalar_color == '2D velocity':
+            fill_color = linear_cmap('speed_2d', "Spectral4", 0, max(group_speed_2d))
+        elif scalar_color == '3D velocity':
+            fill_color = linear_cmap('speed_3d', "Spectral4", 0, max(group_speed_3d))
+        elif scalar_color == 'Height':
+            fill_color = linear_cmap('height', "Spectral4", 0, max(group_height))
+        elif scalar_color == 'Distance to Center':
+            fill_color = linear_cmap('dist_to_center', "Spectral4", 0, max(group_dist))
+        elif scalar_color == 'Entropy-In':
+            fill_color = linear_cmap('ent_in', "Spectral4", 0, max(np.nan_to_num(entropy_in)))
+        elif scalar_color == 'Entropy-Out':
+            fill_color = linear_cmap('ent_out', "Spectral4", 0, max(entropy_out))
+        else:
+            fill_color = 'white'
+            text_color = 'black'
+
+        if fill_color != 'white':
+            color_bar = ColorBar(color_mapper=fill_color['transform'], location=(0, 0))
+            plot.add_layout(color_bar, 'below')
+
+        graph_renderer.node_renderer.glyph = Circle(size='node_size', fill_color=fill_color, line_color='node_color')
+        graph_renderer.node_renderer.selection_glyph = Circle(size='node_size', line_color='node_color', fill_color=fill_color)
+        graph_renderer.node_renderer.nonselection_glyph = Circle(size='node_size', line_color='node_color', fill_color=fill_color)
+        graph_renderer.node_renderer.hover_glyph = Circle(size='node_size', fill_color=Spectral4[1])
+
+        # edge interactions
+        graph_renderer.edge_renderer.glyph = MultiLine(line_color='edge_color', line_alpha=0.7,
+                                                       line_width='edge_width', line_join='miter')
+        graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color='line_color', line_width='edge_width',
+                                                                 line_join='miter', line_alpha=0.8, )
+        graph_renderer.edge_renderer.nonselection_glyph = MultiLine(line_color='edge_color', line_alpha=0.0,
+                                                                    line_width='edge_width', line_join='miter')
+        ## Change line color to match difference colors
+        graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color='line_color', line_width=5,
+                                                             line_join='miter', line_alpha=0.8)
+
+        # selection policies
+        graph_renderer.selection_policy = NodesAndLinkedEdges()
+        graph_renderer.inspection_policy = NodesAndLinkedEdges()
+
+        # added rendered graph to plot
+        plot.renderers.append(graph_renderer)
+
+        # get node positions
+        if len(plots) == 0:
+            x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
+            syllable = list(graph.nodes)
+        else:
+            new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
+                          graph_renderer.layout_provider.graph_layout.keys()}
+            x, y = zip(*new_layout.values())
+            syllable = [a if a in node_indices else '' for a in list(new_layout.keys())]
+
+        # create DataSource for node info
+        label_source = ColumnDataSource({'x': x,
+                                         'y': y,
+                                         'syllable': syllable
+                                         })
+
+        # create the LabelSet to render
+        labels = LabelSet(x='x', y='y',
+                          x_offset=-7, y_offset=-7,
+                          text='syllable', source=label_source,
+                          text_color=text_color, text_font_size="12px",
+                          background_fill_color=None,
+                          render_mode='canvas')
+
+        # render labels
+        plot.renderers.append(labels)
+
+        o_line = plot.line(line_color='orange')
+        p_line = plot.line(line_color='purple')
+        r_line = plot.line(line_color='red')
+        b_line = plot.line(line_color='blue')
+
+        items = [
+            LegendItem(label="Incoming Transition", renderers=[o_line]),
+            LegendItem(label="Outgoing Transition", renderers=[p_line]),
+        ]
+        if i >= len(group):
+            items += [LegendItem(label="Up-regulated", renderers=[r_line])]
+            items += [LegendItem(label="Down-regulated", renderers=[b_line])]
+
+        legend = Legend(items=items,
+                       border_line_color="black", background_fill_color='white',
+                       background_fill_alpha=1.0)
+        plot.renderers.append(legend)
+
+        plots.append(plot)
+        rendered_graphs.append(graph_renderer)
+
+    # Format grid of transition graphs
+    formatted_plots = format_graphs(plots, group)
+
+    # Create Bokeh grid plot object
+    gp = gridplot(formatted_plots, plot_width=550, plot_height=550)
+    show(gp)

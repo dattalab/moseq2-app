@@ -31,3 +31,57 @@ class SyllableStatWidgets:
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
         self.stat_widget_box = HBox([self.stat_box, self.sorting_box, self.session_box])
+
+class TransitionGraphWidgets:
+
+
+    '''
+    edge_thresholder = widgets.FloatRangeSlider(value=[0.0025, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
+                                                description='Edges weights to display', continuous_update=False)
+    usage_thresholder = widgets.FloatRangeSlider(value=[0, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
+                                                description='Usage nodes to display', continuous_update=False)
+    speed_thresholder = widgets.FloatRangeSlider(value=[-25, 200], min=-50, max=200, step=1, style=style, readout_format='.1f',
+                                                description='Threshold nodes by speed', continuous_update=False)
+    '''
+
+    def __init__(self):
+        style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
+
+        self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
+
+        col1_layout = widgets.Layout(flex_flow='column', width='75%', align_items='center')
+        col2_layout = widgets.Layout(flex_flow='column', align_contents='center', width='75%', align_items='center')
+
+        ui_layout = widgets.Layout(flex_flow='row', border='solid', align_items='stretch',
+                                   width='100%', justify_content='space-around')
+
+        self.graph_layout_dropdown = widgets.Dropdown(options=['circular',  'spring', 'spectral'],
+                                                      description='Graph Layout',
+                                                      style=style, value='circular',
+                                                      layout=widgets.Layout(align_items='stretch', width='80%'))
+
+        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', 'Centroid Speed', '2D velocity',
+                                                              '3D velocity', 'Height', 'Distance to Center',
+                                                              'Entropy-In', 'Entropy-Out'],
+                                                     description='Node Coloring',
+                                                     style=style, value='Default',
+                                                     layout=widgets.Layout(align_items='stretch', width='80%'))
+
+        self.edge_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style,
+                                                             description='Threshold Edge Weights',
+                                                             layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                             continuous_update=False)
+        self.usage_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style, readout_format='.4f',
+                                                              description='Threshold Nodes by Usage',
+                                                              layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                              continuous_update=False)
+        self.speed_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style, readout_format='.1f',
+                                                              description='Threshold Nodes by Speed',
+                                                              layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                              continuous_update=False)
+
+        self.thresholding_box = HBox([
+                                      VBox([self.graph_layout_dropdown, self.edge_thresholder, self.usage_thresholder],
+                                           layout=col1_layout),
+                                      VBox([self.color_nodes_dropdown, self.speed_thresholder], layout=col2_layout)],
+                                           layout=ui_layout)

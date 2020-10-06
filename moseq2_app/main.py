@@ -2,7 +2,8 @@ from bokeh.io import output_notebook
 from moseq2_extract.helpers.data import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
      validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
-     interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper
+     interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
+     interactive_plot_transition_graph_wrapper
 
 def view_extraction(extractions, default=0):
     '''
@@ -166,3 +167,29 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
     interactive_crowd_movie_comparison_preview_wrapper(config_file, index_file, model_path,
                                                syll_info_path, group_movie_dir, syll_info_df_path,
                                                get_pdfs=get_pdfs)
+
+def interactive_transition_graph(progress_paths, max_syllables=None):
+    '''
+
+    Parameters
+    ----------
+    progress_paths
+    max_syllables (int)
+
+    Returns
+    -------
+
+    '''
+
+    # Get proper input paths
+    model_path = progress_paths['model_path']
+    index_file = progress_paths['index_file']
+    syll_info_path = progress_paths['syll_info']
+    syll_info_df_path = progress_paths['df_info_path']
+
+    output_notebook()
+    interactive_plot_transition_graph_wrapper(model_path,
+                                              index_file,
+                                              syll_info_path,
+                                              syll_info_df_path,
+                                              max_syllables=max_syllables)
