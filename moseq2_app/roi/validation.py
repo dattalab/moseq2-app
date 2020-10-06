@@ -1,4 +1,12 @@
+'''
+
+The module contains extraction validation functions that test extractions' scalar values,
+ timestamps, and position heatmaps.
+
+'''
+
 import h5py
+import math
 import scipy
 import numpy as np
 import pandas as pd
@@ -12,17 +20,17 @@ def check_timestamp_error_percentage(timestamps, fps):
     '''
     https://www.mathworks.com/help/imaq/examples/determining-the-rate-of-acquisition.html
 
+    Returns the proportion of dropped frames relative to the respective recorded timestamps and frames per second.
+
     Parameters
     ----------
-    timestamps
-    fps
+    timestamps (1D np.array): Session's recorded timestamp array.
+    fps (int): Frames per second
 
     Returns
     -------
-    percentError
-
+    percentError (float): Percentage of frames that were dropped/missed during acquisition.
     '''
-
 
     # Find the time difference between frames.
     diff = np.diff(timestamps) / 1000
@@ -42,13 +50,15 @@ def check_timestamp_error_percentage(timestamps, fps):
 def count_nan_rows(scalar_df):
     '''
 
+    Counts the number of rows with NaN scalar values.
+
     Parameters
     ----------
-    scalar_df
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
     Returns
     -------
-    n_missing_frames
+    n_missing_frames (int): Number of frames with NaN computed scalar values.
     '''
 
     nanrows = scalar_df.isnull().sum(axis=1).to_numpy()
@@ -60,16 +70,18 @@ def count_nan_rows(scalar_df):
 def count_missing_mouse_frames(scalar_df):
     '''
 
+    Counts the number of frames where the mouse is not found.
+
     Parameters
     ----------
-    scalar_df
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
     Returns
     -------
-    missing_mouse_frames
+    missing_mouse_frames (int): Number of frames with recorded mouse area ~= 0
     '''
 
-    missing_mouse_frames = len(scalar_df[scalar_df['area_px'] == 0])
+    missing_mouse_frames = len(scalar_df[math.isclose(scalar_df['area_px'], 0)])
 
     return missing_mouse_frames
 
@@ -77,13 +89,16 @@ def count_missing_mouse_frames(scalar_df):
 def count_frames_with_small_areas(scalar_df):
     '''
 
+    Counts the number of frames where the mouse area is smaller than 2 standard deviations of
+     all mouse areas.
+
     Parameters
     ----------
-    scalar_df
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
     Returns
     -------
-    corrupt_frames
+    corrupt_frames (int): Number of frames where the recorded mouse area is too small
     '''
 
     corrupt_frames = len(scalar_df[scalar_df['area_px'] < 2*scalar_df['area_px'].std()])
@@ -93,13 +108,15 @@ def count_frames_with_small_areas(scalar_df):
 def count_stationary_frames(scalar_df):
     '''
 
+    Counts the number of frames where mouse is not moving.
+
     Parameters
     ----------
-    scalar_df
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
     Returns
     -------
-    motionless_frames
+    motionless_frames (int): Number of frames where the mouse is not moving
     '''
 
     motionless_frames = len(scalar_df[scalar_df['velocity_2d_mm'] < 0.1])-1 # subtract 1 because first frame is always 0mm/s
@@ -187,6 +204,8 @@ def compute_kl_divergences(pdfs, groups, sessions, sessionNames, oob=False):
 def get_kl_divergence_outliers(kl_divergences):
     '''
 
+    Returns the position PDFs that are over 2 standard deviations away from the mean position divergence.
+
     Parameters
     ----------
     kl_divergences (pd.Dataframe): dataframe with group, session, subjectName, and divergence
@@ -207,13 +226,16 @@ def get_kl_divergence_outliers(kl_divergences):
 def make_session_status_dicts(paths):
     '''
 
+    Returns the flag status dicts for all the found completed extracted sessions. Additionally performs
+     dropped frames test on all sessions.
+
     Parameters
     ----------
-    paths
+    paths (dict): path dict of session names paired wit their mp4 paths.
 
     Returns
     -------
-
+    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
     '''
 
     status_dicts = {}
@@ -231,12 +253,13 @@ def make_session_status_dicts(paths):
 
     # Get flags
     for k, v in paths.items():
+        # get yaml metadata
         yamlpath = paths[k].replace('mp4', 'yaml')
-
         with open(yamlpath, 'r') as f:
             stat_dict = yaml.safe_load(f)
             status_dicts[stat_dict['metadata']['SessionName']] = deepcopy(flags)
 
+        # read timestamps from h5
         h5path = paths[k].replace('mp4', 'h5')
         timestamps = h5py.File(h5path, 'r')['timestamps'][()]
 
@@ -250,14 +273,17 @@ def make_session_status_dicts(paths):
 def get_iqr_anomaly_sessions(scalar_df, status_dicts):
     '''
 
+    Finds sessions that have a mean scalar value (for a subset of scalars), that are outside of
+     the accepted inter-quartile range.
+
     Parameters
     ----------
-    scalar_df
-    status_dicts
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
+    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
 
     Returns
     -------
-
+    status_dicts (dict): stacked dictionary object containing updated scalar_anomaly flags.
     '''
 
     mean_df = scalar_df.groupby('SessionName', as_index=False).mean()
@@ -280,6 +306,19 @@ def get_iqr_anomaly_sessions(scalar_df, status_dicts):
     return status_dicts
 
 def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
+    '''
+
+    Finds the position PDF outlier sessions and updates the status_dicts with the respective position heatmap flag.
+
+    Parameters
+    ----------
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
+    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
+
+    Returns
+    -------
+    status_dicts (dict): stacked dictionary object containing updated position_heatmap flags.
+    '''
 
     pdfs, groups, sessions, sessionNames = compute_all_pdf_data(scalar_df, key='SessionName')
 
@@ -298,14 +337,17 @@ def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
 def run_validation_tests(scalar_df, status_dicts):
     '''
 
+    Main function that runs all the available extraction validation tests and updates the status_dicts
+     flags accordingly.
+
     Parameters
     ----------
-    scalar_df
-    status_dicts
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
+    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
 
     Returns
     -------
-
+    status_dicts (dict): stacked dictionary object containing all the sessions' updated flag status dicts.
     '''
 
     sessionNames = list(scalar_df.SessionName.unique())
@@ -335,15 +377,17 @@ def run_validation_tests(scalar_df, status_dicts):
 def get_anomaly_dict(scalar_df, status_dicts):
     '''
 
+    Helper function that prepares a dictionary with all the relevant values to print at the
+     end of the validation wrapper.
+
     Parameters
     ----------
-    scalar_df
-    status_dicts
-    sessionNames
+    scalar_df (pd.DataFrame): Computed Scalar DataFrame
+    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
 
     Returns
     -------
-
+    anomaly_dict (dict): Dict object containing specific session flags to display
     '''
 
     # Run tests
@@ -382,13 +426,15 @@ def plot_heatmap(heatmap, title):
     plt.title(f'{title}')
     plt.show()
 
-
 def print_validation_results(anomaly_dict):
     '''
 
+    Displays all the outlier sessions flag names and values. Additionally plots the flagged
+     position heatmap.
+
     Parameters
     ----------
-    anomaly_dict
+    anomaly_dict (dict): Dict object containing specific session flags to print
 
     Returns
     -------

@@ -1,3 +1,10 @@
+'''
+
+Main functions that facilitate all jupyter notebook functionality. All functions will call a wrapper function
+ to handle any non front-end settings.
+
+'''
+
 from bokeh.io import output_notebook
 from moseq2_extract.helpers.data import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
@@ -68,14 +75,15 @@ def preview_extractions(input_dir):
 
 def validate_extractions(input_dir):
     '''
+    Wrapper function that facilitates the extraction validation step from `main.py`.
+     Prints all the flagged session outlier details.
 
     Parameters
     ----------
-    input_dir
+    input_dir (str): Path to parent directory containing extracted sessions folders
 
     Returns
     -------
-
     '''
 
     validate_extractions_wrapper(input_dir)

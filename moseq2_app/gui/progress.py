@@ -1,3 +1,9 @@
+'''
+
+This module handles all jupyter notebook progress related functionalities.
+
+'''
+
 import os
 import time
 import json
@@ -82,7 +88,7 @@ def update_progress(progress_file, varK, varV):
 
     Returns
     -------
-    None
+    progress (dict): Loaded path dict from the progress yaml file.
     '''
 
     yml = yaml.YAML()
@@ -108,7 +114,7 @@ def restore_progress_vars(progress_file):
 
     Returns
     -------
-    All progress file variables
+    vars (dict): All progress file variables
     '''
 
     warnings.filterwarnings('ignore')
