@@ -1,19 +1,26 @@
 import os
+import time
+import shutil
+import warnings
+import numpy as np
 import pandas as pd
 from glob import glob
 from copy import deepcopy
 from bokeh.io import show
 import ruamel.yaml as yaml
-from bokeh.models import Div
 import ipywidgets as widgets
+from bokeh.models import Div
 from bokeh.layouts import column
+from bokeh.plotting import figure
 from moseq2_viz.util import parse_index
 from IPython.display import display, clear_output
 from moseq2_extract.io.video import get_video_info
+from moseq2_app.viz.view import display_crowd_movies
 from moseq2_viz.model.util import results_to_dataframe
-from moseq2_app.viz.widgets import SyllableLabelerWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper
-from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_session_centroid_speeds, compute_mean_syll_scalar)
+from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
+from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_session_centroid_speeds, compute_mean_syll_scalar,
+                                     compute_syllable_position_heatmaps, get_syllable_pdfs)
 
 class SyllableLabeler(SyllableLabelerWidgets):
     '''
@@ -387,3 +394,416 @@ class SyllableLabeler(SyllableLabelerWidgets):
             syll_num = cm.split('sorted-id-')[1].split()[0]
             if syll_num in self.syll_info.keys():
                 self.syll_info[syll_num]['crowd_movie_path'] = cm
+
+class CrowdMovieComparison(CrowdMovieCompareWidgets):
+    '''
+    Crowd Movie Comparison application class. Contains all the user inputted parameters
+    within its context.
+
+    '''
+
+    def __init__(self, config_data, index_path, df_path, model_path, syll_info, output_dir, get_pdfs):
+        '''
+        Initializes class object context parameters.
+
+        Parameters
+        ----------
+        config_data (dict): Configuration parameters for creating crowd movies.
+        index_path (str): Path to loaded index file.
+        model_path (str): Path to loaded model.
+        syll_info (dict): Dict object containing labeled syllable information.
+        output_dir (str): Path to directory to store crowd movies.
+        '''
+        super().__init__()
+
+        self.config_data = config_data
+        self.index_path = index_path
+        self.model_path = model_path
+        self.df_path = df_path
+        self.get_pdfs = get_pdfs
+
+        if df_path != None:
+            if os.path.exists(df_path):
+                self.label_df_path = df_path.replace('syll_df', 'label_time_df')
+            else:
+                self.df_path = None
+
+        self.syll_info = syll_info
+        self.output_dir = output_dir
+        self.max_sylls = len(syll_info.keys())
+
+        # Prepare current context's base session syllable info dict
+        self.session_dict = {str(i): {'session_info': {}} for i in range(self.max_sylls)}
+
+        # Set widget callbacks
+        self.cm_session_sel.observe(self.select_session)
+        self.cm_sources_dropdown.observe(self.show_session_select)
+        self.cm_trigger_button.on_click(self.on_click_trigger_button)
+
+        self.set_default_cm_parameters()
+
+        self.clear_button.on_click(self.clear_on_click)
+
+    def clear_on_click(self, b):
+        '''
+        Clears the cell output
+
+        Parameters
+        ----------
+        b
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+
+    def set_default_cm_parameters(self):
+
+        self.config_data['max_syllable'] = self.max_sylls
+        self.config_data['separate_by'] = 'groups'
+
+        self.config_data['gaussfilter_space'] = [0, 0]
+        self.config_data['medfilter_space'] = [0]
+        self.config_data['sort'] = True
+        self.config_data['dur_clip'] = 300
+        self.config_data['raw_size'] = (512, 424)
+        self.config_data['scale'] = 1
+        self.config_data['legacy_jitter_fix'] = False
+        self.config_data['cmap'] = 'jet'
+        self.config_data['count'] = 'usage'
+
+    def show_session_select(self, change):
+        '''
+        Callback function to change current view to show session selector when user switches
+        DropDownMenu selection to 'SessionName', and hides it if the user
+        selects 'groups'.
+
+        Parameters
+        ----------
+        change (event): User switches their DropDownMenu selection
+
+        Returns
+        -------
+        '''
+
+        # Handle display syllable selection and update config_data crowd movie generation
+        # source selector.
+        if change.new == 'SessionName':
+            # Show session selector
+            self.cm_session_sel.layout = self.layout_visible
+            self.cm_trigger_button.layout.display = 'block'
+            self.config_data['separate_by'] = 'sessions'
+        elif change.new == 'group':
+            # Hide session selector
+            self.cm_session_sel.layout = self.layout_hidden
+            self.cm_trigger_button.layout.display = 'none'
+            self.config_data['separate_by'] = 'groups'
+
+    def select_session(self, event):
+        '''
+        Callback function to save the list of selected sessions to config_data,
+         and get session syllable info to pass to crowd_movie_wrapper and create the
+         accompanying syllable scalar metadata table.
+
+        Parameters
+        ----------
+        event (event): User clicks on multiple sessions in the SelectMultiple widget
+
+        Returns
+        -------
+        '''
+
+        # Set currently selected sessions
+        self.config_data['session_names'] = list(self.cm_session_sel.value)
+
+        # Update session_syllable info dict
+        self.get_selected_session_syllable_info(self.config_data['session_names'])
+
+    def get_mean_group_dict(self, group_df):
+        '''
+
+        Parameters
+        ----------
+        group_df
+
+        Returns
+        -------
+
+        '''
+
+        self.groups = list(group_df.group.unique())
+
+        # Get array of grouped syllable info
+        group_dicts = []
+        for group in self.groups:
+            group_dict = {
+                group: group_df[group_df['group'] == group].drop('group', axis=1).reset_index(drop=True).to_dict()}
+            group_dicts.append(group_dict)
+
+        self.group_syll_info = deepcopy(self.syll_info)
+        for i in range(self.max_sylls):
+            if 'group_info' not in self.group_syll_info[str(i)].keys():
+                self.group_syll_info[str(i)]['group_info'] = {}
+
+        # Update syllable info dict
+        for gd in group_dicts:
+            group_name = list(gd.keys())[0]
+            for syll in range(self.max_sylls):
+                self.group_syll_info[str(syll)]['group_info'][group_name] = {
+                    'usage': gd[group_name]['usage'][syll],
+                    'centroid speed (mm/s)': gd[group_name]['speed'][syll],
+                    '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
+                    '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
+                    'height (mm)': gd[group_name]['height_ave_mm'][syll],
+                    'norm. dist_to_center': gd[group_name]['dist_to_center'][syll],
+                }
+
+    def get_session_mean_syllable_info_df(self, model_fit, sorted_index):
+        '''
+        Populates session-based syllable information dict with usage and scalar information.
+        Parameters
+        ----------
+        model_fit (dict): dict containing trained model syllable data
+        sorted_index (dict): sorted index file containing paths to extracted session h5s
+        Returns
+        -------
+        '''
+        warnings.filterwarnings('ignore')
+
+        if self.df_path != None:
+            print('Loading parquet files')
+            df = pd.read_parquet(self.df_path, engine='fastparquet')
+            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
+            label_df.columns = label_df.columns.astype(int)
+
+            # Load scalar Dataframe to compute syllable speeds
+            scalar_df = scalars_to_dataframe(sorted_index)
+        else:
+            print('Syllable DataFrame not found. Computing syllable statistics...')
+
+            # Load scalar Dataframe to compute syllable speeds
+            scalar_df = scalars_to_dataframe(sorted_index)
+            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+
+            # Compute a syllable summary Dataframe containing usage-based
+            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
+            df, label_df = results_to_dataframe(model_fit, sorted_index, count='usage',
+                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
+
+            # Compute and append additional syllable scalar data
+            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
+            for scalar in scalars:
+                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+
+        if self.get_pdfs:
+            # Compute syllable position PDFs
+            self.df = compute_syllable_position_heatmaps(df, scalar_df, label_df, syllables=range(self.max_sylls))
+
+        # Get grouped DataFrame
+        self.session_df = df.groupby(['SessionName', 'syllable'], as_index=False).mean()
+
+        # Get group DataFrame
+        self.group_df = df.groupby(['group', 'syllable'], as_index=False).mean()
+        self.get_mean_group_dict(self.group_df)
+
+    def get_selected_session_syllable_info(self, sel_sessions):
+        '''
+        Prepares dict of session-based syllable information to display.
+
+        Parameters
+        ----------
+        sel_sessions (list): list of selected session names.
+
+        Returns
+        -------
+        '''
+
+        # Get array of grouped syllable info
+        session_dicts = []
+        for sess in sel_sessions:
+            session_dict = {
+                sess: self.session_df[self.session_df['SessionName'] == sess].drop('SessionName', axis=1).reset_index(
+                    drop=True).to_dict()}
+            session_dicts.append(session_dict)
+
+        # Update syllable data with session info
+        for sd in session_dicts:
+            session_name = list(sd.keys())[0]
+            for syll in range(self.max_sylls):
+                self.session_dict[str(syll)]['session_info'][session_name] = {
+                    'usage': sd[session_name]['usage'][syll],
+                    'centroid speed (mm/s)': sd[session_name]['speed'][syll],
+                    '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
+                    '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
+                    'height (mm)': sd[session_name]['height_ave_mm'][syll],
+                    'duration': sd[session_name]['duration'][syll],
+                    'norm. dist_to_center': sd[session_name]['dist_to_center'][syll],
+                }
+
+    def get_pdf_plot(self, group_syllable_pdf, group_name):
+        pdf_fig = figure(height=350, width=350, title=f'{group_name}')
+        pdf_fig.x_range.range_padding = pdf_fig.y_range.range_padding = 0
+        pdf_fig.image(image=[group_syllable_pdf],
+                      x=0,
+                      y=0,
+                      dw=group_syllable_pdf.shape[1],
+                      dh=group_syllable_pdf.shape[0],
+                      palette="Viridis256")
+
+        #fill_color = linear_cmap(group_syllable_pdf, "Viridis256", 0, 1.0)
+        #color_bar = ColorBar(color_mapper=fill_color['transform'])
+        #pdf_fig.add_layout(color_bar, 'right')
+
+        return pdf_fig
+
+    def generate_crowd_movie_divs(self):
+        '''
+        Generates HTML divs containing crowd movies and syllable metadata tables
+         from the given syllable dict file.
+
+        Returns
+        -------
+        divs (list of Bokeh.models.Div): Divs of HTML videos and metadata tables.
+        '''
+
+        # Compute paths to crowd movies
+        path_dict = make_crowd_movies_wrapper(self.index_path, self.model_path, self.config_data, self.output_dir)
+
+        time.sleep(1)
+
+        if self.get_pdfs:
+            # Get corresponding syllable position PDF
+            group_syll_pdfs, groups = get_syllable_pdfs(self.df, syllables=[self.cm_syll_select.index],
+                                                        groupby=self.cm_sources_dropdown.value)
+
+            if self.cm_sources_dropdown.value == 'group':
+                g_iter = groups
+            else:
+                g_iter = self.cm_session_sel.value
+
+            for i, group in enumerate(g_iter):
+                self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[groups.index(group)]
+
+        # Remove previously displayed data
+        clear_output()
+
+        # Get each group's syllable info to display; formatting keys.
+        curr_grouped_syll_dict = {}
+        for group in self.grouped_syll_dict.keys():
+            curr_grouped_syll_dict[group] = {}
+            for key in self.grouped_syll_dict[group].keys():
+                if key == 'speed':
+                    new_key = '2D velocity (mm/s)'
+                    curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
+                elif key == 'dist_to_center':
+                    new_key = 'norm. dist_to_center'
+                    curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
+                else:
+                    curr_grouped_syll_dict[group][key] = self.grouped_syll_dict[group][key]
+
+        # Create syllable info DataFrame
+        syll_info_df = pd.DataFrame(curr_grouped_syll_dict)
+
+        # Get currently selected syllable name info
+        self.curr_label = self.syll_info[str(self.cm_syll_select.index)]['label']
+        self.curr_desc = self.syll_info[str(self.cm_syll_select.index)]['desc']
+
+        # Create video divs including syllable metadata
+        divs = []
+        bk_plots = []
+        for group_name, cm_path in path_dict.items():
+            # Convert crowd movie metadata to HTML table
+            if self.get_pdfs:
+                group_info = pd.DataFrame(syll_info_df.drop('pdf', axis=0)[group_name]).to_html()
+
+                group_syllable_pdf = syll_info_df[group_name]['pdf'][0]
+
+                pdf_fig = self.get_pdf_plot(group_syllable_pdf, group_name)
+
+                bk_plots.append(pdf_fig)
+            else:
+                group_info = pd.DataFrame(syll_info_df[group_name]).to_html()
+
+            # Copy generated movie to temporary directory
+            cm_dir = os.path.dirname(cm_path[0])
+            tmp_path = os.path.join(cm_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(cm_path[0])}')
+            tmp_dirname = os.path.dirname(tmp_path)
+
+            self.base_tmpdir = os.path.join(cm_dir, 'tmp')
+
+            if not os.path.exists(tmp_dirname):
+                os.makedirs(tmp_dirname)
+
+            shutil.copy2(cm_path[0], tmp_path)
+
+            video_dims = get_video_info(tmp_path)['dims']
+
+            # Insert paths and table into HTML div
+            group_txt = '''
+                {group_info}
+                <video
+                    src="{src}"; alt="{alt}"; height="{height}"; width="{width}"; preload="auto";
+                    style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
+                    border="2"; autoplay controls loop>
+                </video>
+            '''.format(group_info=group_info, src=tmp_path, alt=tmp_path, height=int(video_dims[1] * 0.8),
+                       width=int(video_dims[0] * 0.8))
+
+            divs.append(group_txt)
+
+        return divs, bk_plots
+
+    def on_click_trigger_button(self, b):
+        '''
+        Generates crowd movies and displays them when the user clicks the trigger button
+
+        Parameters
+        ----------
+
+        b (ipywidgets.Button click event): User clicks "Generate Movies" button
+
+        Returns
+        -------
+        '''
+
+        # Compute current selected syllable's session dict.
+        self.grouped_syll_dict = self.session_dict[str(self.cm_syll_select.index)]['session_info']
+
+        # Get Crowd Movie Divs
+        divs, self.bk_plots = self.generate_crowd_movie_divs()
+
+        # Display generated movies
+        display_crowd_movies(self.widget_box, self.curr_label, self.curr_desc, divs, self.bk_plots)
+
+    def crowd_movie_preview(self, syllable, groupby, nexamples):
+        '''
+        Helper function that triggers the crowd_movie_wrapper function and creates the HTML
+        divs containing the generated crowd movies.
+        Function is triggered whenever any of the widget function inputs are changed.
+
+        Parameters
+        ----------
+        syllable (int or ipywidgets.DropDownMenu): Currently displayed syllable.
+        nexamples (int or ipywidgets.IntSlider): Number of mice to display per crowd movie.
+
+        Returns
+        -------
+        '''
+
+        # Update current config data with widget values
+        self.config_data['specific_syllable'] = int(self.cm_syll_select.index)
+        self.config_data['max_examples'] = nexamples
+
+        # Get group info based on selected DropDownMenu item
+        if groupby == 'group':
+            self.grouped_syll_dict = self.group_syll_info[str(self.cm_syll_select.index)]['group_info']
+
+            # Get Crowd Movie Divs
+            divs, self.bk_plots = self.generate_crowd_movie_divs()
+
+            # Display generated movies
+            display_crowd_movies(self.widget_box, self.curr_label, self.curr_desc, divs, self.bk_plots)
+        else:
+            # Display widget box until user clicks button to generate session-based crowd movies
+            display(self.widget_box)

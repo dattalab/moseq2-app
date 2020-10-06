@@ -12,9 +12,10 @@ from ipywidgets import interactive_output
 from moseq2_app.util import index_to_dataframe
 from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
-from moseq2_app.viz.controller import SyllableLabeler
 from moseq2_app.gui.widgets import GroupSettingWidgets
+from moseq2_viz.helpers.wrappers import init_wrapper_function
 from moseq2_app.stat.controller import InteractiveSyllableStats
+from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_viz.model.util import get_syllable_usages, relabel_by_usage, parse_model_results
 from moseq2_app.roi.validation import (make_session_status_dicts, get_iqr_anomaly_sessions, get_scalar_df,
@@ -283,3 +284,48 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
 
     display(istat.clear_button, istat.stat_widget_box, out)
     show(istat.cladogram)
+
+def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
+                                               df_path=None, get_pdfs=True):
+    '''
+    Wrapper function that launches an interactive crowd movie comparison application.
+    Uses ipywidgets and Bokeh to facilitate real time user interaction.
+
+    Parameters
+    ----------
+    config_data (dict): dict containing crowd movie creation parameters
+    index_path (str): path to index file with paths to all the extracted sessions
+    model_path (str): path to trained model containing syllable labels.
+    syll_info_path (str): path to syllable information file containing syllable labels
+    output_dir (str): path to directory to store crowd movies
+
+    Returns
+    -------
+    '''
+
+    with open(config_filepath, 'r') as f:
+        config_data = yaml.safe_load(f)
+
+    with open(syll_info_path, 'r') as f:
+        syll_info = yaml.safe_load(f)
+
+    index, sorted_index, model_fit = init_wrapper_function(index_file=index_path, model_fit=model_path,
+                                                           output_dir=output_dir)
+
+    cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path, df_path=df_path,
+                                      model_path=model_path, syll_info=syll_info, output_dir=output_dir,
+                                      get_pdfs=get_pdfs)
+
+    # Set Syllable select widget options
+    cm_compare.cm_syll_select.options = syll_info
+
+    # Set Session MultipleSelect widget options
+    sessions = list(set(model_fit['metadata']['uuids']))
+    cm_compare.cm_session_sel.options = sorted([sorted_index['files'][s]['metadata']['SessionName'] for s in sessions])
+
+    cm_compare.get_session_mean_syllable_info_df(model_fit, sorted_index)
+
+    out = interactive_output(cm_compare.crowd_movie_preview, {'syllable': cm_compare.cm_syll_select,
+                                                              'groupby': cm_compare.cm_sources_dropdown,
+                                                              'nexamples': cm_compare.num_examples})
+    display(cm_compare.clear_button, out)
