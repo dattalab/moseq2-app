@@ -133,15 +133,15 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
 
 def interactive_syllable_stats(progress_paths, max_syllable=None):
     '''
+    Generates the interactive syllable statistics viewer, consisting of a dot-line plot and a dendrogram.
 
     Parameters
     ----------
-    progress_paths
-    max_syllable
+    progress_paths (dict): dictionary of notebook progress paths.
+    max_syllables (int or None): manual maximum number of syllables to label.
 
     Returns
     -------
-
     '''
 
     # Get proper input parameters
@@ -156,12 +156,13 @@ def interactive_syllable_stats(progress_paths, max_syllable=None):
 
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True):
     '''
+    Interactive crowd movie/position heatmap comparison function. Launched via the notebook.
 
     Parameters
     ----------
-    progress_paths
-    group_movie_dir
-    get_pdfs
+    progress_paths (dict): dictionary of notebook progress paths.
+    group_movie_dir (str): path to generate new grouped crowd movies in.
+    get_pdfs (bool): indicates whether to also generate position heatmaps.
 
     Returns
     -------

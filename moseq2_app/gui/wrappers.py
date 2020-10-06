@@ -306,11 +306,13 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
 
     Parameters
     ----------
-    config_data (dict): dict containing crowd movie creation parameters
+    config_filepath (str): path to config file containing crowd movie generation parameters
     index_path (str): path to index file with paths to all the extracted sessions
     model_path (str): path to trained model containing syllable labels.
     syll_info_path (str): path to syllable information file containing syllable labels
     output_dir (str): path to directory to store crowd movies
+    df_path (str): optional path to pre-existing syllable information to plot
+    get_pdfs (bool): indicates whether to compute and display position heatmaps
 
     Returns
     -------
