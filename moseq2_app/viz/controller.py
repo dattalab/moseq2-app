@@ -1,3 +1,9 @@
+'''
+
+Main syllable crowd movie viewing, comparing, and labeling functionality.
+
+'''
+
 import os
 import time
 import shutil
@@ -90,7 +96,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
@@ -184,14 +190,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     def get_mean_group_dict(self, group_df):
         '''
+        Creates a dict object to convert to a displayed table containing syllable scalars.
 
         Parameters
         ----------
-        group_df
+        group_df (pd.DataFrame): DataFrame containing mean syllable scalar data for each session and their groups
 
         Returns
         -------
-
         '''
 
         # Get array of grouped syllable info
@@ -340,6 +346,18 @@ class SyllableLabeler(SyllableLabelerWidgets):
         display(grid, self.button_box)
 
     def set_default_cm_parameters(self, config_data):
+        '''
+        Sets default crowd movie generation parameters that may be manually updated.
+
+        Parameters
+        ----------
+        config_data (dict): Dict of main moseq configuration parameters.
+
+        Returns
+        -------
+        config_data (dict): Updated dict of main moseq configuration parameters
+         with default crowd movie generation parameters.
+        '''
 
         config_data['separate_by'] = None
         config_data['specific_syllable'] = None
