@@ -1,3 +1,9 @@
+'''
+
+General utility functions.
+
+'''
+
 import pandas as pd
 import ruamel.yaml as yaml
 

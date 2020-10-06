@@ -83,9 +83,12 @@ def validate_extractions(input_dir):
 def interactive_group_setting(index_file):
     '''
 
+    Interactive group setting wrapper function that displays a excel-like table to update
+    the current group selection
+
     Parameters
     ----------
-    index_file
+    index_file (str): Path to index file to update.
 
     Returns
     -------
