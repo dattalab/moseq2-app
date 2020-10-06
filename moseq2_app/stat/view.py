@@ -254,9 +254,13 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     stat (str): Statistic to plot
     sorting (list): List of the current/selected syllable ordering
     groupby (str): Value to group data by. Either by unique group name or session name.
+    errorbar (str): Error bar type to display
+    syllable_families (dict): dict containing cladogram figure
+    sort_name (str): Syllable sorting name displayed in title.
 
     Returns
     -------
+    p (bokeh figure): Displayed stat plot with optional color pickers.
     '''
 
     tools = 'pan, box_zoom, wheel_zoom, save, reset'

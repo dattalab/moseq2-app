@@ -1,3 +1,9 @@
+'''
+
+Main interactive model syllable statistics results app functionality.
+
+'''
+
 import os
 import joblib
 import warnings
@@ -33,6 +39,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         info_path (str): Path to syllable information file.
         max_sylls (int): Maximum number of syllables to plot.
         '''
+
         super().__init__()
 
         self.model_path = model_path
@@ -66,6 +73,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.exp_dropdown.options = list(self.df.group.unique())
         self.exp_dropdown.value = self.ctrl_dropdown.options[-1]
 
+        self.dropdown_mapping = {
+            'distance to center': 'dist_to_center',
+            'centroid_speed': 'speed',
+            '2d velocity': 'velocity_2d_mm',
+            '3d velocity': 'velocity_3d_mm',
+            'height': 'height_ave_mm'
+        }
+
         self.clear_button.on_click(self.clear_on_click)
 
     def clear_on_click(self, b):
@@ -74,7 +89,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
@@ -117,6 +132,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         Returns
         -------
         '''
+
         warnings.filterwarnings('ignore')
 
         # Read syllable information dict
@@ -180,10 +196,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         Parameters
         ----------
-        stat (list or ipywidgets.DropDown): Statistic to plot: ['usage', 'speed', 'distance to center']
-        sort (list or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
+        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'speed', 'distance to center']
+        sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
             ['usage', 'speed', 'distance to center', 'similarity', 'difference'].
-        groupby (list or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
+        groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
+        errorbar (str or ipywidgets.DropDown): Error bar to display. ['SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
@@ -196,27 +213,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         df = self.df
 
         # Handle names to query DataFrame with
-        if stat.lower() == 'distance to center':
-            stat = 'dist_to_center'
-        elif stat.lower() == 'centroid speed':
-            stat = 'speed'
-        elif stat.lower() == '2d velocity':
-            stat = 'velocity_2d_mm'
-        elif stat.lower() == '3d velocity':
-            stat = 'velocity_3d_mm'
-        elif stat.lower() == 'height':
-            stat = 'height_ave_mm'
-
-        if sort.lower() == 'distance to center':
-            sortby = 'dist_to_center'
-        elif sort.lower() == 'centroid speed':
-            sortby = 'speed'
-        elif sort.lower() == '2d velocity':
-            sortby = 'velocity_2d_mm'
-        elif sort.lower() == '3d velocity':
-            sortby = 'velocity_3d_mm'
-        elif sort.lower() == 'height':
-            sortby = 'height_ave_mm'
+        stat = self.dropdown_mapping[stat.lower()]
+        sortby = self.dropdown_mapping[sort.lower()]
 
         # Get selected syllable sorting
         if sort.lower() == 'difference':
