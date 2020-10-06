@@ -1,3 +1,10 @@
+'''
+
+Wrapper functions for all the functionality included in moseq2-app. These functions are executed directly from
+main.py.
+
+'''
+
 import os
 import qgrid
 import shutil
@@ -49,13 +56,15 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
 def interactive_extraction_preview_wrapper(input_dir):
     '''
 
+    Interactive extraction previewing tool. Upon extracted session selection, function automatically displays
+    the extraction mp4 video file.
+
     Parameters
     ----------
-    input_dir
+    input_dir (str): path to base directory containing extraction directories
 
     Returns
     -------
-
     '''
 
     viewer = InteractiveExtractionViewer(data_path=input_dir)
@@ -67,6 +76,7 @@ def interactive_extraction_preview_wrapper(input_dir):
 
 def validate_extractions_wrapper(input_dir):
     '''
+
     Wrapper function to test the measured scalar values to determine whether some sessions should be
      flagged and diagnosed before aggregating the sessions.
 
@@ -98,13 +108,14 @@ def validate_extractions_wrapper(input_dir):
 def interactive_group_setting_wrapper(index_filepath):
     '''
 
+    Wrapper function that handles the interactive group display and value updating.
+
     Parameters
     ----------
-    index_filepath
+    index_filepath (str): Path to index file.
 
     Returns
     -------
-
     '''
 
     index_grid = GroupSettingWidgets()
@@ -115,14 +126,14 @@ def interactive_group_setting_wrapper(index_filepath):
 
     def update_table(b):
         '''
+        Updates table upon "Set Button" click
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
-
         '''
 
         index_grid.update_index_button.button_style = 'info'
@@ -136,14 +147,14 @@ def interactive_group_setting_wrapper(index_filepath):
 
     def update_clicked(b):
         '''
+        Updates the index file with the current table state upon Save button click.
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
-
         '''
 
         files = index_dict['files']
@@ -163,13 +174,15 @@ def interactive_group_setting_wrapper(index_filepath):
         index_grid.update_index_button.icon = 'check'
 
     def clear_clicked(b):
+        # Clear the display
         clear_output()
 
+    # Add callback functions
     index_grid.clear_button.on_click(clear_clicked)
     index_grid.update_index_button.on_click(update_clicked)
-
     index_grid.save_button.on_click(update_table)
 
+    # Display output
     display(index_grid.clear_button, index_grid.group_set)
     display(qgrid_widget)
 

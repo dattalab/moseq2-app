@@ -1,3 +1,10 @@
+'''
+
+Main functions that facilitate all jupyter notebook functionality. All functions will call a wrapper function
+ to handle any non front-end settings.
+
+'''
+
 from bokeh.io import output_notebook
 from moseq2_extract.helpers.data import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
@@ -69,14 +76,15 @@ def preview_extractions(input_dir):
 
 def validate_extractions(input_dir):
     '''
+    Wrapper function that facilitates the extraction validation step from `main.py`.
+     Prints all the flagged session outlier details.
 
     Parameters
     ----------
-    input_dir
+    input_dir (str): Path to parent directory containing extracted sessions folders
 
     Returns
     -------
-
     '''
 
     validate_extractions_wrapper(input_dir)
@@ -84,9 +92,12 @@ def validate_extractions(input_dir):
 def interactive_group_setting(index_file):
     '''
 
+    Interactive group setting wrapper function that displays a excel-like table to update
+    the current group selection
+
     Parameters
     ----------
-    index_file
+    index_file (str): Path to index file to update.
 
     Returns
     -------
@@ -94,14 +105,15 @@ def interactive_group_setting(index_file):
 
     interactive_group_setting_wrapper(index_file)
 
-def label_syllables(progress_paths, max_syllables=None, n_explained=90):
+def label_syllables(progress_paths, max_syllables=None, n_explained=99):
     '''
+    Interactive syllable labeling tool accessible from the jupyter notebook.
 
     Parameters
     ----------
-    progress_paths
-    max_syllables
-    n_explained
+    progress_paths (dict): dictionary of notebook progress paths.
+    max_syllables (int or None): manual maximum number of syllables to label.
+    n_explained (int): Percentage of explained variance to use to compute max_syllables to compute.
 
     Returns
     -------
