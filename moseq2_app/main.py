@@ -1,7 +1,7 @@
 from bokeh.io import output_notebook
 from moseq2_extract.helpers.data import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
-     validate_extractions_wrapper
+     validate_extractions_wrapper, interactive_group_setting_wrapper
 
 def view_extraction(extractions, default=0):
     '''
@@ -79,3 +79,16 @@ def validate_extractions(input_dir):
     '''
 
     validate_extractions_wrapper(input_dir)
+
+def interactive_group_setting(index_file):
+    '''
+
+    Parameters
+    ----------
+    index_file
+
+    Returns
+    -------
+    '''
+
+    interactive_group_setting_wrapper(index_file)

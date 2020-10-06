@@ -1,7 +1,12 @@
+import qgrid
 import warnings
+import pandas as pd
+import ruamel.yaml as yaml
 import ipywidgets as widgets
-from IPython.display import display
+from moseq2_app.util import index_to_dataframe
+from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
+from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_app.roi.validation import (make_session_status_dicts, get_iqr_anomaly_sessions, get_scalar_df,
                                        get_anomaly_dict, print_validation_results)
@@ -80,3 +85,81 @@ def validate_extractions_wrapper(input_dir):
 
     # Print Results
     print_validation_results(anomaly_dict)
+
+def interactive_group_setting_wrapper(index_filepath):
+    '''
+
+    Parameters
+    ----------
+    index_filepath
+
+    Returns
+    -------
+
+    '''
+
+    index_grid = GroupSettingWidgets()
+
+    index_dict, df = index_to_dataframe(index_filepath)
+    qgrid_widget = qgrid.show_grid(df[['SessionName', 'SubjectName', 'group', 'uuid']], column_options=index_grid.col_opts,
+                                   column_definitions=index_grid.col_defs, show_toolbar=False)
+
+    def update_table(b):
+        '''
+
+        Parameters
+        ----------
+        b
+
+        Returns
+        -------
+
+        '''
+
+        index_grid.update_index_button.button_style = 'info'
+        index_grid.update_index_button.icon = 'none'
+
+        selected_rows = qgrid_widget.get_selected_df()
+        x = selected_rows.index
+
+        for i in x:
+            qgrid_widget.edit_cell(i, 'group', index_grid.group_input.value)
+
+    def update_clicked(b):
+        '''
+
+        Parameters
+        ----------
+        b
+
+        Returns
+        -------
+
+        '''
+
+        files = index_dict['files']
+        meta = [f['metadata'] for f in files]
+        meta_cols = pd.DataFrame(meta).columns
+
+        latest_df = qgrid_widget.get_changed_df()
+        df.update(latest_df)
+
+        updated_index = {'files': list(df.drop(meta_cols, axis=1).to_dict(orient='index').values()),
+                         'pca_path': index_dict['pca_path']}
+
+        with open(index_filepath, 'w+') as f:
+            yaml.safe_dump(updated_index, f)
+
+        index_grid.update_index_button.button_style = 'success'
+        index_grid.update_index_button.icon = 'check'
+
+    def clear_clicked(b):
+        clear_output()
+
+    index_grid.clear_button.on_click(clear_clicked)
+    index_grid.update_index_button.on_click(update_clicked)
+
+    index_grid.save_button.on_click(update_table)
+
+    display(index_grid.clear_button, index_grid.group_set)
+    display(qgrid_widget)
