@@ -2,7 +2,7 @@
 
 <center><img src="https://drive.google.com/uc?export=view&id=1jCpb4AQKBasne2SoXw_S1kwU7R9esAF6"></center>
 
-Last Updated: 10/04/2020
+Last Updated: 10/06/2020
 
 Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 
@@ -16,6 +16,9 @@ to handle and validate the data extraction process, and interactively explore th
 - The Interactive-Model-Results Explorer Notebook: A stand-alone notebook containing all the interactive 
 data exploration tools for modeled data.
   - Simply enter the paths to your selected model(s) and index file to use to syllable exploration tools.
+- Flip Classifier Training Notebook: This notebook is a stand-alone tool that is optionally used to train new 
+flip classifiers (used to accurately extract mouse orientation) for currently unsupported data acquisition setups. 
+For example, Azure or RealSense captured mice/rats with or without head fixed cables.
 
 The MoSeq2 toolkit enables users to model rodent behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.

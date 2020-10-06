@@ -11,6 +11,7 @@ import ipywidgets as widgets
 from ipywidgets import interactive_output
 from moseq2_app.util import index_to_dataframe
 from IPython.display import display, clear_output
+from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_viz.helpers.wrappers import init_wrapper_function
@@ -361,3 +362,33 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 
     # Display widgets and bokeh network plots
     display(i_trans_graph.clear_button, i_trans_graph.thresholding_box, out)
+
+def get_frame_flips_wrapper(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
+    '''
+
+    Parameters
+    ----------
+    input_dir
+    output_file
+    max_frames
+    tail_filter_iters
+    space_filter_size
+
+    Returns
+    -------
+
+    '''
+
+    flip_finder = FlipRangeTool(input_dir=input_dir,
+                                max_frames=max_frames,
+                                output_file=output_file,
+                                tail_filter_iters=tail_filter_iters,
+                                prefilter_kernel_size=space_filter_size)
+
+    from bokeh.io import output_notebook
+    output_notebook()
+    out = interactive_output(flip_finder.interactive_launch_frame_selector, {'num': flip_finder.frame_num_slider})
+
+    display(flip_finder.clear_button, out)
+
+    return flip_finder
