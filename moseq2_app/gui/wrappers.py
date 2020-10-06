@@ -1,3 +1,9 @@
+'''
+
+Wrapper functions for all the functionality included in moseq2-app. These functions are executed directly from
+main.py.
+
+'''
 import qgrid
 import warnings
 import pandas as pd
@@ -40,13 +46,15 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
 def interactive_extraction_preview_wrapper(input_dir):
     '''
 
+    Interactive extraction previewing tool. Upon extracted session selection, function automatically displays
+    the extraction mp4 video file.
+
     Parameters
     ----------
-    input_dir
+    input_dir (str): path to base directory containing extraction directories
 
     Returns
     -------
-
     '''
 
     viewer = InteractiveExtractionViewer(data_path=input_dir)
@@ -58,6 +66,7 @@ def interactive_extraction_preview_wrapper(input_dir):
 
 def validate_extractions_wrapper(input_dir):
     '''
+
     Wrapper function to test the measured scalar values to determine whether some sessions should be
      flagged and diagnosed before aggregating the sessions.
 

@@ -1,6 +1,6 @@
 '''
 
-Interactive ROI detection functionality. This module utilizes the widgets from
+Interactive ROI detection and extraction preview functionalities. This module utilizes the widgets from
 the widgets.py file to facilitate the real-time interaction.
 
 '''
@@ -36,6 +36,16 @@ from moseq2_extract.util import (get_bucket_center, get_strels, select_strel,
 class InteractiveFindRoi(InteractiveROIWidgets):
 
     def __init__(self, data_path, config_file, session_config, compute_bgs=True):
+        '''
+
+        Parameters
+        ----------
+        data_path (str): Path to base directory containing all sessions to test
+        config_file (str): Path to main configuration file.
+        session_config (str): Path to session-configuration file.
+        compute_bgs (bool): Indicates whether to compute all the session backgrounds prior to app launch.
+        '''
+
         super().__init__()
 
         # Read default config parameters
@@ -118,7 +128,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         Parameters
         ----------
-        b
+        b (button click): User clicks Clear Button.
 
         Returns
         -------
@@ -207,6 +217,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
         Callback function to run the ROI area comparison test on all the existing sessions.
         Saving their individual session parameter sets in the session_parameters dict in the process.
+        Additionally updates the button styles to reflect the outcome.
 
         Parameters
         ----------
@@ -222,6 +233,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.test_all_sessions(self.sessions)
 
+        # Handle button styles
         if all(list(self.all_results.values())) == False:
             self.check_all.button_style = 'success'
             self.check_all.icon = 'check'
@@ -486,6 +498,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
     def get_pixels_per_metric(self, pixel_width):
         '''
+        Helper function that computes a pixels_per_metric value, and handles
+         cases without user input.
 
         Parameters
         ----------
@@ -598,6 +612,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Corresponds to a rough pixel area estimate
             r = float(cv2.countNonZero(rois[0].astype('uint8')))
 
+        # Compute pixel area per metric
         if self.config_data.get('arena_width') is not None:
             # Compute arena area
             if self.config_data['arena_shape'] == 'ellipse':
@@ -606,7 +621,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 estimated_height = pixel_height / pixels_per_inch
                 area = self.config_data['arena_width'] * estimated_height
 
-            # Compute pixel per metric
             self.config_data['area_px_per_inch'] = r / area / pixels_per_inch
 
         try:
@@ -699,6 +713,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.indicator.value = r'\(\color{red} {Flagged\ -\ Could\ not\ apply\ ROI\ to\ loaded\ frames}\)'
                 self.curr_results['flagged'] = True
 
+        # filter for included mouse height range
         try:
             filtered_frames = threshold_chunk(filtered_frames, minmax_heights[0], minmax_heights[1])
         except:
@@ -750,6 +765,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 class InteractiveExtractionViewer:
 
     def __init__(self, data_path):
+        '''
+
+        Parameters
+        ----------
+        data_path (str): Path to base directory containing all sessions to test
+        '''
+
         self.sess_select = widgets.Dropdown(options=get_session_paths(data_path, extracted=True),
                                             description='Session:', disabled=False, continuous_update=True)
 
@@ -763,7 +785,7 @@ class InteractiveExtractionViewer:
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
@@ -772,6 +794,17 @@ class InteractiveExtractionViewer:
         clear_output()
 
     def get_extraction(self, input_file):
+        '''
+        Returns a div containing a video object to display.
+
+        Parameters
+        ----------
+        input_file (str): Path to session extraction video to view.
+
+        Returns
+        -------
+        '''
+
         video_dims = get_video_info(input_file)['dims']
 
         # display extracted video as HTML Div using Bokeh
