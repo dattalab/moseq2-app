@@ -1,3 +1,9 @@
+'''
+
+Main syllable crowd movie viewing, comparing, and labeling functionality.
+
+'''
+
 import os
 import pandas as pd
 from glob import glob
@@ -333,6 +339,18 @@ class SyllableLabeler(SyllableLabelerWidgets):
         display(grid, self.button_box)
 
     def set_default_cm_parameters(self, config_data):
+        '''
+        Sets default crowd movie generation parameters that may be manually updated.
+
+        Parameters
+        ----------
+        config_data (dict): Dict of main moseq configuration parameters.
+
+        Returns
+        -------
+        config_data (dict): Updated dict of main moseq configuration parameters
+         with default crowd movie generation parameters.
+        '''
 
         config_data['separate_by'] = None
         config_data['specific_syllable'] = None
