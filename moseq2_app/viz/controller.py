@@ -83,7 +83,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
@@ -177,14 +177,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     def get_mean_group_dict(self, group_df):
         '''
+        Creates a dict object to convert to a displayed table containing syllable scalars.
 
         Parameters
         ----------
-        group_df
+        group_df (pd.DataFrame): DataFrame containing mean syllable scalar data for each session and their groups
 
         Returns
         -------
-
         '''
 
         # Get array of grouped syllable info

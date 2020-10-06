@@ -93,14 +93,15 @@ def interactive_group_setting(index_file):
 
     interactive_group_setting_wrapper(index_file)
 
-def label_syllables(progress_paths, max_syllables=None, n_explained=90):
+def label_syllables(progress_paths, max_syllables=None, n_explained=99):
     '''
+    Interactive syllable labeling tool accessible from the jupyter notebook.
 
     Parameters
     ----------
-    progress_paths
-    max_syllables
-    n_explained
+    progress_paths (dict): dictionary of notebook progress paths.
+    max_syllables (int or None): manual maximum number of syllables to label.
+    n_explained (int): Percentage of explained variance to use to compute max_syllables to compute.
 
     Returns
     -------
