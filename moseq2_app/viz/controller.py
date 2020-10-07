@@ -1,3 +1,9 @@
+'''
+
+Main syllable crowd movie viewing, comparing, and labeling functionality.
+
+'''
+
 import os
 import time
 import shutil
@@ -90,7 +96,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
@@ -184,14 +190,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     def get_mean_group_dict(self, group_df):
         '''
+        Creates a dict object to convert to a displayed table containing syllable scalars.
 
         Parameters
         ----------
-        group_df
+        group_df (pd.DataFrame): DataFrame containing mean syllable scalar data for each session and their groups
 
         Returns
         -------
-
         '''
 
         # Get array of grouped syllable info
@@ -340,6 +346,18 @@ class SyllableLabeler(SyllableLabelerWidgets):
         display(grid, self.button_box)
 
     def set_default_cm_parameters(self, config_data):
+        '''
+        Sets default crowd movie generation parameters that may be manually updated.
+
+        Parameters
+        ----------
+        config_data (dict): Dict of main moseq configuration parameters.
+
+        Returns
+        -------
+        config_data (dict): Updated dict of main moseq configuration parameters
+         with default crowd movie generation parameters.
+        '''
 
         config_data['separate_by'] = None
         config_data['specific_syllable'] = None
@@ -522,14 +540,14 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
     def get_mean_group_dict(self, group_df):
         '''
+        Creates a dict object to convert to a displayed table containing syllable scalars.
 
         Parameters
         ----------
-        group_df
+        group_df (pd.DataFrame): DataFrame containing mean syllable scalar data for each session and their groups
 
         Returns
         -------
-
         '''
 
         self.groups = list(group_df.group.unique())
@@ -562,13 +580,16 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
     def get_session_mean_syllable_info_df(self, model_fit, sorted_index):
         '''
         Populates session-based syllable information dict with usage and scalar information.
+
         Parameters
         ----------
         model_fit (dict): dict containing trained model syllable data
         sorted_index (dict): sorted index file containing paths to extracted session h5s
+
         Returns
         -------
         '''
+
         warnings.filterwarnings('ignore')
 
         if self.df_path != None:
@@ -642,6 +663,19 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 }
 
     def get_pdf_plot(self, group_syllable_pdf, group_name):
+        '''
+        Helper function that creates a bokeh plot with the given PDF heatmap and figure title.
+
+        Parameters
+        ----------
+        group_syllable_pdf (2D np.ndarray): Mean syllable position PDF heatmap.
+        group_name (str): Name of group for generated syllable pdf
+
+        Returns
+        -------
+        pdf_fig (bokeh.figure): Create bokeh figure.
+        '''
+
         pdf_fig = figure(height=350, width=350, title=f'{group_name}')
         pdf_fig.x_range.range_padding = pdf_fig.y_range.range_padding = 0
         pdf_fig.image(image=[group_syllable_pdf],
@@ -665,6 +699,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         Returns
         -------
         divs (list of Bokeh.models.Div): Divs of HTML videos and metadata tables.
+        bk_plots (list): list of corresponding position heatmap figures.
         '''
 
         # Compute paths to crowd movies
@@ -760,7 +795,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         Parameters
         ----------
-
         b (ipywidgets.Button click event): User clicks "Generate Movies" button
 
         Returns

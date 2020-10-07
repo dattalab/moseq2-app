@@ -260,9 +260,13 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     stat (str): Statistic to plot
     sorting (list): List of the current/selected syllable ordering
     groupby (str): Value to group data by. Either by unique group name or session name.
+    errorbar (str): Error bar type to display
+    syllable_families (dict): dict containing cladogram figure
+    sort_name (str): Syllable sorting name displayed in title.
 
     Returns
     -------
+    p (bokeh figure): Displayed stat plot with optional color pickers.
     '''
 
     tools = 'pan, box_zoom, wheel_zoom, save, reset'
@@ -396,24 +400,25 @@ def format_graphs(graphs, group):
 
 def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, group_name):
     '''
-    Computes the incoming and outgoing syllable entropies and
+    Computes the incoming and outgoing syllable entropies, entropy rates, previous nodes and
      neighboring nodes for all the nodes included in node_indices.
 
     Parameters
     ----------
-    graph
-    node_indices
-    entropies
-    entropy_rates
-    group_name
+    graph (networkx DiGraph): Generated DiGraph to convert to Bokeh glyph and plot.
+    node_indices (list): List of node indices included in the given graph
+    entropies (list): Syllable usage entropy values for each included syllable in the graph
+    entropy_rates (list): Syllable transition entropy rates for all possible edge transitions in the graph
+    group_name (str): Graph's group name.
 
     Returns
     -------
-    entropy_in
-    entropy_out
-    prev_states
-    next_states
-    neighbor_edge_colors
+    entropy_in (list): List of computed incoming syllable entropy values for all the given node indices
+    entropy_out (list): List of computed outgoing syllable entropy values for all the given node indices
+    prev_states (list): List of previous nodes for each node index in the graph.
+    next_states (list): List of successor nodes/syllables for each node in the graph
+    neighbor_edge_colors (list): List of colors determining whether an edge is incoming or outgoing from each node.
+     Where orange = incoming, and purple = outgoing
     '''
 
     # get selected node neighboring edge colors
@@ -685,6 +690,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
             LegendItem(label="Incoming Transition", renderers=[o_line]),
             LegendItem(label="Outgoing Transition", renderers=[p_line]),
         ]
+
         if i >= len(group):
             items += [LegendItem(label="Up-regulated", renderers=[r_line])]
             items += [LegendItem(label="Down-regulated", renderers=[b_line])]
