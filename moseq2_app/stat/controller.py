@@ -308,7 +308,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
@@ -343,6 +343,18 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.speed_thresholder.index = (0, speed_threshold_stds - 1)
 
     def on_set_scalar(self, event):
+        '''
+        Updates the scalar threshold slider filter criteria according to the current node coloring.
+        Changes the name of the slider as well.
+
+        Parameters
+        ----------
+        event (dropdown event): User changes selected dropdown value
+
+        Returns
+        -------
+        '''
+
         if event.new == 'Default' or event.new == 'Centroid Speed':
             key = 'speed'
             self.speed_thresholder.description = 'Threshold Nodes by Speed'
@@ -378,6 +390,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         Returns
         -------
         '''
+
         warnings.filterwarnings('ignore')
 
         # Load Model
@@ -471,6 +484,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         edge_threshold (tuple or ipywidgets.FloatRangeSlider): Transition probability range to include in graphs.
         usage_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable usage range to include in graphs.
         speed_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable speed range to include in graphs.
+
         Returns
         -------
         '''

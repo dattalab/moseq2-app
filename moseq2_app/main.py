@@ -184,14 +184,16 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
 def interactive_transition_graph(progress_paths, max_syllables=None):
     '''
 
+    Displays group transition graphs with a configurable number of syllables. Launched via the
+     the jupyter notebook.
+
     Parameters
     ----------
-    progress_paths
-    max_syllables (int)
+    progress_paths (dict): dictionary of notebook progress paths.
+    max_syllables (int or None): manual maximum number of syllables to label.
 
     Returns
     -------
-
     '''
 
     # Get proper input paths
