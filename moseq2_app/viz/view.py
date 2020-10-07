@@ -1,3 +1,9 @@
+'''
+
+Helper function that displays a grid of crowd movies and plotted bokeh figures of position heatmaps.
+
+'''
+
 from bokeh.io import show
 from bokeh.models import Div
 import ipywidgets as widgets
@@ -15,7 +21,6 @@ def display_crowd_movies(widget_box, curr_name, desc, divs, bk_figs):
 
     Returns
     -------
-
     '''
 
     # Set HTML formats
