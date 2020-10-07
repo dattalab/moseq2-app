@@ -19,13 +19,15 @@ class FlipRangeTool(FlipClassifierWidgets):
     def __init__(self, input_dir, max_frames, output_file, tail_filter_iters, prefilter_kernel_size):
         '''
 
+        Initialization for the Flip Classifier Training tool
+
         Parameters
         ----------
-        input_dir
-        max_frames
-        output_file
-        tail_filter_iters
-        prefilter_kernel_size
+        input_dir (str): Path to base directory containing extraction session folders
+        max_frames (int): Maximum number of frames to include in the dataset.
+        output_file (str): Path to save the outputted flip classifier.
+        tail_filter_iters (int): Number of tail filtering iterations
+        prefilter_kernel_size (int): Size of the median spatial filter.
         '''
 
         warnings.filterwarnings('ignore')
@@ -56,14 +58,17 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def start_stop_frame_range(self, b):
         '''
+        Callback function that triggers the "Add Range" functionality.
+         If user clicks the button == 'Start Range', then the function will start including frames
+         in the correct flip set. Else, it will end the included range and truncate the slider range
+         from the start index.
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
-
         '''
 
         if self.start_button.description == 'Start Range':
@@ -91,31 +96,33 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def clear_on_click(self, b):
         '''
+        Clears the output.
 
         Parameters
         ----------
-        b
+        b (button click)
 
         Returns
         -------
-
         '''
 
         clear_output()
 
     def load_sessions(self, input_dir, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
         '''
+        Recursively searches for completed h5 extraction files, and loads total_frames=max_frames to
+         include in the total dataset. Additionally applies some image filtering prior to returning the data.
 
         Parameters
         ----------
-        input_dir
-        max_frames
-        tail_filter_iters
-        space_filter_size
+        input_dir (str): Path to input directory
+        max_frames (int): Maximum number of frames to included in loaded dataset.
+        tail_filter_iters (int): Number of tail filtering iterations to run.
+        space_filter_size (int): Size of median filtering kernel.
 
         Returns
         -------
-        clean_merged_data (3D np.ndarray)
+        clean_merged_data (3D np.ndarray): Loaded and filtered data to get correctly oriented frame ranges from.
         '''
 
         h5s = recursive_find_h5s(root_dir=input_dir)
@@ -142,13 +149,15 @@ class FlipRangeTool(FlipClassifierWidgets):
     def interactive_launch_frame_selector(self, num):
         '''
 
+        Interactive tool that displays the frame to display with the selected data box.
+        Users will use the start_range button to add frame ranges to the range box list.
+
         Parameters
         ----------
-        num
+        num (int or ipywidgets.IntSlider): Currently displayed frame number.
 
         Returns
         -------
-
         '''
 
         tools = 'pan, box_zoom, wheel_zoom, reset'
@@ -179,10 +188,11 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def get_corrected_data(self):
         '''
+        Apply the selected flip orientation ranges to the entire dataset to correct the
+         incorrectly oriented frames.
 
         Returns
         -------
-
         '''
 
         # Get corrected frame ranges
@@ -197,10 +207,11 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def augment_dataset(self):
         '''
+        Augments the dataset with 90 degree rotated versions of the truth values, and creates the
+        X and Y train/test sets.
 
         Returns
         -------
-
         '''
 
         # Get flipped data
@@ -220,14 +231,15 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def prepare_datasets(self, test_size):
         '''
+        Correct data after the appropriate flip ranges have been selected, augment and create X,y training sets,
+         and split the data to training and testing splits.
 
         Parameters
         ----------
-        test_size
+        test_size (int): Test dataset percent split size
 
         Returns
         -------
-
         '''
 
         # Correct flips
@@ -245,9 +257,10 @@ class FlipRangeTool(FlipClassifierWidgets):
     def train_and_evaluate_model(self):
         '''
 
+        Trains the flip classifier and prints its performance accuracy on the test set.
+
         Returns
         -------
-
         '''
 
         self.clf.fit(self.x_train, self.y_train)
@@ -266,10 +279,10 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def train_and_save_model(self):
         '''
+        Trains the model on the entire dataset and saves the model to the desired output file path.
 
         Returns
         -------
-
         '''
 
         self.clf.fit(self.x, self.y)

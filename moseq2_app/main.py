@@ -10,7 +10,29 @@ from moseq2_extract.helpers.data import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
      validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
      interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
-     interactive_plot_transition_graph_wrapper
+     interactive_plot_transition_graph_wrapper, get_frame_flips_wrapper
+
+def flip_classifier_tool(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
+    '''
+
+    Flip Classifier Notebook main functionality access point.
+
+    Parameters
+    ----------
+    input_dir (str): Path to base directory containing extraction session folders
+    max_frames (int): Maximum number of frames to include in the dataset.
+    output_file (str): Path to save the outputted flip classifier.
+    tail_filter_iters (int): Number of tail filtering iterations
+    prefilter_kernel_size (int): Size of the median spatial filter.
+
+    Returns
+    -------
+    flip_obj (FlipRangeTool): Object that holds all saved interactive functionality and data to be used throughout the
+     notebook.
+    '''
+
+    flip_obj = get_frame_flips_wrapper(input_dir, output_file, max_frames, tail_filter_iters, space_filter_size)
+    return flip_obj
 
 def view_extraction(extractions, default=0):
     '''

@@ -383,17 +383,20 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 def get_frame_flips_wrapper(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
     '''
 
+    Wrapper function that facilitates the interactive
+
     Parameters
     ----------
-    input_dir
-    output_file
-    max_frames
-    tail_filter_iters
-    space_filter_size
+    input_dir (str): Input directory containing extracted session folders.
+    output_file (str): Path to save flip classifier in.
+    max_frames (int): Maximum number of frames to load from the extracted data.
+    tail_filter_iters (int): Number of tail filtering iterations
+    prefilter_kernel_size (int): Size of the median spatial filter.
 
     Returns
     -------
-
+    flip_finder (FlipRangeTool): Flip Classifier Training object that will be used throughout the notebook to
+     hold the labeled accepted frame ranges and selected paths/info.
     '''
 
     flip_finder = FlipRangeTool(input_dir=input_dir,
