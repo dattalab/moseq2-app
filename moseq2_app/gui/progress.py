@@ -9,6 +9,7 @@ import time
 import json
 import warnings
 from glob import glob
+from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 from os.path import dirname, basename
@@ -139,6 +140,9 @@ def handle_progress_restore_input(base_progress_vars, progress_filepath):
     progress_vars (dict): loaded progress variables
     '''
 
+    yml = yaml.YAML()
+    yml.indent(mapping=2, offset=2)
+
     restore = ''
     # Restore loaded variables or overwrite with fresh state
     while (restore != 'Y' or restore != 'N' or restore != 'q'):
@@ -157,15 +161,122 @@ def handle_progress_restore_input(base_progress_vars, progress_filepath):
             progress_vars = base_progress_vars
 
             with open(progress_filepath, 'w') as f:
-                yaml.safe_dump(progress_vars, f)
+                yml.dump(progress_vars, f)
 
             return progress_vars
 
         elif restore.lower() == 'q':
             return
 
+def show_progress_bar(nfound, total, desc):
+    '''
+    Helper function to print progress bars for each MoSeq-step progress dict
+
+    Parameters
+    ----------
+    i_dict (dict): Progress dict.
+    nfound (int): Total number of found progress items
+    total (int): Total number of progress items
+    desc (str): Progress description text to display.
+
+    Returns
+    -------
+    '''
+
+    for e in tqdm(list(range(total)), total=total, desc=desc, bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
+        sleep(0.1)
+        if e == nfound:
+            break
+
+def count_total_found_items(i_dict):
+    '''
+    Counts the total number of found progress items
+
+    Parameters
+    ----------
+    i_dict (dict): Dict containing paths to respective pipelines items.
+
+    Returns
+    -------
+    num_files (int): Number of found previously computed paths.
+    '''
+
+    num_files = 0
+    for v in i_dict.values():
+        if v == True:
+            num_files += 1
+
+    return num_files
+
+def get_pca_progress(progress_vars, pca_progress):
+    '''
+    Updates the PCA progress dict variables and prints the names of the missing keys.
+
+    Parameters
+    ----------
+    progress_vars (dict): Notebook progress dict including the relevant PCA paths
+    pca_progress (dict): PCA progress boolean dict used to display progress bar
+
+    Returns
+    -------
+    pca_progress (dict): Updated PCA progress boolean dict.
+    '''
+
+    # Get PCA Progress
+    for key in pca_progress.keys():
+        if progress_vars.get(key, None) != None:
+            if key == 'pca_dirname':
+                if os.path.exists(os.path.join(progress_vars[key], 'pca.h5')):
+                    pca_progress[key] = True
+            elif key == 'changepoints_path':
+                if os.path.exists(os.path.join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
+                    pca_progress[key] = True
+            else:
+                if os.path.exists(progress_vars[key]):
+                    pca_progress[key] = True
+
+        if pca_progress[key] != True:
+            print(f'PCA missing: {key}')
+    return pca_progress
+
+def get_extraction_progress(progress_vars):
+    '''
+    Counts the number of fully extracted sessions, and prints the session directory names
+     of the incomplete or missing extractions.
+
+    Parameters
+    ----------
+    progress_vars (dict): notebook progress dict.
+
+    Returns
+    -------
+    path_dict (dict): Dict with paths to all found sessions
+    num_extracted (int): Total number of completed extractions
+    '''
+
+    path_dict = get_session_paths(progress_vars['base_dir'])
+    e_path_dict = get_session_paths(progress_vars['base_dir'], extracted=True)
+
+    # Count number of extracted sessions and print the
+    num_extracted = 0
+    for k, v in path_dict.items():
+        extracted_path = e_path_dict.get(k, v)
+        extracted = False
+        if '.mp4' in extracted_path:
+            yaml_path = extracted_path.replace('mp4', 'yaml')
+            if check_completion_status(yaml_path):
+                extracted = True
+                num_extracted += 1
+        if not extracted:
+            print('Not yet extracted:', k)
+
+    return path_dict, num_extracted
+
+
 def print_progress(progress_vars):
     '''
+    Searches for all the paths included in the progress file and displays 4 progress bars, one for each pipeline step.
+
     Displays tqdm progress bars checking a users jupyter notebook progress.
 
     Parameters
@@ -176,49 +287,21 @@ def print_progress(progress_vars):
     -------
     '''
 
-    # fill with bools for whether each session is extracted, and index file is generated
-
-    pca_progress = {'pca_file': False, 'pca_scores': False, 'changepoints': False}
-    if progress_vars.get('index_file', None) != None:
-        pca_progress['index_file'] = True
+    pca_progress = {'pca_dirname': False,
+                    'scores_path': False,
+                    'changepoints_path': False,
+                    'index_file': False}
 
     modeling_progress = {'model_path': False}
     analysis_progress = {'syll_info': False, 'crowd_dir': False}
 
-    # Get extraction progress
-    path_dict = get_session_paths(progress_vars['base_dir'])
-    e_path_dict = get_session_paths(progress_vars['base_dir'], extracted=True)
-
-    num_extracted = 0
-    for k, v in path_dict.items():
-        extracted_path = e_path_dict.get(k, v)
-        if '.mp4' in extracted_path:
-            yaml_path = extracted_path.replace('mp4', 'yaml')
-            extracted = check_completion_status(yaml_path)
-        else:
-            extracted = False
-        if extracted:
-            num_extracted += 1
-        else:
-            print('Not yet extracted:', k)
-
-    total_extractions = len(path_dict.keys())
+    # Get Extract Progress
+    path_dict, num_extracted = get_extraction_progress(progress_vars)
 
     # Get PCA Progress
-    if progress_vars.get('pca_dirname', None) != None:
-        if os.path.exists(os.path.join(progress_vars['base_dir'], progress_vars['pca_dirname'], 'pca.h5')):
-            pca_progress['pca_file'] = True
-    if progress_vars.get('scores_path', None) != None:
-        pca_progress['pca_scores'] = True
-    if progress_vars.get('changepoints_path', None) != None:
-        pca_progress['changepoints'] = True
+    pca_progress = get_pca_progress(progress_vars, pca_progress)
 
-    num_pca_files = 0
-    for v in pca_progress.values():
-        if v == True:
-            num_pca_files += 1
-
-    # Get Modeling Progress
+    # Get Modeling Path
     if progress_vars.get('model_path', None) != None:
         if os.path.exists(progress_vars['model_path']):
             modeling_progress['model_path'] = True
@@ -232,29 +315,10 @@ def print_progress(progress_vars):
         if os.path.exists(progress_vars['syll_info']):
             analysis_progress['syll_info'] = True
 
-    # Show extraction progress
-    for e in tqdm(range(len(e_path_dict.keys())), total=total_extractions, desc="Extraction Progress",
-                  bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        if e == num_extracted:
-            break
-
-    # Show PCA progress
-    for j in tqdm(range(len(pca_progress.keys())), total=len(pca_progress.keys()), desc="PCA Progress",
-                  bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        if j == num_pca_files:
-            break
-
-    # Show Modeling progress
-    for i in tqdm(modeling_progress.keys(), total=len(modeling_progress.keys()), desc="Modeling Progress",
-                  bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        if modeling_progress[i] == False:
-            break
-
-    # Show Analysis progress
-    for i in tqdm(analysis_progress.keys(), total=len(analysis_progress.keys()), desc="Analysis Progress",
-                  bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        if analysis_progress[i] == False:
-            break
+    show_progress_bar(num_extracted, len(path_dict.keys()), desc="Extraction Progress")
+    show_progress_bar(count_total_found_items(pca_progress), len(pca_progress.keys()), desc="PCA Progress")
+    show_progress_bar(count_total_found_items(modeling_progress), len(modeling_progress.keys()), desc="Modeling Progress")
+    show_progress_bar(count_total_found_items(analysis_progress), len(analysis_progress.keys()), desc="Analysis Progress")
 
 def check_progress(base_dir, progress_filepath):
     '''
@@ -283,8 +347,10 @@ def check_progress(base_dir, progress_filepath):
                           'pca_dirname': '',
                           'scores_filename': '',
                           'scores_path': '',
+                          'changepoints_path': '',
                           'model_path': '',
                           'crowd_dir': '',
+                          'syll_info': '',
                           'plot_path': os.path.join(base_dir, 'plots/')}
 
     # Check if progress file exists
