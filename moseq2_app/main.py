@@ -6,7 +6,7 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 '''
 
 from bokeh.io import output_notebook
-from moseq2_extract.helpers.data import get_selected_sessions
+from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
      validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
      interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
