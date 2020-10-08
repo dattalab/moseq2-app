@@ -53,6 +53,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.config_data = yaml.safe_load(f)
 
         self.session_config = session_config
+        self.session_parameters = {}
 
         # Read individual session config if it exists
         if session_config is not None:
@@ -257,7 +258,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         # Update current session with current configuration parameters
-        self.session_parameters[self.keys[self.checked_list.index]] = self.config_data
+        self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
         # Update session parameters
         with open(self.config_data['session_config_path'], 'w+') as f:
@@ -476,7 +477,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         else:
             self.indicator.value = r'\(\color{green} {Passing}\)'
-
             # Save passing session parameters
             self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
@@ -517,7 +517,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         else:
             warnings.warn('Warning: arena_width and true_height were not provided. '
                           'Using arbitrary comparison distance value.')
-            self.config_data['true_height'] = self.true_depth
+            self.config_data['true_height'] = float(self.true_depth)
             pixels_per_inch = pixel_width / self.config_data['true_height']
 
         return pixels_per_inch
@@ -698,7 +698,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data['max_height'] = minmax_heights[1]
 
         # update current session parameters
-        self.session_parameters[self.keys[self.checked_list.index]] = self.config_data
+        self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
         # get segmented frame
         raw_frames = load_movie_data(input_file, range(fn, fn + 30), frame_dims=bground_im.shape[::-1])
