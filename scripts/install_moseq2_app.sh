@@ -6,7 +6,7 @@ pip install --upgrade jupyter jupyter_bokeh
 pip install -e .
 
 # Ensure ffmpeg is installed
-conda install -c conda-forge ffmpeg -y
+conda install -c conda-forge ffmpeg==4.2.0 -y
 
 # Install and Enable widget extensions configurator
 jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix

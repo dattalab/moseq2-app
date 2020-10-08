@@ -44,7 +44,7 @@ MoSeq2 requires the following platform dependencies to be installed:
      - numpy
      - pip
      - Conda Environment:
-         - ffmpeg
+         - ffmpeg==4.2.0
  - CentOS:
      - libSM
  - MacOS:
