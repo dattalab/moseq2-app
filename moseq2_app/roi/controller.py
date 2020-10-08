@@ -577,7 +577,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             rois, plane, bboxes, _, _, _ = get_roi(bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
-                                                   strel_erode=strel_erode
+                                                   strel_erode=strel_erode,
+                                                   get_all_data=True
                                                    )
         except:
             results['flagged'] = True

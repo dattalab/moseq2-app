@@ -31,7 +31,7 @@ class InteractiveROIWidgets:
         self.roi_label = widgets.Label(value="ROI Parameters", layout=self.label_layout)
         self.bg_roi_depth_range = widgets.IntRangeSlider(value=[650, 750], min=0, max=1500, step=1,
                                                          description='Depth Range', continuous_update=False,
-                                                         style=style)
+                                                         disable=False, style=style)
         self.dilate_iters = widgets.IntSlider(value=0, min=0, max=25, step=1, description='Dilate Iters:',
                                               continuous_update=False, style=style)
         self.frame_num = widgets.IntSlider(value=0, min=0, max=1000, step=1, description='Current Frame:',
