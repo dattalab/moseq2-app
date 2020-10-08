@@ -1,9 +1,9 @@
 #!/bin/bash
 
-pip install -e .
-
 # Ensure latest version of jupyter is installed
-pip install --upgrade jupyter
+pip install --upgrade jupyter jupyter_bokeh
+
+pip install -e .
 
 # Ensure ffmpeg is installed
 conda install -c conda-forge ffmpeg -y
