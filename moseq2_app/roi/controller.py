@@ -467,8 +467,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             results = self.get_roi_and_depths(bground_im, session)
             self.all_results[self.keys[self.checked_list.index]] = results['flagged']
 
-        self.curr_results = results
-
         # set indicator
         if results['flagged']:
             self.indicator.value = r'\(\color{red} {Flagged\ -\ Current\ ROI\ pixel\ area\ may\ be\ incorrect.\ ' \
@@ -540,8 +538,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         # initialize results dict
-        results = {'flagged': False,
-                   'ret_code': "0x1f7e2"}
+        self.curr_results = {'flagged': False,
+                             'ret_code': "0x1f7e2"}
 
         if self.config_data['autodetect']:
             # Get max depth as a thresholding limit (this would be the DTD if it already was computed)
@@ -581,10 +579,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    get_all_data=True
                                                    )
         except:
-            results['flagged'] = True
-            results['ret_code'] = "0x1f534"
-            results['roi'] = np.zeros_like(self.curr_bground_im)
-            return results
+            self.curr_results['flagged'] = True
+            self.curr_results['ret_code'] = "0x1f534"
+            self.curr_results['roi'] = np.zeros_like(self.curr_bground_im)
+            return self.curr_results
 
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
@@ -628,14 +626,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             assert isclose(self.config_data['pixel_area'], r, abs_tol=50e2)
         except AssertionError:
             if self.config_data.get('area_px_per_inch', 0) < pixels_per_inch:
-                results['flagged'] = True
-                results['ret_code'] = "0x1f534"
+                self.curr_results['flagged'] = True
+                self.curr_results['ret_code'] = "0x1f534"
 
         # Save ROI
-        results['roi'] = rois[0]
-        results['counted_pixels'] = r
+        self.curr_results['roi'] = rois[0]
+        self.curr_results['counted_pixels'] = r
 
-        return results
+        return self.curr_results
 
     def get_extraction(self, input_file, bground_im, roi):
         '''
