@@ -78,11 +78,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.exp_dropdown.value = self.ctrl_dropdown.options[-1]
 
         self.dropdown_mapping = {
+            'usage': 'usage',
             'distance to center': 'dist_to_center',
-            'centroid_speed': 'speed',
+            'centroid speed': 'speed',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',
-            'height': 'height_ave_mm'
+            'height': 'height_ave_mm',
+            'similarity': 'similarity',
+            'difference': 'difference',
         }
 
         self.clear_button.on_click(self.clear_on_click)
