@@ -78,11 +78,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.exp_dropdown.value = self.ctrl_dropdown.options[-1]
 
         self.dropdown_mapping = {
+            'usage': 'usage',
             'distance to center': 'dist_to_center',
-            'centroid_speed': 'speed',
+            'centroid speed': 'speed',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',
-            'height': 'height_ave_mm'
+            'height': 'height_ave_mm',
+            'similarity': 'similarity',
+            'difference': 'difference',
         }
 
         self.clear_button.on_click(self.clear_on_click)
@@ -302,6 +305,16 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         self.clear_button.on_click(self.clear_on_click)
 
+        # Manage dropdown menu values
+        self.scalar_dict = {
+            'Default': 'speed',
+            'Centroid Speed': 'speed',
+            '2D velocity': 'speeds_2d',
+            '3D velocity': 'speeds_3d',
+            'Height': 'heights',
+            'Distance to Center': 'dists'
+        }
+
     def clear_on_click(self, b):
         '''
         Clears the cell output
@@ -379,6 +392,55 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                           range(scalar_threshold_stds)]
         self.speed_thresholder.index = (0, scalar_threshold_stds - 1)
 
+    def compute_entropies(self, labels, label_group):
+        '''
+        Compute individual syllable entropy and transition entropy rates for all sessions with in a label_group.
+        Parameters
+        ----------
+        labels (2d list): list of session syllable labels over time.
+        label_group (list): list of groups computing entropies for
+
+        Returns
+        -------
+        '''
+
+        # Compute entropies
+        entropies = []
+        for g in self.group:
+            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
+            entropies.append(
+                np.mean(entropy(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
+
+        self.entropies = entropies
+
+        # Compute entropy rates
+        entropy_rates = []
+        for g in self.group:
+            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
+            entropy_rates.append(
+                np.mean(entropy_rate(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
+
+        self.entropy_rates = entropy_rates
+
+    def compute_entropy_differences(self):
+        '''
+        Computes cross group entropy/entropy-rate differences
+         and casts them to OrderedDict objects
+
+        Returns
+        -------
+        '''
+
+        # Compute entropy + entropy rate differences
+        for i in range(len(self.group)):
+            for j in range(i + 1, len(self.group)):
+                self.entropies.append(self.entropies[j] - self.entropies[i])
+                self.entropy_rates.append(self.entropy_rates[j] - self.entropy_rates[i])
+
+        # Set entropy and entropy rate Ordered Dicts
+        for i in range(len(self.entropies)):
+            self.entropies[i] = get_usage_dict([self.entropies[i]])[0]
+            self.entropy_rates[i] = get_usage_dict([self.entropy_rates[i]])[0]
 
     def initialize_transition_data(self):
         '''
@@ -434,23 +496,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Get groups and matching session uuids
         self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, index, sorted_index)
 
-        # Compute entropies
-        entropies = []
-        for g in self.group:
-            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropies.append(
-                np.mean(entropy(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
-
-        self.entropies = entropies
-
-        # Compute entropy rates
-        entropy_rates = []
-        for g in self.group:
-            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropy_rates.append(
-                np.mean(entropy_rate(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
-
-        self.entropy_rates = entropy_rates
+        self.compute_entropies(labels, label_group)
 
         labels = relabel_by_usage(labels, count='usage')[0]
 
@@ -462,16 +508,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Get usage dictionary for node sizes
         self.usages = get_usage_dict(usages)
 
-        # Compute entropy + entropy rate differences
-        for i in range(len(self.group)):
-            for j in range(i + 1, len(self.group)):
-                self.entropies.append(self.entropies[j] - self.entropies[i])
-                self.entropy_rates.append(self.entropy_rates[j] - self.entropy_rates[i])
-
-        # Set entropy and entropy rate Ordered Dicts
-        for i in range(len(self.entropies)):
-            self.entropies[i] = get_usage_dict([self.entropies[i]])[0]
-            self.entropy_rates[i] = get_usage_dict([self.entropy_rates[i]])[0]
+        self.compute_entropy_differences()
 
     def interactive_transition_graph_helper(self, layout, scalar_color, edge_threshold, usage_threshold, speed_threshold):
         '''
@@ -510,19 +547,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             scalars['heights'].append(self.df[self.df['group'] == g]['height_ave_mm'].to_numpy())
             scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center'].to_numpy())
 
-        if scalar_color == 'Default' or scalar_color == 'Centroid Speed':
-            key = 'speed'
-        elif scalar_color == '2D velocity':
-            key = 'speeds_2d'
-        elif scalar_color == '3D velocity':
-            key = 'speeds_3d'
-        elif scalar_color == 'Height':
-            key = 'heights'
-        elif scalar_color == 'Distance to Center':
-            key = 'dists'
-        else:
-            key = 'speed'
-
+        key = self.scalar_dict.get(scalar_color, 'speed')
         scalar_anchor = get_usage_dict([scalars[key][anchor]])[0]
 
         # Create graph with nodes and edges
