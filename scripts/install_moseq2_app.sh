@@ -23,6 +23,3 @@ jupyter nbextension enable --py --sys-prefix widgetsnbextension
 # Install bokeh extensions
 jupyter nbextension install --sys-prefix --symlink --py jupyter_bokeh
 jupyter nbextension enable jupyter_bokeh --py --sys-prefix
-
-# Enable jupyter table of contents
-jupyter nbextension enable toc2/main

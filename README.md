@@ -240,5 +240,8 @@ jupyter notebook
 ```  
 
 ## Bug Reporting
+If you experience any errors during installation, consult the [`TROUBLESHOOT.md`](https://github.com/dattalab/moseq2-app/blob/flip-training-notebook/TROUBLESHOOT.md) file.
+If the your issue is not resolved there, submit a GitHub issue.
+
 To report any issues or bugs using the notebook(s), please refer to the GitHub issues page in this repository:
 [Report Issue](https://github.com/dattalab/moseq2-app/issues/new).
