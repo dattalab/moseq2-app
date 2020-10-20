@@ -40,7 +40,8 @@ def show_extraction(input_file, video_file):
     if not os.path.exists(tmp_dirname):
         os.makedirs(tmp_dirname)
 
-    shutil.copy2(video_file, tmp_path)
+    if video_file != tmp_path:
+        shutil.copy2(video_file, tmp_path)
 
     video_dims = get_video_info(tmp_path)['dims']
 

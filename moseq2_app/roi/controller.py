@@ -669,10 +669,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             os.remove(view_path)
 
         # load chunk to display
-        process_extract_batches(input_file,
-                                self.config_data,
-                                bground_im, roi,
-                                frame_batches,
+        process_extract_batches(input_file, self.config_data,
+                                bground_im, roi, frame_batches,
                                 0, str_els, view_path)
 
         # display extracted video as HTML Div using Bokeh
