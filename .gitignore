@@ -20,6 +20,7 @@
 .ipynb_checkpoints/MoSeq2-Notebook-checkpoint.ipynb
 .ipynb_checkpoints
 
+id_travis_rsa
 moseq2_app.egg-info
 .idea/workspace.xml
 dlc_utils/.DS_Store
