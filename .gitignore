@@ -34,3 +34,4 @@ moseq2_app.egg-info
 dlc_utils/.DS_Store
 .DS_Store
 dlc_utils/
+data/

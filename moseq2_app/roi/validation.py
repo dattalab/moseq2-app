@@ -6,7 +6,6 @@ The module contains extraction validation functions that test extractions' scala
 '''
 
 import h5py
-import math
 import scipy
 import numpy as np
 import pandas as pd
@@ -16,7 +15,7 @@ import matplotlib.pyplot as plt
 from moseq2_extract.util import scalar_attributes
 from moseq2_viz.scalars.util import compute_all_pdf_data
 
-def check_timestamp_error_percentage(timestamps, fps):
+def check_timestamp_error_percentage(timestamps, fps=30):
     '''
     https://www.mathworks.com/help/imaq/examples/determining-the-rate-of-acquisition.html
 
@@ -81,7 +80,7 @@ def count_missing_mouse_frames(scalar_df):
     missing_mouse_frames (int): Number of frames with recorded mouse area ~= 0
     '''
 
-    missing_mouse_frames = len(scalar_df[math.isclose(scalar_df['area_px'], 0)])
+    missing_mouse_frames = len(scalar_df[np.isclose(scalar_df['area_px'], 0)])
 
     return missing_mouse_frames
 
@@ -428,7 +427,7 @@ def plot_heatmap(heatmap, title):
     im = plt.imshow(np.array(heatmap) / np.array(heatmap).max())
     plt.colorbar(im, fraction=0.046, pad=0.04)
     plt.title(f'{title}')
-    plt.show()
+    plt.show(block=False)
 
 def print_validation_results(anomaly_dict):
     '''

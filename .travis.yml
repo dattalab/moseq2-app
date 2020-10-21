@@ -4,7 +4,8 @@ dist: trusty
 os: linux
 
 stages:
-  - latest-installs
+  - pip-install
+  - install-script
   - name: latest-pythons
     if: branch = master
 
@@ -12,7 +13,7 @@ jobs:
   include:
     - env: ISOLATED=true
       python: '3.6'
-      stage: latest-installs
+      stage: pip-install
       before_install:
         - pip install -U pip
         - pip install awscli
@@ -30,23 +31,23 @@ jobs:
         - codecov -t $CC_TEST_REPORTER_ID
 
     - env: ISOLATED=true
-        python: '3.6'
-        stage: latest-installs
-        before_install:
-          - pip install -U pip
-          - pip install awscli
-          - pip install pytest==5.4.1 codecov pytest-cov
-          - export PYTHONPATH=$PYTHONPATH:$(pwd)
-          - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
-          - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
-          - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
-          - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
-        install:
-          - ./scripts/install_moseq2_app.sh
-        script:
-          - pytest --cov-report xml --cov-report term
-        after_success:
-          - codecov -t $CC_TEST_REPORTER_ID
+      python: '3.6'
+      stage: install-script
+      before_install:
+        - pip install -U pip
+        - pip install awscli
+        - pip install pytest==5.4.1 codecov pytest-cov
+        - export PYTHONPATH=$PYTHONPATH:$(pwd)
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
+        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+      install:
+        - ./scripts/install_moseq2_app.sh
+      script:
+        - pytest --cov-report xml --cov-report term
+      after_success:
+        - codecov -t $CC_TEST_REPORTER_ID
 
     - env: ISOLATED=true
       dist: xenial
