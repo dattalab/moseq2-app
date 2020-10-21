@@ -44,6 +44,8 @@ jobs:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
         - ./scripts/install_moseq2_app.sh
+      before_script:
+        - make
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
@@ -64,6 +66,8 @@ jobs:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
         - pip install -e .
+      before_script:
+        - make
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
