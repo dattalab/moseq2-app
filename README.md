@@ -28,6 +28,15 @@ utility repositories.__
 
 ***
 
+## Shortcuts
+- [Software Requirements](#moseq2-software-requirements)
+- [Install Dependencies](#installation)
+- [Install MoSeq2-App](#install-moseq2-app-env-or-package)
+- [Download Test Dataset](#download-a-test-dataset)
+- [Get Started](#get-started)
+
+***
+
 # MoSeq2 Software Requirements
 
 MoSeq2 is compatible with Windows, MacOS and Linux.
@@ -40,7 +49,7 @@ For information on how to download and setup Ubuntu on Windows, follow these ste
 MoSeq2 requires the following platform dependencies to be installed:
  - All Platforms:
      - anaconda3/miniconda3 __(FOR LINUX)__
-     - python>=3.6 (top right-hand side of the jupyter notebook will indicate the python version for you)
+     - python>=3.6;<3.8 (top right-hand side of the jupyter notebook will indicate the python version for you)
      - git
      - wget
      - gcc-7 and g++-7 (other accepted versions: [6.2.0, 7.5.0, gcc-9/g++-9])
@@ -57,7 +66,7 @@ Below is a list of all the required minimum versions of each repository to ensur
  Below is a list of all the required minimum versions of each repository to ensure are installed:
  - [`moseq2-extract==0.6.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
  - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
- - [`moseq2-model==0.4.1`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
+ - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
  - [`moseq2-viz==0.4.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
 
 ***
@@ -94,9 +103,17 @@ $HOME/Anaconda3-2020.02-Linux-x86_64.sh -b -p $HOME/anaconda3
 ```
 
 ### Install GCC Dependency
+__Remember, if you are going to use an alternate version of gcc, change inputted the commands to match your version.__
+
+Below are README shortcuts to install GCC for your respective operating system:
+- [For MacOS](#For-MacOS)
+- [For WSL/Ubuntu/Linux](#for-wslubuntulinux)
+- [Set gcc version as default](#set-the-gcc-version-as-default)
+ 
 To check if you have gcc-7/g++-7 is installed, run this command:
 ```bash
 which gcc-7
+# or `which gcc` if your default version is in the working set gcc versions. 
 ```
 You should expect to see an outputted path to your gcc-7 installation, like this:
 ```bash
@@ -146,6 +163,9 @@ The following step is important installing the `moseq2-model` dependency.
 Once you have confirmed gcc-7 is installed, run the next 2 commands to set them as default gcc versions.
 It is also recommended to copy these two commands to your `~/.bashrc` file (for Linux and Windows)  
 or `~/.bash_profile` file (for MacOS) to preserve this setting from now on. 
+
+__NOTE: If you are not using `gcc-7` remember to alter the command below to reflect your version.__
+
 ```bash
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
@@ -209,7 +229,19 @@ Once, the download is complete, navigate to that directory and launch the jupyte
 
 ## Get Started
 To use the notebooks, make sure your environment is activated and your current directory includes 
-the notebooks you would like to use, then run the following command:
-```.bash
+the notebooks you would like to use. 
+
+__NOTE: It is important for the notebook to be run from the parent directory 
+of your dataset in order for the videos to be displayed.__ 
+
+Run the following command to launch the jupyter notebook:
+```bash
 jupyter notebook
 ```  
+
+## Bug Reporting
+If you experience any errors during installation, consult the [`TROUBLESHOOT.md`](https://github.com/dattalab/moseq2-app/blob/flip-training-notebook/TROUBLESHOOT.md) file.
+If the your issue is not resolved there, submit a GitHub issue.
+
+To report any issues or bugs using the notebook(s), please refer to the GitHub issues page in this repository:
+[Report Issue](https://github.com/dattalab/moseq2-app/issues/new).

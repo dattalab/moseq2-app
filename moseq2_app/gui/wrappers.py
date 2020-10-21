@@ -222,7 +222,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
     # Get Maximum number of syllables to include
     if max_syllables == None:
-        syllable_usages = get_syllable_usages(model, 'usage')
+        syllable_usages = get_syllable_usages(model, count='usage')
         cumulative_explanation = 100 * np.cumsum(syllable_usages)
         max_sylls = np.argwhere(cumulative_explanation >= n_explained)[0][0]
         print(f'Number of syllables explaining {n_explained}% variance: {max_sylls}')

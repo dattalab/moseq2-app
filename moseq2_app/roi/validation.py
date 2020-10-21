@@ -261,12 +261,16 @@ def make_session_status_dicts(paths):
 
         # read timestamps from h5
         h5path = paths[k].replace('mp4', 'h5')
-        timestamps = h5py.File(h5path, 'r')['timestamps'][()]
+        try:
+            timestamps = h5py.File(h5path, 'r')['timestamps'][()]
 
-        # Count dropped frame percentage
-        dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
-        if dropped_frames >= 0.05:
-            status_dicts[stat_dict['metadata']['SessionName']]['dropped_frames'] = True
+            # Count dropped frame percentage
+            dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
+            if dropped_frames >= 0.05:
+                status_dicts[stat_dict['metadata']['SessionName']]['dropped_frames'] = True
+        except KeyError:
+            pass
+            print(f'{h5path} timestamps not found.')
 
     return status_dicts
 
