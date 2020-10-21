@@ -71,6 +71,24 @@ Below is a list of all the required minimum versions of each repository to ensur
 
 ***
 
+## Documentation
+
+MoSeq2 uses `sphinx` to generate the documentation in HTML and PDF forms. To install `sphinx`, follow the commands below:
+```.bash
+pip install sphinx==3.0.3
+pip install sphinx-rtd-theme
+pip install rst2pdf
+``` 
+
+All documentation regarding moseq2-extract can be found in the `Documentation.pdf` file in the root directory,
+an HTML ReadTheDocs page can be generated via running the `make html` in the `docs/` directory.
+
+To generate a PDF version of the documentation, simply run `make pdf` in the `docs/` directory.
+
+For information on getting started, check out the [MoSeq Roadmap](https://github.com/dattalab/moseq2-docs/wiki).
+
+***
+
 # Installation
 
 If you already have Anaconda installed, ensure you are working in a separate environment so

@@ -19,6 +19,10 @@
 *.xml
 
 .coverage
+.coverage.*
+
+# Sphinx documentation
+docs/_build/
 
 .idea/
 .ipynb_checkpoints/MoSeq2-Notebook-checkpoint.ipynb

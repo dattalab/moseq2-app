@@ -395,10 +395,11 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
     def compute_entropies(self, labels, label_group):
         '''
         Compute individual syllable entropy and transition entropy rates for all sessions with in a label_group.
+
         Parameters
         ----------
         labels (2d list): list of session syllable labels over time.
-        label_group (list): list of groups computing entropies for
+        label_group (list): list of groups computing entropies for.
 
         Returns
         -------
