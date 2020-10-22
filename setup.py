@@ -23,6 +23,8 @@ def get_version(rel_path):
     else:
         raise RuntimeError("Unable to find version string.")
 
+install('requests')
+
 setup(
     name='moseq2-app',
     author='Datta Lab',
