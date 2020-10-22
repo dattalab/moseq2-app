@@ -85,7 +85,7 @@ class CrowdMovieCompareWidgets:
                                               disabled=False, continuous_update=False, style=style,
                                               layout=widgets.Layout(display='flex', align_items='stretch'))
 
-        self.cm_sources_dropdown = widgets.Dropdown(options=['group', 'SessionName'], style=style,
+        self.cm_sources_dropdown = widgets.Dropdown(options=['group', 'SessionName', 'SubjectName'], style=style,
                                                     description='Movie Sources:')
 
         self.cm_session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,

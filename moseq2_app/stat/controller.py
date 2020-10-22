@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.util import parse_index
-from IPython.display import clear_output
+from IPython.display import display, clear_output
 from moseq2_viz.info.util import entropy, entropy_rate
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -69,8 +69,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.interactive_stat_helper()
         self.df = self.df[self.df['syllable'] < self.max_sylls]
 
+        self.session_names = sorted(list(self.df.SessionName.unique()))
+        self.subject_names = sorted(list(self.df.SubjectName.unique()))
+
         # Update the widget values
-        self.session_sel.options = sorted(list(self.df.SessionName.unique()))
+        self.session_sel.options = self.session_names
         self.session_sel.value = [self.session_sel.options[0]]
 
         self.ctrl_dropdown.options = list(self.df.group.unique())
@@ -89,6 +92,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         }
 
         self.clear_button.on_click(self.clear_on_click)
+        self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
     def clear_on_click(self, b):
         '''
@@ -103,6 +107,32 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         '''
 
         clear_output()
+
+    def on_grouping_update(self, event):
+        '''
+        Updates the MultipleSelect widget upon selecting groupby == SubjectName or SessionName.
+        Hides it if groupby == group.
+
+        Parameters
+        ----------
+        event (user clicks new grouping)
+
+        Returns
+        -------
+        '''
+
+        if event.new == 'SessionName':
+            self.session_sel.layout.display = "flex"
+            self.session_sel.layout.align_items = 'stretch'
+            self.session_sel.options = self.session_names
+        elif event.new == 'SubjectName':
+            self.session_sel.layout.display = "flex"
+            self.session_sel.layout.align_items = 'stretch'
+            self.session_sel.options = self.subject_names
+        else:
+            self.session_sel.layout.display = "none"
+
+        self.session_sel.value = [self.session_sel.options[0]]
 
     def compute_dendrogram(self):
         '''
@@ -241,15 +271,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             self.mutation_box.layout.display = "none"
 
         # Handle selective display to select included sessions to graph
-        if groupby == 'SessionName':
-            self.session_sel.layout.display = "flex"
-            self.session_sel.layout.align_items = 'stretch'
-
+        if groupby == 'SessionName' or groupby == 'SubjectName':
             mean_df = df.copy()
-            df = df[df['SessionName'].isin(self.session_sel.value)]
-
+            df = df[df[groupby].isin(self.session_sel.value)]
         else:
-            self.session_sel.layout.display = "none"
             mean_df = None
 
         # Compute cladogram if it does not already exist

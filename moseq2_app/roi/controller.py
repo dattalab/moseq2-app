@@ -163,7 +163,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
                 # Compute background image; saving the image to a file
-                _ = get_bground_im_file(p)
+                get_bground_im_file(p)
             except:
                 # Print error if an issue arises
                 display(f'Error, could not compute background for session: {s}.')

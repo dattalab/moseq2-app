@@ -120,7 +120,7 @@ def colorscale(hexstr, scalefactor):
 def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid'):
     '''
     Helper function to bokeh_plotting that iterates through the given DataFrame and plots the
-    data grouped by some user defined column ('group', 'SessionName'), with the errorbars of their
+    data grouped by some user defined column ('group', 'SessionName', 'SubjectName'), with the errorbars of their
     choice.
 
     Parameters
@@ -259,7 +259,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     df (pd.DataFrame): Mean syllable statistic DataFrame.
     stat (str): Statistic to plot
     sorting (list): List of the current/selected syllable ordering
-    groupby (str): Value to group data by. Either by unique group name or session name.
+    groupby (str): Value to group data by. Either by unique group name, session name, or subject name.
     errorbar (str): Error bar type to display
     syllable_families (dict): dict containing cladogram figure
     sort_name (str): Syllable sorting name displayed in title.
@@ -289,12 +289,12 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
         groups = list(df.group.unique())
         group_colors = colors
     else:
-        groups = list(df.SessionName.unique())
-        tmp_groups = df[df['SessionName'].isin(groups)]
+        groups = list(df[groupby].unique())
+        tmp_groups = df[df[groupby].isin(groups)]
 
         sess_groups = []
         for s in groups:
-            sess_groups.append(list(tmp_groups[tmp_groups['SessionName'] == s].group)[0])
+            sess_groups.append(list(tmp_groups[tmp_groups[groupby] == s].group)[0])
 
         color_map = {}
         for i, g in enumerate(sess_groups):

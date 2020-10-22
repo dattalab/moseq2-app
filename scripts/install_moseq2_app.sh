@@ -5,7 +5,6 @@ pip install --upgrade jupyter jupyter-bokeh requests
 
 # Enable qgrid widget extensions
 conda install qgrid -y
-jupyter nbextension enable --py --sys-prefix  --py qgrid
 
 # Secure credential storage to limit password inputs
 git config --global credential.helper store
@@ -19,6 +18,7 @@ conda install -c conda-forge ffmpeg=4.2.0 -y
 conda install -c conda-forge jupyter_nbextensions_configurator -y
 jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix
 jupyter nbextension enable --py --sys-prefix widgetsnbextension
+jupyter nbextension enable --py --sys-prefix  --py qgrid
 
 # Install bokeh extensions
 jupyter nbextension install --sys-prefix --symlink --py jupyter_bokeh

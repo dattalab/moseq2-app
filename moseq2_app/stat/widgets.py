@@ -17,7 +17,7 @@ class SyllableStatWidgets:
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)
         self.exp_dropdown = widgets.Dropdown(options=[], description='Group 2:', disabled=False)
 
-        self.grouping_dropdown = widgets.Dropdown(options=['group', 'SessionName'], description='Grouping:', disabled=False)
+        self.grouping_dropdown = widgets.Dropdown(options=['group', 'SessionName', 'SubjectName'], description='Grouping:', disabled=False)
         self.session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,
                                                   layout=self.layout_hidden, disabled=False)
 

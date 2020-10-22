@@ -21,7 +21,6 @@ from IPython.display import display, clear_output
 from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.gui.widgets import GroupSettingWidgets
-from moseq2_viz.helpers.wrappers import init_wrapper_function
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
@@ -325,21 +324,9 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     with open(syll_info_path, 'r') as f:
         syll_info = yaml.safe_load(f)
 
-    index, sorted_index, model_fit = init_wrapper_function(index_file=index_path, model_fit=model_path,
-                                                           output_dir=output_dir)
-
     cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path, df_path=df_path,
                                       model_path=model_path, syll_info=syll_info, output_dir=output_dir,
                                       get_pdfs=get_pdfs)
-
-    # Set Syllable select widget options
-    cm_compare.cm_syll_select.options = syll_info
-
-    # Set Session MultipleSelect widget options
-    sessions = list(set(model_fit['metadata']['uuids']))
-    cm_compare.cm_session_sel.options = sorted([sorted_index['files'][s]['metadata']['SessionName'] for s in sessions])
-
-    cm_compare.get_session_mean_syllable_info_df(model_fit, sorted_index)
 
     out = interactive_output(cm_compare.crowd_movie_preview, {'syllable': cm_compare.cm_syll_select,
                                                               'groupby': cm_compare.cm_sources_dropdown,
