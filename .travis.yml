@@ -25,6 +25,8 @@ jobs:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
         - pip install -e .
+      before_script:
+        - make
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
