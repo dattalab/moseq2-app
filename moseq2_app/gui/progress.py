@@ -12,8 +12,8 @@ from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
-from os.path import dirname, basename
-from moseq2_extract.helpers.data import check_completion_status
+from os.path import dirname, basename, exists, join
+from moseq2_extract.helpers.data import check_completion_status, read_yaml
 
 def generate_missing_metadata(sess_dir, sess_name):
     '''
@@ -34,7 +34,7 @@ def generate_missing_metadata(sess_dir, sess_name):
                    'NidaqChannels': 0, 'NidaqSamplingRate': 0.0, 'DepthResolution': [512, 424],
                    'ColorDataType': "Byte[]", "StartTime": ""}
 
-    with open(os.path.join(sess_dir, 'metadata.json'), 'w') as fp:
+    with open(join(sess_dir, 'metadata.json'), 'w') as fp:
         json.dump(sample_meta, fp)
 
 def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
@@ -241,13 +241,13 @@ def get_pca_progress(progress_vars, pca_progress):
     for key in pca_progress.keys():
         if progress_vars.get(key, None) != None:
             if key == 'pca_dirname':
-                if os.path.exists(os.path.join(progress_vars[key], 'pca.h5')):
+                if exists(join(progress_vars[key], 'pca.h5')):
                     pca_progress[key] = True
             elif key == 'changepoints_path':
-                if os.path.exists(os.path.join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
+                if exists(join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
                     pca_progress[key] = True
             else:
-                if os.path.exists(progress_vars[key]):
+                if exists(progress_vars[key]):
                     pca_progress[key] = True
 
         if pca_progress[key] != True:
@@ -272,7 +272,7 @@ def get_extraction_progress(progress_vars):
     path_dict = get_session_paths(progress_vars['base_dir'])
     e_path_dict = get_session_paths(progress_vars['base_dir'], extracted=True)
 
-    # Count number of extracted sessions and print the
+    # Count number of extracted sessions and print names of the missing/incomplete extractions
     num_extracted = 0
     for k, v in path_dict.items():
         extracted_path = e_path_dict.get(k, v)
@@ -282,6 +282,8 @@ def get_extraction_progress(progress_vars):
             if check_completion_status(yaml_path):
                 extracted = True
                 num_extracted += 1
+            else:
+                print(f'Extraction {k} is listed as incomplete.')
         if not extracted:
             print('Not yet extracted:', k)
 
@@ -318,16 +320,16 @@ def print_progress(progress_vars):
 
     # Get Modeling Path
     if progress_vars.get('model_path', None) != None:
-        if os.path.exists(progress_vars['model_path']):
+        if exists(progress_vars['model_path']):
             modeling_progress['model_path'] = True
 
     # Get Analysis Path
     if progress_vars.get('crowd_dir', None) != None:
-        if os.path.exists(progress_vars['crowd_dir']):
+        if exists(progress_vars['crowd_dir']):
             analysis_progress['crowd_dir'] = True
 
     if progress_vars.get('syll_info', None) != None:
-        if os.path.exists(progress_vars['syll_info']):
+        if exists(progress_vars['syll_info']):
             analysis_progress['syll_info'] = True
 
     show_progress_bar(num_extracted, len(path_dict.keys()), desc="Extraction Progress")
@@ -369,7 +371,7 @@ def check_progress(base_dir, progress_filepath):
                           'plot_path': os.path.join(base_dir, 'plots/')}
 
     # Check if progress file exists
-    if os.path.exists(progress_filepath):
+    if exists(progress_filepath):
         with open(progress_filepath, 'r') as f:
             progress_vars = yaml.safe_load(f)
 
