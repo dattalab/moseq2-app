@@ -443,11 +443,24 @@ def print_validation_results(anomaly_dict):
     -------
     '''
 
-    print('The following sessions were flagged.')
+    errors = ['missing', 'dropped_frames']
+    n_errs = 0
+    n_warnings = 0
+
+    # Count Errors and warnings
+    for v in anomaly_dict.values():
+        if v != [{}]:
+            for i, x in enumerate(v):
+                if x in errors:
+                    n_errs += 1
+                else:
+                    n_warnings += 1
+
+    print(f'{n_errs}/{len(anomaly_dict)} were flagged with error.')
+    print(f'{n_warnings}/{len(anomaly_dict)} were flagged with warning(s).')
     print('Sessions with "Error" flags must be re-extracted or excluded.')
     print('Sessions with "Warning" flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
 
-    errors = ['missing', 'dropped_frames']
     # Print results
     for k, v in anomaly_dict.items():
         if v != [{}]:
@@ -468,4 +481,5 @@ def print_validation_results(anomaly_dict):
                     percent = float(x.split(': ')[1].replace('%', ''))
                     if percent >= 5:
                         t = 'Error'
-                print(f'\t{t}: {x}')
+                if x != []:
+                    print(f'\t{t}: {x}')
