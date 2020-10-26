@@ -19,10 +19,10 @@ from ipywidgets import fixed
 import ipywidgets as widgets
 from bokeh.models import Div
 from os.path import dirname, basename, join
-from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
+from IPython.display import display, clear_output, Markdown
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
@@ -90,7 +90,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.checked_list.value = colored_options[0]
 
         # Display validation indicator
-        self.indicator = widgets.Label(value="", font_size=50, layout=self.label_layout)
+        self.indicator_layout = widgets.Layout(display='flex',
+                                               flex_flow='column',
+                                               font_size='150%',
+                                               align_items='center',
+                                               width='100%')
+        self.indicator = widgets.HTML(value="")
 
         # Set save parameters button callback
         self.save_parameters.on_click(self.save_clicked)
@@ -200,19 +205,15 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         '''
 
-        if self.curr_results['flagged'] == True:
-            self.curr_results['flagged'] = False
-            self.curr_results['ret_code'] = "0x1f7e2"
+        self.curr_results['flagged'] = False
+        self.curr_results['ret_code'] = "0x1f7e2"
 
-            # Update checked list
-            self.config_data['pixel_area'] = self.curr_results['counted_pixels']
-            self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
-            self.indicator.value = r'\(\color{green} {Passing}\)'
+        # Update checked list
+        self.config_data['pixel_area'] = self.curr_results['counted_pixels']
+        self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
+        self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
-            self.update_checked_list(self.curr_results)
-
-            clear_output()
-            display(self.ui_tools, self.main_out)
+        self.update_checked_list(self.curr_results)
 
     def check_all_sessions(self, b):
         '''
@@ -337,7 +338,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.checked_lbl.value = f'Passing Sessions: {self.npassing}/{len(self.checked_list.options)}'
 
                 # Set index passing value
-                checked_options[i] = f'{chr(int(self.curr_results["ret_code"], base=16))} {sessionName}'
+                checked_options[i] = f'{chr(int(sess_res["ret_code"], base=16))} {sessionName}'
 
                 # Updating progress
                 self.all_results[sessionName] = sess_res['flagged']
@@ -380,6 +381,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Get background and display UI plots
         bground_im = get_bground_im_file(session)
         clear_output()
+
         self.main_out = widgets.interactive_output(self.interactive_depth_finder, {'session': fixed(session),
                                                                                    'bground_im': fixed(bground_im),
                                                                                    'dr': self.bg_roi_depth_range,
@@ -445,12 +447,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Autodetect reference depth range and min-max height values at launch
         if self.config_data['autodetect']:
-            results = self.get_roi_and_depths(bground_im, session)
-            if not results['flagged']:
+            self.curr_results = self.get_roi_and_depths(bground_im, session)
+            if not self.curr_results['flagged']:
                 self.config_data['autodetect'] = False
 
             # Update the session flag result
-            self.all_results[self.keys[self.checked_list.index]] = results['flagged']
+            self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
 
             # Set initial frame range tuple value
             self.config_data['frame_range'] = self.frame_range.value
@@ -464,23 +466,17 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.config_data['dilate_iterations'] = di
 
             # Update the session flag result
-            results = self.get_roi_and_depths(bground_im, session)
-            self.all_results[self.keys[self.checked_list.index]] = results['flagged']
-
-        self.curr_results = results
+            self.get_roi_and_depths(bground_im, session)
+            self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
 
         # set indicator
-        if results['flagged']:
-            self.indicator.value = r'\(\color{red} {Flagged\ -\ Current\ ROI\ pixel\ area\ may\ be\ incorrect.\ ' \
-                                   r' If\ ROI\ is\ acceptable,\ Mark\ it\ as\ passing.\ Otherwise,\ change\ the\ depth\
-                                    range\ values.}\)'
-
+        if self.curr_results['flagged']:
+            self.indicator.value = '<center><h2><font color="red";>Flagged: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
+                                   ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
         else:
-            self.indicator.value = r'\(\color{green} {Passing}\)'
+            self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
             # Save passing session parameters
             self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
-
-        self.update_checked_list(results=results)
 
         # Clear output to update view
         clear_output()
@@ -490,7 +486,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         out = widgets.interactive_output(self.prepare_data_to_plot, {'input_file': fixed(session),
                                                                      'bground_im': fixed(bground_im),
-                                                                     'roi': fixed(results['roi']),
+                                                                     'roi': fixed(self.curr_results['roi']),
                                                                      'minmax_heights': self.minmax_heights,
                                                                      'fn': self.frame_num})
         # display graphs
@@ -540,8 +536,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         # initialize results dict
-        results = {'flagged': False,
-                   'ret_code': "0x1f7e2"}
+        self.curr_results = {'flagged': False,
+                             'ret_code': "0x1f7e2"}
 
         if self.config_data['autodetect']:
             # Get max depth as a thresholding limit (this would be the DTD if it already was computed)
@@ -581,10 +577,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    get_all_data=True
                                                    )
         except:
-            results['flagged'] = True
-            results['ret_code'] = "0x1f534"
-            results['roi'] = np.zeros_like(self.curr_bground_im)
-            return results
+            self.curr_results['flagged'] = True
+            self.curr_results['ret_code'] = "0x1f534"
+            self.curr_results['roi'] = np.zeros_like(self.curr_bground_im)
+            self.update_checked_list(results=self.curr_results)
+            return self.curr_results
 
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
@@ -627,15 +624,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         try:
             assert isclose(self.config_data['pixel_area'], r, abs_tol=50e2)
         except AssertionError:
-            if self.config_data.get('area_px_per_inch', 0) < pixels_per_inch:
-                results['flagged'] = True
-                results['ret_code'] = "0x1f534"
+            if self.config_data.get('pixel_area', 0) > r:
+                self.curr_results['flagged'] = True
+                self.curr_results['ret_code'] = "0x1f534"
 
         # Save ROI
-        results['roi'] = rois[0]
-        results['counted_pixels'] = r
+        self.curr_results['roi'] = rois[0]
+        self.curr_results['counted_pixels'] = r
+        self.update_checked_list(results=self.curr_results)
 
-        return results
+        return self.curr_results
 
     def get_extraction(self, input_file, bground_im, roi):
         '''
@@ -712,7 +710,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.indicator.value = r'\(\color{red} {Flagged\ -\ Could\ not\ apply\ ROI\ to\ loaded\ frames}\)'
+                self.indicator.value = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
                 self.curr_results['flagged'] = True
 
         # filter for included mouse height range
@@ -722,7 +720,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display min-max heights error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.indicator.value = r'\(\color{red} {Flagged\ -\ Mouse\ Height\ threshold\ range\ is\ incorrect}\)'
+                self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
 
         # Get overlayed ROI
@@ -748,21 +746,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if (result['depth_frames'] == np.zeros((1, 80, 80))).all():
             if not self.curr_results['flagged']:
-                self.indicator.value = r'\(\color{red} {Flagged\ -\ Mouse\ Height\ threshold\ range\ is\ incorrect}\)'
+                self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
         else:
-            self.indicator.value = r'\(\color{green} {Passing}\)'
+            self.indicator.value = "<center><h2><font color='green';>Passing</h2></center>"
             self.curr_results['flagged'] = False
 
         # Make and display plots
-        out = widgets.interactive_output(plot_roi_results, {'sessionName': fixed(self.formatted_key),
-                                                            'bground_im': fixed(bground_im),
-                                                            'roi': fixed(roi),
-                                                            'overlay': fixed(overlay),
-                                                            'filtered_frames': fixed(filtered_frames),
-                                                            'depth_frames': fixed(result['depth_frames'][0]),
-                                                            'fn': fixed(fn)})
-        display(out)
+        plot_roi_results(self.formatted_key, bground_im, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
 
 class InteractiveExtractionViewer:
 
