@@ -444,8 +444,7 @@ def print_validation_results(anomaly_dict):
     '''
 
     errors = ['missing', 'dropped_frames']
-    n_errs = 0
-    n_warnings = 0
+    n_errs, n_warnings = 0, 0
 
     # Count Errors and warnings
     for v in anomaly_dict.values():
@@ -454,7 +453,8 @@ def print_validation_results(anomaly_dict):
                 if x in errors:
                     n_errs += 1
                 else:
-                    n_warnings += 1
+                    if len(x) > 0:
+                        n_warnings += 1
 
     print(f'{n_errs}/{len(anomaly_dict)} were flagged with error.')
     print(f'{n_warnings}/{len(anomaly_dict)} were flagged with warning(s).')
