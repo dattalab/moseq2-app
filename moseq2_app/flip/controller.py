@@ -4,6 +4,7 @@ import joblib
 import warnings
 import numpy as np
 from copy import deepcopy
+from tqdm.auto import tqdm
 import ipywidgets as widgets
 from bokeh.plotting import figure, show
 from IPython.display import display, clear_output
@@ -81,11 +82,6 @@ class FlipRangeTool(FlipClassifierWidgets):
             if self.stop > self.start:
                 self.frame_ranges.append(range(self.start, self.stop))
                 self.selected_ranges.options = self.frame_ranges
-                if self.stop != self.max_frames-1:
-                    self.frame_num_slider.min = self.stop+1
-                else:
-                    done = True
-                    self.frame_num_slider.min = self.stop
 
             if not done:
                 self.start_button.description = 'Start Range'
@@ -125,11 +121,19 @@ class FlipRangeTool(FlipClassifierWidgets):
         clean_merged_data (3D np.ndarray): Loaded and filtered data to get correctly oriented frame ranges from.
         '''
 
-        h5s = recursive_find_h5s(root_dir=input_dir)
-        h5s = [h5 for h5 in h5s]
+        h5s, dicts, yamls = recursive_find_h5s(root_dir=input_dir)
 
-        dsets = [h5py.File(h5, mode='r')['frames'] for h5 in h5s[0]]
-        data = [dset[()] for dset in dsets]
+        unique_uuids, unique_h5s = [], []
+
+        for i, d in enumerate(dicts):
+            if d['uuid'] not in unique_uuids:
+                unique_uuids.append(d['uuid'])
+                unique_h5s.append(h5s[i])
+
+        data = []
+        for h5 in tqdm(unique_h5s, desc='Loading Data', total=len(unique_h5s)):
+            dset = h5py.File(h5, mode='r')['frames'][()]
+            data.append(dset)
 
         merged_data = np.concatenate(data, axis=0)
 
@@ -276,6 +280,9 @@ class FlipRangeTool(FlipClassifierWidgets):
         else:
             print('Model performance is not high enough. Either try selecting more accurate frame indices, '
                   'or re-extract the data with your latest flip classifier (with highest accuracy).')
+
+        joblib.dump(self.clf, self.output_file)
+        print(f'Saved model in {self.output_file}')
 
     def train_and_save_model(self):
         '''
