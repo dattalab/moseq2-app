@@ -38,7 +38,7 @@ setup(
                       'scikit-learn==0.20.3', 'opencv-python==4.1.2.30', 'h5py==2.10.0',
                       'moseq2-extract @ git+https://github.com/dattalab/moseq2-extract.git@dev',
                       'moseq2-pca @ git+https://github.com/dattalab/moseq2-pca.git@dev',
-                      'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@win-suggested-changes',
+                      'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@dev',
                       'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@best-model-fit'
                       ],
     python_requires='<3.8',

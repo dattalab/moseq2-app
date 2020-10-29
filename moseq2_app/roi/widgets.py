@@ -45,7 +45,7 @@ class InteractiveROIWidgets:
         self.ext_label = widgets.Label(value="Extract Parameters", layout=self.label_layout)
 
         self.minmax_label = widgets.Label(value="Mouse Height Range to Include", layout=self.label_layout)
-        self.minmax_heights = widgets.IntRangeSlider(value=[13, 100], min=0, max=255, step=1,
+        self.minmax_heights = widgets.IntRangeSlider(value=[10, 100], min=0, max=255, step=1,
                                                      description='', style=style,
                                                      continuous_update=False)
         self.fr_label = widgets.Label(value="Frame Range to Extract", layout=self.label_layout)
