@@ -26,7 +26,7 @@ from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionV
 from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
 from moseq2_viz.model.util import get_syllable_usages, relabel_by_usage, parse_model_results
 from moseq2_app.roi.validation import (make_session_status_dicts, get_iqr_anomaly_sessions, get_scalar_df,
-                                       get_anomaly_dict, print_validation_results)
+                                       print_validation_results)
 
 warnings.filterwarnings('ignore')
 
@@ -100,11 +100,8 @@ def validate_extractions_wrapper(input_dir):
     # Flag sessions with mean scalar values that are outside the inter-quartile range (.25-.75)
     status_dicts = get_iqr_anomaly_sessions(scalar_df, status_dicts)
 
-    # Run all validation tests
-    anomaly_dict = get_anomaly_dict(scalar_df, status_dicts)
-
     # Print Results
-    print_validation_results(anomaly_dict)
+    print_validation_results(scalar_df, status_dicts)
 
 def interactive_group_setting_wrapper(index_filepath):
     '''

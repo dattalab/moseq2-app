@@ -268,7 +268,7 @@ def make_session_status_dicts(paths):
             # Count dropped frame percentage
             dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
             if dropped_frames >= 0.05:
-                status_dicts[stat_dict['uuid']]['dropped_frames'] = True
+                status_dicts[stat_dict['uuid']]['dropped_frames'] = dropped_frames
         except KeyError:
             pass
             print(f'{h5path} timestamps not found.')
@@ -335,7 +335,7 @@ def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
     outlier_pdfs = pdfs[outlier_indices]
 
     for o, pdf in zip(outliers, outlier_pdfs):
-        status_dicts[o]['position_heatmap'] = [True, pdf]
+        status_dicts[o]['position_heatmap'] = pdf
 
     return status_dicts
 
@@ -368,58 +368,24 @@ def run_validation_tests(scalar_df, status_dicts):
         # Count stationary frames
         stat_percent = count_stationary_frames(df) / len(df)
         if stat_percent >= 0.05:
-            status_dicts[s]['stationary'] = [True, stat_percent]
+            status_dicts[s]['stationary'] = stat_percent
 
         # Get frames with missing mouse
         missing_percent = count_missing_mouse_frames(df) / len(df)
         if missing_percent >= 0.05:
-            status_dicts[s]['missing'] = [True, missing_percent]
+            status_dicts[s]['missing'] = missing_percent
 
         # Get frames with mouse sizes that are too small
         size_anomaly = count_frames_with_small_areas(df) / len(df)
         if size_anomaly >= 0.05:
-            status_dicts[s]['size_anomaly'] = [True, size_anomaly]
+            status_dicts[s]['size_anomaly'] = size_anomaly
+            
+        # Get corrupted frame ratio
+        corrupted_percent = count_nan_rows(df) / len(df)
+        if corrupted_percent >= 0.05:
+            status_dicts[s]['corrupted'] = corrupted_percent
 
     return status_dicts
-
-def get_anomaly_dict(scalar_df, status_dicts):
-    '''
-
-    Helper function that prepares a dictionary with all the relevant values to print at the
-     end of the validation wrapper.
-
-    Parameters
-    ----------
-    scalar_df (pd.DataFrame): Computed Scalar DataFrame
-    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
-
-    Returns
-    -------
-    anomaly_dict (dict): Dict object containing specific session flags to display
-    '''
-
-    # Run tests
-    status_dicts = run_validation_tests(scalar_df, status_dicts)
-
-    # Get dict of anomalies
-    anomaly_dict = {}
-    for k, v in status_dicts.items():
-        anomaly_dict[k] = {}
-        for k1, v1 in v.items():
-            if isinstance(v1, dict):
-                # scalar anomaly dict
-                anomaly_dict[k][k1] = v1
-            elif isinstance(v1, list):
-                # position heatmap
-                if v1[0] == True and isinstance(v1[1], float):
-                    anomaly_dict[k][k1] = f'{k1}: {str(v1[1] * 100)[:5]}%'
-                elif v1[0] == True:
-                    # anomaly bools
-                    anomaly_dict[k][k1] = v1[1]
-            else:
-                anomaly_dict[k][k1] = v1
-
-    return anomaly_dict
 
 def plot_heatmap(heatmap, title):
     '''
@@ -439,7 +405,7 @@ def plot_heatmap(heatmap, title):
     plt.title(f'{title}')
     plt.show(block=False)
 
-def print_validation_results(anomaly_dict):
+def print_validation_results(scalar_df, status_dicts):
     '''
 
     Displays all the outlier sessions flag names and values. Additionally plots the flagged
@@ -452,34 +418,35 @@ def print_validation_results(anomaly_dict):
     Returns
     -------
     '''
+    # Run tests
+    anomaly_dict = run_validation_tests(scalar_df, status_dicts)
 
-    errors = ['missing', 'dropped_frames']
+    errors = ['missing', 'dropped_frames', 'corrupted']
     n_errs, n_warnings = 0, 0
 
     n_sessions = len(anomaly_dict)
+    print_dict = {}
 
     # Count Errors and warnings
     for k in anomaly_dict:
-        flagged = False
+        error, warning = False, False
         for k1, v1 in anomaly_dict[k].items():
             if k1 != 'metadata':
-                if k1 in errors and v1 == True:
-                    n_errs += 1
-                    flagged = True
-                elif isinstance(v1, list):
-                    if v1[0] == True:
-                        n_warnings += 1
-                        flagged = True
+                if k1 in errors and v1 != False:
+                    error = True
                 elif isinstance(v1, dict):
+                    # scalar anomalies
                     if len(v1) > 0:
-                        n_warnings += 1
-                        flagged = True
-                elif v1 == True:
-                    n_warnings += 1
-                    flagged = True
+                        warning = True
+                elif isinstance(v1, (float, type(np.array))):
+                    warning = True
 
-        if not flagged:
-            del anomaly_dict[k]
+        if warning:
+            n_warnings += 1
+            print_dict[k] = anomaly_dict[k]
+        if error:
+            n_errs += 1
+            print_dict[k] = anomaly_dict[k]
 
     print(f'{n_errs}/{n_sessions} were flagged with error.')
     print(f'{n_warnings}/{n_sessions} were flagged with warning(s).')
@@ -487,24 +454,28 @@ def print_validation_results(anomaly_dict):
     print('Sessions with "Warning" flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
 
     # Print results
-    for k in anomaly_dict:
-        for k1, v1 in anomaly_dict[k].items():
+    for k in print_dict:
+        # Get session name
+        session_name = print_dict[k]['metadata']['SessionName']
+        subject_name = print_dict[k]['metadata']['SubjectName']
+        print(f'Session: {session_name}; Subject: {subject_name} flags')
+        for k1, v1 in print_dict[k].items():
             x = ''
             if k1 != 'metadata':
-                if k1 in errors and v1 == True:
+                if k1 in errors and isinstance(v1, float):
                     t = 'Error'
-                elif isinstance(v1, list):
-                    if v1[0] == True:
-                        x = 'position heatmaps'
-                        t = 'Warning - Position Heatmap was flagged'
-                        try:
-                            plot_heatmap(v1[1]['position_heatmap'], k)
-                        except:
-                            pass
+                    x = f'{k1} - {v1*100}%'
+                elif k1 == 'position_heatmap' and not isinstance(v1, bool): 
+                    x = 'position heatmaps'
+                    t = 'Warning - Position Heatmap was flagged'
+                    try:
+                        plot_heatmap(v1, f'{session_name}_{subject_name}')
+                    except:
+                        pass
                 elif isinstance(v1, dict):
                     t = 'Warning'
                     if len(v1) > 0:
-                        print(list(v1.values()))
+                        x = list(v1.keys())
                 elif v1 == True:
                     t = 'Warning'
                     x = f'{k1} was flagged'
