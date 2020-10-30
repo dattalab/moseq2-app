@@ -192,7 +192,7 @@ class TestNotebookProgress(TestCase):
                               'syll_info': '',
                               'plot_path': os.path.join(base_dir, 'plots/')}
 
-        path_dict, num_extracted = get_extraction_progress(base_progress_vars)
+        path_dict, num_extracted = get_extraction_progress(base_dir)
 
         assert num_extracted == 0
         assert len(list(path_dict.keys())) == 1
@@ -213,7 +213,7 @@ class TestNotebookProgress(TestCase):
                               'syll_info': '',
                               'plot_path': os.path.join(base_dir, 'plots/')}
 
-        print_progress(base_progress_vars)
+        print_progress(base_dir, base_progress_vars)
 
     def test_check_progress(self):
         stdin = 'data/stdin.txt'

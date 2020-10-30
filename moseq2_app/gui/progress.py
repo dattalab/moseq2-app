@@ -254,14 +254,14 @@ def get_pca_progress(progress_vars, pca_progress):
             print(f'PCA missing: {key}')
     return pca_progress
 
-def get_extraction_progress(progress_vars):
+def get_extraction_progress(base_dir):
     '''
     Counts the number of fully extracted sessions, and prints the session directory names
      of the incomplete or missing extractions.
 
     Parameters
     ----------
-    progress_vars (dict): notebook progress dict.
+    base_dir (str): Path to parent directory containing all sessions
 
     Returns
     -------
@@ -269,8 +269,8 @@ def get_extraction_progress(progress_vars):
     num_extracted (int): Total number of completed extractions
     '''
 
-    path_dict = get_session_paths(progress_vars['base_dir'])
-    e_path_dict = get_session_paths(progress_vars['base_dir'], extracted=True)
+    path_dict = get_session_paths(base_dir)
+    e_path_dict = get_session_paths(base_dir, extracted=True)
 
     # Count number of extracted sessions and print names of the missing/incomplete extractions
     num_extracted = 0
@@ -290,7 +290,7 @@ def get_extraction_progress(progress_vars):
     return path_dict, num_extracted
 
 
-def print_progress(progress_vars):
+def print_progress(base_dir, progress_vars):
     '''
     Searches for all the paths included in the progress file and displays 4 progress bars, one for each pipeline step.
 
@@ -298,6 +298,7 @@ def print_progress(progress_vars):
 
     Parameters
     ----------
+    base_dir (str): Path to parent directory containing all sessions
     progress_vars (dict): notebook progress dict
 
     Returns
@@ -313,7 +314,7 @@ def print_progress(progress_vars):
     analysis_progress = {'syll_info': False, 'crowd_dir': False}
 
     # Get Extract Progress
-    path_dict, num_extracted = get_extraction_progress(progress_vars)
+    path_dict, num_extracted = get_extraction_progress(base_dir)
 
     # Get PCA Progress
     pca_progress = get_pca_progress(progress_vars, pca_progress)
@@ -377,7 +378,7 @@ def check_progress(base_dir, progress_filepath):
 
         print('Found progress file, displaying progress...\n')
         # Display progress bars
-        print_progress(progress_vars)
+        print_progress(base_dir, progress_vars)
         time.sleep(0.1)
 
         # Handle user input
