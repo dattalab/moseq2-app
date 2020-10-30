@@ -269,8 +269,6 @@ def get_extraction_progress(progress_vars):
     num_extracted (int): Total number of completed extractions
     '''
 
-    print(progress_vars['base_dir'])
-
     path_dict = get_session_paths(progress_vars['base_dir'])
     e_path_dict = get_session_paths(progress_vars['base_dir'], extracted=True)
 
