@@ -241,6 +241,7 @@ def make_session_status_dicts(paths):
 
     # Get default flags
     flags = {
+        'metadata': {},
         'scalar_anomaly': {},
         'dropped_frames': False,
         'corrupted': False,
@@ -256,7 +257,8 @@ def make_session_status_dicts(paths):
         yamlpath = paths[k].replace('mp4', 'yaml')
         with open(yamlpath, 'r') as f:
             stat_dict = yaml.safe_load(f)
-            status_dicts[stat_dict['metadata']['SessionName']] = deepcopy(flags)
+            status_dicts[stat_dict['uuid']] = deepcopy(flags)
+            status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
 
         # read timestamps from h5
         h5path = paths[k].replace('mp4', 'h5')
@@ -266,7 +268,7 @@ def make_session_status_dicts(paths):
             # Count dropped frame percentage
             dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
             if dropped_frames >= 0.05:
-                status_dicts[stat_dict['metadata']['SessionName']]['dropped_frames'] = True
+                status_dicts[stat_dict['uuid']]['dropped_frames'] = True
         except KeyError:
             pass
             print(f'{h5path} timestamps not found.')
@@ -289,7 +291,7 @@ def get_iqr_anomaly_sessions(scalar_df, status_dicts):
     status_dicts (dict): stacked dictionary object containing updated scalar_anomaly flags.
     '''
 
-    mean_df = scalar_df.groupby('SessionName', as_index=False).mean()
+    mean_df = scalar_df.groupby('uuid', as_index=False).mean()
 
     # Get sessions within interquartile range
     q1 = scalar_df.quantile(.25)
@@ -303,7 +305,7 @@ def get_iqr_anomaly_sessions(scalar_df, status_dicts):
         mask = mean_df[key].between(q1[key], q2[key], inclusive=True)
         iqr = mean_df.loc[~mask]
 
-        for s in list(iqr.SessionName):
+        for s in list(iqr.uuid):
             status_dicts[s]['scalar_anomaly'][key] = True
 
     return status_dicts
@@ -323,7 +325,7 @@ def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
     status_dicts (dict): stacked dictionary object containing updated position_heatmap flags.
     '''
 
-    pdfs, groups, sessions, sessionNames = compute_all_pdf_data(scalar_df, key='SessionName')
+    pdfs, groups, sessions, sessionNames = compute_all_pdf_data(scalar_df, key='uuid')
 
     kl_divergences = compute_kl_divergences(pdfs, groups, sessions, sessionNames)
 
@@ -353,12 +355,15 @@ def run_validation_tests(scalar_df, status_dicts):
     status_dicts (dict): stacked dictionary object containing all the sessions' updated flag status dicts.
     '''
 
-    sessionNames = list(scalar_df.SessionName.unique())
+    sessionNames = list(scalar_df.uuid.unique())
 
-    status_dicts = run_heatmap_kl_divergence_test(scalar_df, status_dicts)
+    try:
+        status_dicts = run_heatmap_kl_divergence_test(scalar_df, status_dicts)
+    except:
+        pass
 
     for s in sessionNames:
-        df = scalar_df[scalar_df['SessionName'] == s]
+        df = scalar_df[scalar_df['uuid'] == s]
 
         # Count stationary frames
         stat_percent = count_stationary_frames(df) / len(df)
@@ -399,15 +404,20 @@ def get_anomaly_dict(scalar_df, status_dicts):
     # Get dict of anomalies
     anomaly_dict = {}
     for k, v in status_dicts.items():
-        anomaly_dict[k] = []
+        anomaly_dict[k] = {}
         for k1, v1 in v.items():
-            if isinstance(v1, list):
+            if isinstance(v1, dict):
+                # scalar anomaly dict
+                anomaly_dict[k][k1] = v1
+            elif isinstance(v1, list):
+                # position heatmap
                 if v1[0] == True and isinstance(v1[1], float):
-                    anomaly_dict[k].append(f'{k1}: {str(v1[1] * 100)[:5]}%')
+                    anomaly_dict[k][k1] = f'{k1}: {str(v1[1] * 100)[:5]}%'
                 elif v1[0] == True:
-                    anomaly_dict[k].append({k1: v1[1]})
-            elif isinstance(v1, dict):
-                anomaly_dict[k].append(v1)
+                    # anomaly bools
+                    anomaly_dict[k][k1] = v1[1]
+            else:
+                anomaly_dict[k][k1] = v1
 
     return anomaly_dict
 
@@ -446,40 +456,57 @@ def print_validation_results(anomaly_dict):
     errors = ['missing', 'dropped_frames']
     n_errs, n_warnings = 0, 0
 
-    # Count Errors and warnings
-    for v in anomaly_dict.values():
-        if v != [{}]:
-            for i, x in enumerate(v):
-                if x in errors:
-                    n_errs += 1
-                else:
-                    if len(x) > 0:
-                        n_warnings += 1
+    n_sessions = len(anomaly_dict)
 
-    print(f'{n_errs}/{len(anomaly_dict)} were flagged with error.')
-    print(f'{n_warnings}/{len(anomaly_dict)} were flagged with warning(s).')
+    # Count Errors and warnings
+    for k in anomaly_dict:
+        flagged = False
+        for k1, v1 in anomaly_dict[k].items():
+            if k1 != 'metadata':
+                if k1 in errors and v1 == True:
+                    n_errs += 1
+                    flagged = True
+                elif isinstance(v1, list):
+                    if v1[0] == True:
+                        n_warnings += 1
+                        flagged = True
+                elif isinstance(v1, dict):
+                    if len(v1) > 0:
+                        n_warnings += 1
+                        flagged = True
+                elif v1 == True:
+                    n_warnings += 1
+                    flagged = True
+
+        if not flagged:
+            del anomaly_dict[k]
+
+    print(f'{n_errs}/{n_sessions} were flagged with error.')
+    print(f'{n_warnings}/{n_sessions} were flagged with warning(s).')
     print('Sessions with "Error" flags must be re-extracted or excluded.')
     print('Sessions with "Warning" flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
 
     # Print results
-    for k, v in anomaly_dict.items():
-        if v != [{}]:
-            print(f'{k}:')
-            for i, x in enumerate(v):
-                if x in errors:
+    for k in anomaly_dict:
+        for k1, v1 in anomaly_dict[k].items():
+            x = ''
+            if k1 != 'metadata':
+                if k1 in errors and v1 == True:
                     t = 'Error'
-                elif isinstance(x, dict):
-                    t = 'Warning - Detected mean scalar values outside of accepted IQR'
-                    x = list(x.keys())
-                    if 'position_heatmap' in x:
+                elif isinstance(v1, list):
+                    if v1[0] == True:
                         x = 'position heatmaps'
                         t = 'Warning - Position Heatmap was flagged'
-                        plot_heatmap(v[i]['position_heatmap'], k)
-                else:
+                        try:
+                            plot_heatmap(v1[1]['position_heatmap'], k)
+                        except:
+                            pass
+                elif isinstance(v1, dict):
                     t = 'Warning'
-                    # test percentage
-                    percent = float(x.split(': ')[1].replace('%', ''))
-                    if percent >= 5:
-                        t = 'Error'
-                if x != []:
-                    print(f'\t{t}: {x}')
+                    if len(v1) > 0:
+                        print(list(v1.values()))
+                elif v1 == True:
+                    t = 'Warning'
+                    x = f'{k1} was flagged'
+            if len(x) > 0:
+                print(f'\t{t}: {x}')

@@ -127,8 +127,8 @@ class TestExtractionValidation(TestCase):
 
         status_dicts = make_session_status_dicts(paths)
         assert len(list(status_dicts.keys())) == 1
-        assert list(status_dicts['012517']) == ['scalar_anomaly', 'dropped_frames',
-                                                'corrupted', 'stationary', 'missing',
+        assert list(status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']) == ['metadata', 'scalar_anomaly',
+                                                'dropped_frames', 'corrupted', 'stationary', 'missing',
                                                 'size_anomaly', 'position_heatmap']
 
     def test_get_iqr_anomaly_sessions(self):
@@ -169,6 +169,7 @@ class TestExtractionValidation(TestCase):
         new_status_dicts = run_validation_tests(scalar_df, deepcopy(status_dicts))
 
         assert new_status_dicts == status_dicts
+        assert new_status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['dropped_frames'] == True
 
     def test_get_anomaly_dict(self):
         paths = {
@@ -179,10 +180,10 @@ class TestExtractionValidation(TestCase):
 
         scalar_df = get_scalar_df(paths)
 
-        anomaly_dict = get_anomaly_dict(scalar_df, status_dicts)
+        anomaly_dict = get_anomaly_dict(scalar_df, deepcopy(status_dicts))
 
-        assert anomaly_dict != status_dicts
-        assert anomaly_dict == {'012517': [{}]}
+        assert anomaly_dict == status_dicts
+        assert anomaly_dict['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['dropped_frames'] == True
 
     def test_plot_heatmap(self):
 

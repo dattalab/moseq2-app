@@ -742,9 +742,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                    )
         except:
             # Display error and flag
-            result = {'depth_frames': np.zeros((1, 80, 80))}
+            result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
 
-        if (result['depth_frames'] == np.zeros((1, 80, 80))).all():
+        if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
