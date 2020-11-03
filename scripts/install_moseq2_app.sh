@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download some dependencies prior to installing moseq2-app
-pip install --upgrade jupyter jupyter-bokeh requests
+pip install --upgrade jupyter jupyter-bokeh requests opencv-python==4.1.2.30
 
 # Enable qgrid widget extensions
 conda install qgrid -y

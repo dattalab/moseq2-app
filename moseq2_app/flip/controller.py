@@ -133,6 +133,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         data = []
         for h5 in tqdm(unique_h5s, desc='Loading Data', total=len(unique_h5s)):
             dset = h5py.File(h5, mode='r')['frames'][()]
+            # TODO: potentially add crop size readjustment
             data.append(dset)
 
         merged_data = np.concatenate(data, axis=0)

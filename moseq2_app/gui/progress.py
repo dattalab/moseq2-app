@@ -388,7 +388,7 @@ def check_progress(base_dir, progress_filepath):
     else:
         print('Progress file not found, creating new one.')
         progress_vars = base_progress_vars
-        print_progress(progress_vars)
+        print_progress(base_dir, progress_vars)
 
         with open(progress_filepath, 'w') as f:
             yml.dump(progress_vars, f)
