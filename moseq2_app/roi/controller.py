@@ -802,7 +802,7 @@ class InteractiveExtractionViewer:
 
         # display extracted video as HTML Div using Bokeh
         video_div = f'''
-                        <h2>{dirname(input_file)}</h2>
+                        <h2>{input_file}</h2>
                         <video
                             src="{input_file}"; alt="{input_file}"; 
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";

@@ -267,6 +267,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Handle selective display for whether mutation sort is selected
         if sort.lower() == 'difference':
             self.mutation_box.layout.display = "block"
+            sort = f'Difference: {self.exp_dropdown.value} - {self.ctrl_dropdown.value}'
         else:
             self.mutation_box.layout.display = "none"
 

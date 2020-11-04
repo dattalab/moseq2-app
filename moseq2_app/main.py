@@ -6,12 +6,14 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 '''
 
 from bokeh.io import output_notebook
+from moseq2_extract.util import filter_warnings
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
      validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
      interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
      interactive_plot_transition_graph_wrapper, get_frame_flips_wrapper
 
+@filter_warnings
 def flip_classifier_tool(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
     '''
 
@@ -34,6 +36,7 @@ def flip_classifier_tool(input_dir, output_file, max_frames=1e6, tail_filter_ite
     flip_obj = get_frame_flips_wrapper(input_dir, output_file, max_frames, tail_filter_iters, space_filter_size)
     return flip_obj
 
+@filter_warnings
 def view_extraction(extractions, default=0):
     '''
     Prompts user to select which extracted video(s) to preview.
@@ -62,6 +65,7 @@ def view_extraction(extractions, default=0):
 
     return extractions
 
+@filter_warnings
 def interactive_roi_detector(input_dir, progress_paths, compute_all_bgs=True):
     '''
     Function to launch ROI detector interactive GUI in jupyter notebook
@@ -82,6 +86,7 @@ def interactive_roi_detector(input_dir, progress_paths, compute_all_bgs=True):
 
     interactive_roi_wrapper(input_dir, config_file, session_config, compute_bgs=compute_all_bgs)
 
+@filter_warnings
 def preview_extractions(input_dir):
     '''
     Function to launch a dynamic video loader that displays extraction session mp4s.
@@ -97,6 +102,7 @@ def preview_extractions(input_dir):
     output_notebook()
     interactive_extraction_preview_wrapper(input_dir)
 
+@filter_warnings
 def validate_extractions(input_dir):
     '''
     Wrapper function that facilitates the extraction validation step from `main.py`.
@@ -112,6 +118,7 @@ def validate_extractions(input_dir):
 
     validate_extractions_wrapper(input_dir)
 
+@filter_warnings
 def interactive_group_setting(index_file):
     '''
 
@@ -128,6 +135,7 @@ def interactive_group_setting(index_file):
 
     interactive_group_setting_wrapper(index_file)
 
+@filter_warnings
 def label_syllables(progress_paths, max_syllables=None, n_explained=99):
     '''
     Interactive syllable labeling tool accessible from the jupyter notebook.
@@ -154,6 +162,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
                                          index_file, crowd_dir, syll_info_path,
                                          max_syllables=max_syllables, n_explained=n_explained)
 
+@filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None):
     '''
     Generates the interactive syllable statistics viewer, consisting of a dot-line plot and a dendrogram.
@@ -177,6 +186,7 @@ def interactive_syllable_stats(progress_paths, max_syllable=None):
     interactive_syllable_stat_wrapper(index_file, model_path, syll_info_path,
                                       syll_info_df_path, max_syllables=max_syllable)
 
+@filter_warnings
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True):
     '''
     Interactive crowd movie/position heatmap comparison function. Launched via the notebook.
@@ -203,6 +213,7 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
                                                syll_info_path, group_movie_dir, syll_info_df_path,
                                                get_pdfs=get_pdfs)
 
+@filter_warnings
 def interactive_transition_graph(progress_paths, max_syllables=None):
     '''
 

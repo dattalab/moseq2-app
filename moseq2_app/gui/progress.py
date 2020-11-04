@@ -13,7 +13,7 @@ from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 from os.path import dirname, basename, exists, join
-from moseq2_extract.helpers.data import check_completion_status, read_yaml
+from moseq2_extract.helpers.data import check_completion_status
 
 def generate_missing_metadata(sess_dir, sess_name):
     '''
@@ -74,9 +74,19 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
             else:
                 print('directory not found, try again.')
 
+    if len(sessions) == 0:
+        if extracted:
+            sessions = glob(join(data_dir, '*.mp4'))
+        else:
+            for ext in exts:
+                sessions += glob(join(data_dir, f'*.{ext}'))
+
     if extracted:
         names = [dirname(sess).split('/')[-2] for sess in sessions]
-        path_dict = {n: p for n, p in zip(names, sessions)}
+        if len(set(names)) == len(sessions):
+            path_dict = {n: p for n, p in zip(names, sessions)}
+        else:
+            path_dict = {basename(p): p for p in sessions}
     else:
         for sess in sessions:
             # get path to session directory
@@ -88,7 +98,10 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
 
         # Create path dictionary
         names = [basename(dirname(sess)) for sess in sessions]
-        path_dict = {n: p for n, p in zip(names, sessions)}
+        if len(set(names)) == len(sessions):
+            path_dict = {n: p for n, p in zip(names, sessions)}
+        else:
+            path_dict = {basename(p): p for p in sessions}
 
     return path_dict
 
