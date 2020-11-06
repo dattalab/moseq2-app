@@ -5,6 +5,7 @@ the widgets.py file to facilitate the real-time interaction.
 
 '''
 
+import gc
 import os
 import cv2
 import math
@@ -189,7 +190,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-
+        clear_output()
+        display(self.clear_button, self.ui_tools, self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
     def mark_passing_button_clicked(self, b):
@@ -343,6 +345,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
                 # Updating progress
                 self.all_results[sessionName] = sess_res['flagged']
+                gc.collect()
 
         # Updating displayed list
         self.checked_list.options = checked_options
@@ -388,6 +391,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    )
 
         display(self.main_out)
+        gc.collect()
 
     def update_checked_list(self, results):
         '''
@@ -490,6 +494,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                                      'fn': self.frame_num})
         # display graphs
         display(out)
+        gc.collect()
 
     def get_pixels_per_metric(self, pixel_width):
         '''
@@ -631,6 +636,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.curr_results['roi'] = rois[0]
         self.curr_results['counted_pixels'] = r
         self.update_checked_list(results=self.curr_results)
+        gc.collect()
 
         return self.curr_results
 
@@ -672,6 +678,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # display extracted video as HTML Div using Bokeh
         show_extraction(basename(dirname(input_file)), view_path)
+        gc.collect()
 
     def prepare_data_to_plot(self, input_file, bground_im, roi, minmax_heights, fn):
         '''
@@ -753,6 +760,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Make and display plots
         plot_roi_results(self.formatted_key, bground_im, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
+        gc.collect()
 
 class InteractiveExtractionViewer:
 
