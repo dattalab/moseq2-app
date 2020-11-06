@@ -257,7 +257,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Update view when user selects new syllable from DropDownMenu
     output.observe(on_syll_change, names='value')
 
-def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path=None, max_syllables=None):
+def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path=None, max_syllables=None, load_parquet=False):
     '''
     Wrapper function to launch the interactive syllable statistics API. Users will be able to view different
     syllable statistics, sort them according to their metric of choice, and dynamically group the data to
@@ -269,6 +269,7 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
     model_path (str): Path to trained model file.
     info_path (str): Path to syllable information file.
     max_syllables (int): Maximum number of syllables to plot.
+    load_parquet (bool): Indicates to load previously loaded data
 
     Returns
     -------
@@ -276,7 +277,7 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
 
     # Initialize the statistical grapher context
     istat = InteractiveSyllableStats(index_path=index_path, model_path=model_path, df_path=df_path,
-                                     info_path=info_path, max_sylls=max_syllables)
+                                     info_path=info_path, max_sylls=max_syllables, load_parquet=load_parquet)
 
     # Compute the syllable dendrogram values
     istat.compute_dendrogram()
@@ -296,7 +297,7 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
     show(istat.cladogram)
 
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
-                                               df_path=None, get_pdfs=True):
+                                               df_path=None, get_pdfs=True, load_parquet=False):
     '''
     Wrapper function that launches an interactive crowd movie comparison application.
     Uses ipywidgets and Bokeh to facilitate real time user interaction.
@@ -310,6 +311,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     output_dir (str): path to directory to store crowd movies
     df_path (str): optional path to pre-existing syllable information to plot
     get_pdfs (bool): indicates whether to compute and display position heatmaps
+    load_parquet (bool): Indicates to load previously saved syllable data.
 
     Returns
     -------
@@ -323,7 +325,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
 
     cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path, df_path=df_path,
                                       model_path=model_path, syll_info=syll_info, output_dir=output_dir,
-                                      get_pdfs=get_pdfs)
+                                      get_pdfs=get_pdfs, load_parquet=load_parquet)
 
     out = interactive_output(cm_compare.crowd_movie_preview, {'syllable': cm_compare.cm_syll_select,
                                                               'groupby': cm_compare.cm_sources_dropdown,
@@ -331,7 +333,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     display(cm_compare.clear_button, out)
 
 
-def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, max_syllables=None):
+def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, max_syllables=None, load_parquet=False):
     '''
     Wrapper function that works as a background process that prepares the data
     for the interactive graphing function.
@@ -343,6 +345,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     info_path (str): Path to user-labeled syllable information file.
     df_path (str): Path to pre-saved syllable information.
     max_syllables (int or None): Limit maximum number of displayed syllables.
+    load_parquet (bool): Indicates to load previously saved data.
 
     Returns
     -------
@@ -350,7 +353,8 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 
     # Initialize Transition Graph data structure
     i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index_path=index_path,
-                                               info_path=info_path, df_path=df_path, max_sylls=max_syllables)
+                                               info_path=info_path, df_path=df_path,
+                                               max_sylls=max_syllables, load_parquet=load_parquet)
 
     # Make graphs
     out = interactive_output(i_trans_graph.interactive_transition_graph_helper,

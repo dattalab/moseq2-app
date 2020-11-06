@@ -163,7 +163,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
                                          max_syllables=max_syllables, n_explained=n_explained)
 
 @filter_warnings
-def interactive_syllable_stats(progress_paths, max_syllable=None):
+def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
     '''
     Generates the interactive syllable statistics viewer, consisting of a dot-line plot and a dendrogram.
 
@@ -171,6 +171,7 @@ def interactive_syllable_stats(progress_paths, max_syllable=None):
     ----------
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
+    load_parquet (bool): Indicates to load previously saved data.
 
     Returns
     -------
@@ -184,10 +185,10 @@ def interactive_syllable_stats(progress_paths, max_syllable=None):
 
     output_notebook()
     interactive_syllable_stat_wrapper(index_file, model_path, syll_info_path,
-                                      syll_info_df_path, max_syllables=max_syllable)
+                                      syll_info_df_path, max_syllables=max_syllable, load_parquet=load_parquet)
 
 @filter_warnings
-def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True):
+def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):
     '''
     Interactive crowd movie/position heatmap comparison function. Launched via the notebook.
 
@@ -196,6 +197,7 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
     progress_paths (dict): dictionary of notebook progress paths.
     group_movie_dir (str): path to generate new grouped crowd movies in.
     get_pdfs (bool): indicates whether to also generate position heatmaps.
+    load_parquet (bool): Indicates to load previously saved data.
 
     Returns
     -------
@@ -211,10 +213,10 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
     output_notebook()
     interactive_crowd_movie_comparison_preview_wrapper(config_file, index_file, model_path,
                                                syll_info_path, group_movie_dir, syll_info_df_path,
-                                               get_pdfs=get_pdfs)
+                                               get_pdfs=get_pdfs, load_parquet=load_parquet)
 
 @filter_warnings
-def interactive_transition_graph(progress_paths, max_syllables=None):
+def interactive_transition_graph(progress_paths, max_syllables=None, load_parquet=False):
     '''
 
     Displays group transition graphs with a configurable number of syllables. Launched via the
@@ -224,6 +226,7 @@ def interactive_transition_graph(progress_paths, max_syllables=None):
     ----------
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
+    load_parquet (bool): Indicates to load previously saved data.
 
     Returns
     -------
@@ -240,5 +243,5 @@ def interactive_transition_graph(progress_paths, max_syllables=None):
                                               index_file,
                                               syll_info_path,
                                               syll_info_df_path,
-                                              max_syllables=max_syllables)
-
+                                              max_syllables=max_syllables,
+                                              load_parquet=load_parquet)

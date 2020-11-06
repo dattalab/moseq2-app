@@ -186,7 +186,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             yml.dump(tmp, f)
 
         # Update button style
-        self.set_button.button_type = 'success'
+        self.set_button.button_style = 'success'
 
     def get_mean_group_dict(self, group_df):
         '''
@@ -252,8 +252,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         else:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_output_file, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_output_file, engine='fastparquet')
-            label_df.columns = label_df.columns.astype(int)
 
         # Get all unique groups in df
         self.groups = df.group.unique()
@@ -298,7 +296,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         -------
         '''
 
-        self.set_button.button_type = 'primary'
+        self.set_button.button_style = 'primary'
 
         # Set current widget values
         if len(syllables['label']) > 0:
@@ -359,7 +357,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
          with default crowd movie generation parameters.
         '''
 
-        config_data['separate_by'] = None
+        config_data['separate_by'] = ''
         config_data['specific_syllable'] = None
         config_data['max_syllable'] = self.max_sylls
         config_data['max_examples'] = 20
@@ -420,7 +418,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
     '''
 
-    def __init__(self, config_data, index_path, df_path, model_path, syll_info, output_dir, get_pdfs):
+    def __init__(self, config_data, index_path, df_path, model_path, syll_info, output_dir, get_pdfs, load_parquet):
         '''
         Initializes class object context parameters.
 
@@ -433,7 +431,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         syll_info (dict): Dict object containing labeled syllable information.
         output_dir (str): Path to directory to store crowd movies.
         get_pdfs (bool): Generate position heatmaps for the corresponding crowd movie grouping
+        load_parquet (bool): Indicates to load previously saved syllable data.
         '''
+
         super().__init__()
 
         self.config_data = config_data
@@ -449,10 +449,13 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Set Syllable select widget options
         self.cm_syll_select.options = syll_info
 
-        if df_path != None:
-            if not os.path.exists(df_path) or not os.path.exists(self.label_df_path):
-                self.df_path = None
-                self.label_df_path = None
+        if load_parquet:
+            if df_path != None:
+                if not os.path.exists(df_path) or not os.path.exists(self.label_df_path):
+                    self.df_path = None
+                    self.label_df_path = None
+        else:
+            self.df_path = None
 
         # Prepare current context's base session syllable info dict
         self.session_dict = {str(i): {'session_info': {}} for i in range(self.max_sylls)}
@@ -620,8 +623,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         if self.df_path != None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
-            label_df.columns = label_df.columns.astype(int)
+            if self.get_pdfs:
+                label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
+                label_df.columns = label_df.columns.astype(int)
 
             # Load scalar Dataframe to compute syllable speeds
             scalar_df = scalars_to_dataframe(self.sorted_index)

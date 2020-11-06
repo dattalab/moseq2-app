@@ -32,7 +32,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
     '''
 
-    def __init__(self, index_path, model_path, df_path, info_path, max_sylls):
+    def __init__(self, index_path, model_path, df_path, info_path, max_sylls, load_parquet):
         '''
         Initialize the main data inputted into the current context
 
@@ -42,6 +42,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         model_path (str): Path to trained model file.
         info_path (str): Path to syllable information file.
         max_sylls (int): Maximum number of syllables to plot.
+        load_parquet (bool): Indicates to load previously loaded data
         '''
 
         super().__init__()
@@ -52,11 +53,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.index_path = index_path
         self.df_path = df_path
 
-        if df_path != None:
-            if os.path.exists(df_path):
-                self.label_df_path = df_path.replace('syll_df', 'label_time_df')
-            else:
-                self.df_path = None
+        if load_parquet:
+            if df_path != None:
+                if os.path.exists(df_path):
+                    self.label_df_path = df_path.replace('syll_df', 'label_time_df')
+                else:
+                    self.df_path = None
+        else:
+            df_path = None
 
         self.df = None
 
@@ -201,8 +205,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         if self.df_path != None:
             print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
+            df = pd.read_parquet(self.df_path, engine='auto')
+            label_df = pd.read_parquet(self.label_df_path, engine='auto')
             label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
@@ -295,7 +299,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
     '''
 
-    def __init__(self, model_path, index_path, info_path, df_path, max_sylls):
+    def __init__(self, model_path, index_path, info_path, df_path, max_sylls, load_parquet):
         '''
         Initializes context variables
 
@@ -315,11 +319,14 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.df_path = df_path
         self.max_sylls = max_sylls
 
-        if df_path != None:
-            if os.path.exists(df_path):
-                self.label_df_path = df_path.replace('syll_df', 'label_time_df')
-            else:
-                self.df_path = None
+        if load_parquet:
+            if df_path != None:
+                if os.path.exists(df_path):
+                    self.label_df_path = df_path.replace('syll_df', 'label_time_df')
+                else:
+                    self.df_path = None
+        else:
+            self.df_path = None
 
         # Load and store transition graph data
         self.initialize_transition_data()
@@ -504,8 +511,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         if self.df_path != None:
             print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
+            df = pd.read_parquet(self.df_path, engine='auto')
+            label_df = pd.read_parquet(self.label_df_path, engine='auto')
             label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
@@ -515,10 +522,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                                 max_syllable=self.max_sylls, sort=True, compute_labels=True)
             scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
 
-            # Compute and append additional syllable scalar data
-            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            for scalar in scalars:
-                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+        # Compute and append additional syllable scalar data
+        scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
+        for scalar in scalars:
+            df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
 
         # Get groups and matching session uuids
         self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, index, sorted_index)

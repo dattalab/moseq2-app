@@ -298,7 +298,7 @@ def get_iqr_anomaly_sessions(scalar_df, status_dicts):
     q2 = scalar_df.quantile(.75)
 
     # Scalar values to measure
-    val_keys = ['area_mm', 'length_mm', 'width_mm', 'height_ave_mm']
+    val_keys = ['area_mm', 'length_mm', 'width_mm', 'height_ave_mm', 'velocity_2d_mm', 'velocity_3d_mm']
 
     # Get scalar anomalies based on quartile ranges
     for key in val_keys:
@@ -405,6 +405,17 @@ def plot_heatmap(heatmap, title):
     plt.title(f'{title}')
     plt.show(block=False)
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 def print_validation_results(scalar_df, status_dicts):
     '''
 
@@ -448,23 +459,23 @@ def print_validation_results(scalar_df, status_dicts):
             n_errs += 1
             print_dict[k] = anomaly_dict[k]
 
-    print(f'{n_errs}/{n_sessions} were flagged with error.')
-    print(f'{n_warnings}/{n_sessions} were flagged with warning(s).')
-    print('Sessions with "Error" flags must be re-extracted or excluded.')
-    print('Sessions with "Warning" flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
+    print(f'{bcolors.FAIL}{n_errs}/{n_sessions} were flagged with error.{bcolors.ENDC}')
+    print(f'{bcolors.WARNING}{n_warnings}/{n_sessions} were flagged with warning(s).{bcolors.ENDC}')
+    print(f'Sessions with {bcolors.FAIL}"Error"{bcolors.ENDC} flags must be re-extracted or excluded.')
+    print(f'Sessions with {bcolors.WARNING}"Warning"{bcolors.ENDC} flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
 
     # Print results
     for k in print_dict:
         # Get session name
         session_name = print_dict[k]['metadata']['SessionName']
         subject_name = print_dict[k]['metadata']['SubjectName']
-        print(f'Session: {session_name}; Subject: {subject_name} flags')
+        print(f'{bcolors.BOLD}{bcolors.UNDERLINE}Session: {session_name}; Subject: {subject_name} flags:{bcolors.ENDC}')
         for k1, v1 in print_dict[k].items():
             x = ''
             if k1 != 'metadata':
                 if k1 in errors and isinstance(v1, float):
                     t = 'Error'
-                    x = f'{k1} - {v1*100}%'
+                    x = f'{k1} - {v1*100:.2f}%'
                 elif k1 == 'position_heatmap' and not isinstance(v1, bool): 
                     x = 'position heatmaps'
                     t = 'Warning - Position Heatmap was flagged'
@@ -480,4 +491,9 @@ def print_validation_results(scalar_df, status_dicts):
                     t = 'Warning'
                     x = f'{k1} was flagged'
             if len(x) > 0:
-                print(f'\t{t}: {x}')
+                if 'Warning' in t:
+                    t = f'{bcolors.WARNING}{t}'
+                elif 'Error' in t:
+                    t = f'{bcolors.FAIL}{t}'
+                print(f'\t{t}: {x}{bcolors.ENDC}')
+        print()

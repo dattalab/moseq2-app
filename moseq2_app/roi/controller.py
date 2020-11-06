@@ -154,8 +154,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-
         self.checked_list.value = event.new
+
+        clear_output()
+        display(self.clear_button, self.ui_tools)
+        self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def compute_all_bgs(self):
         '''
@@ -187,8 +190,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
-        clear_output()
-        display(self.ui_tools, self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
     def mark_passing_button_clicked(self, b):
@@ -380,8 +381,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Get background and display UI plots
         bground_im = get_bground_im_file(session)
-        clear_output()
-
         self.main_out = widgets.interactive_output(self.interactive_depth_finder, {'session': fixed(session),
                                                                                    'bground_im': fixed(bground_im),
                                                                                    'dr': self.bg_roi_depth_range,
