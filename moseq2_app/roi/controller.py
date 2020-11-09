@@ -9,6 +9,7 @@ import gc
 import os
 import cv2
 import math
+import bokeh
 import warnings
 import numpy as np
 from math import isclose
@@ -122,6 +123,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.clear_button.on_click(self.clear_on_click)
 
         # Update main configuration parameters
+        self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
+        self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
         self.config_data = set_bg_roi_weights(self.config_data)
         self.config_data = check_filter_sizes(self.config_data)
         self.config_data['autodetect'] = True
@@ -140,7 +143,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-
+        bokeh.io.curdoc().clear()
+        bokeh.io.state.State().reset()
+        bokeh.io.reset_output()
         clear_output()
 
     def get_selected_session(self, event):
@@ -157,8 +162,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
         self.checked_list.value = event.new
 
+        gc.collect()
         clear_output()
-        display(self.clear_button, self.ui_tools)
+        bokeh.io.curdoc().clear()
+        bokeh.io.state.State().reset()
+        bokeh.io.reset_output()
+        bokeh.io.output_notebook(hide_banner=False)
+        clear_output()
         self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def compute_all_bgs(self):
@@ -191,7 +201,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
         clear_output()
-        display(self.clear_button, self.ui_tools, self.main_out)
+        display(self.clear_button, self.ui_tools)
+        display(self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
     def mark_passing_button_clicked(self, b):
@@ -380,16 +391,17 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.formatted_key = session.split(' ')[1]
 
         if self.formatted_key in self.keys:
-            session = self.sessions[self.formatted_key]
+            self.curr_session = self.sessions[self.formatted_key]
 
         # Get background and display UI plots
-        bground_im = get_bground_im_file(session)
-        self.main_out = widgets.interactive_output(self.interactive_depth_finder, {'session': fixed(session),
-                                                                                   'bground_im': fixed(bground_im),
+        self.curr_bground_im = get_bground_im_file(self.curr_session)
+        self.main_out = widgets.interactive_output(self.interactive_depth_finder, {'minmax_heights': self.minmax_heights,
+                                                                                   'fn': self.frame_num,
                                                                                    'dr': self.bg_roi_depth_range,
                                                                                    'di': self.dilate_iters}
                                                    )
 
+        display(self.clear_button, self.ui_tools)
         display(self.main_out)
         gc.collect()
 
@@ -417,7 +429,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.checked_list._initializing_traits_ = False
         self.checked_list.value = checked_options[curr_index]
 
-    def interactive_depth_finder(self, session, bground_im, dr, di):
+    def interactive_depth_finder(self, minmax_heights, fn, dr, di):
         '''
         Interactive helper function that updates that views whenever the depth range or
         dilation iterations sliders are changed.
@@ -436,7 +448,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
-        if '.tar' in session:
+        if '.tar' in self.curr_session:
             self.config_data['tar'] = True
         else:
             self.config_data['tar'] = False
@@ -444,13 +456,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.save_parameters.button_style = 'primary'
         self.save_parameters.icon = 'none'
 
-        # Setting current context parameters
-        self.curr_session = session
-        self.curr_bground_im = bground_im
-
         # Autodetect reference depth range and min-max height values at launch
         if self.config_data['autodetect']:
-            self.curr_results = self.get_roi_and_depths(bground_im, session)
+            self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
             if not self.curr_results['flagged']:
                 self.config_data['autodetect'] = False
 
@@ -469,7 +477,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.config_data['dilate_iterations'] = di
 
             # Update the session flag result
-            self.get_roi_and_depths(bground_im, session)
+            self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
             self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
 
         # set indicator
@@ -487,13 +495,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Display extraction validation indicator
         display(self.indicator)
 
-        out = widgets.interactive_output(self.prepare_data_to_plot, {'input_file': fixed(session),
-                                                                     'bground_im': fixed(bground_im),
-                                                                     'roi': fixed(self.curr_results['roi']),
-                                                                     'minmax_heights': self.minmax_heights,
-                                                                     'fn': self.frame_num})
         # display graphs
-        display(out)
+        self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
+
         gc.collect()
 
     def get_pixels_per_metric(self, pixel_width):
@@ -540,7 +544,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         # initialize results dict
-        self.curr_results = {'flagged': False,
+        curr_results = {'flagged': False,
                              'ret_code': "0x1f7e2"}
 
         if self.config_data['autodetect']:
@@ -581,11 +585,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    get_all_data=True
                                                    )
         except:
-            self.curr_results['flagged'] = True
-            self.curr_results['ret_code'] = "0x1f534"
-            self.curr_results['roi'] = np.zeros_like(self.curr_bground_im)
-            self.update_checked_list(results=self.curr_results)
-            return self.curr_results
+            curr_results['flagged'] = True
+            curr_results['ret_code'] = "0x1f534"
+            curr_results['roi'] = np.zeros_like(self.curr_bground_im)
+            self.update_checked_list(results=curr_results)
+            return curr_results
 
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
@@ -629,16 +633,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             assert isclose(self.config_data['pixel_area'], r, abs_tol=50e2)
         except AssertionError:
             if self.config_data.get('pixel_area', 0) > r:
-                self.curr_results['flagged'] = True
-                self.curr_results['ret_code'] = "0x1f534"
+                curr_results['flagged'] = True
+                curr_results['ret_code'] = "0x1f534"
 
         # Save ROI
-        self.curr_results['roi'] = rois[0]
-        self.curr_results['counted_pixels'] = r
-        self.update_checked_list(results=self.curr_results)
+        curr_results['roi'] = rois[0]
+        curr_results['counted_pixels'] = r
+        self.update_checked_list(results=curr_results)
         gc.collect()
 
-        return self.curr_results
+        return curr_results
 
     def get_extraction(self, input_file, bground_im, roi):
         '''
@@ -680,7 +684,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         show_extraction(basename(dirname(input_file)), view_path)
         gc.collect()
 
-    def prepare_data_to_plot(self, input_file, bground_im, roi, minmax_heights, fn):
+    def prepare_data_to_plot(self, roi, minmax_heights, fn):
         '''
         Helper function that generates the display plots with the currently selected parameters,
          and checks if the min-max height parameters are acceptable, updating the success indicator if any
@@ -706,8 +710,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
         # get segmented frame
-        raw_frames = load_movie_data(input_file, range(fn, fn + 30), frame_dims=bground_im.shape[::-1])
-        curr_frame = (bground_im - raw_frames)
+        raw_frames = load_movie_data(self.curr_session, range(fn, fn + 30), frame_dims=self.curr_bground_im.shape[::-1])
+
+        if self.dilate_iters.value <= 1:
+            curr_frame = (self.curr_bground_im- raw_frames)
+        else:
+            mouse_on_edge = (self.curr_bground_im < self.true_depth) & (raw_frames < self.curr_bground_im)
+            curr_frame = (self.curr_bground_im - raw_frames) * np.logical_not(mouse_on_edge) + \
+                         (self.true_depth - raw_frames) * mouse_on_edge
 
         # filter out regions outside of ROI
         try:
@@ -730,7 +740,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.curr_results['flagged'] = True
 
         # Get overlayed ROI
-        overlay = bground_im.copy()
+        overlay = self.curr_bground_im.copy()
         overlay[roi != True] = 0
 
         # prepare extraction metadatas
@@ -744,7 +754,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                    **str_els,
                                    chunk=raw_frames.copy(),
                                    roi=roi,
-                                   bground=bground_im,
+                                   bground=self.curr_bground_im,
                                    )
         except:
             # Display error and flag
@@ -759,7 +769,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.curr_results['flagged'] = False
 
         # Make and display plots
-        plot_roi_results(self.formatted_key, bground_im, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
+        plot_roi_results(self.formatted_key, self.curr_bground_im, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
         gc.collect()
 
 class InteractiveExtractionViewer:

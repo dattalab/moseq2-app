@@ -50,9 +50,8 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
     roi_app = InteractiveFindRoi(data_path, config_file, session_config, compute_bgs=compute_bgs)
 
     # Run interactive application
-    selout = widgets.interactive_output(roi_app.interactive_find_roi_session_selector,
-                                        {'session': roi_app.checked_list})
-    display(roi_app.clear_button, roi_app.ui_tools, selout)
+    roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
+
 
 def interactive_extraction_preview_wrapper(input_dir):
     '''
