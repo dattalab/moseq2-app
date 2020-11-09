@@ -17,14 +17,13 @@ from bokeh.io import show
 from copy import deepcopy
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
-from ipywidgets import fixed
 import ipywidgets as widgets
 from bokeh.models import Div
 from os.path import dirname, basename, join
+from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
-from IPython.display import display, clear_output, Markdown
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
@@ -116,6 +115,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Set extract frame range slider
         self.frame_range.observe(self.update_config_fr, names='value')
+        self.frame_num.observe(self.update_config_fn, names='value')
+
+        self.bg_roi_depth_range.observe(self.update_config_dr, names='value')
 
         # Set session select callback
         self.checked_list.observe(self.get_selected_session, names='value')
@@ -128,6 +130,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data = set_bg_roi_weights(self.config_data)
         self.config_data = check_filter_sizes(self.config_data)
         self.config_data['autodetect'] = True
+        self.config_data['detect'] = True
 
         if compute_bgs:
             self.compute_all_bgs()
@@ -170,6 +173,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         bokeh.io.output_notebook(hide_banner=False)
         clear_output()
         self.interactive_find_roi_session_selector(self.checked_list.value)
+        self.config_data['detect'] = True
 
     def compute_all_bgs(self):
         '''
@@ -299,6 +303,21 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.config_data['min_height'] = self.minmax_heights.value[0]
         self.config_data['max_height'] = self.minmax_heights.value[1]
+        self.config_data['detect'] = False
+
+    def update_config_dr(self, event):
+        '''
+        Callback function to update config dict with current UI depth range values
+
+        Parameters
+        ----------
+        event (ipywidget callback): Any user interaction.
+
+        Returns
+        -------
+        '''
+
+        self.config_data['detect'] = False
 
     def update_config_fr(self, event):
         '''
@@ -313,6 +332,22 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         self.config_data['frame_range'] = self.frame_range.value
+        self.config_data['detect'] = False
+
+    def update_config_fn(self, event):
+        '''
+        Callback function to update config dict with current UI depth range values
+
+        Parameters
+        ----------
+        event (ipywidget callback): Any user interaction.
+
+        Returns
+        -------
+        '''
+
+        self.config_data['frame_num'] = self.frame_num.value
+        self.config_data['detect'] = False
 
     def test_all_sessions(self, session_dict):
         '''
@@ -476,9 +511,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.config_data['bg_roi_depth_range'] = (int(dr[0]), int(dr[1]))
             self.config_data['dilate_iterations'] = di
 
-            # Update the session flag result
-            self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
-            self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
+            if self.config_data['detect']:
+                # Update the session flag result
+                self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
+                self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
 
         # set indicator
         if self.curr_results['flagged']:
