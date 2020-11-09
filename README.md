@@ -1,5 +1,7 @@
 # MoSeq2-Notebook: An interactive Jupyter Notebook for animal behavior sequencing
 
+[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/dattalab/community)
+
 <center><img src="https://drive.google.com/uc?export=view&id=1jCpb4AQKBasne2SoXw_S1kwU7R9esAF6"></center>
 
 Last Updated: 10/06/2020
@@ -207,7 +209,7 @@ If you created a new environment, you may need to restart your shell in order fo
 This is done in the 5th line in the command block above `source ~/.bashrc`. 
 
 If for whatever reason the environment creation is interrupted, restart the shell and check if the environment `moseq2-app` exists.
-If so, activate the environment and run the install script again but enter `2` to only install the latest dependency versions.
+If so, activate the environment and run the `easy_install.sh` script again but enter `2` to only install the latest dependency versions.
 
 You can list your currently existing conda environments by running the following command:
 ```bash
