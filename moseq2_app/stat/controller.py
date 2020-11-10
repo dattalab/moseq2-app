@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.util import parse_index
-from IPython.display import display, clear_output
+from IPython.display import clear_output
 from moseq2_viz.info.util import entropy, entropy_rate
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -21,7 +21,7 @@ from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interact
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats, get_usage_dict,
                                          handle_graph_layout, convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
-from moseq2_viz.model.label_util import get_syllable_mutation_ordering, get_sorted_syllable_stat_ordering
+from moseq2_viz.model.label_util import sort_syllables_by_stat_difference, sort_syllables_by_stat
 from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_mean_syll_scalar, compute_session_centroid_speeds)
 
 class InteractiveSyllableStats(SyllableStatWidgets):
@@ -260,11 +260,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Get selected syllable sorting
         if sort.lower() == 'difference':
             # display Text for groups to input experimental groups
-            ordering = get_syllable_mutation_ordering(df, ctrl_group, exp_group, stat=stat)
+            ordering = sort_syllables_by_stat_difference(df, ctrl_group, exp_group, stat=stat)
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
         elif sort.lower() != 'usage':
-            ordering, _ = get_sorted_syllable_stat_ordering(df, stat=sortby)
+            ordering, _ = sort_syllables_by_stat(df, stat=sortby)
         else:
             ordering = range(len(df.syllable.unique()))
 
