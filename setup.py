@@ -41,6 +41,5 @@ setup(
                       'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@dev',
                       'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@dev'
                       ],
-    python_requires='<3.8',
-    entry_points={'console_scripts': ['moseq2-app = moseq2_app']}
+    python_requires='<3.8'
 )
