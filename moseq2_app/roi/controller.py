@@ -166,12 +166,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.checked_list.value = event.new
 
         gc.collect()
-        clear_output()
         bokeh.io.curdoc().clear()
         bokeh.io.state.State().reset()
         bokeh.io.reset_output()
-        bokeh.io.output_notebook(hide_banner=False)
-        clear_output()
+        bokeh.io.output_notebook(hide_banner=True)
+        clear_output(wait=True)
         self.interactive_find_roi_session_selector(self.checked_list.value)
         self.config_data['detect'] = True
 
@@ -204,7 +203,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-        clear_output()
+        clear_output(wait=True)
         display(self.clear_button, self.ui_tools)
         display(self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])

@@ -59,8 +59,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                     self.label_df_path = df_path.replace('syll_df', 'label_time_df')
                 else:
                     self.df_path = None
+                    self.label_df_path = None
         else:
-            df_path = None
+            self.df_path = None
+            self.label_df_path = None
 
         self.df = None
 
@@ -205,8 +207,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         if self.df_path != None:
             print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='auto')
-            label_df = pd.read_parquet(self.label_df_path, engine='auto')
+            df = pd.read_parquet(self.df_path, engine='fastparquet')
+            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
             label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
@@ -325,8 +327,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                     self.label_df_path = df_path.replace('syll_df', 'label_time_df')
                 else:
                     self.df_path = None
+                    self.label_df_path = None
         else:
             self.df_path = None
+            self.label_df_path = None
 
         # Load and store transition graph data
         self.initialize_transition_data()
@@ -506,13 +510,13 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         labels = model_fit['labels']
 
         # get max_sylls
-        if self.max_sylls == None:
+        if self.max_sylls is None:
             self.max_sylls = len(list(self.syll_info.keys()))
 
-        if self.df_path != None:
+        if self.df_path is not None:
             print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='auto')
-            label_df = pd.read_parquet(self.label_df_path, engine='auto')
+            df = pd.read_parquet(self.df_path, engine='fastparquet')
+            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
             label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
