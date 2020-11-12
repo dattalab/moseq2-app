@@ -31,7 +31,7 @@ from moseq2_extract.io.video import load_movie_data, get_video_info
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel,
                                  set_bground_to_plane_fit, set_bg_roi_weights,
-                                 check_filter_sizes)
+                                 check_filter_sizes, graduate_dilated_wall_area)
 
 
 class InteractiveFindRoi(InteractiveROIWidgets):
@@ -119,6 +119,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.bg_roi_depth_range.observe(self.update_config_dr, names='value')
 
+        self.dilate_iters.observe(self.update_config_di, names='value')
+
         # Set session select callback
         self.checked_list.observe(self.get_selected_session, names='value')
 
@@ -127,6 +129,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Update main configuration parameters
         self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
         self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
+        self.graduate_walls = self.config_data.get('graduate_walls', False)
         self.config_data = set_bg_roi_weights(self.config_data)
         self.config_data = check_filter_sizes(self.config_data)
         self.config_data['autodetect'] = True
@@ -317,6 +320,20 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         self.config_data['detect'] = False
+
+    def update_config_di(self, event):
+        '''
+        Callback function to update config dict with current UI dilation iterations
+
+        Parameters
+        ----------
+        event (ipywidget callback): Any user interaction.
+
+        Returns
+        -------
+        '''
+
+        self.config_data['detect'] = True
 
     def update_config_fr(self, event):
         '''
@@ -580,7 +597,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # initialize results dict
         curr_results = {'flagged': False,
-                             'ret_code': "0x1f7e2"}
+                        'ret_code': "0x1f7e2"}
 
         if self.config_data['autodetect']:
             # Get max depth as a thresholding limit (this would be the DTD if it already was computed)
@@ -594,6 +611,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
             # True depth is at the center of the bucket
             self.true_depth = bground_im[cY][cX]
+            self.config_data['true_depth'] = self.true_depth
 
             # Get true depth range difference
             range_diff = 10 ** (len(str(int(self.true_depth))) - 1)
@@ -613,7 +631,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         try:
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
+            rois, plane, bboxes, _, _, _ = get_roi(self.curr_bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
@@ -629,6 +647,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
             self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
+
+        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 0:
+            print('Graduating Background')
+            bground_im = get_bground_im_file(self.curr_session)
+            self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
+        elif self.dilate_iters.value == 0:
+            self.curr_bground_im = get_bground_im_file(self.curr_session)
 
         if self.config_data['autodetect']:
             # Get pixel dims from bounding box
@@ -741,6 +766,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data['min_height'] = minmax_heights[0]
         self.config_data['max_height'] = minmax_heights[1]
 
+        # prepare extraction metadatas
+        str_els = get_strels(self.config_data)
+        self.config_data['tracking_init_mean'] = None
+        self.config_data['tracking_init_cov'] = None
+        self.config_data['true_depth'] = int(self.true_depth)
+
         # update current session parameters
         self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
@@ -748,7 +779,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         raw_frames = load_movie_data(self.curr_session, range(fn, fn + 30), frame_dims=self.curr_bground_im.shape[::-1])
 
         if self.dilate_iters.value <= 1:
-            curr_frame = (self.curr_bground_im- raw_frames)
+            curr_frame = (self.curr_bground_im - raw_frames)
         else:
             mouse_on_edge = (self.curr_bground_im < self.true_depth) & (raw_frames < self.curr_bground_im)
             curr_frame = (self.curr_bground_im - raw_frames) * np.logical_not(mouse_on_edge) + \
@@ -777,11 +808,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Get overlayed ROI
         overlay = self.curr_bground_im.copy()
         overlay[roi != True] = 0
-
-        # prepare extraction metadatas
-        str_els = get_strels(self.config_data)
-        self.config_data['tracking_init_mean'] = None
-        self.config_data['tracking_init_cov'] = None
 
         # extract crop-rotated selected frame
         try:
