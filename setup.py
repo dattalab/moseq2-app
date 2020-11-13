@@ -4,8 +4,8 @@ import codecs
 import subprocess
 from setuptools import setup, find_packages
 
-os.system('export CC="$(which gcc)"')
-os.system('export CXX="$(which g++)"')
+# os.system('export CC="$(which gcc)"')
+# os.system('export CXX="$(which g++)"')
 
 def install(package):
     subprocess.call([sys.executable, "-m", "pip", "install", package])

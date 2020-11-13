@@ -3,8 +3,9 @@ channels:
   - conda-forge
   - default
 dependencies:
-  - python=3.6
+  - python=3.7
   - pip
   - jupyter
-  - ffmpeg
+  - qgrid
+  - ffmpeg=4.2.0
   - jupyter_nbextensions_configurator
