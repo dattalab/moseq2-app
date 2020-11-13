@@ -264,11 +264,12 @@ script depends on some of MoSeq's packages.
 
 Run the following command in the `moseq2-app` directory
 ```bash
-./scripts/download_small_dataset.py  # or ./scripts/download_full_dataset.py
+./scripts/download_small_dataset.sh  # or ./scripts/download_full_dataset.sh
 ```
 
 The shell scripts will create a new folder within `moseq2-app` to download the data.
-Be warned, this process will take a long time to finish (hours).
+Be warned, this process will take a long time to finish (hours), and requires 20-60 GB
+of disk space.
 <!-- with a copy of the `Main-MoSeq2-Notebook`.  -->
 
 ## Getting started
