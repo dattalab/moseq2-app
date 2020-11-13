@@ -5,7 +5,6 @@ cd small_test_ds
 
 # amphetamine data
 curl -L -o amphetamine_example_0.zip https://www.dropbox.com/sh/gnx4htuvmb7ue65/AACB-twQSGiERqkHHEUiLc5ya?dl=1 && unzip amphetamine_example_0.zip -d amphetamine_example_0
-curl -L -o amphetamine_example_0.zip https://www.dropbox.com/sh/gnx4htuvmb7ue65/AACB-twQSGiERqkHHEUiLc5ya?dl=1 && unzip amphetamine_example_0.zip -d amphetamine_example_0
 curl -L -o amphetamine_example_1.zip https://www.dropbox.com/sh/e2o8v9skrb0ef6b/AAA0y6no4eNPHzqMxd-eQqYxa?dl=1 && unzip amphetamine_example_1.zip -d amphetamine_example_1
 curl -L -o amphetamine_example_2.zip https://www.dropbox.com/sh/k7ieoducleexbpq/AAAQKOAjKt1k1nU2L5OzYsNsa?dl=1 && unzip amphetamine_example_2.zip -d amphetamine_example_2
 curl -L -o amphetamine_example_3.zip https://www.dropbox.com/sh/yywypn9m6z1lpyt/AABAPaoEJugycnLNI0ICNnnXa?dl=1 && unzip amphetamine_example_3.zip -d amphetamine_example_3
