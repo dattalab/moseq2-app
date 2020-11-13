@@ -167,10 +167,13 @@ export CXX="$(which g++-7)"
 
 #### For WSL/Linux:
 
+How to install on Ubuntu or Debian:
 ```bash
 sudo apt update
 sudo apt install build-essential
 ```
+If you're using a different linux distribution, refer to their package manager to
+install gcc.
 
 The gcc version that's installed through `build-essential` should be able to compile
 `moseq2-model`'s dependencies, and there are no extra steps you need to take to make
