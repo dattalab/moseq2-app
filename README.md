@@ -259,8 +259,7 @@ conda env list
 
 To try MoSeq2 on some sample data, we have provided 2 scripts to either download
 the complete 48 session dataset, or a smaller dataset with 20 total sessions,
-10 of each experimental group. Run this after you've installed MoSeq because this
-script depends on some of MoSeq's packages.
+10 of each experimental group.
 
 Run the following command in the `moseq2-app` directory
 ```bash
@@ -287,23 +286,23 @@ jupyter notebook
 
 ## (Optional) Building and re-generating documentation
 
-MoSeq2 uses `sphinx` to generate the documentation in HTML and PDF forms. To install `sphinx`, follow the commands below:
+All documentation regarding moseq2-extract can be found in the `Documentation.pdf` file in the root directory,
+an HTML ReadTheDocs page can be generated via running the `make html` in the `docs/` directory.
+
+MoSeq2 uses `sphinx` to generate the html and pdf documentation. To install `sphinx`, follow the commands below:
 ```.bash
 pip install sphinx==3.0.3
 pip install sphinx-rtd-theme
 pip install rst2pdf
 ``` 
 
-All documentation regarding moseq2-extract can be found in the `Documentation.pdf` file in the root directory,
-an HTML ReadTheDocs page can be generated via running the `make html` in the `docs/` directory.
-
 To generate a PDF version of the documentation, simply run `make pdf` in the `docs/` directory.
 
-For information on getting started, check out the [MoSeq Roadmap](https://github.com/dattalab/moseq2-docs/wiki).
-
+For information on getting started, check out the [MoSeq Wiki](https://github.com/dattalab/moseq2-app/wiki).
 
 ## Bug Reporting
-If you experience any errors during installation, consult the [`TROUBLESHOOT.md`](https://github.com/dattalab/moseq2-app/blob/flip-training-notebook/TROUBLESHOOT.md) file.
+
+If you experience any errors during installation, consult the [troubleshooting](./TROUBLESHOOT.md) guide.
 If the your issue is not resolved there, submit a GitHub issue.
 
 To report any issues or bugs using the notebook(s), please refer to the GitHub issues page in this repository:
