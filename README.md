@@ -106,27 +106,28 @@ the essentials.
 
 On Linux and WSL:
 ```bash
-curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+curl -L https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o "$HOME/miniconda3_latest.sh"
 chmod +x $HOME/miniconda3_latest.sh  # turn script into excutable
-$HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
+$HOME/miniconda3_latest.sh
 ```
 On MacOS:
 ```bash
-curl https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "$HOME/miniconda3_latest.sh"
 chmod +x $HOME/miniconda3_latest.sh  # turn script into excutable
-$HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
+$HOME/miniconda3_latest.sh
 ```
-**NOTE: the `-b` flag installs miniconda in silent mode and assumes you accept
-their license agreement. For more information, refer to the
-[official documentation](https://docs.anaconda.com/anaconda/install/silent-mode/)**
 
-If you prefer to install the Anaconda package, we refer you to the [official installation documentation](https://docs.anaconda.com/anaconda/install/).
+We recommend that you say "yes" when the installation prompt asks if you want
+to initialize Miniconda3 by running conda init.
 
-This will install a new python distribution as well as some essential tools, like `pip`,
-which you can use to install other python packages.
+You will need to restart your terminal and/or run `conda init` to initialize conda and
+have it become recognized as a command. You now installed a new python distribution as
+well as some essential tools, like `pip`, which you can use to install other python packages.
 
-You might need to restart your terminal and/or run `conda init` to initialize conda and
-have it become recognized as a command.
+If you prefer to install the full Anaconda package, we refer you to the
+[official installation documentation](https://docs.anaconda.com/anaconda/install/).
+
+Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
 
 ### gcc
 
@@ -140,10 +141,10 @@ which gcc-7
 ```
 You should expect to see an outputted path to your gcc-7 installation, like this:
 ```bash
-/usr/local/bin/gcc-7
+/usr/local/bin/gcc-7  # or /usr/bin/gcc
 ```
 
-If gcc-7/g++-7 cannot be found, then follow these steps to install them for your respective OS:
+If gcc cannot be found, then follow these steps to install them for your respective OS:
 
 #### For macOS:
 
@@ -151,45 +152,44 @@ If gcc-7/g++-7 cannot be found, then follow these steps to install them for your
 2. Install the xcode command line tools. Command: `xcode-select --install`
 3. Install gcc: `brew install gcc@7`
 
-#### For WSL/Linux:
-
-<!-- TODO: check if the following sentence is true -->
-The pre-installed `gcc` version should work out-of-the box with linux.
-```bash
-sudo apt-get install -y software-properties-common
-sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-sudo apt update
-sudo apt install g++-7 -y
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 \
-                         --slave /usr/bin/g++ g++ /usr/bin/g++-7 
-sudo update-alternatives --config gcc
-gcc --version
-g++ --version
-```
-
-Finally, for all platforms:
-
 Confirm you have `gcc-7` installed by running:
 ```bash
 which gcc-7
-which g++-7
 ```
 
 The following step is important installing the `moseq2-model` dependency.
-
-Once you have confirmed gcc-7 is installed, run the next 2 commands to set them as default gcc versions.
-It is also recommended to copy these two commands to your `~/.bashrc` file (for Linux and Windows)  
-or `~/.bash_profile` file (for MacOS) to preserve this setting from now on. 
+Once you have confirmed gcc-7 is installed, run the next 2 commands to set
+them as default gcc versions. You need to run these two commands for
+the installation process only. Not every time you open a new terminal.
 
 ```bash
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
 ```
 
+#### For WSL/Linux:
+
+```bash
+sudo apt update
+sudo apt install build-essential
+```
+
+The gcc version that's installed through `build-essential` should be able to compile
+`moseq2-model`'s dependencies, and there are no extra steps you need to take to make
+MoSeq recognize gcc (like you do for [macOS](#for-macos)).
+
 ### Git
 
 To check if you have it installed, run `which git`. If it prints a path to git,
 you have it installed. Otherwise, refer to the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git/).
+
+:bulb: **Helpful tip!** :bulb:
+
+If you don't want to repeatedly type your GitHub username and password when installing
+the MoSeq packages, you can set up `git` to temporarily remember them for 15 minutes:
+```bash
+git config credential.helper cache
+```
 
 ### MoSeq2 packages and notebook
 
@@ -204,7 +204,7 @@ can't figure out on your own or aren't documented here, please [sumbit an issue]
 
 - download the `moseq2-app` GitHub repository, and navigate to it:
 ```bash
-git clone -b release https://github.com/dattalab/moseq2-app.git
+git clone -b jupyter https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ```
 You'll be asked for your github username and password since this is a private repository.
@@ -223,18 +223,11 @@ that environment.
 conda activate moseq2-app
 ```
 
-- If on a mac, link to the gcc compilers via 2 environment variables (remember to replace `7` with the gcc version you have)
+- If on a mac, link to the gcc compilers via 2 environment variables, like [we said
+above](#for-macos) (remember to replace `7` with the gcc version you have)
 ```bash
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
-```
-
-:bulb: **Helpful tip!** :bulb:
-
-If you don't want to repeatedly type your GitHub username and password when installing
-the MoSeq packages, you can set up `git` to temporarily remember them for 15 minutes:
-```bash
-git config credential.helper cache
 ```
 
 #### Installing MoSeq
@@ -248,12 +241,8 @@ Run:
 ```
 
 If you get any errors running that script, open the script in a text file and run each line
-independently. This will help you (and us) figure out where the error is occuring.
-
-You can view your conda environments by running the following command:
-```bash
-conda env list
-```
+of the script independently. This will help you (and us) figure out where the
+error is occuring.
 
 ## Downloading a test dataset
 

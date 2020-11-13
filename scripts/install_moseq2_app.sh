@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# Download some dependencies prior to installing moseq2-app
-pip install --upgrade jupyter jupyter-bokeh requests opencv-python==4.1.2.30 scipy==1.3.2
-
-# Secure credential storage to limit password inputs
-#git config --global credential.helper store
-
 pip install -e .
 
 # Install and Enable widget extensions configurator
