@@ -84,8 +84,6 @@ Don't worry, we'll walk through installation steps for each of these packages in
      - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
      - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
      - [`moseq2-viz==0.4.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
- - CentOS:
-     - libSM
  - macOS:
      - XCode command line tools
 
@@ -136,10 +134,10 @@ supported versions listed above. Just replace `7` with the version you want to i
 
 To check if you have `gcc-7`/`g++-7` is installed, run this command:
 ```bash
-which gcc-7
-# or `which gcc` if your default version is in the working set of gcc versions. 
+which gcc-7 # if you're on macOS
+which gcc   # if you're on linux
 ```
-You should expect to see an outputted path to your gcc-7 installation, like this:
+You should expect to see a path to your gcc-7 installation, like this:
 ```bash
 /usr/local/bin/gcc-7  # or /usr/bin/gcc
 ```
@@ -262,16 +260,28 @@ of disk space.
 
 ## Getting started
 <!-- Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the activated conda env). -->
-To use the notebooks, make sure your environment is activated and your current directory includes 
-the notebooks you would like to use. 
 
-__NOTE: It is important for the notebook to be run from the parent directory 
-of your dataset in order for the videos to be displayed.__ 
+At this point, you should have MoSeq installed and some data to extract.
+As discussed above, we've provided 3 jupyter notebooks that describe
+MoSeq's pipeline in detail. To use the notebooks, make sure that you've
+activated the conda environment you installed MoSeq in (likely `moseq2-app`)
+and you have navigated to the folder that contains the jupyter notebook(s).
+__:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
+your dataset so that the videos you generate will load into the notebooks
+properly.__ 
 
 Run the following command to launch the jupyter notebook:
 ```bash
 jupyter notebook
-```  
+```
+
+Then, when your browser launches, click on the notebook you want to run.
+The notebooks contain tutorial materials to walk you through the process
+of running the MoSeq pipeline itself. Our hope is that once you've grown
+accustomed to the pipeline, you will be able to modify (i.e., remove
+the text and examples) the notebook to increase your productivity and
+to fit your needs best. Please share with us how you've adapted the MoSeq
+pipeline for your research!
 
 ## (Optional) Building and re-generating documentation
 
