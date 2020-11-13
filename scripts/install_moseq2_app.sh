@@ -1,5 +1,7 @@
 #!/bin/bash
 
+pip install requests
+
 pip install -e .
 
 # Install and Enable widget extensions configurator
