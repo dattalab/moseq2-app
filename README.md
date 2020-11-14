@@ -1,266 +1,310 @@
-# MoSeq2-Notebook: An interactive Jupyter Notebook for animal behavior sequencing
+# MoSeq2-Notebook: A suite of interactive Jupyter notebooks for animal behavior sequencing and analysis
 
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/dattalab/community)
 
 <center><img src="https://drive.google.com/uc?export=view&id=1jCpb4AQKBasne2SoXw_S1kwU7R9esAF6"></center>
 
-Last Updated: 10/06/2020
+Last Updated: 10/12/2020
 
-Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
-
-This package contains interactive jupyter notebooks that are tailored for novice programmers to process
-their depth videos of rodents, and segment their behavior into what is denoted as "syllables".
-
-Below is a list of the notebooks afforded by MoSeq2-App:
-- The Main MoSeq2-Notebook: A full detailed walk-through of the entire MoSeq pipeline with interactive tools to
-to handle and validate the data extraction process, and interactively explore the modeled behavior results.
-  - It includes examples of what to expect at each step, and what to do if things don't go as expected.
-- The Interactive-Model-Results Explorer Notebook: A stand-alone notebook containing all the interactive 
-data exploration tools for modeled data.
-  - Simply enter the paths to your selected model(s) and index file to use to syllable exploration tools.
-- Flip Classifier Training Notebook: This notebook is a stand-alone tool that is optionally used to train new 
-flip classifiers (used to accurately extract mouse orientation) for currently unsupported data acquisition setups. 
-For example, Azure or RealSense captured mice/rats with or without head fixed cables.
+## Overview
 
 The MoSeq2 toolkit enables users to model rodent behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.
 
-__Note: The Notebook is currently in a testing phase and is utilizing the `release` branch from all of the MoSeq2
-utility repositories.__
+This package contains interactive jupyter notebooks that are tailored for novice programmers to process
+their depth videos of rodents, and segment their behavior into what is denoted as "syllables".
 
-***
+Consult the wiki-page for a complete overview and description of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 
-## Shortcuts
-- [Software Requirements](#moseq2-software-requirements)
-- [Install Dependencies](#installation)
-- [Install MoSeq2-App](#install-moseq2-app-env-or-package)
-- [Download Test Dataset](#download-a-test-dataset)
-- [Get Started](#get-started)
+__Note: The Notebook is currently in a testing phase and is subject to potential substantial changes.__
 
-***
+If you experience any issues using MoSeq or have comments on how you'd like to see
+MoSeq improved, please [file an issue here](https://github.com/dattalab/moseq2-docs/issues) (but first [see if it's been addressed before](https://github.com/dattalab/moseq2-docs/issues?q=is%3Aissue+is%3Aclosed))
+and/or fill out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
-# MoSeq2 Software Requirements
+Currently, we offer 3 notebooks that provide tutorials for using MoSeq's pipeline
+to extract, preprocess, model, and perform basic analysis on experimental data. We
+hope to expand our selection of notebooks based on user feedback and the
+project's trajectory.
 
-MoSeq2 is compatible with Windows, MacOS and Linux.
+### The main MoSeq notebook ([link](./Main-MoSeq2-Notebook.ipynb))
 
-For Windows users, we recommend using an Ubuntu shell in the Windows Subsystem for Linux.
-For information on how to download and setup Ubuntu on Windows, follow these steps:
- 1. [Enable WSL in Windows 10](https://winaero.com/blog/enable-wsl-windows-10-fall-creators-update/)
- 2.  Download and install Ubuntu from the [Microsoft Store](https://www.microsoft.com/en-us/p/ubuntu/9nblggh4msv6?activetab=pivot:overviewtab).
+A detailed and complete walk-through of the MoSeq pipeline — from data extraction to modeling.
+It includes examples of what to expect at each step, and what to do if things don't go as expected.
+There are also a few visualizations to help with extraction and modeling. 
 
-MoSeq2 requires the following platform dependencies to be installed:
+### A notebook to explore modeling and experimental results interactively ([link](./Interactive-Model-Results-Exploration.ipynb))
+
+A stand-alone notebook containing all the interactive data exploration tools for
+modeled data. Simply enter the paths to your selected model(s) and index file
+to use to syllable exploration tools.
+
+### Flip Classifier Training Notebook ([link](./Flip%20Classifier%20Training%20Notebook.ipynb))
+
+This notebook is a stand-alone tool that can be used to train a new 
+flip classifier used to correct the orientation of the extracted animal. If's
+utilized if the current flip classifier is not working as expected.
+For example, the current flip classifier does not work well with datasets
+acquired with the Azure or RealSense depth cameras.
+
+### Our goal for the notebooks
+
+These notebooks are built with the intention that users will copy and adapt them for
+their specific needs once they feel comfortable with the MoSeq platform.
+
+## Installation and getting started
+
+### Shortcuts
+
+- [Software requirements](#software-requirements)
+- [Installation](#installation)
+- [Download test dataset](#downloading-a-test-dataset)
+- [Getting started](#getting-started)
+
+### Software Requirements
+
+MoSeq2 is compatible with Windows, MacOS and many flavors of Linux. We've tested
+Debian, CentOS, and Ubuntu. Use other Linux distributions at your own risk.
+
+For Windows users, we recommend using Windows Subsystem for Linux (WSL) with the
+Ubuntu distribution. This will allow you to use Linux within the Windows
+operating system. To install WSL, follow the steps below.
+ 1. Enable WSL in Windows 10. Official instructions [here](https://docs.microsoft.com/en-us/windows/wsl/install-win10) and unofficial instructions [here](https://winaero.com/blog/enable-wsl-windows-10-fall-creators-update/)
+ 2.  Download and install the Ubuntu distribution from the [Microsoft Store](https://www.microsoft.com/en-us/p/ubuntu/9nblggh4msv6?activetab=pivot:overviewtab). This step is included in the official instructions.
+
+The following software packages are required to install and run the MoSeq pipeline.
+Don't worry, we'll walk through installation steps for each of these packages in the
+[Installation](#installation) section.
  - All Platforms:
-     - anaconda3/miniconda3 __(FOR LINUX)__
-     - python>=3.6;<3.8 (top right-hand side of the jupyter notebook will indicate the python version for you)
+     - anaconda3/miniconda3
      - git
-     - wget
-     - gcc-7 and g++-7 (other accepted versions: [6.2.0, 7.5.0, gcc-9/g++-9])
-     - numpy
-     - pip
-     - Conda Environment:
-         - ffmpeg==4.2.0
- - CentOS:
-     - libSM
- - MacOS:
-     - latest version of XCode
+     - curl (it should be installed by default on all systems)
+     - gcc and g++: accepted and tested versions: 6, 7, and 9
+     - [`moseq2-extract==0.6.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
+     - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
+     - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
+     - [`moseq2-viz==0.4.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
+ - macOS:
+     - XCode command line tools
 
-Below is a list of all the required minimum versions of each repository to ensure are installed:
- Below is a list of all the required minimum versions of each repository to ensure are installed:
- - [`moseq2-extract==0.6.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
- - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
- - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
- - [`moseq2-viz==0.4.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
 
-***
+## Installation
 
-## Documentation
+You're going to need an open terminal to work through this installation guide. On
+Mac, use `Terminal.app` or your favorite application. On Windows, open up a terminal
+in WSL by starting the distribution application. On Linux, open up the `Terminal`
+application.
 
-MoSeq2 uses `sphinx` to generate the documentation in HTML and PDF forms. To install `sphinx`, follow the commands below:
-```.bash
-pip install sphinx==3.0.3
-pip install sphinx-rtd-theme
-pip install rst2pdf
-``` 
+### Anaconda/miniconda
 
-All documentation regarding moseq2-extract can be found in the `Documentation.pdf` file in the root directory,
-an HTML ReadTheDocs page can be generated via running the `make html` in the `docs/` directory.
+First, check to see if you have Anaconda already installed in the terminal. Type `conda info` then hit enter. If you received something similar to: `command not found` instead
+of a description of the current anaconda installation, you don't have anaconda
+installed. Miniconda is the preferred version to install because it only installs
+the essentials.
 
-To generate a PDF version of the documentation, simply run `make pdf` in the `docs/` directory.
-
-For information on getting started, check out the [MoSeq Roadmap](https://github.com/dattalab/moseq2-docs/wiki).
-
-***
-
-# Installation
-
-If you already have Anaconda installed, ensure you are working in a separate environment so
- that your pre-existing work flows are not disrupted by any of the newly set environmental variables
- or jupyter settings.
- 
-## Anaconda Installation Guide
-### Ensure Anaconda For Linux is Installed
-The reason it is recommended to use Mini/Anaconda for Linux instead of installing a separate Conda application is due
- to the need to set environmental variables relating to respective OS dependencies. Using Linux provides more control
- and flexibility when dealing with OS-specific dependencies across different Operating Systems. 
-
-To check if you have anaconda/miniconda already installed, you can run the following command in your
-respective CLI: `conda info`. 
-
-If the command doesn't return anything, then continue with the install steps below:
- - The first command will download the miniconda install script `miniconda3_latest.sh` to your default landing directory.
+On Linux and WSL:
 ```bash
-curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o "$HOME/miniconda3_latest.sh"
-chmod +x $HOME/miniconda3_latest.sh
-$HOME/miniconda3_latest.sh -b -p $HOME/miniconda3
+curl -L https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+chmod +x $HOME/miniconda3_latest.sh  # turn script into excutable
+$HOME/miniconda3_latest.sh
+```
+On MacOS:
+```bash
+curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "$HOME/miniconda3_latest.sh"
+chmod +x $HOME/miniconda3_latest.sh  # turn script into excutable
+$HOME/miniconda3_latest.sh
 ```
 
-OR
+We recommend that you say "yes" when the installation prompt asks if you want
+to initialize Miniconda3 by running conda init.
 
+You will need to restart your terminal and/or run `conda init` to initialize conda and
+have it become recognized as a command. You now installed a new python distribution as
+well as some essential tools, like `pip`, which you can use to install other python packages.
+
+If you prefer to install the full Anaconda package, we refer you to the
+[official installation documentation](https://docs.anaconda.com/anaconda/install/).
+
+Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
+
+### gcc
+
+We're going to walk through the process of installing `gcc-7` but you can install any of the
+supported versions listed above. Just replace `7` with the version you want to install.
+
+To check if you have `gcc-7`/`g++-7` is installed, run this command:
 ```bash
-wget https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
-chmod +x $HOME/Anaconda3-2020.02-Linux-x86_64.sh
-$HOME/Anaconda3-2020.02-Linux-x86_64.sh -b -p $HOME/anaconda3
+which gcc-7 # if you're on macOS
+which gcc   # if you're on linux
+```
+You should expect to see a path to your gcc-7 installation, like this:
+```bash
+/usr/local/bin/gcc-7  # or /usr/bin/gcc
 ```
 
-### Install GCC Dependency
-__Remember, if you are going to use an alternate version of gcc, change inputted the commands to match your version.__
+If gcc cannot be found, then follow these steps to install them for your respective OS:
 
-Below are README shortcuts to install GCC for your respective operating system:
-- [For MacOS](#For-MacOS)
-- [For WSL/Ubuntu/Linux](#for-wslubuntulinux)
-- [Set gcc version as default](#set-the-gcc-version-as-default)
- 
-To check if you have gcc-7/g++-7 is installed, run this command:
-```bash
-which gcc-7
-# or `which gcc` if your default version is in the working set gcc versions. 
-```
-You should expect to see an outputted path to your gcc-7 installation, like this:
-```bash
-/usr/local/bin/gcc-7
-```
+#### For macOS:
 
-If gcc-7/g++-7 cannot be found, then follow these steps to install them for your respective OS:
-
-#### For MacOS:
- - You can use [brew](https://brew.sh/) to install gcc by running these commands:
- 
-To install Homebrew:
-```bash
-ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
-
-GCC Install Command:
-```bash
-xcode-select --install || softwareupdate -i -a # Download the latest version of Xcode if you don't already have it
-brew install gcc@7
-```
-
-#### For WSL/Ubuntu/Linux:
-```bash
-sudo apt-get install -y software-properties-common
-sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-sudo apt update
-sudo apt install g++-7 -y
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 \
-                         --slave /usr/bin/g++ g++ /usr/bin/g++-7 
-sudo update-alternatives --config gcc
-gcc --version
-g++ --version
-```
-
-Finally, for all platforms:
+1. Install [brew](https://brew.sh/), the macOS package manager, via their website.
+2. Install the xcode command line tools. Command: `xcode-select --install`
+3. Install gcc: `brew install gcc@7`
 
 Confirm you have `gcc-7` installed by running:
 ```bash
 which gcc-7
-which g++-7
 ```
 
 The following step is important installing the `moseq2-model` dependency.
-
-### Set the GCC Version as Default
-Once you have confirmed gcc-7 is installed, run the next 2 commands to set them as default gcc versions.
-It is also recommended to copy these two commands to your `~/.bashrc` file (for Linux and Windows)  
-or `~/.bash_profile` file (for MacOS) to preserve this setting from now on. 
-
-__NOTE: If you are not using `gcc-7` remember to alter the command below to reflect your version.__
+Once you have confirmed gcc-7 is installed, run the next 2 commands to set
+them as default gcc versions. You need to run these two commands for
+the installation process only. Not every time you open a new terminal.
 
 ```bash
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
 ```
 
-## Install MoSeq2-App Env or Package
-Once conda is operational and gcc-7 is installed, clone this repository and run the install script (line 3 below).
-The install script gives the option to either create a new conda environment for moseq2-app, or to install the latest versions
-of the required dependencies into a pre-existing __(activated)__ conda environment.
+#### For WSL/Linux:
+
+How to install on Ubuntu or Debian:
 ```bash
-git clone -b release https://github.com/dattalab/moseq2-app.git
+sudo apt update
+sudo apt install build-essential
+```
+If you're using a different linux distribution, refer to their package manager to
+install gcc.
+
+The gcc version that's installed through `build-essential` should be able to compile
+`moseq2-model`'s dependencies, and there are no extra steps you need to take to make
+MoSeq recognize gcc (like you do for [macOS](#for-macos)).
+
+### Git
+
+To check if you have it installed, run `which git`. If it prints a path to git,
+you have it installed. Otherwise, refer to the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git/).
+
+:bulb: **Helpful tip!** :bulb:
+
+If you don't want to repeatedly type your GitHub username and password when installing
+the MoSeq packages, you can set up `git` to temporarily remember them for 15 minutes:
+```bash
+git config credential.helper cache
+```
+
+### MoSeq2 packages and notebook
+
+Now that we've handled the prerequisites, we can finally install MoSeq.
+
+The optimal way to install MoSeq is automagically via a script we supply. But if you
+run into trouble, you can run each of the commands from the script separately
+to figure out where the problem lies. If you run into installation issues that you
+can't figure out on your own or aren't documented here, please [sumbit an issue](https://github.com/dattalab/moseq2-docs/issues)
+
+#### Pre-installation instructions
+
+- download the `moseq2-app` GitHub repository, and navigate to it:
+```bash
+git clone -b jupyter https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
-./scripts/easy_install.sh # '1' to create a new env, '2' to install the latest version of moseq2-app in current env
-# if a new env was created
-source ~/.bashrc # or ~/.bash_profile  [OPTIONAL: depending on whether env can be found after creation]
-conda activate moseq2-app 
+```
+You'll be asked for your github username and password since this is a private repository.
+
+- We recommend that you create a new [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html) named `moseq2-app`:
+```bash
+# assuming you're in the moseq2-app directory:
+conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+```
+If you're already a conda master, feel free to install MoSeq in any environment you want.
+Just make sure the dependencies described in `scripts/moseq2-env.yaml` are installed in
+that environment.
+
+- activate the new conda environment
+```bash
+conda activate moseq2-app
+```
+
+- If on a mac, link to the gcc compilers via 2 environment variables, like [we said
+above](#for-macos) (remember to replace `7` with the gcc version you have)
+```bash
+export CC="$(which gcc-7)"
+export CXX="$(which g++-7)"
+```
+
+#### Installing MoSeq
+
+Make sure you're in the `moseq2-app` folder with your new conda environment activated
+([see pre-installation instructions](#pre-installation-instructions))
+
+Run:
+```bash
 ./scripts/install_moseq2_app.sh
 ```
 
-If you created a new environment, you may need to restart your shell in order for it to become visible. 
-This is done in the 5th line in the command block above `source ~/.bashrc`. 
+If you get any errors running that script, open the script in a text file and run each line
+of the script independently. This will help you (and us) figure out where the
+error is occuring.
 
-If for whatever reason the environment creation is interrupted, restart the shell and check if the environment `moseq2-app` exists.
-If so, activate the environment and run the `easy_install.sh` script again but enter `2` to only install the latest dependency versions.
+## Downloading a test dataset
 
-You can list your currently existing conda environments by running the following command:
+To try MoSeq2 on some sample data, we have provided 2 scripts to either download
+the complete 48 session dataset, or a smaller dataset with 20 total sessions,
+10 of each experimental group.
+
+Run the following command in the `moseq2-app` directory
 ```bash
-conda env list
+./scripts/download_small_dataset.sh  # or ./scripts/download_full_dataset.sh
 ```
 
-***
+The shell scripts will create a new folder within `moseq2-app` to download the data.
+Be warned, this process will take a long time to finish (hours), and requires 20-60 GB
+of disk space.
+<!-- with a copy of the `Main-MoSeq2-Notebook`.  -->
 
-# Download a Test Dataset
+## Getting started
+<!-- Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the activated conda env). -->
 
-To try MoSeq2 on some sample data, we have provided 2 bash script files to either download the complete 48 session dataset,
-or 20 total sessions with 10 of each experimental group.
-
-`wget` is required in order to download the datasets. Installation commands for different operating systems are listed below.
-
-For MacOS:
-```bash
-brew install wget
-```
-
-For Ubuntu/Debian:
-```bash
-sudo apt-get install wget
-```
-
-Download your chosen dataset using either of the following command (might take >30 minutes):
-```bash
-./download_10n10.sh # 20 total session; 10 saline, 10 amphetamine
-
-./download_full_dataset.sh # all 48 sessions [24 sessions per group]
-```
-
-The shell scripts will create a new directory in this cloned repo with a copy of the `Main-MoSeq2-Notebook`. 
-Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the activated conda env).
-
-***
-
-## Get Started
-To use the notebooks, make sure your environment is activated and your current directory includes 
-the notebooks you would like to use. 
-
-__NOTE: It is important for the notebook to be run from the parent directory 
-of your dataset in order for the videos to be displayed.__ 
+At this point, you should have MoSeq installed and some data to extract.
+As discussed above, we've provided 3 jupyter notebooks that describe
+MoSeq's pipeline in detail. To use the notebooks, make sure that you've
+activated the conda environment you installed MoSeq in (likely `moseq2-app`)
+and you have navigated to the folder that contains the jupyter notebook(s).
+__:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
+your dataset so that the videos you generate will load into the notebooks
+properly.__ 
 
 Run the following command to launch the jupyter notebook:
 ```bash
 jupyter notebook
-```  
+```
+
+Then, when your browser launches, click on the notebook you want to run.
+The notebooks contain tutorial materials to walk you through the process
+of running the MoSeq pipeline itself. Our hope is that once you've grown
+accustomed to the pipeline, you will be able to modify (i.e., remove
+the text and examples) the notebook to increase your productivity and
+to fit your needs best. Please share with us how you've adapted the MoSeq
+pipeline for your research!
+
+## (Optional) Building and re-generating documentation
+
+All documentation regarding moseq2-extract can be found in the `Documentation.pdf` file in the root directory,
+an HTML ReadTheDocs page can be generated via running the `make html` in the `docs/` directory.
+
+MoSeq2 uses `sphinx` to generate the html and pdf documentation. To install `sphinx`, follow the commands below:
+```.bash
+pip install sphinx==3.0.3
+pip install sphinx-rtd-theme
+pip install rst2pdf
+``` 
+
+To generate a PDF version of the documentation, simply run `make pdf` in the `docs/` directory.
+
+For information on getting started, check out the [MoSeq Wiki](https://github.com/dattalab/moseq2-app/wiki).
 
 ## Bug Reporting
-If you experience any errors during installation, consult the [`TROUBLESHOOT.md`](https://github.com/dattalab/moseq2-app/blob/flip-training-notebook/TROUBLESHOOT.md) file.
+
+If you experience any errors during installation, consult the [troubleshooting](./TROUBLESHOOT.md) guide.
 If the your issue is not resolved there, submit a GitHub issue.
 
 To report any issues or bugs using the notebook(s), please refer to the GitHub issues page in this repository:
