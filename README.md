@@ -251,6 +251,11 @@ To try MoSeq2 on some sample data, we have provided 2 scripts to either download
 the complete 48 session dataset, or a smaller dataset with 20 total sessions,
 10 of each experimental group.
 
+If on linux (Ubuntu/Debian), you might need to install the `unzip` package:
+```bash
+sudo apt install unzip
+```
+
 Run the following command in the `moseq2-app` directory
 ```bash
 ./scripts/download_small_dataset.sh  # or ./scripts/download_full_dataset.sh
@@ -259,10 +264,8 @@ Run the following command in the `moseq2-app` directory
 The shell scripts will create a new folder within `moseq2-app` to download the data.
 Be warned, this process will take a long time to finish (hours), and requires 20-60 GB
 of disk space.
-<!-- with a copy of the `Main-MoSeq2-Notebook`.  -->
 
 ## Getting started
-<!-- Once, the download is complete, navigate to that directory and launch the jupyter notebook (within the activated conda env). -->
 
 At this point, you should have MoSeq installed and some data to extract.
 As discussed above, we've provided 3 jupyter notebooks that describe
