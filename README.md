@@ -251,7 +251,7 @@ To try MoSeq2 on some sample data, we have provided 2 scripts to either download
 the complete 48 session dataset, or a smaller dataset with 20 total sessions,
 10 of each experimental group.
 
-If on linux (Ubuntu/Debian), you might need to install the `unzip` package:
+If on WSL/linux (Ubuntu/Debian), you might need to install the `unzip` package:
 ```bash
 sudo apt install unzip
 ```
