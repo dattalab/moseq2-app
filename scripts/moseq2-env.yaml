@@ -7,5 +7,6 @@ dependencies:
   - pip
   - jupyter
   - qgrid
-  - ffmpeg=4.2.0
+  - conda-forge::ffmpeg=4.2.0
+  - conda-forge::opencv
   - jupyter_nbextensions_configurator
