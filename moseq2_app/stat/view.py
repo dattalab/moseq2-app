@@ -272,7 +272,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     tools = 'pan, box_zoom, wheel_zoom, save, reset'
 
     # Instantiate Bokeh figure with the HoverTool data
-    p = figure(title=f'Syllable Statistics - Sorted by {sort_name}',
+    p = figure(title=f'Syllable {stat} Statistics - Sorted by {sort_name}',
                width=850,
                height=500,
                tools=tools,
@@ -281,7 +281,6 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
                y_axis_label=f'{stat}',
                output_backend="svg")
 
-    # TODO: allow users to set their own colors
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
