@@ -86,7 +86,7 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:
-            path_dict = {basename(p): p for p in sessions}
+            path_dict = {basename(dirname(p)): p for p in sessions}
     else:
         for sess in sessions:
             # get path to session directory
@@ -101,7 +101,7 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:
-            path_dict = {basename(p): p for p in sessions}
+            path_dict = {basename(dirname(p)): p for p in sessions}
 
     return path_dict
 
@@ -283,6 +283,7 @@ def get_extraction_progress(base_dir):
     '''
 
     path_dict = get_session_paths(base_dir)
+
     e_path_dict = get_session_paths(base_dir, extracted=True)
 
     # Count number of extracted sessions and print names of the missing/incomplete extractions
