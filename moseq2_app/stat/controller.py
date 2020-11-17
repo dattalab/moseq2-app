@@ -518,18 +518,20 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
             label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
             label_df.columns = label_df.columns.astype(int)
+            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
             df, label_df = results_to_dataframe(model_fit, index, count='usage',
                                                 max_syllable=self.max_sylls, sort=True, compute_labels=True)
+
             scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
 
-        # Compute and append additional syllable scalar data
-        scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-        for scalar in scalars:
-            df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            # Compute and append additional syllable scalar data
+            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
+            for scalar in scalars:
+                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
 
         # Get groups and matching session uuids
         self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, index, sorted_index)
