@@ -55,6 +55,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.model_fit = model_fit
         self.sorted_index = parse_index(index_file)[1]
 
+        index_uuids = sorted(list(self.sorted_index['files'].keys()))
+        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
+
+        if index_uuids != model_uuids:
+            print('Error: Index file UUIDs do not match model UUIDs.')
+
         if os.path.exists(save_path):
             with open(save_path, 'r') as f:
                 self.syll_info = yaml.safe_load(f)
@@ -467,7 +473,11 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                                                                          output_dir=output_dir)
 
         # Set Session MultipleSelect widget options
-        self.sessions = list(set(self.model_fit['metadata']['uuids']))
+        self.sessions = sorted(list(set(self.model_fit['metadata']['uuids'])))
+
+        index_uuids = sorted(list(self.sorted_index['files'].keys()))
+        if index_uuids != self.sessions:
+            print('Error: Index file UUIDs do not match model UUIDs.')
 
         options = list(set([self.sorted_index['files'][s]['metadata']['SessionName'] for s in self.sessions]))
 

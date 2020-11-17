@@ -194,6 +194,15 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Load the model
         model_data = parse_model_results(joblib.load(self.model_path))
 
+        # Read index file
+        index, sorted_index = parse_index(self.index_path)
+
+        index_uuids = sorted(list(sorted_index['files'].keys()))
+        model_uuids = sorted(list(set(model_data['metadata']['uuids'])))
+
+        if index_uuids != model_uuids:
+            print('Error: Index file UUIDs do not match model UUIDs.')
+
         # Relabel the models, and get the order mapping
         labels, mapping = relabel_by_usage(model_data['labels'], count='usage')
 
@@ -212,8 +221,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            # Read index file
-            index, sorted_index = parse_index(self.index_path)
 
             # Load scalar Dataframe to compute syllable speeds
             scalar_df = scalars_to_dataframe(sorted_index)
@@ -498,6 +505,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # Load Index File
         index, sorted_index = parse_index(self.index_path)
+
+        index_uuids = sorted(list(self.sorted_index['files'].keys()))
+        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
+
+        if index_uuids != model_uuids:
+            print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Load scalar Dataframe to compute syllable speeds
         scalar_df = scalars_to_dataframe(sorted_index)
