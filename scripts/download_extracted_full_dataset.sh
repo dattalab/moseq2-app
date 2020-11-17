@@ -113,6 +113,5 @@ curl -L -o saline-amphetamine.zip https://www.dropbox.com/sh/qnsrbpqrbot0lw2/AAA
 rm saline-amphetamine.zip
 
 # Progress and Index Files
-curl -L -o moseq2-index.yaml https://www.dropbox.com/s/rf4wpkwurrwy41u/moseq2-index.yaml?dl=0
 curl -L -o progress.yaml https://www.dropbox.com/s/49445asfydjpkvd/progress.yaml?dl=0
 
