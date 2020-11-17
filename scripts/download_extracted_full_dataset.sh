@@ -115,3 +115,6 @@ rm saline-amphetamine.zip
 # Progress and Index Files
 curl -L -o progress.yaml https://www.dropbox.com/s/49445asfydjpkvd/progress.yaml?dl=0
 
+# Config File
+curl -L -o config.yaml https://www.dropbox.com/s/3n10dtwo5rnta2u/config.yaml?dl=0
+
