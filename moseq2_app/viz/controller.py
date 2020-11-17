@@ -466,8 +466,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                                                                          model_fit=model_path,
                                                                          output_dir=output_dir)
 
-        self.groups = list(self.model_fit['metadata']['groups'])
-
         # Set Session MultipleSelect widget options
         self.sessions = list(set(self.model_fit['metadata']['uuids']))
 
@@ -657,6 +655,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Get grouped DataFrame
         self.session_df = df.groupby(['SessionName', 'syllable'], as_index=False).mean()
         self.subject_df = df.groupby(['SubjectName', 'syllable'], as_index=False).mean()
+
+        self.groups = list(df.group.unique())
 
         # Get group DataFrame
         self.group_df = df.groupby(['group', 'syllable'], as_index=False).mean()
