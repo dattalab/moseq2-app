@@ -468,6 +468,28 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
 
     return entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors
 
+def format_plot(plot):
+    '''
+    Turns off all major and minor x,y ticks on the transition plot graphs
+
+    Parameters
+    ----------
+    plot (bokeh Plot): Current graph being generated
+
+    Returns
+    -------
+    '''
+
+    plot.xaxis.major_tick_line_color = None  # turn off x-axis major ticks
+    plot.xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
+
+    plot.yaxis.major_tick_line_color = None  # turn off y-axis major ticks
+    plot.yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
+
+    plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
+    plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
+
+
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, entropies, entropy_rates,
                                       scalars, scalar_color='default'):
@@ -503,6 +525,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         else:
             # Connecting pan-zoom interaction across plots
             plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
+
+        format_plot(plot)
 
         tooltips = """
                         <div>
@@ -691,8 +715,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         ]
 
         if i >= len(group):
-            items += [LegendItem(label="Up-regulated", renderers=[r_line])]
-            items += [LegendItem(label="Down-regulated", renderers=[b_line])]
+            items += [LegendItem(label="Up-regulated in G1", renderers=[r_line])]
+            items += [LegendItem(label="Down-regulated in G1", renderers=[b_line])]
 
         legend = Legend(items=items,
                        border_line_color="black", background_fill_color='white',
