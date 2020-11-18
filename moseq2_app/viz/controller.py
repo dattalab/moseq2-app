@@ -5,6 +5,7 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 '''
 
 import os
+import h5py
 import time
 import shutil
 import warnings
@@ -220,11 +221,11 @@ class SyllableLabeler(SyllableLabelerWidgets):
             for syll in range(self.max_sylls):
                 self.group_syll_info[str(syll)]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
-                    'centroid speed (mm/s)': gd[group_name]['speed'][syll],
+                    'centroid speed (mm/s)': gd[group_name]['centroid_speed_mm'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                    'norm. dist_to_center': gd[group_name]['dist_to_center'][syll],
+                    'norm. dist_to_center': gd[group_name]['dist_to_center_px'][syll],
                 }
 
     def get_mean_syllable_info(self):
@@ -238,6 +239,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Load scalar Dataframe to compute syllable speeds
         scalar_df = scalars_to_dataframe(self.sorted_index)
         scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+        scalar_df['syllable'] = np.inf
 
         if not os.path.exists(self.df_output_file):
             # Compute a syllable summary Dataframe containing usage-based
@@ -245,9 +247,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
             df, label_df = results_to_dataframe(self.model_fit, self.sorted_index, count='usage',
                                                 max_syllable=self.max_sylls, sort=True, compute_labels=True)
 
+            for i, indexes in enumerate(label_df.index):
+                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
+                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
+
             scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            for scalar in scalars:
-                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
 
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
@@ -611,11 +616,11 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             for syll in range(self.max_sylls):
                 self.group_syll_info[str(syll)]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
-                    'centroid speed (mm/s)': gd[group_name]['speed'][syll],
+                    'centroid speed (mm/s)': gd[group_name]['centroid_speed_mm'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                    'norm. dist_to_center': gd[group_name]['dist_to_center'][syll],
+                    'norm. dist_to_center': gd[group_name]['dist_to_center_px'][syll],
                 }
 
     def get_session_mean_syllable_info_df(self):
@@ -647,16 +652,19 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Load scalar Dataframe to compute syllable speeds
             scalar_df = scalars_to_dataframe(self.sorted_index)
             scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+            scalar_df['syllable'] = np.inf
 
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
             df, label_df = results_to_dataframe(self.model_fit, self.sorted_index, count='usage',
                                                 max_syllable=self.max_sylls, sort=True, compute_labels=True)
 
-            # Compute and append additional syllable scalar data
+            for i, indexes in enumerate(label_df.index):
+                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
+                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
+
             scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            for scalar in scalars:
-                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
 
         if self.get_pdfs:
             # Compute syllable position PDFs
@@ -704,12 +712,12 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             for syll in range(self.max_sylls):
                 self.session_dict[str(syll)]['session_info'][session_name] = {
                     'usage': sd[session_name]['usage'][syll],
-                    'centroid speed (mm/s)': sd[session_name]['speed'][syll],
+                    'centroid speed (mm/s)': sd[session_name]['centroid_speed_mm'][syll],
                     '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
                     'height (mm)': sd[session_name]['height_ave_mm'][syll],
                     'duration': sd[session_name]['duration'][syll],
-                    'norm. dist_to_center': sd[session_name]['dist_to_center'][syll],
+                    'norm. dist_to_center': sd[session_name]['dist_to_center_px'][syll],
                 }
 
     def get_pdf_plot(self, group_syllable_pdf, group_name):
@@ -779,10 +787,10 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         for group in self.grouped_syll_dict.keys():
             curr_grouped_syll_dict[group] = {}
             for key in self.grouped_syll_dict[group].keys():
-                if key == 'speed':
+                if key == 'centroid_speed_mm':
                     new_key = '2D velocity (mm/s)'
                     curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
-                elif key == 'dist_to_center':
+                elif key == 'dist_to_center_px':
                     new_key = 'norm. dist_to_center'
                     curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
                 else:

@@ -172,11 +172,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=range(len(aux_df.index)),
             y=aux_df[stat].to_numpy(),
             usage=aux_df['usage'].to_numpy(),
-            speed=aux_df['speed'].to_numpy(),
+            speed=aux_df['centroid_speed_mm'].to_numpy(),
             speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
             height=aux_df['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_df['dist_to_center'].to_numpy(),
+            dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
             sem=aux_sem[stat].to_numpy(),
             number=sem.index,
             label=labels,
@@ -189,11 +189,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=errs_x,
             y=errs_y,
             usage=aux_sem['usage'].to_numpy(),
-            speed=aux_sem['speed'].to_numpy(),
+            speed=aux_sem['centroid_speed_mm'].to_numpy(),
             speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
             height=aux_sem['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_sem['dist_to_center'].to_numpy(),
+            dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
             sem=aux_sem[stat].to_numpy(),
             number=sem.index,
             label=labels,
@@ -538,7 +538,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                             <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center_px{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
                             <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
@@ -625,7 +625,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         graph_renderer.node_renderer.data_source.add(group_speed_2d, 'speed_2d')
         graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
         graph_renderer.node_renderer.data_source.add(group_height, 'height')
-        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center')
+        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center_px')
         graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_in), 'ent_in')
         graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_out), 'ent_out')
 
@@ -641,7 +641,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         elif scalar_color == 'Height':
             fill_color = linear_cmap('height', "Spectral4", 0, max(group_height))
         elif scalar_color == 'Distance to Center':
-            fill_color = linear_cmap('dist_to_center', "Spectral4", 0, max(group_dist))
+            fill_color = linear_cmap('dist_to_center_px', "Spectral4", 0, max(group_dist))
         elif scalar_color == 'Entropy-In':
             fill_color = linear_cmap('ent_in', "Spectral4", 0, max(np.nan_to_num(entropy_in)))
         elif scalar_color == 'Entropy-Out':

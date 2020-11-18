@@ -88,8 +88,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.dropdown_mapping = {
             'usage': 'usage',
-            'distance to center': 'dist_to_center',
-            'centroid speed': 'speed',
+            'distance to center': 'dist_to_center_px',
+            'centroid speed': 'centroid_speed_mm',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',
             'height': 'height_ave_mm',
@@ -224,6 +224,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
             # Load scalar Dataframe to compute syllable speeds
             scalar_df = scalars_to_dataframe(sorted_index)
+            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+            scalar_df['syllable'] = np.inf
 
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
@@ -232,10 +234,12 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
             scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
 
-            # Compute and append additional syllable scalar data
+            for i, indexes in enumerate(label_df.index):
+                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
+                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
+
             scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            for scalar in scalars:
-                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -246,9 +250,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         Parameters
         ----------
-        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'speed', 'distance to center']
+        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'centroid_speed_mm', 'distance to center']
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
-            ['usage', 'speed', 'distance to center', 'similarity', 'difference'].
+            ['usage', 'centroid_speed_mm', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
         errorbar (str or ipywidgets.DropDown): Error bar to display. ['SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
@@ -385,7 +389,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Update threshold range values
         edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
         usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['speed'].max() / self.df['speed'].std()) + 2
+        speed_threshold_stds = int(self.df['centroid_speed_mm'].max() / self.df['centroid_speed_mm'].std()) + 2
 
         self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
                                          range(edge_threshold_stds)]
@@ -395,7 +399,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                           range(usage_threshold_stds)]
         self.usage_thresholder.index = (0, usage_threshold_stds - 1)
 
-        self.speed_thresholder.options = [float('%.3f' % (self.df['speed'].std() * i)) for i in
+        self.speed_thresholder.options = [float('%.3f' % (self.df['centroid_speed_mm'].std() * i)) for i in
                                           range(speed_threshold_stds)]
         self.speed_thresholder.index = (0, speed_threshold_stds - 1)
 
@@ -413,7 +417,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         '''
 
         if event.new == 'Default' or event.new == 'Centroid Speed':
-            key = 'speed'
+            key = 'centroid_speed_mm'
             self.speed_thresholder.description = 'Threshold Nodes by Speed'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
@@ -425,10 +429,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             key = 'height_ave_mm'
             self.speed_thresholder.description = 'Threshold Nodes by Height'
         elif event.new == 'Distance to Center':
-            key = 'dist_to_center'
+            key = 'dist_to_center_px'
             self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
         else:
-            key = 'speed'
+            key = 'centroid_speed_mm'
             self.speed_thresholder.description = 'Threshold Nodes by Speed'
 
         scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
@@ -514,6 +518,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # Load scalar Dataframe to compute syllable speeds
         scalar_df = scalars_to_dataframe(sorted_index)
+        scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+        scalar_df['syllable'] = np.inf
 
         # Load Syllable Info
         with open(self.info_path, 'r') as f:
@@ -531,7 +537,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
             label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
             label_df.columns = label_df.columns.astype(int)
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             # Compute a syllable summary Dataframe containing usage-based
@@ -539,15 +544,15 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             df, label_df = results_to_dataframe(model_fit, index, count='usage',
                                                 max_syllable=self.max_sylls, sort=True, compute_labels=True)
 
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+            for i, indexes in enumerate(label_df.index):
+                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
+                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
 
-            # Compute and append additional syllable scalar data
             scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            for scalar in scalars:
-                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
 
         # Get groups and matching session uuids
-        self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, index, sorted_index)
+        self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, sorted_index)
 
         self.compute_entropies(labels, label_group)
 
@@ -594,11 +599,11 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         }
 
         for g in self.group:
-            scalars['speed'].append(self.df[self.df['group'] == g]['speed'].to_numpy())
+            scalars['speed'].append(self.df[self.df['group'] == g]['centroid_speed_mm'].to_numpy())
             scalars['speeds_2d'].append(self.df[self.df['group'] == g]['velocity_2d_mm'].to_numpy())
             scalars['speeds_3d'].append(self.df[self.df['group'] == g]['velocity_3d_mm'].to_numpy())
             scalars['heights'].append(self.df[self.df['group'] == g]['height_ave_mm'].to_numpy())
-            scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center'].to_numpy())
+            scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center_px'].to_numpy())
 
         key = self.scalar_dict.get(scalar_color, 'speed')
         scalar_anchor = get_usage_dict([scalars[key][anchor]])[0]
