@@ -506,8 +506,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Load Index File
         index, sorted_index = parse_index(self.index_path)
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
-        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
+        index_uuids = sorted(list(sorted_index['files'].keys()))
+        model_uuids = sorted(list(set(model_fit['metadata']['uuids'])))
 
         if index_uuids != model_uuids:
             print('Error: Index file UUIDs do not match model UUIDs.')
