@@ -172,7 +172,6 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=range(len(aux_df.index)),
             y=aux_df[stat].to_numpy(),
             usage=aux_df['usage'].to_numpy(),
-            speed=aux_df['centroid_speed_mm'].to_numpy(),
             speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
             height=aux_df['height_ave_mm'].to_numpy(),
@@ -189,7 +188,6 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=errs_x,
             y=errs_y,
             usage=aux_sem['usage'].to_numpy(),
-            speed=aux_sem['centroid_speed_mm'].to_numpy(),
             speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
             height=aux_sem['height_ave_mm'].to_numpy(),
@@ -211,7 +209,6 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                     <div>
                         <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                         <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                        <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -534,7 +531,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                             <div><span style="font-size: 12px;">label: @label</span></div>
                             <div><span style="font-size: 12px;">description: @desc</span></div>
                             <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                            <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -580,7 +576,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         group_usage = [usages[i][j] for j in node_indices if j in usages[i].keys()]
 
         # get speeds
-        group_speed = [scalars['speed'][i][j] for j in node_indices if j in scalars['speed'][i].keys()]
         group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i].keys()]
         group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i].keys()]
 
@@ -621,7 +616,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         graph_renderer.node_renderer.data_source.add(prev_states, 'prev')
         graph_renderer.node_renderer.data_source.add(next_states, 'next')
         graph_renderer.node_renderer.data_source.add(group_usage, 'usage')
-        graph_renderer.node_renderer.data_source.add(group_speed, 'speed')
         graph_renderer.node_renderer.data_source.add(group_speed_2d, 'speed_2d')
         graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
         graph_renderer.node_renderer.data_source.add(group_height, 'height')
@@ -632,9 +626,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         text_color = 'white'
 
         # node interactions
-        if scalar_color == 'Centroid Speed':
-            fill_color = linear_cmap('speed', "Spectral4", 0, max(group_speed))
-        elif scalar_color == '2D velocity':
+        if scalar_color == '2D velocity':
             fill_color = linear_cmap('speed_2d', "Spectral4", 0, max(group_speed_2d))
         elif scalar_color == '3D velocity':
             fill_color = linear_cmap('speed_3d', "Spectral4", 0, max(group_speed_3d))

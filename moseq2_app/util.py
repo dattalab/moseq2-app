@@ -7,10 +7,10 @@ General utility functions.
 import numpy as np
 import pandas as pd
 import ruamel.yaml as yaml
-from moseq2_viz.model.util import results_to_dataframe, get_syllable_usages
-from moseq2_viz.scalars.util import scalars_to_dataframe, compute_session_centroid_speeds, compute_mean_syll_scalar
+from moseq2_viz.scalars.util import scalars_to_dataframe
+from moseq2_viz.model.util import get_syllable_usages, compute_behavioral_statistics
 
-def merge_labels_with_scalars(sorted_index, model_fit, model_path, max_sylls=40):
+def merge_labels_with_scalars(sorted_index, model_path):
     '''
     Computes all the syllable statistics to plot, including syllable scalars.
 
@@ -29,13 +29,9 @@ def merge_labels_with_scalars(sorted_index, model_fit, model_path, max_sylls=40)
 
     # Load scalar Dataframe to compute syllable speeds
     scalar_df = scalars_to_dataframe(sorted_index, model_path=model_path)
-    scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
 
-    df, _ = results_to_dataframe(model_fit, sorted_index, count='usage',
-                                 max_syllable=max_sylls, sort=True, compute_labels=False)
-    scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-    df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=max_sylls,
-                                  keep_cols=['group', 'uuid', 'labels (usage sort)'])
+    df = compute_behavioral_statistics(scalar_df, count='usage',
+                                       groupby=['group', 'uuid', 'SessionName', 'SubjectName'])
 
     return df, scalar_df
 

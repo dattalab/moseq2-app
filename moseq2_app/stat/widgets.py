@@ -10,10 +10,10 @@ class SyllableStatWidgets:
         self.layout_hidden = widgets.Layout(display='none')
         self.layout_visible = widgets.Layout(display='block')
 
-        self.stat_dropdown = widgets.Dropdown(options=['usage', 'Centroid Speed', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
+        self.stat_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
         # add dist to center
-        self.sorting_dropdown = widgets.Dropdown(options=['usage', 'Centroid Speed', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.sorting_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)
         self.exp_dropdown = widgets.Dropdown(options=[], description='Group 2:', disabled=False)
 
@@ -60,7 +60,7 @@ class TransitionGraphWidgets:
                                                       style=style, value='circular',
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', 'Centroid Speed', '2D velocity',
+        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', '2D velocity',
                                                               '3D velocity', 'Height', 'Distance to Center',
                                                               'Entropy-In', 'Entropy-Out'],
                                                      description='Node Coloring',

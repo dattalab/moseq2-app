@@ -16,10 +16,10 @@ from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.info.util import entropy, entropy_rate
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
-from moseq2_viz.model.util import (parse_model_results, relabel_by_usage)
+from moseq2_viz.scalars.util import scalars_to_dataframe
+from moseq2_viz.model.util import (parse_model_results, relabel_by_usage,
+                                   sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
-from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_session_centroid_speeds)
-from moseq2_viz.model.label_util import sort_syllables_by_stat_difference, sort_syllables_by_stat
 from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interactive_transition_graph
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats, get_usage_dict,
                                          handle_graph_layout, convert_transition_matrix_to_ebunch,
@@ -55,15 +55,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df_path = df_path
 
         if load_parquet:
-            if df_path != None:
-                if os.path.exists(df_path):
-                    self.label_df_path = df_path.replace('syll_df', 'label_time_df')
-                else:
+            if df_path is not None:
+                if not os.path.exists(df_path):
                     self.df_path = None
-                    self.label_df_path = None
         else:
             self.df_path = None
-            self.label_df_path = None
 
         self.df = None
 
@@ -75,7 +71,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Load all the data
         self.interactive_stat_helper()
         self.df = self.df[self.df['syllable'] < self.max_sylls]
-
         self.session_names = sorted(list(self.df.SessionName.unique()))
         self.subject_names = sorted(list(self.df.SubjectName.unique()))
 
@@ -90,7 +85,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.dropdown_mapping = {
             'usage': 'usage',
             'distance to center': 'dist_to_center_px',
-            'centroid speed': 'centroid_speed_mm',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',
             'height': 'height_ave_mm',
@@ -220,7 +214,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(sorted_index, model_data, self.model_path, self.max_sylls)
+            df, scalar_df = merge_labels_with_scalars(sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -231,9 +225,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         Parameters
         ----------
-        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'centroid_speed_mm', 'distance to center']
+        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'distance to center']
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
-            ['usage', 'centroid_speed_mm', 'distance to center', 'similarity', 'difference'].
+            ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
         errorbar (str or ipywidgets.DropDown): Error bar to display. ['SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
@@ -315,14 +309,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         if load_parquet:
             if df_path != None:
-                if os.path.exists(df_path):
-                    self.label_df_path = df_path.replace('syll_df', 'label_time_df')
-                else:
+                if not os.path.exists(df_path):
                     self.df_path = None
-                    self.label_df_path = None
         else:
             self.df_path = None
-            self.label_df_path = None
 
         # Load Model
         self.model_fit = parse_model_results(joblib.load(model_path))
@@ -348,8 +338,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # Manage dropdown menu values
         self.scalar_dict = {
-            'Default': 'speed',
-            'Centroid Speed': 'speed',
+            'Default': 'speeds_2d',
             '2D velocity': 'speeds_2d',
             '3D velocity': 'speeds_3d',
             'Height': 'heights',
@@ -382,7 +371,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Update threshold range values
         edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
         usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['centroid_speed_mm'].max() / self.df['centroid_speed_mm'].std()) + 2
+        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
 
         self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
                                          range(edge_threshold_stds)]
@@ -392,7 +381,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                           range(usage_threshold_stds)]
         self.usage_thresholder.index = (0, usage_threshold_stds - 1)
 
-        self.speed_thresholder.options = [float('%.3f' % (self.df['centroid_speed_mm'].std() * i)) for i in
+        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
                                           range(speed_threshold_stds)]
         self.speed_thresholder.index = (0, speed_threshold_stds - 1)
 
@@ -409,9 +398,9 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         -------
         '''
 
-        if event.new == 'Default' or event.new == 'Centroid Speed':
-            key = 'centroid_speed_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by Speed'
+        if event.new == 'Default' or event.new == '2D velocity':
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
@@ -425,8 +414,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             key = 'dist_to_center_px'
             self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
         else:
-            key = 'centroid_speed_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by Speed'
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
 
         scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
         self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
@@ -512,7 +501,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
             scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
 
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
@@ -559,7 +547,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # Get anchored group scalars
         scalars = {
-            'speed': [],
             'speeds_2d': [],
             'speeds_3d': [],
             'heights': [],
@@ -567,13 +554,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         }
 
         for g in self.group:
-            scalars['speed'].append(self.df[self.df['group'] == g]['centroid_speed_mm'].to_numpy())
             scalars['speeds_2d'].append(self.df[self.df['group'] == g]['velocity_2d_mm'].to_numpy())
             scalars['speeds_3d'].append(self.df[self.df['group'] == g]['velocity_3d_mm'].to_numpy())
             scalars['heights'].append(self.df[self.df['group'] == g]['height_ave_mm'].to_numpy())
             scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center_px'].to_numpy())
 
-        key = self.scalar_dict.get(scalar_color, 'speed')
+        key = self.scalar_dict.get(scalar_color, 'speeds_2d')
         scalar_anchor = get_usage_dict([scalars[key][anchor]])[0]
 
         # Create graph with nodes and edges
