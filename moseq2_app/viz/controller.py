@@ -5,7 +5,6 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 '''
 
 import os
-import h5py
 import time
 import shutil
 import warnings
@@ -23,7 +22,7 @@ from moseq2_viz.util import parse_index
 from IPython.display import display, clear_output
 from moseq2_extract.io.video import get_video_info
 from moseq2_app.viz.view import display_crowd_movies
-from moseq2_viz.model.util import results_to_dataframe
+from moseq2_app.util import merge_labels_with_scalars
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
 from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_session_centroid_speeds, compute_mean_syll_scalar,
@@ -37,7 +36,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     '''
 
-    def __init__(self, model_fit, index_file, max_sylls, save_path):
+    def __init__(self, model_fit, model_path, index_file, max_sylls, save_path):
         '''
         Initializes class context parameters, reads and creates the syllable information dict.
 
@@ -54,7 +53,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.max_sylls = max_sylls
 
         self.model_fit = model_fit
+        self.model_path = model_path
         self.sorted_index = parse_index(index_file)[1]
+
+        # Syllable Info DataFrame path
+        output_dir = os.path.dirname(save_path)
+        self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
+        self.label_df_output_file = os.path.join(output_dir, 'label_time_df.parquet')
 
         index_uuids = sorted(list(self.sorted_index['files'].keys()))
         model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
@@ -65,8 +70,11 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if os.path.exists(save_path):
             with open(save_path, 'r') as f:
                 self.syll_info = yaml.safe_load(f)
-
                 if len(self.syll_info.keys()) != max_sylls:
+                    # Delete previously saved parquet
+                    if os.path.exists(self.df_output_file):
+                        os.remove(self.df_output_file)
+
                     self.syll_info = {str(i): {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i
                                       in range(max_sylls)}
 
@@ -74,6 +82,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
                     if 'group_info' not in self.syll_info[str(i)].keys():
                         self.syll_info[str(i)]['group_info'] = {}
         else:
+            # Delete previously saved parquet
+            if os.path.exists(self.df_output_file):
+                os.remove(self.df_output_file)
+
             self.syll_info = {str(i): {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in
                               range(max_sylls)}
             yml = yaml.YAML()
@@ -87,11 +99,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.next_button.on_click(self.on_next)
         self.prev_button.on_click(self.on_prev)
         self.set_button.on_click(self.on_set)
-
-        # Syllable Info DataFrame path
-        output_dir = os.path.dirname(save_path)
-        self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
-        self.label_df_output_file = os.path.join(output_dir, 'label_time_df.parquet')
 
         self.get_mean_syllable_info()
 
@@ -236,30 +243,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
         -------
         '''
 
-        # Load scalar Dataframe to compute syllable speeds
-        scalar_df = scalars_to_dataframe(self.sorted_index)
-        scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-        scalar_df['syllable'] = np.inf
-
         if not os.path.exists(self.df_output_file):
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, label_df = results_to_dataframe(self.model_fit, self.sorted_index, count='usage',
-                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
-
-            for i, indexes in enumerate(label_df.index):
-                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
-                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
-
-            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
-
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_fit, self.model_path, self.max_sylls)
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
-            tmp = label_df.copy()
-            tmp.columns = tmp.columns.astype(str)
-            print('Writing session syllable labels to parquet')
-            tmp.to_parquet(self.label_df_output_file, engine='fastparquet', compression='gzip')
         else:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_output_file, engine='fastparquet')
@@ -404,25 +393,27 @@ class SyllableLabeler(SyllableLabelerWidgets):
             config_data = self.set_default_cm_parameters(config_data)
 
             # Generate movies if directory does not exist
-            _ = make_crowd_movies_wrapper(index_path, model_path, config_data, crowd_movie_dir)
-
-        # Get movie paths
-        crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
+            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, config_data, crowd_movie_dir)['all']
+        else:
+            # get existing crowd movie paths
+            crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
 
         if len(crowd_movie_paths) < self.max_sylls:
             print('Crowd movie list is incomplete. Generating movies...')
             config_data = self.set_default_cm_parameters(config_data)
 
             # Generate movies if directory does not exist
-            _ = make_crowd_movies_wrapper(index_path, model_path, config_data, crowd_movie_dir)
+            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, config_data, crowd_movie_dir)['all']
 
-        crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
+        # Get syll_info paths
+        info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
 
-        for cm in crowd_movie_paths:
-            # Parse paths to get corresponding syllable number
-            syll_num = str(int(cm.split('sorted-id-')[1].split()[0]))
-            if syll_num in self.syll_info.keys():
-                self.syll_info[syll_num]['crowd_movie_path'] = cm
+        if set(crowd_movie_paths) != set(info_cm_paths):
+            for cm in crowd_movie_paths:
+                # Parse paths to get corresponding syllable number
+                syll_num = str(int(cm.split('sorted-id-')[1].split()[0]))
+                if syll_num in self.syll_info.keys():
+                    self.syll_info[syll_num]['crowd_movie_path'] = cm
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
     '''
@@ -640,35 +631,15 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         if self.df_path != None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            if self.get_pdfs:
-                label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
-                label_df.columns = label_df.columns.astype(int)
-
-            # Load scalar Dataframe to compute syllable speeds
-            scalar_df = scalars_to_dataframe(self.sorted_index)
+            scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
+            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-
-            # Load scalar Dataframe to compute syllable speeds
-            scalar_df = scalars_to_dataframe(self.sorted_index)
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-            scalar_df['syllable'] = np.inf
-
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, label_df = results_to_dataframe(self.model_fit, self.sorted_index, count='usage',
-                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
-
-            for i, indexes in enumerate(label_df.index):
-                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
-                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
-
-            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_fit, self.model_path, self.max_sylls)
 
         if self.get_pdfs:
             # Compute syllable position PDFs
-            self.df = compute_syllable_position_heatmaps(df, scalar_df, label_df, syllables=range(self.max_sylls))
+            self.df = compute_syllable_position_heatmaps(df, scalar_df, syllables=range(self.max_sylls))
 
         # Get grouped DataFrame
         self.session_df = df.groupby(['SessionName', 'syllable'], as_index=False).mean()

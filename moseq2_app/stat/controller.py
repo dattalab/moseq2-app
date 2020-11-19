@@ -12,17 +12,18 @@ import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.util import parse_index
 from IPython.display import clear_output
+from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.info.util import entropy, entropy_rate
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
+from moseq2_viz.model.util import (parse_model_results, relabel_by_usage)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
-from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, results_to_dataframe)
+from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_session_centroid_speeds)
+from moseq2_viz.model.label_util import sort_syllables_by_stat_difference, sort_syllables_by_stat
 from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interactive_transition_graph
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats, get_usage_dict,
                                          handle_graph_layout, convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
-from moseq2_viz.model.label_util import sort_syllables_by_stat_difference, sort_syllables_by_stat
-from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_mean_syll_scalar, compute_session_centroid_speeds)
 
 class InteractiveSyllableStats(SyllableStatWidgets):
     '''
@@ -217,29 +218,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if self.df_path != None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
-            label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-
-            # Load scalar Dataframe to compute syllable speeds
-            scalar_df = scalars_to_dataframe(sorted_index)
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-            scalar_df['syllable'] = np.inf
-
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, label_df = results_to_dataframe(model_data, index, count='usage',
-                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
-
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-
-            for i, indexes in enumerate(label_df.index):
-                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
-                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
-
-            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
+            df, scalar_df = merge_labels_with_scalars(sorted_index, model_data, self.model_path, self.max_sylls)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -342,6 +323,18 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         else:
             self.df_path = None
             self.label_df_path = None
+
+        # Load Model
+        self.model_fit = parse_model_results(joblib.load(model_path))
+
+        # Load Index File
+        self.index, self.sorted_index = parse_index(index_path)
+
+        index_uuids = sorted(list(self.sorted_index['files'].keys()))
+        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
+
+        if index_uuids != model_uuids:
+            print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Load and store transition graph data
         self.initialize_transition_data()
@@ -504,29 +497,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         warnings.filterwarnings('ignore')
 
-        # Load Model
-        model_fit = parse_model_results(joblib.load(self.model_path))
-
-        # Load Index File
-        index, sorted_index = parse_index(self.index_path)
-
-        index_uuids = sorted(list(sorted_index['files'].keys()))
-        model_uuids = sorted(list(set(model_fit['metadata']['uuids'])))
-
-        if index_uuids != model_uuids:
-            print('Error: Index file UUIDs do not match model UUIDs.')
-
-        # Load scalar Dataframe to compute syllable speeds
-        scalar_df = scalars_to_dataframe(sorted_index)
-        scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-        scalar_df['syllable'] = np.inf
-
         # Load Syllable Info
         with open(self.info_path, 'r') as f:
             self.syll_info = yaml.safe_load(f)
 
         # Get labels and optionally relabel them by usage sorting
-        labels = model_fit['labels']
+        labels = self.model_fit['labels']
 
         # get max_sylls
         if self.max_sylls is None:
@@ -535,24 +511,16 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
-            label_df.columns = label_df.columns.astype(int)
+            scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
+            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
+
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, label_df = results_to_dataframe(model_fit, index, count='usage',
-                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
-
-            for i, indexes in enumerate(label_df.index):
-                session_label_idx = scalar_df[scalar_df['uuid'] == indexes[1]].index
-                scalar_df.loc[session_label_idx, 'syllable'] = list(label_df.iloc[i])[:len(session_label_idx)]
-
-            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            df = compute_mean_syll_scalar(df, scalar_df, scalar=scalars, max_sylls=self.max_sylls)
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_fit,
+                                                      self.model_path, self.max_sylls)
 
         # Get groups and matching session uuids
-        self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, sorted_index)
+        self.group, label_group, label_uuids = get_trans_graph_groups(self.model_fit, self.sorted_index)
 
         self.compute_entropies(labels, label_group)
 
