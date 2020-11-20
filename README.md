@@ -248,7 +248,7 @@ Run:
 
 If you get any errors running that script, open the script in a text file and run each line
 of the script independently. This will help you (and us) figure out where the
-error is occuring.
+error is occurring.
 
 ## Downloading a test dataset
 
