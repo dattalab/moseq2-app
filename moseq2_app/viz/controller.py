@@ -739,12 +739,12 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         if self.get_pdfs:
             # Get corresponding syllable position PDF
-            group_syll_pdfs, group_df = get_syllable_pdfs(self.df,
-                                                          syllables=[self.cm_syll_select.value],
-                                                          groupby=self.cm_sources_dropdown.value)
-
+            group_syll_pdfs = get_syllable_pdfs(self.df,
+                                                syllables=[self.cm_syll_select.value],
+                                                groupby=self.cm_sources_dropdown.value,
+                                                syllable_key='syllable')[0].drop('syllable', axis=1).reset_index()
             for i, group in enumerate(g_iter):
-                self.grouped_syll_dict[group]['pdf'] = self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_df.index(group)]
+                self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs['group'] == group]['pdf']
 
         # Remove previously displayed data
         #clear_output()
@@ -777,9 +777,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Convert crowd movie metadata to HTML table
             if self.get_pdfs:
                 group_info = pd.DataFrame(syll_info_df.drop('pdf', axis=0)[group_name]).to_html()
-
-                group_syllable_pdf = syll_info_df[group_name]['pdf'][0]
-
+                group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
                 pdf_fig = self.get_pdf_plot(group_syllable_pdf, group_name)
 
                 bk_plots.append(pdf_fig)
