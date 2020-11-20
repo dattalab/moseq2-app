@@ -154,7 +154,9 @@ def update_progress(progress_file, varK, varV):
         curr_id = str(progress.get('snapshot', uuid.uuid4()))
 
         log_dict = {curr_id: progress}
-        del log_dict[curr_id]['snapshot']
+        if 'snapshot' in log_dict[curr_id]:
+            del log_dict[curr_id]['snapshot']
+            
         update_pickle_log(log_dict)
 
         progress[varK] = varV

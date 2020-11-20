@@ -48,7 +48,8 @@ class TestNotebookProgress(TestCase):
                               'model_path': '',
                               'crowd_dir': '',
                               'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/')}
+                              'plot_path': os.path.join(base_dir, 'plots/'),
+                              'snapshot': 'test'}
 
         with open(progress_file, 'w') as f:
             yaml.safe_dump(base_progress_vars, f)
@@ -79,7 +80,8 @@ class TestNotebookProgress(TestCase):
                               'model_path': '',
                               'crowd_dir': '',
                               'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/')}
+                              'plot_path': os.path.join(base_dir, 'plots/'),
+                              'snapshot': 'test'}
 
         with open(progress_file, 'w') as f:
             yaml.safe_dump(base_progress_vars, f)

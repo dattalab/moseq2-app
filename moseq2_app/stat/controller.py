@@ -12,8 +12,8 @@ import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.util import parse_index
 from IPython.display import clear_output
+from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
-from moseq2_viz.info.util import entropy, entropy_rate
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.scalars.util import scalars_to_dataframe
@@ -435,24 +435,22 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         -------
         '''
 
-        # Compute entropies
-        entropies = []
+        self.incoming_transition_entropy, self.outgoing_transition_entropy = [], []
+
         for g in self.group:
             use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropies.append(
-                np.mean(entropy(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
 
-        self.entropies = entropies
+            self.incoming_transition_entropy.append(np.mean(transition_entropy(use_labels,
+                                                    tm_smoothing=0,
+                                                    truncate_syllable=self.max_sylls-1,
+                                                    transition_type='incoming',
+                                                    relabel_by='usage'), axis=0))
 
-        # Compute entropy rates
-        entropy_rates = []
-        for g in self.group:
-            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropy_rates.append(
-                np.mean(entropy_rate(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
-
-        self.entropy_rates = entropy_rates
-
+            self.outgoing_transition_entropy.append(np.mean(transition_entropy(use_labels,
+                                                    tm_smoothing=0,
+                                                    truncate_syllable=self.max_sylls-1,
+                                                    transition_type='outgoing',
+                                                    relabel_by='usage'), axis=0))
     def compute_entropy_differences(self):
         '''
         Computes cross group entropy/entropy-rate differences
@@ -465,13 +463,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Compute entropy + entropy rate differences
         for i in range(len(self.group)):
             for j in range(i + 1, len(self.group)):
-                self.entropies.append(self.entropies[j] - self.entropies[i])
-                self.entropy_rates.append(self.entropy_rates[j] - self.entropy_rates[i])
-
-        # Set entropy and entropy rate Ordered Dicts
-        for i in range(len(self.entropies)):
-            self.entropies[i] = get_usage_dict([self.entropies[i]])[0]
-            self.entropy_rates[i] = get_usage_dict([self.entropy_rates[i]])[0]
+                self.incoming_transition_entropy.append(self.incoming_transition_entropy[j] - self.incoming_transition_entropy[i])
+                self.outgoing_transition_entropy.append(self.outgoing_transition_entropy[j] - self.outgoing_transition_entropy[i])
 
     def initialize_transition_data(self):
         '''
@@ -504,8 +497,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_fit,
-                                                      self.model_path, self.max_sylls)
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         # Get groups and matching session uuids
         self.group, label_group, label_uuids = get_trans_graph_groups(self.model_fit, self.sorted_index)
@@ -596,5 +588,5 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # interactive plot transition graphs
         plot_interactive_transition_graph(graphs, pos, self.group,
                                           group_names, usages, self.syll_info,
-                                          self.entropies, self.entropy_rates,
+                                          self.incoming_transition_entropy, self.outgoing_transition_entropy,
                                           scalars=scalars, scalar_color=scalar_color)

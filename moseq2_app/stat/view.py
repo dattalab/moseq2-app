@@ -394,7 +394,7 @@ def format_graphs(graphs, group):
 
     return list(group_grid)
 
-def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, group_name):
+def get_neighbors(graph, node_indices, group_name):
     '''
     Computes the incoming and outgoing syllable entropies, entropy rates, previous nodes and
      neighboring nodes for all the nodes included in node_indices.
@@ -403,14 +403,10 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
     ----------
     graph (networkx DiGraph): Generated DiGraph to convert to Bokeh glyph and plot.
     node_indices (list): List of node indices included in the given graph
-    entropies (list): Syllable usage entropy values for each included syllable in the graph
-    entropy_rates (list): Syllable transition entropy rates for all possible edge transitions in the graph
     group_name (str): Graph's group name.
 
     Returns
     -------
-    entropy_in (list): List of computed incoming syllable entropy values for all the given node indices
-    entropy_out (list): List of computed outgoing syllable entropy values for all the given node indices
     prev_states (list): List of previous nodes for each node index in the graph.
     next_states (list): List of successor nodes/syllables for each node in the graph
     neighbor_edge_colors (list): List of colors determining whether an edge is incoming or outgoing from each node.
@@ -431,17 +427,10 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
             pred = np.array(list(graph.predecessors(n)))
             neighbors = np.array(list(graph.neighbors(n)))
 
-            e_ins, e_outs = [], []
             for p in pred:
-                e_in = entropy_rates[p][n] + (entropies[n] + entropies[p])
-                e_ins.append(e_in)
-
                 neighbor_edge_colors[(p, n)] = 'orange'
 
             for nn in neighbors:
-                e_out = entropy_rates[n][nn] + (entropies[nn] + entropies[n])
-                e_outs.append(e_out)
-
                 neighbor_edge_colors[(n, nn)] = 'purple'
 
             # Get predecessor and next state transition weights
@@ -456,14 +445,12 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
             prev_states.append(pred[pred_sort_idx])
             next_states.append(neighbors[next_sort_idx])
 
-            entropy_in.append(np.nanmean(e_ins))
-            entropy_out.append(np.nanmean(e_outs))
         except nx.NetworkXError:
             # handle orphans
             print('missing', group_name, n)
             pass
 
-    return entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors
+    return prev_states, next_states, neighbor_edge_colors
 
 def format_plot(plot):
     '''
@@ -488,7 +475,7 @@ def format_plot(plot):
 
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
-                                      syll_info, entropies, entropy_rates,
+                                      syll_info, incoming_transition_entropy, outgoing_transition_entropy,
                                       scalars, scalar_color='default'):
     '''
 
@@ -554,8 +541,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                        TapTool(),
                        BoxSelectTool())
 
-        entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors = \
-            get_neighbors_and_entropies(graph, node_indices, entropies[i], entropy_rates[i], group_names[i])
+        prev_states, next_states, neighbor_edge_colors = \
+            get_neighbors(graph, node_indices, group_names[i])
 
         # edge colors for difference graphs
         if i >= len(group):
@@ -620,8 +607,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
         graph_renderer.node_renderer.data_source.add(group_height, 'height')
         graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center_px')
-        graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_in), 'ent_in')
-        graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_out), 'ent_out')
+        graph_renderer.node_renderer.data_source.add(incoming_transition_entropy[i], 'ent_in')
+        graph_renderer.node_renderer.data_source.add(outgoing_transition_entropy[i], 'ent_out')
 
         text_color = 'white'
 
@@ -635,9 +622,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         elif scalar_color == 'Distance to Center':
             fill_color = linear_cmap('dist_to_center_px', "Spectral4", 0, max(group_dist))
         elif scalar_color == 'Entropy-In':
-            fill_color = linear_cmap('ent_in', "Spectral4", 0, max(np.nan_to_num(entropy_in)))
+            fill_color = linear_cmap('ent_in', "Spectral4", 0, max(incoming_transition_entropy[i]))
         elif scalar_color == 'Entropy-Out':
-            fill_color = linear_cmap('ent_out', "Spectral4", 0, max(entropy_out))
+            fill_color = linear_cmap('ent_out', "Spectral4", 0, max(outgoing_transition_entropy[i]))
         else:
             fill_color = 'white'
             text_color = 'black'
