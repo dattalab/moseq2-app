@@ -86,7 +86,7 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:
-            path_dict = {basename(p): p for p in sessions}
+            path_dict = {basename(dirname(p)): p for p in sessions}
     else:
         for sess in sessions:
             # get path to session directory
@@ -101,7 +101,7 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:
-            path_dict = {basename(p): p for p in sessions}
+            path_dict = {basename(dirname(p)): p for p in sessions}
 
     return path_dict
 
@@ -267,7 +267,7 @@ def get_pca_progress(progress_vars, pca_progress):
             print(f'PCA missing: {key}')
     return pca_progress
 
-def get_extraction_progress(base_dir):
+def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
     '''
     Counts the number of fully extracted sessions, and prints the session directory names
      of the incomplete or missing extractions.
@@ -282,8 +282,9 @@ def get_extraction_progress(base_dir):
     num_extracted (int): Total number of completed extractions
     '''
 
-    path_dict = get_session_paths(base_dir)
-    e_path_dict = get_session_paths(base_dir, extracted=True)
+    path_dict = get_session_paths(base_dir, exts=exts)
+
+    e_path_dict = get_session_paths(base_dir, extracted=True, exts=exts)
 
     # Count number of extracted sessions and print names of the missing/incomplete extractions
     num_extracted = 0
@@ -303,7 +304,7 @@ def get_extraction_progress(base_dir):
     return path_dict, num_extracted
 
 
-def print_progress(base_dir, progress_vars):
+def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     '''
     Searches for all the paths included in the progress file and displays 4 progress bars, one for each pipeline step.
 
@@ -327,7 +328,7 @@ def print_progress(base_dir, progress_vars):
     analysis_progress = {'syll_info': False, 'crowd_dir': False}
 
     # Get Extract Progress
-    path_dict, num_extracted = get_extraction_progress(base_dir)
+    path_dict, num_extracted = get_extraction_progress(base_dir, exts=exts)
 
     # Get PCA Progress
     pca_progress = get_pca_progress(progress_vars, pca_progress)
@@ -351,7 +352,7 @@ def print_progress(base_dir, progress_vars):
     show_progress_bar(count_total_found_items(modeling_progress), len(modeling_progress.keys()), desc="Modeling Progress")
     show_progress_bar(count_total_found_items(analysis_progress), len(analysis_progress.keys()), desc="Analysis Progress")
 
-def check_progress(base_dir, progress_filepath):
+def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.gz']):
     '''
     Checks whether progress file exists and prompts user input on whether to overwrite, load old, or generate a new one.
 
@@ -391,7 +392,7 @@ def check_progress(base_dir, progress_filepath):
 
         print('Found progress file, displaying progress...\n')
         # Display progress bars
-        print_progress(base_dir, progress_vars)
+        print_progress(base_dir, progress_vars, exts=exts)
         time.sleep(0.1)
 
         # Handle user input
@@ -401,7 +402,7 @@ def check_progress(base_dir, progress_filepath):
     else:
         print('Progress file not found, creating new one.')
         progress_vars = base_progress_vars
-        print_progress(base_dir, progress_vars)
+        print_progress(base_dir, progress_vars, exts=exts)
 
         with open(progress_filepath, 'w') as f:
             yml.dump(progress_vars, f)
