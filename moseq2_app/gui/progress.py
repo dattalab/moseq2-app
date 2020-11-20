@@ -5,15 +5,22 @@ This module handles all jupyter notebook progress related functionalities.
 '''
 
 import os
-import time
+import uuid
 import json
+import pickle
+import logging
 import warnings
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
+from datetime import datetime
 from os.path import dirname, basename, exists, join
 from moseq2_extract.helpers.data import check_completion_status
+
+progress_log = 'progress.log'
+progress_pkl = 'progress_log.pkl'
+logging.basicConfig(filename=progress_log, level=logging.INFO)
 
 def generate_missing_metadata(sess_dir, sess_name):
     '''
@@ -105,6 +112,20 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
 
     return path_dict
 
+def update_pickle_log(log_dict):
+
+    if not exists(progress_pkl):
+        with open(progress_pkl, 'wb+') as fp:
+            pickle.dump(log_dict, fp)
+    else:
+        with open(progress_pkl, 'rb') as fp:
+            old_log = pickle.load(fp)
+
+        log_dict.update(old_log)
+
+        with open(progress_pkl, 'wb+') as fp:
+            pickle.dump(log_dict, fp)
+
 def update_progress(progress_file, varK, varV):
     '''
     Updates progress file with new notebook variable
@@ -127,9 +148,25 @@ def update_progress(progress_file, varK, varV):
         progress = yaml.safe_load(f)
 
     if isinstance(varV, str):
+        old_value = progress.get(varK, '') # get previous variable to print
+
+        # update pickle log with latest uuid-progress key-value pair
+        curr_id = str(progress.get('snapshot', uuid.uuid4()))
+
+        log_dict = {curr_id: progress}
+        del log_dict[curr_id]['snapshot']
+        update_pickle_log(log_dict)
+
         progress[varK] = varV
+
+        # update snapshot variable
+        progress['snapshot'] = str(uuid.uuid4())
+
         with open(progress_file, 'w') as f:
             yml.dump(progress, f)
+
+        # update log file
+        logging.info(f'{datetime.now()}, {progress["snapshot"]}, {varK}: {old_value} -> {varV}')
 
         print(f'Successfully updated progress file with {varK} -> {varV}')
     else:
@@ -158,12 +195,17 @@ def generate_intital_progressfile(base_dir):
                           'model_path': '',
                           'crowd_dir': '',
                           'syll_info': '',
-                          'plot_path': os.path.join(base_dir, 'plots/')}
-
-
+                          'plot_path': os.path.join(base_dir, 'plots/'),
+                          'snapshot': str(uuid.uuid4())}
 
     with open(progress_filepath, 'w') as f:
         yml.dump(base_progress_vars, f)
+
+    curr_id = base_progress_vars['snapshot']
+    log_dict = {curr_id: base_progress_vars}
+    update_pickle_log(log_dict)
+
+    logging.info(f'New progress file created: \n{json.dumps(base_progress_vars, indent=4)}')
 
     return base_progress_vars
 
