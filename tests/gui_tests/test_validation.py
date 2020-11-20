@@ -22,7 +22,7 @@ class TestExtractionValidation(TestCase):
 
         percent_error = check_timestamp_error_percentage(timestamps)
 
-        assert percent_error == 1.1003544858038812
+        assert percent_error == 0.011003544858038812
 
     def test_count_nan_rows(self):
 
@@ -169,7 +169,7 @@ class TestExtractionValidation(TestCase):
         new_status_dicts = run_validation_tests(scalar_df, deepcopy(status_dicts))
 
         assert new_status_dicts == status_dicts
-        assert new_status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['dropped_frames'] > 0.05
+        assert new_status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['dropped_frames'] == False
 
     def test_plot_heatmap(self):
 

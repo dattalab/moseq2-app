@@ -42,7 +42,7 @@ def check_timestamp_error_percentage(timestamps, fps=30):
 
     # Determine the percent error between the determined and actual frame rate.
     diffRates = abs(fps - expRate)
-    percentError = (diffRates / fps) * 100
+    percentError = (diffRates / fps)
 
     return percentError
 
@@ -60,11 +60,8 @@ def count_nan_rows(scalar_df):
     n_missing_frames (int): Number of frames with NaN computed scalar values.
     '''
 
-    nanrows = scalar_df.isnull().sum(axis=1).to_numpy()
+    return scalar_df.isnull().any(1).sum()
 
-    n_missing_frames = len(nanrows[nanrows > 0])
-
-    return n_missing_frames
 
 def count_missing_mouse_frames(scalar_df):
     '''
@@ -80,9 +77,8 @@ def count_missing_mouse_frames(scalar_df):
     missing_mouse_frames (int): Number of frames with recorded mouse area ~= 0
     '''
 
-    missing_mouse_frames = len(scalar_df[np.isclose(scalar_df['area_px'], 0)])
+    return (scalar_df["area_px"] == 0).sum()
 
-    return missing_mouse_frames
 
 # warning: min height may be too high
 def count_frames_with_small_areas(scalar_df):
@@ -100,9 +96,8 @@ def count_frames_with_small_areas(scalar_df):
     corrupt_frames (int): Number of frames where the recorded mouse area is too small
     '''
 
-    corrupt_frames = len(scalar_df[scalar_df['area_px'] < 2*scalar_df['area_px'].std()])
+    return (scalar_df["area_px"] < 2 * scalar_df["area_px"].std()).sum()
 
-    return corrupt_frames
 
 def count_stationary_frames(scalar_df):
     '''
@@ -117,15 +112,15 @@ def count_stationary_frames(scalar_df):
     -------
     motionless_frames (int): Number of frames where the mouse is not moving
     '''
+    
+    # subtract 1 because first frame is always 0mm/s
+    return (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1
 
-    motionless_frames = len(scalar_df[scalar_df['velocity_2d_mm'] < 0.1])-1 # subtract 1 because first frame is always 0mm/s
-
-    return motionless_frames
 
 def get_scalar_df(path_dict):
     '''
     Computes a scalar dataframe that contains all the extracted sessions
-     recorded scalar values along with their metadata.
+    recorded scalar values along with their metadata.
 
     Parameters
     ----------
