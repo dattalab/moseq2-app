@@ -14,9 +14,9 @@ from moseq2_viz.util import parse_index
 from IPython.display import clear_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
-from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.scalars.util import scalars_to_dataframe
+from moseq2_viz.model.dist import get_behavioral_distance
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
@@ -145,11 +145,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         '''
 
         # Get Pairwise distances
-        X = pairwise_distances(self.ar_mats, metric='euclidean')
+        X = get_behavioral_distance(self.sorted_index,
+                                    self.model_path,
+                                    max_syllable=self.max_sylls,
+                                    distances=['ar[init]'])['ar[init]']
         Z = linkage(X, 'ward')
 
         # Get Dendrogram Metadata
-        self.results = dendrogram(Z, distance_sort=True, no_plot=True, get_leaves=True)
+        self.results = dendrogram(Z, distance_sort=False, no_plot=True, get_leaves=True)
 
         # Get Graph layout info
         icoord, dcoord = self.results['icoord'], self.results['dcoord']
@@ -190,9 +193,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         model_data = parse_model_results(joblib.load(self.model_path))
 
         # Read index file
-        index, sorted_index = parse_index(self.index_path)
+        index, self.sorted_index = parse_index(self.index_path)
 
-        index_uuids = sorted(list(sorted_index['files'].keys()))
+        index_uuids = sorted(list(self.sorted_index['files'].keys()))
         model_uuids = sorted(list(set(model_data['metadata']['uuids'])))
 
         if index_uuids != model_uuids:
@@ -214,7 +217,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(sorted_index, self.model_path)
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
 
