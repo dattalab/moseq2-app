@@ -42,7 +42,7 @@ def check_timestamp_error_percentage(timestamps, fps=30):
 
     # Determine the percent error between the determined and actual frame rate.
     diffRates = abs(fps - expRate)
-    percentError = (diffRates / fps) * 100
+    percentError = (diffRates / fps)
 
     return percentError
 
