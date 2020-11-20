@@ -149,7 +149,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                                     self.model_path,
                                     max_syllable=self.max_sylls,
                                     distances=['ar[init]'])['ar[init]']
-        Z = linkage(X, 'ward')
+        Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
         self.results = dendrogram(Z, distance_sort=False, no_plot=True, get_leaves=True)
