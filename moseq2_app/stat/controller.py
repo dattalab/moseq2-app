@@ -17,12 +17,12 @@ from moseq2_viz.info.util import entropy, entropy_rate
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.scalars.util import scalars_to_dataframe
-from moseq2_viz.model.util import (parse_model_results, relabel_by_usage,
+from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
 from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interactive_transition_graph
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats, get_usage_dict,
-                                         handle_graph_layout, convert_transition_matrix_to_ebunch,
+                                         convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
 
 class InteractiveSyllableStats(SyllableStatWidgets):
@@ -308,19 +308,18 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.max_sylls = max_sylls
 
         if load_parquet:
-            if df_path != None:
-                if not os.path.exists(df_path):
-                    self.df_path = None
+            if df_path is not None and not os.path.exists(df_path):
+                self.df_path = None
         else:
             self.df_path = None
 
         # Load Model
-        self.model_fit = parse_model_results(joblib.load(model_path))
+        self.model_fit = parse_model_results(model_path)
 
         # Load Index File
         self.index, self.sorted_index = parse_index(index_path)
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
+        index_uuids = sorted(list(self.sorted_index['files']))
         model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
 
         if index_uuids != model_uuids:
@@ -483,46 +482,46 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         Returns
         -------
         '''
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
 
-        warnings.filterwarnings('ignore')
+            # Load Syllable Info
+            with open(self.info_path, 'r') as f:
+                self.syll_info = yaml.safe_load(f)
 
-        # Load Syllable Info
-        with open(self.info_path, 'r') as f:
-            self.syll_info = yaml.safe_load(f)
+            # Get labels and optionally relabel them by usage sorting
+            labels = self.model_fit['labels']
 
-        # Get labels and optionally relabel them by usage sorting
-        labels = self.model_fit['labels']
+            # get max_sylls
+            if self.max_sylls is None:
+                self.max_sylls = len(list(self.syll_info))
 
-        # get max_sylls
-        if self.max_sylls is None:
-            self.max_sylls = len(list(self.syll_info.keys()))
+            if self.df_path is not None:
+                print('Loading parquet files')
+                df = pd.read_parquet(self.df_path, engine='fastparquet')
+                scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
+            else:
+                print('Syllable DataFrame not found. Creating new dataframe and  computing syllable statistics...')
+                df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
-        if self.df_path is not None:
-            print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='fastparquet')
-            scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
+            # Get groups and matching session uuids
+            # set unique groups
+            label_group, label_uuids = get_trans_graph_groups(self.model_fit)
+            self.group = list(set(label_group))
 
-        else:
-            print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_fit,
-                                                      self.model_path, self.max_sylls)
+            self.compute_entropies(labels, label_group)
 
-        # Get groups and matching session uuids
-        self.group, label_group, label_uuids = get_trans_graph_groups(self.model_fit, self.sorted_index)
+            labels = relabel_by_usage(labels, count='usage')[0]
 
-        self.compute_entropies(labels, label_group)
+            # Compute usages and transition matrices
+            self.trans_mats, usages = get_group_trans_mats(labels, label_group, self.group, self.max_sylls)
+            self.df = self.df[self.df['syllable'] <= self.max_sylls]
+            self.df = df.groupby(['group', 'syllable'], as_index=False).mean()
 
-        labels = relabel_by_usage(labels, count='usage')[0]
+            # Get usage dictionary for node sizes
+            self.usages = get_usage_dict(usages)
 
-        # Compute usages and transition matrices
-        self.trans_mats, usages = get_group_trans_mats(labels, label_group, self.group, self.max_sylls)
-        self.df = df.groupby(['group', 'syllable'], as_index=False).mean()
-        self.df = self.df[self.df['syllable'] < self.max_sylls]
-
-        # Get usage dictionary for node sizes
-        self.usages = get_usage_dict(usages)
-
-        self.compute_entropy_differences()
+            self.compute_entropy_differences()
 
     def interactive_transition_graph_helper(self, layout, scalar_color, edge_threshold, usage_threshold, speed_threshold):
         '''
@@ -541,7 +540,11 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         '''
 
         # Get graph node anchors
-        usages, anchor, usages_anchor, ngraphs = handle_graph_layout(self.trans_mats, self.usages, anchor=0)
+        ngraphs = len(self.trans_mats)
+        anchor = 0
+        # make a list of normalized usages
+        usages = [normalize_usages(u) for u in self.usages]
+        usages_anchor = usages[anchor]
 
         weights = self.trans_mats
 
@@ -566,12 +569,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
             weights[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
             keep_orphans=True, usages=usages_anchor, speeds=scalar_anchor, speed_threshold=speed_threshold,
-            usage_threshold=usage_threshold, max_syllable=self.max_sylls - 1)
+            usage_threshold=usage_threshold, max_syllable=self.max_sylls)
 
         # Get graph anchor
         graph_anchor = convert_ebunch_to_graph(ebunch_anchor)
 
-        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls-1)
+        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls)
 
         # make transition graphs
         group_names = self.group.copy()
