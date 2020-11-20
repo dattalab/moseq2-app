@@ -409,7 +409,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if set(crowd_movie_paths) != set(info_cm_paths):
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                syll_num = str(int(cm.split('sorted-id-')[1].split()[0]))
+                syll_num = str(int(cm.split('sorted-id-')[1].split('_')[0]))
                 if syll_num in self.syll_info.keys():
                     self.syll_info[syll_num]['crowd_movie_path'] = cm
 
