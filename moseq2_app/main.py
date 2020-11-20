@@ -5,6 +5,7 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 
 '''
 
+from os.path import exists
 from bokeh.io import output_notebook
 from moseq2_extract.util import filter_warnings
 from moseq2_extract.gui import get_selected_sessions
@@ -157,6 +158,18 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
     crowd_dir = progress_paths['crowd_dir']
     syll_info_path = progress_paths['syll_info']
 
+    inputs = ['model_path', 'config_file', 'index_file']
+
+    error = False
+    for i in inputs:
+        if not exists(progress_paths[i]):
+            error = True
+            print(f'ERROR: {i} not found.')
+
+    if error:
+        print('Set the correct paths to the missing variables and run the function again.')
+        return
+
     output_notebook()
     interactive_syllable_labeler_wrapper(model_path, config_file,
                                          index_file, crowd_dir, syll_info_path,
@@ -182,6 +195,18 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
     model_path = progress_paths['model_path']
     syll_info_path = progress_paths['syll_info']
     syll_info_df_path = progress_paths['df_info_path']
+
+    inputs = ['model_path', 'index_file', 'syll_info', 'df_info_path']
+
+    error = False
+    for i in inputs:
+        if not exists(progress_paths[i]):
+            error = True
+            print(f'ERROR: {i} not found.')
+
+    if error:
+        print('Set the correct paths to the missing variables and run the function again.')
+        return
 
     output_notebook()
     interactive_syllable_stat_wrapper(index_file, model_path, syll_info_path,
@@ -210,6 +235,18 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
     syll_info_path = progress_paths['syll_info']
     syll_info_df_path = progress_paths['df_info_path']
 
+    inputs = ['model_path', 'config_file', 'index_file', 'syll_info', 'df_info_path']
+
+    error = False
+    for i in inputs:
+        if not exists(progress_paths[i]):
+            error = True
+            print(f'ERROR: {i} not found.')
+
+    if error:
+        print('Set the correct paths to the missing variables and run the function again.')
+        return
+
     output_notebook()
     interactive_crowd_movie_comparison_preview_wrapper(config_file, index_file, model_path,
                                                syll_info_path, group_movie_dir, syll_info_df_path,
@@ -237,6 +274,18 @@ def interactive_transition_graph(progress_paths, max_syllables=None, load_parque
     index_file = progress_paths['index_file']
     syll_info_path = progress_paths['syll_info']
     syll_info_df_path = progress_paths['df_info_path']
+
+    inputs = ['model_path', 'index_file', 'syll_info', 'df_info_path']
+
+    error = False
+    for i in inputs:
+        if not exists(progress_paths[i]):
+            error = True
+            print(f'ERROR: {i} not found.')
+
+    if error:
+        print('Set the correct paths to the missing variables and run the function again.')
+        return
 
     output_notebook()
     interactive_plot_transition_graph_wrapper(model_path,
