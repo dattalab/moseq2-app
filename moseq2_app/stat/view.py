@@ -172,11 +172,10 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=range(len(aux_df.index)),
             y=aux_df[stat].to_numpy(),
             usage=aux_df['usage'].to_numpy(),
-            speed=aux_df['speed'].to_numpy(),
             speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
             height=aux_df['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_df['dist_to_center'].to_numpy(),
+            dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
             sem=aux_sem[stat].to_numpy(),
             number=sem.index,
             label=labels,
@@ -189,11 +188,10 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=errs_x,
             y=errs_y,
             usage=aux_sem['usage'].to_numpy(),
-            speed=aux_sem['speed'].to_numpy(),
             speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
             height=aux_sem['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_sem['dist_to_center'].to_numpy(),
+            dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
             sem=aux_sem[stat].to_numpy(),
             number=sem.index,
             label=labels,
@@ -211,7 +209,6 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                     <div>
                         <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                         <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                        <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -468,6 +465,28 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
 
     return entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors
 
+def format_plot(plot):
+    '''
+    Turns off all major and minor x,y ticks on the transition plot graphs
+
+    Parameters
+    ----------
+    plot (bokeh Plot): Current graph being generated
+
+    Returns
+    -------
+    '''
+
+    plot.xaxis.major_tick_line_color = None  # turn off x-axis major ticks
+    plot.xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
+
+    plot.yaxis.major_tick_line_color = None  # turn off y-axis major ticks
+    plot.yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
+
+    plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
+    plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
+
+
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, entropies, entropy_rates,
                                       scalars, scalar_color='default'):
@@ -504,17 +523,18 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
             # Connecting pan-zoom interaction across plots
             plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
 
+        format_plot(plot)
+
         tooltips = """
                         <div>
                             <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                             <div><span style="font-size: 12px;">label: @label</span></div>
                             <div><span style="font-size: 12px;">description: @desc</span></div>
                             <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                            <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center_px{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
                             <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
@@ -556,7 +576,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         group_usage = [usages[i][j] for j in node_indices if j in usages[i].keys()]
 
         # get speeds
-        group_speed = [scalars['speed'][i][j] for j in node_indices if j in scalars['speed'][i].keys()]
         group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i].keys()]
         group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i].keys()]
 
@@ -597,27 +616,24 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         graph_renderer.node_renderer.data_source.add(prev_states, 'prev')
         graph_renderer.node_renderer.data_source.add(next_states, 'next')
         graph_renderer.node_renderer.data_source.add(group_usage, 'usage')
-        graph_renderer.node_renderer.data_source.add(group_speed, 'speed')
         graph_renderer.node_renderer.data_source.add(group_speed_2d, 'speed_2d')
         graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
         graph_renderer.node_renderer.data_source.add(group_height, 'height')
-        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center')
+        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center_px')
         graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_in), 'ent_in')
         graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_out), 'ent_out')
 
         text_color = 'white'
 
         # node interactions
-        if scalar_color == 'Centroid Speed':
-            fill_color = linear_cmap('speed', "Spectral4", 0, max(group_speed))
-        elif scalar_color == '2D velocity':
+        if scalar_color == '2D velocity':
             fill_color = linear_cmap('speed_2d', "Spectral4", 0, max(group_speed_2d))
         elif scalar_color == '3D velocity':
             fill_color = linear_cmap('speed_3d', "Spectral4", 0, max(group_speed_3d))
         elif scalar_color == 'Height':
             fill_color = linear_cmap('height', "Spectral4", 0, max(group_height))
         elif scalar_color == 'Distance to Center':
-            fill_color = linear_cmap('dist_to_center', "Spectral4", 0, max(group_dist))
+            fill_color = linear_cmap('dist_to_center_px', "Spectral4", 0, max(group_dist))
         elif scalar_color == 'Entropy-In':
             fill_color = linear_cmap('ent_in', "Spectral4", 0, max(np.nan_to_num(entropy_in)))
         elif scalar_color == 'Entropy-Out':
@@ -691,8 +707,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         ]
 
         if i >= len(group):
-            items += [LegendItem(label="Up-regulated", renderers=[r_line])]
-            items += [LegendItem(label="Down-regulated", renderers=[b_line])]
+            items += [LegendItem(label="Up-regulated in G1", renderers=[r_line])]
+            items += [LegendItem(label="Down-regulated in G1", renderers=[b_line])]
 
         legend = Legend(items=items,
                        border_line_color="black", background_fill_color='white',
