@@ -12,8 +12,10 @@ import pandas as pd
 from copy import deepcopy
 import ruamel.yaml as yaml
 import matplotlib.pyplot as plt
+from sklearn.covariance import EllipticEnvelope
 from moseq2_extract.util import scalar_attributes
 from moseq2_viz.scalars.util import compute_all_pdf_data
+
 
 def check_timestamp_error_percentage(timestamps, fps=30):
     '''
@@ -237,7 +239,7 @@ def make_session_status_dicts(paths):
     # Get default flags
     flags = {
         'metadata': {},
-        'scalar_anomaly': {},
+        'scalar_anomaly': False,
         'dropped_frames': False,
         'corrupted': False,
         'stationary': False,
@@ -270,11 +272,10 @@ def make_session_status_dicts(paths):
 
     return status_dicts
 
-def get_iqr_anomaly_sessions(scalar_df, status_dicts):
+def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     '''
 
-    Finds sessions that have a mean scalar value (for a subset of scalars), that are outside of
-     the accepted inter-quartile range.
+    Detects outlier sessions using an EllipticEnvelope model based on a subset of their mean scalar values.
 
     Parameters
     ----------
@@ -286,22 +287,17 @@ def get_iqr_anomaly_sessions(scalar_df, status_dicts):
     status_dicts (dict): stacked dictionary object containing updated scalar_anomaly flags.
     '''
 
-    mean_df = scalar_df.groupby('uuid', as_index=False).mean()
-
-    # Get sessions within interquartile range
-    q1 = scalar_df.quantile(.25)
-    q2 = scalar_df.quantile(.75)
-
     # Scalar values to measure
     val_keys = ['area_mm', 'length_mm', 'width_mm', 'height_ave_mm', 'velocity_2d_mm', 'velocity_3d_mm']
 
-    # Get scalar anomalies based on quartile ranges
-    for key in val_keys:
-        mask = mean_df[key].between(q1[key], q2[key], inclusive=True)
-        iqr = mean_df.loc[~mask]
+    mean_df = scalar_df.groupby('uuid').mean()
 
-        for s in list(iqr.uuid):
-            status_dicts[s]['scalar_anomaly'][key] = True
+    outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
+
+    # Get scalar anomalies based on quartile ranges
+    for i, index in enumerate(mean_df.index):
+        if outliers[i] == -1:
+            status_dicts[index]['scalar_anomaly'] = True
 
     return status_dicts
 
@@ -446,6 +442,9 @@ def print_validation_results(scalar_df, status_dicts):
                         warning = True
                 elif isinstance(v1, (float, type(np.array))):
                     warning = True
+                elif v1 == True:
+                    warning = True
+
 
         if warning:
             n_warnings += 1

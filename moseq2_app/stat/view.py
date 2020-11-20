@@ -1,3 +1,4 @@
+import time
 import random
 import warnings
 import itertools
@@ -419,8 +420,6 @@ def get_neighbors(graph, node_indices, group_name):
     # get node directed neighbors
     prev_states, next_states = [], []
 
-    # get average entropy_in and out
-    entropy_in, entropy_out = [], []
     for n in node_indices:
         try:
             # Get predecessor and neighboring states
@@ -656,15 +655,19 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         # added rendered graph to plot
         plot.renderers.append(graph_renderer)
 
-        # get node positions
-        if len(plots) == 0:
-            x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
-            syllable = list(graph.nodes)
-        else:
-            new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
-                          graph_renderer.layout_provider.graph_layout.keys()}
-            x, y = zip(*new_layout.values())
-            syllable = [a if a in node_indices else '' for a in list(new_layout.keys())]
+        try:
+            # get node positions
+            if len(plots) == 0:
+                x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
+                syllable = list(graph.nodes)
+            else:
+                new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
+                              graph_renderer.layout_provider.graph_layout.keys()}
+                x, y = zip(*new_layout.values())
+                syllable = [a if a in node_indices else '' for a in list(new_layout.keys())]
+        except:
+            x, y = [], []
+            syllable = []
 
         # create DataSource for node info
         label_source = ColumnDataSource({'x': x,
