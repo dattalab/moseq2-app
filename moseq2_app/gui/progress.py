@@ -154,10 +154,12 @@ def update_progress(progress_file, varK, varV):
         curr_id = str(progress.get('snapshot', uuid.uuid4()))
 
         log_dict = {curr_id: progress}
-        if 'snapshot' in log_dict[curr_id]:
-            del log_dict[curr_id]['snapshot']
-            
-        update_pickle_log(log_dict)
+
+        if old_value != varV:
+            update_pickle_log(log_dict)
+        else:
+            print('Variables are the same. No update necessary.')
+            return progress
 
         progress[varK] = varV
 
@@ -177,13 +179,13 @@ def update_progress(progress_file, varK, varV):
 
     return progress
 
-def generate_intital_progressfile(base_dir):
+def generate_intital_progressfile(filename='progress.yaml'):
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
-    progress_filepath = join(base_dir, 'progress.yaml')
+    base_dir = dirname(filename)
 
-    print(f'Generating progress path at: {progress_filepath}')
+    print(f'Generating progress path at: {filename}')
 
     # Create basic progress file
     base_progress_vars = {'base_dir': base_dir,
@@ -200,7 +202,7 @@ def generate_intital_progressfile(base_dir):
                           'plot_path': os.path.join(base_dir, 'plots/'),
                           'snapshot': str(uuid.uuid4())}
 
-    with open(progress_filepath, 'w') as f:
+    with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)
 
     curr_id = base_progress_vars['snapshot']
@@ -244,12 +246,16 @@ def restore_progress_vars(progress_file, init=False, overwrite=False):
     # Restore loaded variables or overwrite with fresh state
     if init:
         if overwrite:
-            progress_vars = generate_intital_progressfile(base_dir=dirname(progress_file))
+            print('Overwriting progress file with initial progress.')
+            progress_vars = generate_intital_progressfile(progress_file)
         else:
-            progress_vars = load_progress(progress_file)
+            if exists(progress_file):
+                progress_vars = load_progress(progress_file)
+            else:
+                progress_vars = generate_intital_progressfile(progress_file)
     elif overwrite:
         print('Overwriting progress file with initial progress.')
-        progress_vars = generate_intital_progressfile(base_dir=dirname(progress_file))
+        progress_vars = generate_intital_progressfile(progress_file)
     else:
         progress_vars = load_progress(progress_file)
 
