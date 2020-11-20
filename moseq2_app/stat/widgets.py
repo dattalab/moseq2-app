@@ -57,14 +57,14 @@ class TransitionGraphWidgets:
 
         self.graph_layout_dropdown = widgets.Dropdown(options=['circular',  'spring', 'spectral'],
                                                       description='Graph Layout',
-                                                      style=style, value='circular',
+                                                      style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
 
         self.color_nodes_dropdown = widgets.Dropdown(options=['Default', '2D velocity',
                                                               '3D velocity', 'Height', 'Distance to Center',
                                                               'Entropy-In', 'Entropy-Out'],
                                                      description='Node Coloring',
-                                                     style=style, value='Default',
+                                                     style=style, value='Default', continuous_update=False,
                                                      layout=widgets.Layout(align_items='stretch', width='80%'))
 
         self.edge_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style,

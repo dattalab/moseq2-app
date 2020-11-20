@@ -442,13 +442,13 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             self.incoming_transition_entropy.append(np.mean(transition_entropy(use_labels,
                                                     tm_smoothing=0,
-                                                    truncate_syllable=self.max_sylls-1,
+                                                    truncate_syllable=self.max_sylls,
                                                     transition_type='incoming',
                                                     relabel_by='usage'), axis=0))
 
             self.outgoing_transition_entropy.append(np.mean(transition_entropy(use_labels,
                                                     tm_smoothing=0,
-                                                    truncate_syllable=self.max_sylls-1,
+                                                    truncate_syllable=self.max_sylls,
                                                     transition_type='outgoing',
                                                     relabel_by='usage'), axis=0))
     def compute_entropy_differences(self):
@@ -531,6 +531,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         Returns
         -------
         '''
+        warnings.filterwarnings('ignore')
 
         # Get graph node anchors
         usages, anchor, usages_anchor, ngraphs = handle_graph_layout(self.trans_mats, self.usages, anchor=0)
@@ -558,12 +559,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
             weights[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
             keep_orphans=True, usages=usages_anchor, speeds=scalar_anchor, speed_threshold=speed_threshold,
-            usage_threshold=usage_threshold, max_syllable=self.max_sylls - 1)
+            usage_threshold=usage_threshold, max_syllable=self.max_sylls)
 
         # Get graph anchor
         graph_anchor = convert_ebunch_to_graph(ebunch_anchor)
 
-        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls-1)
+        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls)
 
         # make transition graphs
         group_names = self.group.copy()
