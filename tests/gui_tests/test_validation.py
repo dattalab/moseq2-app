@@ -144,6 +144,20 @@ class TestExtractionValidation(TestCase):
 
         assert new_status_dicts == status_dicts
 
+    def test_get_scalar_anomaly_sessions(self):
+        paths = {
+            'session_1': 'data/test_session/proc/results_00.mp4'
+        }
+
+        status_dicts = make_session_status_dicts(paths)
+
+        scalar_df = get_scalar_df(paths)
+
+        test_x = get_scalar_anomaly_sessions(scalar_df, status_dicts)
+        print(test_x)
+        assert test_x['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['scalar_anomaly'] == False
+
+
     def test_run_validation_tests(self):
         paths = {
             'session_1': 'data/test_session/proc/results_00.mp4'

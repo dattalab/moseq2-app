@@ -4,6 +4,7 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 
 '''
 
+import re
 import os
 import time
 import shutil
@@ -230,7 +231,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                    'norm. dist_to_center': gd[group_name]['dist_to_center_px'][syll],
+                    'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
                 }
 
     def get_mean_syllable_info(self):
@@ -409,7 +410,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if set(crowd_movie_paths) != set(info_cm_paths):
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                syll_num = str(int(cm.split('sorted-id-')[1].split('_')[0]))
+                syll_num = str(int(re.findall(r'\d+', cm)[0]))
                 if syll_num in self.syll_info.keys():
                     self.syll_info[syll_num]['crowd_movie_path'] = cm
 
@@ -606,7 +607,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                    'norm. dist_to_center': gd[group_name]['dist_to_center_px'][syll],
+                    'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
                 }
 
     def get_session_mean_syllable_info_df(self):
@@ -684,7 +685,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
                     'height (mm)': sd[session_name]['height_ave_mm'][syll],
                     'duration': sd[session_name]['duration'][syll],
-                    'norm. dist_to_center': sd[session_name]['dist_to_center_px'][syll],
+                    'dist_to_center_px': sd[session_name]['dist_to_center_px'][syll],
                 }
 
     def get_pdf_plot(self, group_syllable_pdf, group_name):
@@ -747,7 +748,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs['group'] == group]['pdf']
 
         # Remove previously displayed data
-        #clear_output()
+        clear_output()
 
         # Get each group's syllable info to display; formatting keys.
         curr_grouped_syll_dict = {}
@@ -758,7 +759,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     new_key = '2D velocity (mm/s)'
                     curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
                 elif key == 'dist_to_center_px':
-                    new_key = 'norm. dist_to_center'
+                    new_key = 'dist_to_center_px'
                     curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
                 else:
                     curr_grouped_syll_dict[group][key] = self.grouped_syll_dict[group][key]

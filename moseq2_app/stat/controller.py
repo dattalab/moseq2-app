@@ -232,7 +232,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
             ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
-        errorbar (str or ipywidgets.DropDown): Error bar to display. ['SEM', 'STD']
+        errorbar (str or ipywidgets.DropDown): Error bar to display. ['CI 95%' ,'SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
@@ -496,8 +496,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
-
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
