@@ -232,7 +232,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
             ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
-        errorbar (str or ipywidgets.DropDown): Error bar to display. ['SEM', 'STD']
+        errorbar (str or ipywidgets.DropDown): Error bar to display. ['CI 95%' ,'SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
@@ -499,13 +499,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             else:
                 print('Syllable DataFrame not found. Creating new dataframe and  computing syllable statistics...')
                 df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-
-            # Get groups and matching session uuids
-            # set unique groups
-            label_group, label_uuids = get_trans_graph_groups(self.model_fit)
-            self.group = list(set(label_group))
-
-            self.compute_entropies(labels, label_group)
 
             labels = relabel_by_usage(labels, count='usage')[0]
 
