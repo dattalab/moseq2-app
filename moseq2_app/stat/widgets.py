@@ -21,7 +21,7 @@ class SyllableStatWidgets:
         self.session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,
                                                   layout=self.layout_hidden, disabled=False)
 
-        self.errorbar_dropdown = widgets.Dropdown(options=['SEM', 'STD'], description='Error Bars:', disabled=False)
+        self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
         ## boxes
         self.stat_box = VBox([self.stat_dropdown, self.errorbar_dropdown])

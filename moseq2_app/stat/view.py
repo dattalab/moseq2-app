@@ -1,8 +1,8 @@
-import time
 import random
 import warnings
 import itertools
 import numpy as np
+import pandas as pd
 import networkx as nx
 from collections import deque
 from bokeh.layouts import column
@@ -118,6 +118,16 @@ def colorscale(hexstr, scalefactor):
 
     return "#%02x%02x%02x" % (r, g, b)
 
+def get_ci_vect_vectorized(x, n_boots=1000, n_samp=None, function=np.mean, pct=5):
+    if isinstance(x, pd.core.series.Series):
+        x = x.values
+    pct /= 2
+    n_vals = len(x)
+    if n_samp is None:
+        n_samp = n_vals
+    boots = function(x[np.random.choice(n_vals, size=(n_samp, n_boots))], axis=0)
+    return np.percentile(boots, [pct, 100 - pct])
+
 def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid'):
     '''
     Helper function to bokeh_plotting that iterates through the given DataFrame and plots the
@@ -142,19 +152,29 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
     pickers = []
     for i, color in zip(range(len(groups)), colors):
+
         # Get resorted mean syllable data
         aux_df = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).mean().reindex(sorting)
 
+        if errorbar == 'CI 95%':
+            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
         # Get SEM values
-        if errorbar == 'SEM':
+        elif errorbar == 'SEM':
             sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
             aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
         else:
             sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].std().reindex(sorting)
             aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).std().reindex(sorting)
 
-        miny = aux_df[stat] - sem[stat]
-        maxy = aux_df[stat] + sem[stat]
+        if errorbar == 'CI 95%':
+            errors = df[df[groupby] == groups[i]].groupby('syllable')[stat].apply(get_ci_vect_vectorized,
+                                                                               n_boots=10000).reindex(sorting).to_numpy()
+            miny = [e[0] for e in errors]
+            maxy = [e[1] for e in errors]
+        else:
+            miny = aux_df[stat] - sem[stat]
+            maxy = aux_df[stat] + sem[stat]
 
         errs_x = [(i, i) for i in range(len(aux_df.index))]
         errs_y = [(min_y, max_y) for min_y, max_y in zip(miny, maxy)]
@@ -214,7 +234,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                         <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
                         <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
-                        <div><span style="font-size: 12px;">group-SEM: @sem{0.000}</span></div>
+                        <div><span style="font-size: 12px;">group-error: +/- @sem{0.000}</span></div>
                         <div><span style="font-size: 12px;">label: @label</span></div>
                         <div><span style="font-size: 12px;">description: @desc</span></div>
                         <div>
