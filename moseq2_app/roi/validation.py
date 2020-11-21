@@ -292,7 +292,10 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
 
     mean_df = scalar_df.groupby('uuid').mean()
 
-    outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
+    try:
+        outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
+    except:
+        outliers = [1]
 
     # Get scalar anomalies based on quartile ranges
     for i, index in enumerate(mean_df.index):
