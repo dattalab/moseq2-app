@@ -496,8 +496,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
-
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)

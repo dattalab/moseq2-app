@@ -213,7 +213,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                         <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                        <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center{0.000}</span></div>
+                        <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
                         <div><span style="font-size: 12px;">group-SEM: @sem{0.000}</span></div>
                         <div><span style="font-size: 12px;">label: @label</span></div>
                         <div><span style="font-size: 12px;">description: @desc</span></div>
@@ -520,7 +520,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                             <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center_px{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
                             <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
