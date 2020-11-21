@@ -5,15 +5,22 @@ This module handles all jupyter notebook progress related functionalities.
 '''
 
 import os
-import time
+import uuid
 import json
+import pickle
+import logging
 import warnings
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
+from datetime import datetime
 from os.path import dirname, basename, exists, join
 from moseq2_extract.helpers.data import check_completion_status
+
+progress_log = 'progress.log'
+progress_pkl = 'progress_log.pkl'
+logging.basicConfig(filename=progress_log, level=logging.INFO)
 
 def generate_missing_metadata(sess_dir, sess_name):
     '''
@@ -105,6 +112,20 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
 
     return path_dict
 
+def update_pickle_log(log_dict):
+
+    if not exists(progress_pkl):
+        with open(progress_pkl, 'wb+') as fp:
+            pickle.dump(log_dict, fp)
+    else:
+        with open(progress_pkl, 'rb') as fp:
+            old_log = pickle.load(fp)
+
+        log_dict.update(old_log)
+
+        with open(progress_pkl, 'wb+') as fp:
+            pickle.dump(log_dict, fp)
+
 def update_progress(progress_file, varK, varV):
     '''
     Updates progress file with new notebook variable
@@ -126,14 +147,84 @@ def update_progress(progress_file, varK, varV):
     with open(progress_file, 'r') as f:
         progress = yaml.safe_load(f)
 
-    progress[varK] = varV
-    with open(progress_file, 'w') as f:
-        yml.dump(progress, f)
+    if isinstance(varV, str):
+        old_value = progress.get(varK, '') # get previous variable to print
 
-    print(f'Successfully updated progress file with {varK} -> {varV}')
+        # update pickle log with latest uuid-progress key-value pair
+        curr_id = str(progress.get('snapshot', uuid.uuid4()))
+
+        log_dict = {curr_id: progress}
+
+        if old_value != varV:
+            update_pickle_log(log_dict)
+        else:
+            print('Variables are the same. No update necessary.')
+            return progress
+
+        progress[varK] = varV
+
+        # update snapshot variable
+        progress['snapshot'] = str(uuid.uuid4())
+
+        with open(progress_file, 'w') as f:
+            yml.dump(progress, f)
+
+        # update log file
+        logging.info(f'{datetime.now()}, {progress["snapshot"]}, {varK}: {old_value} -> {varV}')
+
+        print(f'Successfully updated progress file with {varK} -> {varV}')
+    else:
+        print('Entered path is invalid.')
+        print('Ensure you are updating the progress file with string paths only.')
+
     return progress
 
-def restore_progress_vars(progress_file):
+def generate_intital_progressfile(filename='progress.yaml'):
+    yml = yaml.YAML()
+    yml.indent(mapping=2, offset=2)
+
+    base_dir = dirname(filename)
+
+    print(f'Generating progress path at: {filename}')
+
+    # Create basic progress file
+    base_progress_vars = {'base_dir': base_dir,
+                          'config_file': '',
+                          'index_file': '',
+                          'train_data_dir': '',
+                          'pca_dirname': '',
+                          'scores_filename': '',
+                          'scores_path': '',
+                          'changepoints_path': '',
+                          'model_path': '',
+                          'crowd_dir': '',
+                          'syll_info': '',
+                          'plot_path': os.path.join(base_dir, 'plots/'),
+                          'snapshot': str(uuid.uuid4())}
+
+    with open(filename, 'w') as f:
+        yml.dump(base_progress_vars, f)
+
+    curr_id = base_progress_vars['snapshot']
+    log_dict = {curr_id: base_progress_vars}
+    update_pickle_log(log_dict)
+
+    logging.info(f'New progress file created: \n{json.dumps(base_progress_vars, indent=4)}')
+
+    return base_progress_vars
+
+def load_progress(progress_file):
+    if exists(progress_file):
+        print('Updating notebook variables...')
+        with open(progress_file, 'r') as f:
+            progress_vars = yaml.safe_load(f)
+    else:
+        print('Progress file not found.')
+        progress_vars = None
+
+    return progress_vars
+
+def restore_progress_vars(progress_file, init=False, overwrite=False):
     '''
     Restore all saved progress variables to Jupyter Notebook.
 
@@ -146,55 +237,30 @@ def restore_progress_vars(progress_file):
     vars (dict): All progress file variables
     '''
 
+
     warnings.filterwarnings('ignore')
-
-    with open(progress_file, 'r') as f:
-        vars = yaml.safe_load(f)
-
-    return vars
-
-def handle_progress_restore_input(base_progress_vars, progress_filepath):
-    '''
-
-    Helper function that handles user input for restoring progress variables.
-
-    Parameters
-    ----------
-    base_progress_vars (dict): dict of default progress name to path pairs.
-    progress_filepath (str): path to progress filename
-
-    Returns
-    -------
-    progress_vars (dict): loaded progress variables
-    '''
 
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
-    restore = ''
     # Restore loaded variables or overwrite with fresh state
-    while (restore != 'Y' or restore != 'N' or restore != 'q'):
-        restore = input('Would you like to restore the above listed notebook variables? Y -> restore variables, N -> overwrite progress file, q -> quit]')
-
-        if restore.lower() == "y":
-
-            print('Updating notebook variables...')
-            progress_vars = restore_progress_vars(progress_filepath)
-
-            return progress_vars
-
-        elif restore.lower() == "n":
-
+    if init:
+        if overwrite:
             print('Overwriting progress file with initial progress.')
-            progress_vars = base_progress_vars
+            progress_vars = generate_intital_progressfile(progress_file)
+        else:
+            if exists(progress_file):
+                progress_vars = load_progress(progress_file)
+            else:
+                progress_vars = generate_intital_progressfile(progress_file)
+    elif overwrite:
+        print('Overwriting progress file with initial progress.')
+        progress_vars = generate_intital_progressfile(progress_file)
+    else:
+        progress_vars = load_progress(progress_file)
 
-            with open(progress_filepath, 'w') as f:
-                yml.dump(progress_vars, f)
+    return progress_vars
 
-            return progress_vars
-
-        elif restore.lower() == 'q':
-            return
 
 def show_progress_bar(nfound, total, desc):
     '''
@@ -264,7 +330,7 @@ def get_pca_progress(progress_vars, pca_progress):
                     pca_progress[key] = True
 
         if pca_progress[key] != True:
-            print(f'PCA missing: {key}')
+            print(f'PCA path missing: {key}')
     return pca_progress
 
 def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
@@ -325,7 +391,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
                     'index_file': False}
 
     modeling_progress = {'model_path': False}
-    analysis_progress = {'syll_info': False, 'crowd_dir': False}
+    analysis_progress = {'syll_info': False}
 
     # Get Extract Progress
     path_dict, num_extracted = get_extraction_progress(base_dir, exts=exts)
@@ -337,11 +403,6 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     if progress_vars.get('model_path', None) != None:
         if exists(progress_vars['model_path']):
             modeling_progress['model_path'] = True
-
-    # Get Analysis Path
-    if progress_vars.get('crowd_dir', None) != None:
-        if exists(progress_vars['crowd_dir']):
-            analysis_progress['crowd_dir'] = True
 
     if progress_vars.get('syll_info', None) != None:
         if exists(progress_vars['syll_info']):
@@ -368,23 +429,6 @@ def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.
 
     warnings.filterwarnings('ignore')
 
-    yml = yaml.YAML()
-    yml.indent(mapping=2, offset=2)
-
-    # Create basic progress file
-    base_progress_vars = {'base_dir': base_dir,
-                          'config_file': '',
-                          'index_file': '',
-                          'train_data_dir': '',
-                          'pca_dirname': '',
-                          'scores_filename': '',
-                          'scores_path': '',
-                          'changepoints_path': '',
-                          'model_path': '',
-                          'crowd_dir': '',
-                          'syll_info': '',
-                          'plot_path': os.path.join(base_dir, 'plots/')}
-
     # Check if progress file exists
     if exists(progress_filepath):
         with open(progress_filepath, 'r') as f:
@@ -393,18 +437,3 @@ def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.
         print('Found progress file, displaying progress...\n')
         # Display progress bars
         print_progress(base_dir, progress_vars, exts=exts)
-        time.sleep(0.1)
-
-        # Handle user input
-        progress_vars = handle_progress_restore_input(base_progress_vars, progress_filepath)
-        return progress_vars
-
-    else:
-        print('Progress file not found, creating new one.')
-        progress_vars = base_progress_vars
-        print_progress(base_dir, progress_vars, exts=exts)
-
-        with open(progress_filepath, 'w') as f:
-            yml.dump(progress_vars, f)
-
-        return progress_vars

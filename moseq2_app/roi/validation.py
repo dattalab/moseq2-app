@@ -12,8 +12,10 @@ import pandas as pd
 from copy import deepcopy
 import ruamel.yaml as yaml
 import matplotlib.pyplot as plt
+from sklearn.covariance import EllipticEnvelope
 from moseq2_extract.util import scalar_attributes
 from moseq2_viz.scalars.util import compute_all_pdf_data
+
 
 def check_timestamp_error_percentage(timestamps, fps=30):
     '''
@@ -42,7 +44,7 @@ def check_timestamp_error_percentage(timestamps, fps=30):
 
     # Determine the percent error between the determined and actual frame rate.
     diffRates = abs(fps - expRate)
-    percentError = (diffRates / fps) * 100
+    percentError = (diffRates / fps)
 
     return percentError
 
@@ -60,11 +62,8 @@ def count_nan_rows(scalar_df):
     n_missing_frames (int): Number of frames with NaN computed scalar values.
     '''
 
-    nanrows = scalar_df.isnull().sum(axis=1).to_numpy()
+    return scalar_df.isnull().any(1).sum()
 
-    n_missing_frames = len(nanrows[nanrows > 0])
-
-    return n_missing_frames
 
 def count_missing_mouse_frames(scalar_df):
     '''
@@ -80,9 +79,8 @@ def count_missing_mouse_frames(scalar_df):
     missing_mouse_frames (int): Number of frames with recorded mouse area ~= 0
     '''
 
-    missing_mouse_frames = len(scalar_df[np.isclose(scalar_df['area_px'], 0)])
+    return (scalar_df["area_px"] == 0).sum()
 
-    return missing_mouse_frames
 
 # warning: min height may be too high
 def count_frames_with_small_areas(scalar_df):
@@ -100,9 +98,8 @@ def count_frames_with_small_areas(scalar_df):
     corrupt_frames (int): Number of frames where the recorded mouse area is too small
     '''
 
-    corrupt_frames = len(scalar_df[scalar_df['area_px'] < 2*scalar_df['area_px'].std()])
+    return (scalar_df["area_px"] < 2 * scalar_df["area_px"].std()).sum()
 
-    return corrupt_frames
 
 def count_stationary_frames(scalar_df):
     '''
@@ -117,15 +114,15 @@ def count_stationary_frames(scalar_df):
     -------
     motionless_frames (int): Number of frames where the mouse is not moving
     '''
+    
+    # subtract 1 because first frame is always 0mm/s
+    return (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1
 
-    motionless_frames = len(scalar_df[scalar_df['velocity_2d_mm'] < 0.1])-1 # subtract 1 because first frame is always 0mm/s
-
-    return motionless_frames
 
 def get_scalar_df(path_dict):
     '''
     Computes a scalar dataframe that contains all the extracted sessions
-     recorded scalar values along with their metadata.
+    recorded scalar values along with their metadata.
 
     Parameters
     ----------
@@ -242,7 +239,7 @@ def make_session_status_dicts(paths):
     # Get default flags
     flags = {
         'metadata': {},
-        'scalar_anomaly': {},
+        'scalar_anomaly': False,
         'dropped_frames': False,
         'corrupted': False,
         'stationary': False,
@@ -275,11 +272,10 @@ def make_session_status_dicts(paths):
 
     return status_dicts
 
-def get_iqr_anomaly_sessions(scalar_df, status_dicts):
+def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     '''
 
-    Finds sessions that have a mean scalar value (for a subset of scalars), that are outside of
-     the accepted inter-quartile range.
+    Detects outlier sessions using an EllipticEnvelope model based on a subset of their mean scalar values.
 
     Parameters
     ----------
@@ -291,22 +287,17 @@ def get_iqr_anomaly_sessions(scalar_df, status_dicts):
     status_dicts (dict): stacked dictionary object containing updated scalar_anomaly flags.
     '''
 
-    mean_df = scalar_df.groupby('uuid', as_index=False).mean()
-
-    # Get sessions within interquartile range
-    q1 = scalar_df.quantile(.25)
-    q2 = scalar_df.quantile(.75)
-
     # Scalar values to measure
     val_keys = ['area_mm', 'length_mm', 'width_mm', 'height_ave_mm', 'velocity_2d_mm', 'velocity_3d_mm']
 
-    # Get scalar anomalies based on quartile ranges
-    for key in val_keys:
-        mask = mean_df[key].between(q1[key], q2[key], inclusive=True)
-        iqr = mean_df.loc[~mask]
+    mean_df = scalar_df.groupby('uuid').mean()
 
-        for s in list(iqr.uuid):
-            status_dicts[s]['scalar_anomaly'][key] = True
+    outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
+
+    # Get scalar anomalies based on quartile ranges
+    for i, index in enumerate(mean_df.index):
+        if outliers[i] == -1:
+            status_dicts[index]['scalar_anomaly'] = True
 
     return status_dicts
 
@@ -451,6 +442,9 @@ def print_validation_results(scalar_df, status_dicts):
                         warning = True
                 elif isinstance(v1, (float, type(np.array))):
                     warning = True
+                elif v1 == True:
+                    warning = True
+
 
         if warning:
             n_warnings += 1

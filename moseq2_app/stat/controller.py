@@ -12,11 +12,11 @@ import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.util import parse_index
 from IPython.display import clear_output
+from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
-from moseq2_viz.info.util import entropy, entropy_rate
-from sklearn.metrics.pairwise import pairwise_distances
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.scalars.util import scalars_to_dataframe
+from moseq2_viz.model.dist import get_behavioral_distance
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
@@ -145,11 +145,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         '''
 
         # Get Pairwise distances
-        X = pairwise_distances(self.ar_mats, metric='euclidean')
-        Z = linkage(X, 'ward')
+        X = get_behavioral_distance(self.sorted_index,
+                                    self.model_path,
+                                    max_syllable=self.max_sylls,
+                                    distances=['ar[init]'])['ar[init]']
+        Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
-        self.results = dendrogram(Z, distance_sort=True, no_plot=True, get_leaves=True)
+        self.results = dendrogram(Z, distance_sort=False, no_plot=True, get_leaves=True)
 
         # Get Graph layout info
         icoord, dcoord = self.results['icoord'], self.results['dcoord']
@@ -190,9 +193,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         model_data = parse_model_results(joblib.load(self.model_path))
 
         # Read index file
-        index, sorted_index = parse_index(self.index_path)
+        index, self.sorted_index = parse_index(self.index_path)
 
-        index_uuids = sorted(list(sorted_index['files'].keys()))
+        index_uuids = sorted(list(self.sorted_index['files'].keys()))
         model_uuids = sorted(list(set(model_data['metadata']['uuids'])))
 
         if index_uuids != model_uuids:
@@ -214,7 +217,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(sorted_index, self.model_path)
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -434,24 +437,22 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         -------
         '''
 
-        # Compute entropies
-        entropies = []
+        self.incoming_transition_entropy, self.outgoing_transition_entropy = [], []
+
         for g in self.group:
             use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropies.append(
-                np.mean(entropy(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
 
-        self.entropies = entropies
+            self.incoming_transition_entropy.append(np.mean(transition_entropy(use_labels,
+                                                    tm_smoothing=0,
+                                                    truncate_syllable=self.max_sylls,
+                                                    transition_type='incoming',
+                                                    relabel_by='usage'), axis=0))
 
-        # Compute entropy rates
-        entropy_rates = []
-        for g in self.group:
-            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropy_rates.append(
-                np.mean(entropy_rate(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
-
-        self.entropy_rates = entropy_rates
-
+            self.outgoing_transition_entropy.append(np.mean(transition_entropy(use_labels,
+                                                    tm_smoothing=0,
+                                                    truncate_syllable=self.max_sylls,
+                                                    transition_type='outgoing',
+                                                    relabel_by='usage'), axis=0))
     def compute_entropy_differences(self):
         '''
         Computes cross group entropy/entropy-rate differences
@@ -464,13 +465,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Compute entropy + entropy rate differences
         for i in range(len(self.group)):
             for j in range(i + 1, len(self.group)):
-                self.entropies.append(self.entropies[j] - self.entropies[i])
-                self.entropy_rates.append(self.entropy_rates[j] - self.entropy_rates[i])
-
-        # Set entropy and entropy rate Ordered Dicts
-        for i in range(len(self.entropies)):
-            self.entropies[i] = get_usage_dict([self.entropies[i]])[0]
-            self.entropy_rates[i] = get_usage_dict([self.entropy_rates[i]])[0]
+                self.incoming_transition_entropy.append(self.incoming_transition_entropy[j] - self.incoming_transition_entropy[i])
+                self.outgoing_transition_entropy.append(self.outgoing_transition_entropy[j] - self.outgoing_transition_entropy[i])
 
     def initialize_transition_data(self):
         '''
@@ -538,6 +534,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         Returns
         -------
         '''
+        warnings.filterwarnings('ignore')
 
         # Get graph node anchors
         ngraphs = len(self.trans_mats)
@@ -599,5 +596,5 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # interactive plot transition graphs
         plot_interactive_transition_graph(graphs, pos, self.group,
                                           group_names, usages, self.syll_info,
-                                          self.entropies, self.entropy_rates,
+                                          self.incoming_transition_entropy, self.outgoing_transition_entropy,
                                           scalars=scalars, scalar_color=scalar_color)
