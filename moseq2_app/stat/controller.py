@@ -495,12 +495,17 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             if self.df_path is not None:
                 print('Loading parquet files')
                 df = pd.read_parquet(self.df_path, engine='fastparquet')
-                scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
             else:
                 print('Syllable DataFrame not found. Creating new dataframe and  computing syllable statistics...')
                 df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
+            # Get groups and matching session uuids
+            label_group, label_uuids = get_trans_graph_groups(self.model_fit)
+            self.group = list(set(label_group))
+
             labels = relabel_by_usage(labels, count='usage')[0]
+
+            self.compute_entropies(labels, label_group)
 
             # Compute usages and transition matrices
             self.trans_mats, usages = get_group_trans_mats(labels, label_group, self.group, self.max_sylls)
