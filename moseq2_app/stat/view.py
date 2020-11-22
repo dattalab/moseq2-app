@@ -118,7 +118,7 @@ def colorscale(hexstr, scalefactor):
 
     return "#%02x%02x%02x" % (r, g, b)
 
-def get_ci_vect_vectorized(x, n_boots=1000, n_samp=None, function=np.mean, pct=5):
+def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.mean, pct=5):
     if isinstance(x, pd.core.series.Series):
         x = x.values
     pct /= 2
@@ -151,25 +151,25 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     '''
 
     pickers = []
-    for i, color in zip(range(len(groups)), colors):
+    for group, color in zip(groups, colors):
+        df_group = df[df[groupby] == group]
 
         # Get resorted mean syllable data
-        aux_df = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).mean().reindex(sorting)
+        aux_df = df_group.groupby('syllable', as_index=False).mean().reindex(sorting)
 
         if errorbar == 'CI 95%':
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
         # Get SEM values
         elif errorbar == 'SEM':
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
         else:
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].std().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).std().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].std().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).std().reindex(sorting)
 
         if errorbar == 'CI 95%':
-            errors = df[df[groupby] == groups[i]].groupby('syllable')[stat].apply(get_ci_vect_vectorized,
-                                                                               n_boots=10000).reindex(sorting).to_numpy()
+            errors = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
             miny = [e[0] for e in errors]
             maxy = [e[1] for e in errors]
         else:
@@ -222,9 +222,9 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         # Draw glyphs
         line = fig.line('x', 'y', source=source, alpha=0.8, muted_alpha=0.1, line_dash=line_dash,
-                        legend_label=groups[i], color=color)
+                        legend_label=group, color=color)
         circle = fig.circle('x', 'y', source=source, alpha=0.8, muted_alpha=0.1,
-                            legend_label=groups[i], color=color, size=6)
+                            legend_label=group, color=color, size=6)
 
         tooltips = """
                     <div>
@@ -253,11 +253,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                           line_policy='nearest')
         fig.add_tools(hover)
 
-        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=groups[i],
+        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
                                     color=color)
 
         if groupby == 'group':
-            picker = ColorPicker(title=f"{groups[i]} Line Color")
+            picker = ColorPicker(title=f"{group} Line Color")
             picker.js_link('color', line.glyph, 'line_color')
             picker.js_link('color', circle.glyph, 'fill_color')
             picker.js_link('color', circle.glyph, 'line_color')
