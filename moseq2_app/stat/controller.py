@@ -477,7 +477,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # get max_sylls
         if self.max_sylls is None:
-            self.max_sylls = len(syll_info)
+            self.max_sylls = len(self.syll_info)
 
         if self.df_path is not None:
             print('Loading parquet files')
