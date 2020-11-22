@@ -20,6 +20,7 @@ from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
 from moseq2_viz.util import parse_index
+from moseq2_extract.util import read_yaml
 from IPython.display import display, clear_output
 from moseq2_extract.io.video import get_video_info
 from moseq2_app.viz.view import display_crowd_movies
@@ -61,36 +62,35 @@ class SyllableLabeler(SyllableLabelerWidgets):
         output_dir = os.path.dirname(save_path)
         self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
-        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
+        index_uuids = sorted(self.sorted_index['files'])
+        model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
         if index_uuids != model_uuids:
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         if os.path.exists(save_path):
-            with open(save_path, 'r') as f:
-                self.syll_info = yaml.safe_load(f)
-                if len(self.syll_info.keys()) != max_sylls:
-                    # Delete previously saved parquet
-                    if os.path.exists(self.df_output_file):
-                        os.remove(self.df_output_file)
+            self.syll_info = read_yaml(save_path)
+            if len(self.syll_info) != max_sylls:
+                # Delete previously saved parquet
+                if os.path.exists(self.df_output_file):
+                    os.remove(self.df_output_file)
 
-                    self.syll_info = {str(i): {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i
-                                      in range(max_sylls)}
+                self.syll_info = {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i
+                                    in range(max_sylls)}
 
-                for i in range(max_sylls):
-                    if 'group_info' not in self.syll_info[str(i)].keys():
-                        self.syll_info[str(i)]['group_info'] = {}
+            for i in range(max_sylls):
+                if 'group_info' not in self.syll_info[i]:
+                    self.syll_info[i]['group_info'] = {}
         else:
             # Delete previously saved parquet
             if os.path.exists(self.df_output_file):
                 os.remove(self.df_output_file)
 
-            self.syll_info = {str(i): {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in
+            self.syll_info = {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in
                               range(max_sylls)}
+
             yml = yaml.YAML()
             yml.indent(mapping=3, offset=2)
-
             # Write to file
             with open(self.save_path, 'w+') as f:
                 yml.dump(self.syll_info, f)
@@ -131,19 +131,19 @@ class SyllableLabeler(SyllableLabelerWidgets):
         '''
 
         # Updating dict
-        self.syll_info[str(self.syll_select.index)]['label'] = self.lbl_name_input.value
-        self.syll_info[str(self.syll_select.index)]['desc'] = self.desc_input.value
+        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
+        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
 
         # Handle cycling through syllable labels
-        if self.syll_select.index != int(list(self.syll_select.options.keys())[-1]):
+        if self.syll_select.index < len(self.syll_select.options) - 1:
             # Updating selection to trigger update
             self.syll_select.index += 1
         else:
             self.syll_select.index = 0
 
         # Updating input values with current dict entries
-        self.lbl_name_input.value = self.syll_info[str(self.syll_select.index)]['label']
-        self.desc_input.value = self.syll_info[str(self.syll_select.index)]['desc']
+        self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
+        self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
 
     def on_prev(self, event):
         '''
@@ -158,19 +158,19 @@ class SyllableLabeler(SyllableLabelerWidgets):
         '''
 
         # Update syllable information dict
-        self.syll_info[str(self.syll_select.index)]['label'] = self.lbl_name_input.value
-        self.syll_info[str(self.syll_select.index)]['desc'] = self.desc_input.value
+        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
+        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
 
         # Handle cycling through syllable labels
         if self.syll_select.index != 0:
             # Updating selection to trigger update
             self.syll_select.index -= 1
         else:
-            self.syll_select.index = int(list(self.syll_select.options.keys())[-1])
+            self.syll_select.index = len(self.syll_select.options) - 1
 
         # Reloading previously inputted text area string values
-        self.lbl_name_input.value = self.syll_info[str(self.syll_select.index)]['label']
-        self.desc_input.value = self.syll_info[str(self.syll_select.index)]['desc']
+        self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
+        self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
 
     def on_set(self, event):
         '''
@@ -185,16 +185,15 @@ class SyllableLabeler(SyllableLabelerWidgets):
         '''
 
         # Update dict
-        self.syll_info[str(self.syll_select.index)]['label'] = self.lbl_name_input.value
-        self.syll_info[str(self.syll_select.index)]['desc'] = self.desc_input.value
-
-        yml = yaml.YAML()
-        yml.indent(mapping=3, offset=2)
+        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
+        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
 
         tmp = deepcopy(self.syll_info)
         for syll in range(self.max_sylls):
-            del tmp[str(syll)]['group_info']
+            tmp[syll].pop('group_info', None)
 
+        yml = yaml.YAML()
+        yml.indent(mapping=3, offset=2)
         # Write to file
         with open(self.save_path, 'w+') as f:
             yml.dump(tmp, f)
@@ -224,9 +223,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.group_syll_info = deepcopy(self.syll_info)
         # Update syllable info dict
         for gd in group_dicts:
-            group_name = list(gd.keys())[0]
+            group_name = list(gd)[0]
             for syll in range(self.max_sylls):
-                self.group_syll_info[str(syll)]['group_info'][group_name] = {
+                self.group_syll_info[syll]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
@@ -248,6 +247,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
+            scalar_df.to_parquet(self.df_output_file.replace('syll_df', 'moseq_dataframe', compression='gzip'))
         else:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_output_file, engine='fastparquet')
@@ -308,7 +308,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.cm_lbl.text = f'Crowd Movie {self.syll_select.index + 1}/{len(self.syll_select.options)}'
 
         # Update scalar values
-        self.set_group_info_widgets(self.group_syll_info[str(self.syll_select.index)]['group_info'])
+        self.set_group_info_widgets(self.group_syll_info[self.syll_select.index]['group_info'])
 
         # Get current movie path
         cm_path = syllables['crowd_movie_path']
@@ -408,11 +408,16 @@ class SyllableLabeler(SyllableLabelerWidgets):
         info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
 
         if set(crowd_movie_paths) != set(info_cm_paths):
+            exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d{1,3}).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d{1,3})')
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                syll_num = str(int(re.findall(r'\d+', cm)[0]))
-                if syll_num in self.syll_info.keys():
-                    self.syll_info[syll_num]['crowd_movie_path'] = cm
+                match_groups = exp.search(cm).groupdict()
+                match_groups = {k: int(v) if v.isdigit() else v for k, v in match_groups.items()}
+                sorted_num = match_groups['sorted_id']
+                if sorted_num in self.syll_info:
+                    sd = self.syll_info[sorted_num]
+                    sd['crowd_movie_path'] = cm
+                    self.syll_info[sorted_num] = {**sd, **match_groups}
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
     '''
@@ -447,7 +452,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.get_pdfs = get_pdfs
         self.syll_info = syll_info
         self.output_dir = output_dir
-        self.max_sylls = len(syll_info.keys())
+        self.max_sylls = len(syll_info)
 
         # Set Syllable select widget options
         self.cm_syll_select.options = list(range(self.max_sylls))
@@ -595,14 +600,14 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.group_syll_info = deepcopy(self.syll_info)
 
         for i in range(self.max_sylls):
-            if 'group_info' not in self.group_syll_info[str(i)].keys():
-                self.group_syll_info[str(i)]['group_info'] = {}
+            if 'group_info' not in self.group_syll_info[i].keys():
+                self.group_syll_info[i]['group_info'] = {}
 
         # Update syllable info dict
         for gd in group_dicts:
             group_name = list(gd.keys())[0]
             for syll in range(self.max_sylls):
-                self.group_syll_info[str(syll)]['group_info'][group_name] = {
+                self.group_syll_info[syll]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
@@ -768,8 +773,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         syll_info_df = pd.DataFrame(curr_grouped_syll_dict)
 
         # Get currently selected syllable name info
-        self.curr_label = self.syll_info[str(self.cm_syll_select.value)]['label']
-        self.curr_desc = self.syll_info[str(self.cm_syll_select.value)]['desc']
+        self.curr_label = self.syll_info[self.cm_syll_select.value]['label']
+        self.curr_desc = self.syll_info[self.cm_syll_select.value]['desc']
 
         # Create video divs including syllable metadata
         divs = []
@@ -856,7 +861,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         # Get group info based on selected DropDownMenu item
         if groupby == 'group':
-            self.grouped_syll_dict = self.group_syll_info[str(syllable)]['group_info']
+            self.grouped_syll_dict = self.group_syll_info[syllable]['group_info']
             for k in self.grouped_syll_dict:
                 self.grouped_syll_dict[k]['pdf'] = None
 

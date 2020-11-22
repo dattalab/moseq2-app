@@ -10,8 +10,9 @@ import warnings
 import numpy as np
 import pandas as pd
 import ruamel.yaml as yaml
-from moseq2_viz.util import parse_index
+from collections import defaultdict
 from IPython.display import clear_output
+from moseq2_viz.util import get_sorted_index
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -21,7 +22,7 @@ from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normal
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
 from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interactive_transition_graph
-from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats, get_usage_dict,
+from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats,
                                          convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
 
@@ -181,38 +182,31 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             syll_info = yaml.safe_load(f)
 
         # Getting number of syllables included in the info dict
-        max_sylls = len(list(syll_info.keys()))
+        max_sylls = len(syll_info)
         for k in range(max_sylls):
-            if 'group_info' in syll_info[str(k)].keys():
-                del syll_info[str(k)]['group_info']
+            # remove group_info
+            syll_info[k].pop('group_info', None)
 
-        info_df = pd.DataFrame(list(syll_info.values()), index=[int(k) for k in list(syll_info.keys())]).sort_index()
+        info_df = pd.DataFrame(list(syll_info.values()), index=list(syll_info)).sort_index()
         info_df['syllable'] = info_df.index
 
-        # Load the model
-        model_data = parse_model_results(joblib.load(self.model_path))
+        # Load the model and sort labels - also remaps the ar matrices
+        model_data = parse_model_results(self.model_path, sort_labels_by_usage=True, count='usage')
 
         # Read index file
-        index, self.sorted_index = parse_index(self.index_path)
+        self.sorted_index = get_sorted_index(self.index_path)
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
-        model_uuids = sorted(list(set(model_data['metadata']['uuids'])))
+        index_uuids = sorted(self.sorted_index['files'])
+        model_uuids = sorted(set(model_data['metadata']['uuids']))
 
         if index_uuids != model_uuids:
             print('Error: Index file UUIDs do not match model UUIDs.')
 
-        # Relabel the models, and get the order mapping
-        labels, mapping = relabel_by_usage(model_data['labels'], count='usage')
-
         # Get max syllables if None is given
-        if self.max_sylls == None:
+        if self.max_sylls is None:
             self.max_sylls = max_sylls
 
-        # Read AR matrices and reorder according to the syllable mapping
-        ar_mats = np.array(model_data['model_parameters']['ar_mat'])
-        self.ar_mats = np.reshape(ar_mats, (100, -1))[mapping][:self.max_sylls]
-
-        if self.df_path != None:
+        if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
@@ -320,10 +314,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.model_fit = parse_model_results(model_path)
 
         # Load Index File
-        self.index, self.sorted_index = parse_index(index_path)
+        self.sorted_index = get_sorted_index(index_path)
 
         index_uuids = sorted(list(self.sorted_index['files']))
-        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
+        model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
         if index_uuids != model_uuids:
             print('Error: Index file UUIDs do not match model UUIDs.')
@@ -453,6 +447,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                                     truncate_syllable=self.max_sylls,
                                                     transition_type='outgoing',
                                                     relabel_by='usage'), axis=0))
+
     def compute_entropy_differences(self):
         '''
         Computes cross group entropy/entropy-rate differences
@@ -490,7 +485,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             # get max_sylls
             if self.max_sylls is None:
-                self.max_sylls = len(list(self.syll_info))
+                self.max_sylls = len(self.syll_info)
 
             if self.df_path is not None:
                 print('Loading parquet files')
@@ -498,6 +493,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             else:
                 print('Syllable DataFrame not found. Creating new dataframe and  computing syllable statistics...')
                 df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            self.df = df
 
             # Get groups and matching session uuids
             label_group, label_uuids = get_trans_graph_groups(self.model_fit)
@@ -508,12 +504,9 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             self.compute_entropies(labels, label_group)
 
             # Compute usages and transition matrices
-            self.trans_mats, usages = get_group_trans_mats(labels, label_group, self.group, self.max_sylls)
-            self.df = self.df[self.df['syllable'] <= self.max_sylls]
-            self.df = df.groupby(['group', 'syllable'], as_index=False).mean()
-
-            # Get usage dictionary for node sizes
-            self.usages = get_usage_dict(usages)
+            self.trans_mats, self.usages = get_group_trans_mats(labels, label_group, self.group, self.max_sylls)
+            self.df = self.df[self.df['syllable'] < self.max_sylls]
+            self.df = self.df.groupby(['group', 'syllable'], as_index=False).mean()
 
             self.compute_entropy_differences()
 
@@ -532,67 +525,74 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         Returns
         -------
         '''
-        warnings.filterwarnings('ignore')
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
 
-        # Get graph node anchors
-        ngraphs = len(self.trans_mats)
-        anchor = 0
-        # make a list of normalized usages
-        usages = [normalize_usages(u) for u in self.usages]
-        usages_anchor = usages[anchor]
+            # Get graph node anchors
+            ngraphs = len(self.trans_mats)
+            anchor = 0
+            # make a list of normalized usages
+            usages = [normalize_usages(u) for u in self.usages]
+            usages_anchor = usages[anchor]
 
-        weights = self.trans_mats
+            weights = self.trans_mats
 
-        # Get anchored group scalars
-        scalars = {
-            'speeds_2d': [],
-            'speeds_3d': [],
-            'heights': [],
-            'dists': []
-        }
+            # Get anchored group scalars
+            scalars = defaultdict(list)
+            _scalar_map = {
+                'speeds_2d': 'velocity_2d_mm',
+                'speeds_3d': 'velocity_3d_mm',
+                'heights': 'height_ave_mm',
+                'dists': 'dist_to_center_px'
+            }
+            # loop thru each group and append a syllable -> scalar value mapping to collection above
+            for g in self.group:
+                group_df = self.df.query('group == @g').set_index('syllable')
+                for new_scalar, old_scalar in _scalar_map.items():
+                    scalars[new_scalar].append(dict(group_df[old_scalar]))
 
-        for g in self.group:
-            scalars['speeds_2d'].append(self.df[self.df['group'] == g]['velocity_2d_mm'].to_numpy())
-            scalars['speeds_3d'].append(self.df[self.df['group'] == g]['velocity_3d_mm'].to_numpy())
-            scalars['heights'].append(self.df[self.df['group'] == g]['height_ave_mm'].to_numpy())
-            scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center_px'].to_numpy())
+            key = self.scalar_dict.get(scalar_color, 'speeds_2d')
+            scalar_anchor = scalars[key][anchor]
 
-        key = self.scalar_dict.get(scalar_color, 'speeds_2d')
-        scalar_anchor = get_usage_dict([scalars[key][anchor]])[0]
+            usage_kwargs = {
+                'usages': usages_anchor,
+                'usage_threshold': usage_threshold
+            }
+            speed_kwargs = {
+                'speeds': scalar_anchor,
+                'speed_threshold': speed_threshold
+            }
 
-        # Create graph with nodes and edges
-        ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
-            weights[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
-            keep_orphans=True, usages=usages_anchor, speeds=scalar_anchor, speed_threshold=speed_threshold,
-            usage_threshold=usage_threshold, max_syllable=self.max_sylls)
+            # Create graph with nodes and edges
+            ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
+                weights[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
+                keep_orphans=True, max_syllable=self.max_sylls, **usage_kwargs, **speed_kwargs)
+            indices = [e[:-1] for e in ebunch_anchor]
 
-        # Get graph anchor
-        graph_anchor = convert_ebunch_to_graph(ebunch_anchor)
+            # Get graph anchor
+            graph_anchor = convert_ebunch_to_graph(ebunch_anchor)
 
-        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls)
+            pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls)
 
-        # make transition graphs
-        group_names = self.group.copy()
+            # make transition graphs
+            group_names = self.group.copy()
 
-        # prepare transition graphs
-        usages, group_names, _, _, _, graphs, scalars = make_transition_graphs(self.trans_mats,
-                                                                               self.usages[:len(self.group)],
-                                                                               self.group,
-                                                                               group_names,
-                                                                               usages_anchor,
-                                                                               pos, ebunch_anchor,
-                                                                               orphans=orphans,
-                                                                               edge_threshold=edge_threshold,
-                                                                               arrows=True,
-                                                                               scalars=scalars)
+            # prepare transition graphs
+            usages, group_names, _, _, _, graphs, scalars = make_transition_graphs(self.trans_mats,
+                                                                                usages[:len(self.group)],
+                                                                                self.group,
+                                                                                group_names,
+                                                                                pos=pos,
+                                                                                indices=indices,
+                                                                                orphans=orphans,
+                                                                                edge_threshold=edge_threshold,
+                                                                                arrows=True,
+                                                                                scalars=scalars,
+                                                                                usage_kwargs=usage_kwargs,
+                                                                                speed_kwargs=speed_kwargs)
 
-        for key in scalars.keys():
-            for i, scalar in enumerate(scalars[key]):
-                if isinstance(scalar, (list, np.ndarray)):
-                    scalars[key][i] = get_usage_dict([scalar])[0]
-
-        # interactive plot transition graphs
-        plot_interactive_transition_graph(graphs, pos, self.group,
-                                          group_names, usages, self.syll_info,
-                                          self.incoming_transition_entropy, self.outgoing_transition_entropy,
-                                          scalars=scalars, scalar_color=scalar_color)
+            # interactive plot transition graphs
+            plot_interactive_transition_graph(graphs, pos, self.group,
+                                            group_names, usages, self.syll_info,
+                                            self.incoming_transition_entropy, self.outgoing_transition_entropy,
+                                            scalars=scalars, scalar_color=scalar_color)

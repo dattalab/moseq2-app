@@ -515,13 +515,13 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     -------
     '''
 
-    warnings.filterwarnings('ignore')
+    # warnings.filterwarnings('ignore')
 
     rendered_graphs, plots = [], []
 
     for i, graph in enumerate(graphs):
 
-        node_indices = [n for n in graph.nodes if n in usages[i].keys()]
+        node_indices = [n for n in graph.nodes if n in usages[i]]
 
         if len(plots) == 0:
             plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2))
@@ -579,17 +579,17 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         nx.set_edge_attributes(graph, edge_width, "edge_width")
 
         # get usages
-        group_usage = [usages[i][j] for j in node_indices if j in usages[i].keys()]
+        group_usage = [usages[i][j] for j in node_indices if j in usages[i]]
 
         # get speeds
-        group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i].keys()]
-        group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i].keys()]
+        group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i]]
+        group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i]]
 
         # get average height
-        group_height = [scalars['heights'][i][j] for j in node_indices if j in scalars['heights'][i].keys()]
+        group_height = [scalars['heights'][i][j] for j in node_indices if j in scalars['heights'][i]]
 
         # get mean distances to bucket centers
-        group_dist = [scalars['dists'][i][j] for j in node_indices if j in scalars['dists'][i].keys()]
+        group_dist = [scalars['dists'][i][j] for j in node_indices if j in scalars['dists'][i]]
 
         # node colors for difference graphs
         if i >= len(group):
@@ -610,9 +610,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         labels, descs, cm_paths = [], [], []
 
         for n in node_indices:
-            labels.append(syll_info[str(n)]['label'])
-            descs.append(syll_info[str(n)]['desc'])
-            cm_paths.append(syll_info[str(n)]['crowd_movie_path'])
+            labels.append(syll_info[n]['label'])
+            descs.append(syll_info[n]['desc'])
+            cm_paths.append(syll_info[n]['crowd_movie_path'])
 
         # setting common data source to display via HoverTool
         graph_renderer.node_renderer.data_source.add(node_indices, 'number')
@@ -632,17 +632,17 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         text_color = 'white'
 
         # node interactions
-        if scalar_color == '2D velocity':
+        if scalar_color == '2D velocity' and len(group_speed_2d) > 0:
             fill_color = linear_cmap('speed_2d', "Spectral4", 0, max(group_speed_2d))
-        elif scalar_color == '3D velocity':
+        elif scalar_color == '3D velocity' and len(group_speed_3d) > 0:
             fill_color = linear_cmap('speed_3d', "Spectral4", 0, max(group_speed_3d))
-        elif scalar_color == 'Height':
+        elif scalar_color == 'Height' and len(group_height) > 0:
             fill_color = linear_cmap('height', "Spectral4", 0, max(group_height))
-        elif scalar_color == 'Distance to Center':
+        elif scalar_color == 'Distance to Center' and len(group_dist) > 0:
             fill_color = linear_cmap('dist_to_center_px', "Spectral4", 0, max(group_dist))
-        elif scalar_color == 'Entropy-In':
+        elif scalar_color == 'Entropy-In' and len(incoming_transition_entropy[i]) > 0:
             fill_color = linear_cmap('ent_in', "Spectral4", 0, max(incoming_transition_entropy[i]))
-        elif scalar_color == 'Entropy-Out':
+        elif scalar_color == 'Entropy-Out' and len(outgoing_transition_entropy[i]) > 0:
             fill_color = linear_cmap('ent_out', "Spectral4", 0, max(outgoing_transition_entropy[i]))
         else:
             fill_color = 'white'
@@ -682,9 +682,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                 syllable = list(graph.nodes)
             else:
                 new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
-                              graph_renderer.layout_provider.graph_layout.keys()}
+                                graph_renderer.layout_provider.graph_layout}
                 x, y = zip(*new_layout.values())
-                syllable = [a if a in node_indices else '' for a in list(new_layout.keys())]
+                syllable = [a if a in node_indices else '' for a in new_layout]
         except:
             x, y = [], []
             syllable = []
