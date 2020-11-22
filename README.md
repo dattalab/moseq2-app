@@ -184,6 +184,13 @@ The gcc version that's installed through `build-essential` should be able to com
 `moseq2-model`'s dependencies, and there are no extra steps you need to take to make
 MoSeq recognize gcc (like you do for [macOS](#for-macos)).
 
+Alternatively, you can also install `gcc-7.3` with `conda`:
+```bash
+# automatically sets CC/CXX after installing, too
+conda install -c anaconda gcc_linux-64
+conda install -c anaconda gxx_linux-64
+```
+
 ### Git
 
 To check if you have it installed, run `which git`. If it prints a path to git,
