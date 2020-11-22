@@ -245,7 +245,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if not os.path.exists(self.df_output_file):
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
         else:
@@ -630,7 +630,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             self.scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_fit, self.model_path, self.max_sylls)
+            df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         if self.get_pdfs:
             # Compute syllable position PDFs

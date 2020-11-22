@@ -15,7 +15,6 @@ from IPython.display import clear_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from scipy.cluster.hierarchy import linkage, dendrogram
-from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.dist import get_behavioral_distance
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
@@ -63,7 +62,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.df = None
 
-        self.ar_mats = None
         self.results = None
         self.icoord, self.dcoord = None, None
         self.cladogram = None
@@ -181,43 +179,34 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             syll_info = yaml.safe_load(f)
 
         # Getting number of syllables included in the info dict
-        max_sylls = len(list(syll_info.keys()))
+        max_sylls = len(syll_info)
         for k in range(max_sylls):
             if 'group_info' in syll_info[str(k)].keys():
                 del syll_info[str(k)]['group_info']
 
-        info_df = pd.DataFrame(list(syll_info.values()), index=[int(k) for k in list(syll_info.keys())]).sort_index()
+        info_df = pd.DataFrame(syll_info).T
+        info_df.index = info_df.index.astype(int)
         info_df['syllable'] = info_df.index
 
         # Load the model
         model_data = parse_model_results(joblib.load(self.model_path))
 
         # Read index file
-        index, self.sorted_index = parse_index(self.index_path)
+        _, self.sorted_index = parse_index(self.index_path)
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
-        model_uuids = sorted(list(set(model_data['metadata']['uuids'])))
-
-        if index_uuids != model_uuids:
+        if set(self.sorted_index['files'].keys()) != set(model_data['metadata']['uuids']):
             print('Error: Index file UUIDs do not match model UUIDs.')
-
-        # Relabel the models, and get the order mapping
-        labels, mapping = relabel_by_usage(model_data['labels'], count='usage')
 
         # Get max syllables if None is given
         if self.max_sylls == None:
             self.max_sylls = max_sylls
-
-        # Read AR matrices and reorder according to the syllable mapping
-        ar_mats = np.array(model_data['model_parameters']['ar_mat'])
-        self.ar_mats = np.reshape(ar_mats, (100, -1))[mapping][:self.max_sylls]
 
         if self.df_path != None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -323,10 +312,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Load Index File
         self.index, self.sorted_index = parse_index(index_path)
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
-        model_uuids = sorted(list(set(self.model_fit['metadata']['uuids'])))
-
-        if index_uuids != model_uuids:
+        if set(self.sorted_index['files'].keys()) != set(self.model_fit['metadata']['uuids']):
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Load and store transition graph data
@@ -491,17 +477,17 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # get max_sylls
         if self.max_sylls is None:
-            self.max_sylls = len(list(self.syll_info.keys()))
+            self.max_sylls = len(self.syll_info)
 
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         # Get groups and matching session uuids
-        self.group, label_group, label_uuids = get_trans_graph_groups(self.model_fit, self.sorted_index)
+        self.group, label_group, _ = get_trans_graph_groups(self.model_fit, self.sorted_index)
 
         self.compute_entropies(labels, label_group)
 
@@ -535,23 +521,20 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         warnings.filterwarnings('ignore')
 
         # Get graph node anchors
-        usages, anchor, usages_anchor, ngraphs = handle_graph_layout(self.trans_mats, self.usages, anchor=0)
+        usages, anchor, usages_anchor, _ = handle_graph_layout(self.trans_mats, self.usages, anchor=0)
 
         weights = self.trans_mats
 
         # Get anchored group scalars
-        scalars = {
-            'speeds_2d': [],
-            'speeds_3d': [],
-            'heights': [],
-            'dists': []
-        }
+        scalar_names = ['speeds_2d', 'speeds_3d', 'heights', 'dists']
+        col_names = ['velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
+        col_mapping = dict(zip(scalar_names, col_names))
+        scalars = {k: [] for k in scalar_names}
 
         for g in self.group:
-            scalars['speeds_2d'].append(self.df[self.df['group'] == g]['velocity_2d_mm'].to_numpy())
-            scalars['speeds_3d'].append(self.df[self.df['group'] == g]['velocity_3d_mm'].to_numpy())
-            scalars['heights'].append(self.df[self.df['group'] == g]['height_ave_mm'].to_numpy())
-            scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center_px'].to_numpy())
+            df_group = self.df[self.df['group'] == g]
+            for _k, _col in col_mapping.items():
+                scalars[_k].append(df_group[_col].to_numpy())
 
         key = self.scalar_dict.get(scalar_color, 'speeds_2d')
         scalar_anchor = get_usage_dict([scalars[key][anchor]])[0]
