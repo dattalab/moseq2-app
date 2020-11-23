@@ -170,8 +170,14 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         if errorbar == 'CI 95%':
             errors = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
-            miny = [e[0] for e in errors]
-            maxy = [e[1] for e in errors]
+            miny, maxy = [], []
+            for e in errors:
+                if isinstance(e, list):
+                    miny.append(e[0])
+                    maxy.append(e[1])
+                else:
+                    miny.append(0)
+                    maxy.append(0)
         else:
             miny = aux_df[stat] - sem[stat]
             maxy = aux_df[stat] + sem[stat]
