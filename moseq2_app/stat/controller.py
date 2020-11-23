@@ -187,7 +187,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             # remove group_info
             syll_info[k].pop('group_info', None)
 
-        info_df = pd.DataFrame(list(syll_info.values()), index=list(syll_info)).sort_index()
+        info_df = pd.DataFrame(syll_info).T.sort_index()
         info_df['syllable'] = info_df.index
 
         # Load the model and sort labels - also remaps the ar matrices
@@ -196,10 +196,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Read index file
         self.sorted_index = get_sorted_index(self.index_path)
 
-        index_uuids = sorted(self.sorted_index['files'])
-        model_uuids = sorted(set(model_data['metadata']['uuids']))
-
-        if index_uuids != model_uuids:
+        if set(self.sorted_index['files']) != set(model_data['metadata']['uuids']):
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Get max syllables if None is given
@@ -211,7 +208,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -316,10 +313,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Load Index File
         self.sorted_index = get_sorted_index(index_path)
 
-        index_uuids = sorted(list(self.sorted_index['files']))
-        model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
-
-        if index_uuids != model_uuids:
+        if set(self.sorted_index['files']) != set(self.model_fit['metadata']['uuids']):
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Load and store transition graph data
@@ -492,7 +486,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                 df = pd.read_parquet(self.df_path, engine='fastparquet')
             else:
                 print('Syllable DataFrame not found. Creating new dataframe and  computing syllable statistics...')
-                df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+                df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
             self.df = df
 
             # Get groups and matching session uuids

@@ -61,6 +61,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Syllable Info DataFrame path
         output_dir = os.path.dirname(save_path)
         self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
+        self.scalar_df_output = os.path.join(output_dir, 'moseq_dataframe.parquet')
 
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
@@ -247,7 +248,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
-            scalar_df.to_parquet(self.df_output_file.replace('syll_df', 'moseq_dataframe', compression='gzip'))
+            scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
         else:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_output_file, engine='fastparquet')
