@@ -20,8 +20,8 @@ from IPython.display import display, clear_output
 from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.gui.widgets import GroupSettingWidgets
-from moseq2_app.util import compute_syllable_explained_variance
-from moseq2_viz.model.util import relabel_by_usage, parse_model_results
+from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
+                                   compute_syllable_explained_variance)
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
