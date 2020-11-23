@@ -29,6 +29,9 @@ from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidg
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
 from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_position_heatmaps, get_syllable_pdfs)
 
+yml = yaml.YAML()
+yml.indent(mapping=3, offset=2)
+
 class SyllableLabeler(SyllableLabelerWidgets):
     '''
 
@@ -88,8 +91,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
             self.syll_info = {str(i): {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in
                               range(max_sylls)}
-            yml = yaml.YAML()
-            yml.indent(mapping=3, offset=2)
 
             # Write to file
             with open(self.save_path, 'w+') as f:
@@ -413,6 +414,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
                 syll_num = str(int(re.findall(r'\d+', cm)[0]))
                 if syll_num in self.syll_info.keys():
                     self.syll_info[syll_num]['crowd_movie_path'] = cm
+
+        # Write to file
+        with open(self.save_path, 'w+') as f:
+            yml.dump(self.syll_info, f)
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
     '''

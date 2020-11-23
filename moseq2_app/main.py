@@ -14,6 +14,16 @@ from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extract
      interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
      interactive_plot_transition_graph_wrapper, get_frame_flips_wrapper
 
+def validate_inputs(inputs, progress_paths):
+
+    error = False
+    for i in inputs:
+        if not exists(progress_paths[i]):
+            error = True
+            print(f'ERROR: {i} not found.')
+
+    return error
+
 @filter_warnings
 def flip_classifier_tool(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
     '''
@@ -160,11 +170,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
 
     inputs = ['model_path', 'config_file', 'index_file']
 
-    error = False
-    for i in inputs:
-        if not exists(progress_paths[i]):
-            error = True
-            print(f'ERROR: {i} not found.')
+    error = validate_inputs(inputs, progress_paths)
 
     if error:
         print('Set the correct paths to the missing variables and run the function again.')
@@ -196,13 +202,9 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
     syll_info_path = progress_paths['syll_info']
     syll_info_df_path = progress_paths['df_info_path']
 
-    inputs = ['model_path', 'index_file', 'syll_info', 'df_info_path']
+    inputs = ['model_path', 'index_file', 'syll_info']
 
-    error = False
-    for i in inputs:
-        if not exists(progress_paths[i]):
-            error = True
-            print(f'ERROR: {i} not found.')
+    error = validate_inputs(inputs, progress_paths)
 
     if error:
         print('Set the correct paths to the missing variables and run the function again.')
@@ -235,13 +237,9 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
     syll_info_path = progress_paths['syll_info']
     syll_info_df_path = progress_paths['df_info_path']
 
-    inputs = ['model_path', 'config_file', 'index_file', 'syll_info', 'df_info_path']
+    inputs = ['model_path', 'config_file', 'index_file', 'syll_info']
 
-    error = False
-    for i in inputs:
-        if not exists(progress_paths[i]):
-            error = True
-            print(f'ERROR: {i} not found.')
+    error = validate_inputs(inputs, progress_paths)
 
     if error:
         print('Set the correct paths to the missing variables and run the function again.')
@@ -275,14 +273,10 @@ def interactive_transition_graph(progress_paths, max_syllables=None, load_parque
     syll_info_path = progress_paths['syll_info']
     syll_info_df_path = progress_paths['df_info_path']
 
-    inputs = ['model_path', 'index_file', 'syll_info', 'df_info_path']
+    inputs = ['model_path', 'index_file', 'syll_info']
 
-    error = False
-    for i in inputs:
-        if not exists(progress_paths[i]):
-            error = True
-            print(f'ERROR: {i} not found.')
-
+    error = validate_inputs(inputs, progress_paths)
+    
     if error:
         print('Set the correct paths to the missing variables and run the function again.')
         return
