@@ -6,13 +6,15 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 '''
 
 from os.path import exists
-from bokeh.io import output_notebook
 from moseq2_extract.util import filter_warnings
+from bokeh.io import output_notebook, output_file
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
      validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
      interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
      interactive_plot_transition_graph_wrapper, get_frame_flips_wrapper
+
+output_notebook()
 
 def validate_inputs(inputs, progress_paths):
 
@@ -91,7 +93,6 @@ def interactive_roi_detector(input_dir, progress_paths, compute_all_bgs=True):
     -------
     '''
 
-    output_notebook()
     config_file = progress_paths['config_file']
     session_config = progress_paths['session_config']
 
@@ -110,7 +111,6 @@ def preview_extractions(input_dir):
     -------
     '''
 
-    output_notebook()
     interactive_extraction_preview_wrapper(input_dir)
 
 @filter_warnings
@@ -176,7 +176,6 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
-    output_notebook()
     interactive_syllable_labeler_wrapper(model_path, config_file,
                                          index_file, crowd_dir, syll_info_path,
                                          max_syllables=max_syllables, n_explained=n_explained)
@@ -210,7 +209,6 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
-    output_notebook()
     interactive_syllable_stat_wrapper(index_file, model_path, syll_info_path,
                                       syll_info_df_path, max_syllables=max_syllable, load_parquet=load_parquet)
 
@@ -245,7 +243,6 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
-    output_notebook()
     interactive_crowd_movie_comparison_preview_wrapper(config_file, index_file, model_path,
                                                syll_info_path, group_movie_dir, syll_info_df_path,
                                                get_pdfs=get_pdfs, load_parquet=load_parquet)
@@ -281,7 +278,6 @@ def interactive_transition_graph(progress_paths, max_syllables=None, load_parque
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
-    output_notebook()
     interactive_plot_transition_graph_wrapper(model_path,
                                               index_file,
                                               syll_info_path,
