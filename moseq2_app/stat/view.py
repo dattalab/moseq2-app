@@ -515,8 +515,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     -------
     '''
 
-    # warnings.filterwarnings('ignore')
-
     rendered_graphs, plots = [], []
 
     for i, graph in enumerate(graphs):

@@ -627,9 +627,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         Returns
         -------
         '''
-
-        warnings.filterwarnings('ignore')
-
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')

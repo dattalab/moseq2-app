@@ -28,8 +28,6 @@ from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTran
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
 
-warnings.filterwarnings('ignore')
-
 def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True):
     '''
 

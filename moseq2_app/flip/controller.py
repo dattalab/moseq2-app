@@ -31,31 +31,32 @@ class FlipRangeTool(FlipClassifierWidgets):
         prefilter_kernel_size (int): Size of the median spatial filter.
         '''
 
-        warnings.filterwarnings('ignore')
-        super().__init__()
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore')
+            super().__init__()
 
-        # User input parameters
-        self.input_dir = input_dir
-        self.max_frames = max_frames
-        self.output_file = output_file
-        self.cleaned_data = self.load_sessions(input_dir, max_frames, tail_filter_iters, prefilter_kernel_size)
+            # User input parameters
+            self.input_dir = input_dir
+            self.max_frames = max_frames
+            self.output_file = output_file
+            self.cleaned_data = self.load_sessions(input_dir, max_frames, tail_filter_iters, prefilter_kernel_size)
 
-        # Widget values
-        self.frame_num_slider.max = int(max_frames) - 1
-        self.frame_ranges = []
+            # Widget values
+            self.frame_num_slider.max = int(max_frames) - 1
+            self.frame_ranges = []
 
-        self.start = self.frame_num_slider.value
-        self.stop = 0
+            self.start = self.frame_num_slider.value
+            self.stop = 0
 
-        # Flip Classifier Model to train
-        self.clf = RandomForestClassifier(n_estimators=100, random_state=0, n_jobs=-1,
-                                          max_depth=10, class_weight='balanced', warm_start=False)
+            # Flip Classifier Model to train
+            self.clf = RandomForestClassifier(n_estimators=100, random_state=0, n_jobs=-1,
+                                            max_depth=10, class_weight='balanced', warm_start=False)
 
-        self.selected_ranges.options = self.frame_ranges
+            self.selected_ranges.options = self.frame_ranges
 
-        # Callbacks
-        self.clear_button.on_click(self.clear_on_click)
-        self.start_button.on_click(self.start_stop_frame_range)
+            # Callbacks
+            self.clear_button.on_click(self.clear_on_click)
+            self.start_button.on_click(self.start_stop_frame_range)
 
     def start_stop_frame_range(self, b):
         '''

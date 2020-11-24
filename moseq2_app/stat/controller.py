@@ -174,9 +174,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         Returns
         -------
         '''
-
-        warnings.filterwarnings('ignore')
-
         # Read syllable information dict
         with open(self.info_path, 'r') as f:
             syll_info = yaml.safe_load(f)

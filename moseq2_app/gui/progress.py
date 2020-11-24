@@ -237,9 +237,6 @@ def restore_progress_vars(progress_file, init=False, overwrite=False):
     vars (dict): All progress file variables
     '''
 
-
-    warnings.filterwarnings('ignore')
-
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
@@ -426,8 +423,6 @@ def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.
     -------
     All restored variables or None.
     '''
-
-    warnings.filterwarnings('ignore')
 
     # Check if progress file exists
     if exists(progress_filepath):
