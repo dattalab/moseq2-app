@@ -515,8 +515,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data['medfilter_space'] = [0]
         self.config_data['sort'] = True
         self.config_data['pad'] = 10
-        self.config_data['min_dur'] = 3
+        self.config_data['min_dur'] = 40
         self.config_data['max_dur'] = 60
+        self.config_data['max_movie_dur'] = 40
         self.config_data['raw_size'] = (512, 424)
         self.config_data['scale'] = 1
         self.config_data['legacy_jitter_fix'] = False
