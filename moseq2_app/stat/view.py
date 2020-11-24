@@ -498,10 +498,60 @@ def format_plot(plot):
     plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
     plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
 
+def get_difference_legend_items(plot, edge_width, group_name):
+    '''
+    Creates the difference graph legend items with the min and max transition probabilities
+     for both the up and down-regulated transition probabilities.
+
+    Parameters
+    ----------
+    plot (bokeh.figure): Bokeh plot to add legend to.
+    edge_width (dict): Dictionary of edge widths
+    group_name (str): Difference graph title.
+
+    Returns
+    -------
+    diff_items (list): List of LegendItem objects to display
+    '''
+
+    r_line = plot.line(line_color='red')
+    b_line = plot.line(line_color='blue')
+
+    r_circle = plot.circle(line_color='red', fill_color='white')
+    b_circle = plot.circle(line_color='blue', fill_color='white')
+
+    G1 = group_name.split('-')[0]
+
+    # get min/max down
+    min_down_tp = min([e for e in edge_width.values() if e < 0]) / 350
+    max_down_tp = max([e for e in edge_width.values() if e < 0]) / 350
+
+    # get min/max up
+    min_up_tp = min([e for e in edge_width.values() if e > 0]) / 350
+    max_up_tp = max([e for e in edge_width.values() if e > 0]) / 350
+
+    min_down_line = plot.line(line_color='blue', line_width=min_down_tp * 350)
+    max_down_line = plot.line(line_color='blue', line_width=max_down_tp * 350)
+
+    min_up_line = plot.line(line_color='red', line_width=min_up_tp * 350)
+    max_up_line = plot.line(line_color='red', line_width=max_up_tp * 350)
+
+    diff_items = [
+        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[r_circle]),
+        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[b_circle]),
+        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[r_line]),
+        LegendItem(label=f"Min Up-regulated P(transition): {min_up_tp:.4f}", renderers=[min_up_line]),
+        LegendItem(label=f"Max Up-regulated P(transition): {max_up_tp:.4f}", renderers=[max_up_line]),
+        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[b_line]),
+        LegendItem(label=f"Min Down-regulated P(transition): {min_down_tp:.4f}", renderers=[min_down_line]),
+        LegendItem(label=f"Max Down-regulated P(transition): {max_down_tp:.4f}", renderers=[max_down_line]),
+    ]
+
+    return diff_items
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, incoming_transition_entropy, outgoing_transition_entropy,
-                                      scalars, scalar_color='default', plot_vertically=False):
+                                      scalars, scalar_color='default', plot_vertically=False, legend_loc='above'):
     '''
 
     Converts the computed networkx transition graphs to Bokeh glyph objects that can be interacted with
@@ -714,34 +764,54 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
         o_line = plot.line(line_color='orange')
         p_line = plot.line(line_color='purple')
-        r_line = plot.line(line_color='red')
-        b_line = plot.line(line_color='blue')
 
-        items = [
+        # re-adjust edge width values back to weights
+        min_tp = min(list(edge_width.values())) / 200
+        max_tp = max(list(edge_width.values())) / 200
+
+        mink_line = plot.line(line_color='black', line_width=min(list(edge_width.values())))
+        maxk_line = plot.line(line_color='black', line_width=max(list(edge_width.values())))
+
+        group_items = [
             LegendItem(label="Incoming Transition", renderers=[o_line]),
             LegendItem(label="Outgoing Transition", renderers=[p_line]),
         ]
 
-        if i >= len(group):
-            items += [LegendItem(label="Up-regulated in G1", renderers=[r_line])]
-            items += [LegendItem(label="Down-regulated in G1", renderers=[b_line])]
+        tp_items = [
+            LegendItem(label=f"Min P(transition): {min_tp:.4f}", renderers=[mink_line]),
+            LegendItem(label=f"Max P(transition): {max_tp:.4f}", renderers=[maxk_line]),
+        ]
 
-        legend = Legend(items=items,
-                       border_line_color="black", background_fill_color='white',
-                       background_fill_alpha=1.0)
+        if i >= len(group):
+            group_items += get_difference_legend_items(plot, edge_width, group_names[i])
+        else:
+            group_items += tp_items
+
+        legend = Legend(items=group_items,
+                        border_line_color="black",
+                        background_fill_color='white',
+                        background_fill_alpha=1.0)
+
         plot.renderers.append(legend)
+
+        if plot_vertically:
+            legend_loc = 'right'
+        plot.add_layout(legend, legend_loc)
 
         plots.append(plot)
         rendered_graphs.append(graph_renderer)
 
-    # Format grid of transition graphs
     ncols = None
+    plot_width, plot_height = 550, 675
+
     if not plot_vertically:
+        # Format grid of transition graphs
         formatted_plots = format_graphs(plots, group)
     else:
         formatted_plots = list(plots)
         ncols = 1
+        plot_height, plot_width = 600, 600
 
     # Create Bokeh grid plot object
-    gp = gridplot(formatted_plots, ncols=ncols, plot_width=550, plot_height=550)
+    gp = gridplot(formatted_plots, sizing_mode='stretch_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
     show(gp)
