@@ -16,6 +16,7 @@ from copy import deepcopy
 from bokeh.io import show
 import ruamel.yaml as yaml
 import ipywidgets as widgets
+from os.path import basename
 from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
@@ -411,7 +412,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if set(crowd_movie_paths) != set(info_cm_paths):
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                syll_num = str(int(re.findall(r'\d+', cm)[0]))
+                syll_num = str(int(re.findall(r'\d+', basename(cm))[0]))
                 if syll_num in self.syll_info.keys():
                     self.syll_info[syll_num]['crowd_movie_path'] = cm
 
