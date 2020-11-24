@@ -333,7 +333,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     display(cm_compare.clear_button, out)
 
 
-def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, max_syllables=None, load_parquet=False):
+def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, max_syllables=None, plot_vertically=False, load_parquet=False):
     '''
     Wrapper function that works as a background process that prepares the data
     for the interactive graphing function.
@@ -354,7 +354,8 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     # Initialize Transition Graph data structure
     i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index_path=index_path,
                                                info_path=info_path, df_path=df_path,
-                                               max_sylls=max_syllables, load_parquet=load_parquet)
+                                               max_sylls=max_syllables, plot_vertically=plot_vertically,
+                                               load_parquet=load_parquet)
 
     # Make graphs
     out = interactive_output(i_trans_graph.interactive_transition_graph_helper,

@@ -501,7 +501,7 @@ def format_plot(plot):
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, incoming_transition_entropy, outgoing_transition_entropy,
-                                      scalars, scalar_color='default'):
+                                      scalars, scalar_color='default', plot_vertically=False):
     '''
 
     Converts the computed networkx transition graphs to Bokeh glyph objects that can be interacted with
@@ -735,8 +735,13 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         rendered_graphs.append(graph_renderer)
 
     # Format grid of transition graphs
-    formatted_plots = format_graphs(plots, group)
+    ncols = None
+    if not plot_vertically:
+        formatted_plots = format_graphs(plots, group)
+    else:
+        formatted_plots = list(plots)
+        ncols = 1
 
     # Create Bokeh grid plot object
-    gp = gridplot(formatted_plots, plot_width=550, plot_height=550)
+    gp = gridplot(formatted_plots, ncols=ncols, plot_width=550, plot_height=550)
     show(gp)

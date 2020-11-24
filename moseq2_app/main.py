@@ -6,8 +6,8 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 '''
 
 from os.path import exists
+from bokeh.io import output_notebook
 from moseq2_extract.util import filter_warnings
-from bokeh.io import output_notebook, output_file
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
      validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
@@ -248,7 +248,7 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
                                                get_pdfs=get_pdfs, load_parquet=load_parquet)
 
 @filter_warnings
-def interactive_transition_graph(progress_paths, max_syllables=None, load_parquet=False):
+def interactive_transition_graph(progress_paths, max_syllables=None, plot_vertically=False, load_parquet=False):
     '''
 
     Displays group transition graphs with a configurable number of syllables. Launched via the
@@ -283,4 +283,5 @@ def interactive_transition_graph(progress_paths, max_syllables=None, load_parque
                                               syll_info_path,
                                               syll_info_df_path,
                                               max_syllables=max_syllables,
-                                              load_parquet=load_parquet)
+                                              load_parquet=load_parquet,
+                                              plot_vertically=plot_vertically)

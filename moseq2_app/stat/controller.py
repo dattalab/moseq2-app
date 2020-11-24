@@ -279,7 +279,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
     '''
 
-    def __init__(self, model_path, index_path, info_path, df_path, max_sylls, load_parquet):
+    def __init__(self, model_path, index_path, info_path, df_path, max_sylls, plot_vertically, load_parquet):
         '''
         Initializes context variables
 
@@ -298,6 +298,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.info_path = info_path
         self.df_path = df_path
         self.max_sylls = max_sylls
+        self.plot_vertically = plot_vertically
 
         if load_parquet:
             if df_path != None:
@@ -574,4 +575,4 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         plot_interactive_transition_graph(graphs, pos, self.group,
                                           group_names, usages, self.syll_info,
                                           self.incoming_transition_entropy, self.outgoing_transition_entropy,
-                                          scalars=scalars, scalar_color=scalar_color)
+                                          scalars=scalars, scalar_color=scalar_color, plot_vertically=self.plot_vertically)
