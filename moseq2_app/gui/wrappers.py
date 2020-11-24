@@ -251,7 +251,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
         -------
         '''
 
-        clear_output()
+        clear_output(wait=True)
         display(labeler.syll_select, output)
 
     # Update view when user selects new syllable from DropDownMenu

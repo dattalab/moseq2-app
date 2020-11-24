@@ -120,6 +120,22 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         clear_output()
 
+    def write_syll_info(self):
+        '''
+        Writes current syllable info data to a YAML file.
+
+        Returns
+        -------
+        '''
+
+        tmp = deepcopy(self.syll_info)
+        for syll in range(self.max_sylls):
+            del tmp[str(syll)]['group_info']
+
+        # Write to file
+        with open(self.save_path, 'w+') as f:
+            yml.dump(tmp, f)
+
     def on_next(self, event):
         '''
         Callback function to trigger an view update when the user clicks the "Next" button.
@@ -146,6 +162,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Updating input values with current dict entries
         self.lbl_name_input.value = self.syll_info[str(self.syll_select.index)]['label']
         self.desc_input.value = self.syll_info[str(self.syll_select.index)]['desc']
+
+        self.write_syll_info()
 
     def on_prev(self, event):
         '''
@@ -174,6 +192,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.lbl_name_input.value = self.syll_info[str(self.syll_select.index)]['label']
         self.desc_input.value = self.syll_info[str(self.syll_select.index)]['desc']
 
+        self.write_syll_info()
+
     def on_set(self, event):
         '''
         Callback function to save the dict to syllable information file.
@@ -190,16 +210,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.syll_info[str(self.syll_select.index)]['label'] = self.lbl_name_input.value
         self.syll_info[str(self.syll_select.index)]['desc'] = self.desc_input.value
 
-        yml = yaml.YAML()
-        yml.indent(mapping=3, offset=2)
-
-        tmp = deepcopy(self.syll_info)
-        for syll in range(self.max_sylls):
-            del tmp[str(syll)]['group_info']
-
-        # Write to file
-        with open(self.save_path, 'w+') as f:
-            yml.dump(tmp, f)
+        self.write_syll_info()
 
         # Update button style
         self.set_button.button_style = 'success'
@@ -276,11 +287,26 @@ class SyllableLabeler(SyllableLabelerWidgets):
         -------
         '''
 
-        output_table = Div(text=pd.DataFrame(group_info).to_html())
+        full_df = pd.DataFrame(group_info)
+        columns = full_df.columns
+
+        output_tables = []
+        if len(self.groups) < 4:
+            # if there are less than 4 groups, plot the table in one row
+            output_tables = [Div(text=full_df.to_html())]
+        else:
+            # plot 4 groups per row to avoid table being cut off by movie
+            n_rows = int(len(columns) / 4)
+            row_cols = np.split(columns, n_rows)
+
+            for i in range(len(row_cols)):
+                row_df = full_df[row_cols[i]]
+                output_tables += [Div(text=row_df.to_html())]
 
         ipy_output = widgets.Output()
         with ipy_output:
-            show(output_table)
+            for ot in output_tables:
+                show(ot)
 
         self.info_boxes.children = [self.syll_info_lbl, ipy_output, ]
 
@@ -339,7 +365,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Create grid layout to display all the widgets
         grid = widgets.AppLayout(left_sidebar=vid_out,
                                  right_sidebar=self.data_box,
-                                 pane_widths=[3, 0, 2.5])
+                                 pane_widths=[3, 0, 3])
 
         # Display all widgets
         display(grid, self.button_box)
