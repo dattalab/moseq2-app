@@ -449,12 +449,12 @@ def print_validation_results(scalar_df, status_dicts):
                 elif v1 == True:
                     warning = True
 
-            if warning:
-                n_warnings += 1
-                print_dict[k] = anomaly_dict[k]
-            if error:
-                n_errs += 1
-                print_dict[k] = anomaly_dict[k]
+        if warning:
+            n_warnings += 1
+            print_dict[k] = anomaly_dict[k]
+        if error:
+            n_errs += 1
+            print_dict[k] = anomaly_dict[k]
 
     print(f'{bcolors.FAIL}{n_errs}/{n_sessions} were flagged with error.{bcolors.ENDC}')
     print(f'{bcolors.WARNING}{n_warnings}/{n_sessions} were flagged with warning(s).{bcolors.ENDC}')
