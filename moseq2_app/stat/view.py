@@ -536,18 +536,21 @@ def get_difference_legend_items(plot, edge_width, group_name):
     min_up_line = plot.line(line_color='red', line_width=min_up_tp * 350)
     max_up_line = plot.line(line_color='red', line_width=max_up_tp * 350)
 
-    diff_items = [
+    diff_main_items = [
         LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[r_circle]),
         LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[b_circle]),
         LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[r_line]),
+        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[b_line]),
+    ]
+
+    diff_width_items = [
         LegendItem(label=f"Min Up-regulated P(transition): {min_up_tp:.4f}", renderers=[min_up_line]),
         LegendItem(label=f"Max Up-regulated P(transition): {max_up_tp:.4f}", renderers=[max_up_line]),
-        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[b_line]),
         LegendItem(label=f"Min Down-regulated P(transition): {min_down_tp:.4f}", renderers=[min_down_line]),
         LegendItem(label=f"Max Down-regulated P(transition): {max_down_tp:.4f}", renderers=[max_down_line]),
     ]
 
-    return diff_items
+    return diff_main_items, diff_width_items
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, incoming_transition_entropy, outgoing_transition_entropy,
@@ -570,6 +573,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     Returns
     -------
     '''
+
+    if plot_vertically:
+        legend_loc = 'right'
 
     warnings.filterwarnings('ignore')
 
@@ -777,41 +783,47 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
             LegendItem(label="Outgoing Transition", renderers=[p_line]),
         ]
 
-        tp_items = [
+        info_items = [
             LegendItem(label=f"Min P(transition): {min_tp:.4f}", renderers=[mink_line]),
             LegendItem(label=f"Max P(transition): {max_tp:.4f}", renderers=[maxk_line]),
         ]
 
         if i >= len(group):
-            group_items += get_difference_legend_items(plot, edge_width, group_names[i])
-        else:
-            group_items += tp_items
+            diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_names[i])
+            group_items += diff_main_items
 
-        legend = Legend(items=group_items,
-                        border_line_color="black",
-                        background_fill_color='white',
-                        background_fill_alpha=1.0)
+        main_legend = Legend(items=group_items,
+                             location='top_left',
+                             border_line_color="black",
+                             background_fill_color='white',
+                             background_fill_alpha=0.7)
 
-        plot.renderers.append(legend)
+        info_legend = Legend(items=info_items,
+                             location='bottom_left',
+                             border_line_color="black",
+                             background_fill_color='white',
+                             background_fill_alpha=0.7)
 
-        if plot_vertically:
-            legend_loc = 'right'
-        plot.add_layout(legend, legend_loc)
+        plot.renderers.append(main_legend)
+        plot.renderers.append(info_legend)
+
+        if not plot_vertically:
+            plot.add_layout(main_legend, legend_loc)
+            #plot.add_layout(info_legend, legend_loc)
 
         plots.append(plot)
         rendered_graphs.append(graph_renderer)
 
     ncols = None
     plot_width, plot_height = 550, 675
-
     if not plot_vertically:
         # Format grid of transition graphs
         formatted_plots = format_graphs(plots, group)
     else:
         formatted_plots = list(plots)
         ncols = 1
-        plot_height, plot_width = 600, 600
+        plot_height, plot_width = 550, 550
 
     # Create Bokeh grid plot object
-    gp = gridplot(formatted_plots, sizing_mode='stretch_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
+    gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
     show(gp)
