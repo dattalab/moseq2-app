@@ -12,17 +12,17 @@ import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.util import parse_index
 from IPython.display import clear_output
-from moseq2_viz.info.util import entropy, entropy_rate
-from sklearn.metrics.pairwise import pairwise_distances
+from moseq2_viz.info.util import transition_entropy
+from moseq2_app.util import merge_labels_with_scalars
 from scipy.cluster.hierarchy import linkage, dendrogram
+from moseq2_viz.model.dist import get_behavioral_distance
+from moseq2_viz.model.util import (parse_model_results, relabel_by_usage,
+                                   sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
-from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, results_to_dataframe)
 from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interactive_transition_graph
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats, get_usage_dict,
                                          handle_graph_layout, convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
-from moseq2_viz.model.label_util import sort_syllables_by_stat_difference, sort_syllables_by_stat
-from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_mean_syll_scalar, compute_session_centroid_speeds)
 
 class InteractiveSyllableStats(SyllableStatWidgets):
     '''
@@ -54,19 +54,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df_path = df_path
 
         if load_parquet:
-            if df_path != None:
-                if os.path.exists(df_path):
-                    self.label_df_path = df_path.replace('syll_df', 'label_time_df')
-                else:
+            if df_path is not None:
+                if not os.path.exists(df_path):
                     self.df_path = None
-                    self.label_df_path = None
         else:
             self.df_path = None
-            self.label_df_path = None
 
         self.df = None
 
-        self.ar_mats = None
         self.results = None
         self.icoord, self.dcoord = None, None
         self.cladogram = None
@@ -74,7 +69,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Load all the data
         self.interactive_stat_helper()
         self.df = self.df[self.df['syllable'] < self.max_sylls]
-
         self.session_names = sorted(list(self.df.SessionName.unique()))
         self.subject_names = sorted(list(self.df.SubjectName.unique()))
 
@@ -88,8 +82,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.dropdown_mapping = {
             'usage': 'usage',
-            'distance to center': 'dist_to_center',
-            'centroid speed': 'speed',
+            'distance to center': 'dist_to_center_px',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',
             'height': 'height_ave_mm',
@@ -150,11 +143,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         '''
 
         # Get Pairwise distances
-        X = pairwise_distances(self.ar_mats, metric='euclidean')
-        Z = linkage(X, 'ward')
+        X = get_behavioral_distance(self.sorted_index,
+                                    self.model_path,
+                                    max_syllable=self.max_sylls,
+                                    distances=['ar[init]'])['ar[init]']
+        Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
-        self.results = dendrogram(Z, distance_sort=True, no_plot=True, get_leaves=True)
+        self.results = dendrogram(Z, distance_sort=False, no_plot=True, get_leaves=True)
 
         # Get Graph layout info
         icoord, dcoord = self.results['icoord'], self.results['dcoord']
@@ -183,52 +179,34 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             syll_info = yaml.safe_load(f)
 
         # Getting number of syllables included in the info dict
-        max_sylls = len(list(syll_info.keys()))
+        max_sylls = len(syll_info)
         for k in range(max_sylls):
             if 'group_info' in syll_info[str(k)].keys():
                 del syll_info[str(k)]['group_info']
 
-        info_df = pd.DataFrame(list(syll_info.values()), index=[int(k) for k in list(syll_info.keys())]).sort_index()
+        info_df = pd.DataFrame(syll_info).T
+        info_df.index = info_df.index.astype(int)
         info_df['syllable'] = info_df.index
 
         # Load the model
         model_data = parse_model_results(joblib.load(self.model_path))
 
-        # Relabel the models, and get the order mapping
-        labels, mapping = relabel_by_usage(model_data['labels'], count='usage')
+        # Read index file
+        _, self.sorted_index = parse_index(self.index_path)
+
+        if set(self.sorted_index['files'].keys()) != set(model_data['metadata']['uuids']):
+            print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Get max syllables if None is given
         if self.max_sylls == None:
             self.max_sylls = max_sylls
 
-        # Read AR matrices and reorder according to the syllable mapping
-        ar_mats = np.array(model_data['model_parameters']['ar_mat'])
-        self.ar_mats = np.reshape(ar_mats, (100, -1))[mapping][:self.max_sylls]
-
         if self.df_path != None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
-            label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            # Read index file
-            index, sorted_index = parse_index(self.index_path)
-
-            # Load scalar Dataframe to compute syllable speeds
-            scalar_df = scalars_to_dataframe(sorted_index)
-
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, label_df = results_to_dataframe(model_data, index, count='usage',
-                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
-
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-
-            # Compute and append additional syllable scalar data
-            scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-            for scalar in scalars:
-                df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
 
@@ -239,11 +217,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         Parameters
         ----------
-        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'speed', 'distance to center']
+        stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'distance to center']
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
-            ['usage', 'speed', 'distance to center', 'similarity', 'difference'].
+            ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
-        errorbar (str or ipywidgets.DropDown): Error bar to display. ['SEM', 'STD']
+        errorbar (str or ipywidgets.DropDown): Error bar to display. ['CI 95%' ,'SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
@@ -323,14 +301,19 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         if load_parquet:
             if df_path != None:
-                if os.path.exists(df_path):
-                    self.label_df_path = df_path.replace('syll_df', 'label_time_df')
-                else:
+                if not os.path.exists(df_path):
                     self.df_path = None
-                    self.label_df_path = None
         else:
             self.df_path = None
-            self.label_df_path = None
+
+        # Load Model
+        self.model_fit = parse_model_results(joblib.load(model_path))
+
+        # Load Index File
+        self.index, self.sorted_index = parse_index(index_path)
+
+        if set(self.sorted_index['files'].keys()) != set(self.model_fit['metadata']['uuids']):
+            print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Load and store transition graph data
         self.initialize_transition_data()
@@ -344,8 +327,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         # Manage dropdown menu values
         self.scalar_dict = {
-            'Default': 'speed',
-            'Centroid Speed': 'speed',
+            'Default': 'speeds_2d',
             '2D velocity': 'speeds_2d',
             '3D velocity': 'speeds_3d',
             'Height': 'heights',
@@ -378,7 +360,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Update threshold range values
         edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
         usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['speed'].max() / self.df['speed'].std()) + 2
+        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
 
         self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
                                          range(edge_threshold_stds)]
@@ -388,7 +370,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                           range(usage_threshold_stds)]
         self.usage_thresholder.index = (0, usage_threshold_stds - 1)
 
-        self.speed_thresholder.options = [float('%.3f' % (self.df['speed'].std() * i)) for i in
+        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
                                           range(speed_threshold_stds)]
         self.speed_thresholder.index = (0, speed_threshold_stds - 1)
 
@@ -405,9 +387,9 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         -------
         '''
 
-        if event.new == 'Default' or event.new == 'Centroid Speed':
-            key = 'speed'
-            self.speed_thresholder.description = 'Threshold Nodes by Speed'
+        if event.new == 'Default' or event.new == '2D velocity':
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
@@ -418,11 +400,11 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             key = 'height_ave_mm'
             self.speed_thresholder.description = 'Threshold Nodes by Height'
         elif event.new == 'Distance to Center':
-            key = 'dist_to_center'
+            key = 'dist_to_center_px'
             self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
         else:
-            key = 'speed'
-            self.speed_thresholder.description = 'Threshold Nodes by Speed'
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
 
         scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
         self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
@@ -442,24 +424,22 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         -------
         '''
 
-        # Compute entropies
-        entropies = []
+        self.incoming_transition_entropy, self.outgoing_transition_entropy = [], []
+
         for g in self.group:
             use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropies.append(
-                np.mean(entropy(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
 
-        self.entropies = entropies
+            self.incoming_transition_entropy.append(np.mean(transition_entropy(use_labels,
+                                                    tm_smoothing=0,
+                                                    truncate_syllable=self.max_sylls,
+                                                    transition_type='incoming',
+                                                    relabel_by='usage'), axis=0))
 
-        # Compute entropy rates
-        entropy_rates = []
-        for g in self.group:
-            use_labels = [lbl for lbl, grp in zip(labels, label_group) if grp == g]
-            entropy_rates.append(
-                np.mean(entropy_rate(use_labels, truncate_syllable=self.max_sylls, get_session_sum=False), axis=0))
-
-        self.entropy_rates = entropy_rates
-
+            self.outgoing_transition_entropy.append(np.mean(transition_entropy(use_labels,
+                                                    tm_smoothing=0,
+                                                    truncate_syllable=self.max_sylls,
+                                                    transition_type='outgoing',
+                                                    relabel_by='usage'), axis=0))
     def compute_entropy_differences(self):
         '''
         Computes cross group entropy/entropy-rate differences
@@ -472,13 +452,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Compute entropy + entropy rate differences
         for i in range(len(self.group)):
             for j in range(i + 1, len(self.group)):
-                self.entropies.append(self.entropies[j] - self.entropies[i])
-                self.entropy_rates.append(self.entropy_rates[j] - self.entropy_rates[i])
-
-        # Set entropy and entropy rate Ordered Dicts
-        for i in range(len(self.entropies)):
-            self.entropies[i] = get_usage_dict([self.entropies[i]])[0]
-            self.entropy_rates[i] = get_usage_dict([self.entropy_rates[i]])[0]
+                self.incoming_transition_entropy.append(self.incoming_transition_entropy[j] - self.incoming_transition_entropy[i])
+                self.outgoing_transition_entropy.append(self.outgoing_transition_entropy[j] - self.outgoing_transition_entropy[i])
 
     def initialize_transition_data(self):
         '''
@@ -493,46 +468,26 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         warnings.filterwarnings('ignore')
 
-        # Load Model
-        model_fit = parse_model_results(joblib.load(self.model_path))
-
-        # Load Index File
-        index, sorted_index = parse_index(self.index_path)
-
-        # Load scalar Dataframe to compute syllable speeds
-        scalar_df = scalars_to_dataframe(sorted_index)
-
         # Load Syllable Info
         with open(self.info_path, 'r') as f:
             self.syll_info = yaml.safe_load(f)
 
         # Get labels and optionally relabel them by usage sorting
-        labels = model_fit['labels']
+        labels = self.model_fit['labels']
 
         # get max_sylls
         if self.max_sylls is None:
-            self.max_sylls = len(list(self.syll_info.keys()))
+            self.max_sylls = len(self.syll_info)
 
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            label_df = pd.read_parquet(self.label_df_path, engine='fastparquet')
-            label_df.columns = label_df.columns.astype(int)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, label_df = results_to_dataframe(model_fit, index, count='usage',
-                                                max_syllable=self.max_sylls, sort=True, compute_labels=True)
-            scalar_df['centroid_speed_mm'] = compute_session_centroid_speeds(scalar_df)
-
-        # Compute and append additional syllable scalar data
-        scalars = ['centroid_speed_mm', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
-        for scalar in scalars:
-            df = compute_mean_syll_scalar(df, scalar_df, label_df, scalar=scalar, max_sylls=self.max_sylls)
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         # Get groups and matching session uuids
-        self.group, label_group, label_uuids = get_trans_graph_groups(model_fit, index, sorted_index)
+        self.group, label_group, _ = get_trans_graph_groups(self.model_fit, self.sorted_index)
 
         self.compute_entropies(labels, label_group)
 
@@ -563,41 +518,37 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         Returns
         -------
         '''
+        warnings.filterwarnings('ignore')
 
         # Get graph node anchors
-        usages, anchor, usages_anchor, ngraphs = handle_graph_layout(self.trans_mats, self.usages, anchor=0)
+        usages, anchor, usages_anchor, _ = handle_graph_layout(self.trans_mats, self.usages, anchor=0)
 
         weights = self.trans_mats
 
         # Get anchored group scalars
-        scalars = {
-            'speed': [],
-            'speeds_2d': [],
-            'speeds_3d': [],
-            'heights': [],
-            'dists': []
-        }
+        scalar_names = ['speeds_2d', 'speeds_3d', 'heights', 'dists']
+        col_names = ['velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']
+        col_mapping = dict(zip(scalar_names, col_names))
+        scalars = {k: [] for k in scalar_names}
 
         for g in self.group:
-            scalars['speed'].append(self.df[self.df['group'] == g]['speed'].to_numpy())
-            scalars['speeds_2d'].append(self.df[self.df['group'] == g]['velocity_2d_mm'].to_numpy())
-            scalars['speeds_3d'].append(self.df[self.df['group'] == g]['velocity_3d_mm'].to_numpy())
-            scalars['heights'].append(self.df[self.df['group'] == g]['height_ave_mm'].to_numpy())
-            scalars['dists'].append(self.df[self.df['group'] == g]['dist_to_center'].to_numpy())
+            df_group = self.df[self.df['group'] == g]
+            for _k, _col in col_mapping.items():
+                scalars[_k].append(df_group[_col].to_numpy())
 
-        key = self.scalar_dict.get(scalar_color, 'speed')
+        key = self.scalar_dict.get(scalar_color, 'speeds_2d')
         scalar_anchor = get_usage_dict([scalars[key][anchor]])[0]
 
         # Create graph with nodes and edges
         ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
             weights[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
             keep_orphans=True, usages=usages_anchor, speeds=scalar_anchor, speed_threshold=speed_threshold,
-            usage_threshold=usage_threshold, max_syllable=self.max_sylls - 1)
+            usage_threshold=usage_threshold, max_syllable=self.max_sylls)
 
         # Get graph anchor
         graph_anchor = convert_ebunch_to_graph(ebunch_anchor)
 
-        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls-1)
+        pos = get_pos(graph_anchor, layout=layout, nnodes=self.max_sylls)
 
         # make transition graphs
         group_names = self.group.copy()
@@ -622,5 +573,5 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # interactive plot transition graphs
         plot_interactive_transition_graph(graphs, pos, self.group,
                                           group_names, usages, self.syll_info,
-                                          self.entropies, self.entropy_rates,
+                                          self.incoming_transition_entropy, self.outgoing_transition_entropy,
                                           scalars=scalars, scalar_color=scalar_color)

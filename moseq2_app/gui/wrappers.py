@@ -10,7 +10,6 @@ import qgrid
 import shutil
 import joblib
 import warnings
-import numpy as np
 import pandas as pd
 from bokeh.io import show
 import ruamel.yaml as yaml
@@ -21,12 +20,13 @@ from IPython.display import display, clear_output
 from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.gui.widgets import GroupSettingWidgets
+from moseq2_app.util import compute_syllable_explained_variance
+from moseq2_viz.model.util import relabel_by_usage, parse_model_results
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
-from moseq2_viz.model.util import get_syllable_usages, relabel_by_usage, parse_model_results
-from moseq2_app.roi.validation import (make_session_status_dicts, get_iqr_anomaly_sessions, get_scalar_df,
-                                       print_validation_results)
+from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
+                                       get_scalar_df, print_validation_results)
 
 warnings.filterwarnings('ignore')
 
@@ -97,7 +97,7 @@ def validate_extractions_wrapper(input_dir):
     scalar_df = get_scalar_df(paths)
 
     # Flag sessions with mean scalar values that are outside the inter-quartile range (.25-.75)
-    status_dicts = get_iqr_anomaly_sessions(scalar_df, status_dicts)
+    status_dicts = get_scalar_anomaly_sessions(scalar_df, status_dicts)
 
     # Print Results
     print_validation_results(scalar_df, status_dicts)
@@ -217,15 +217,16 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
     # Get Maximum number of syllables to include
     if max_syllables == None:
-        syllable_usages = get_syllable_usages(model, count='usage')
-        cumulative_explanation = 100 * np.cumsum(syllable_usages)
-        max_sylls = np.argwhere(cumulative_explanation >= n_explained)[0][0]
-        print(f'Number of syllables explaining {n_explained}% variance: {max_sylls}')
+        max_sylls = compute_syllable_explained_variance(model, n_explained=n_explained)
     else:
         max_sylls = max_syllables
 
     # Make initial syllable information dict
-    labeler = SyllableLabeler(model_fit=model, index_file=index_file, max_sylls=max_sylls, save_path=output_file)
+    labeler = SyllableLabeler(model_fit=model,
+                              model_path=model_path,
+                              index_file=index_file,
+                              max_sylls=max_sylls,
+                              save_path=output_file)
 
     # Populate syllable info dict with relevant syllable information
     labeler.get_crowd_movie_paths(index_file, model_path, config_data, crowd_movie_dir)

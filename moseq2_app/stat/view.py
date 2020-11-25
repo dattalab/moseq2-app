@@ -2,6 +2,7 @@ import random
 import warnings
 import itertools
 import numpy as np
+import pandas as pd
 import networkx as nx
 from collections import deque
 from bokeh.layouts import column
@@ -117,6 +118,16 @@ def colorscale(hexstr, scalefactor):
 
     return "#%02x%02x%02x" % (r, g, b)
 
+def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.mean, pct=5):
+    if isinstance(x, pd.core.series.Series):
+        x = x.values
+    pct /= 2
+    n_vals = len(x)
+    if n_samp is None:
+        n_samp = n_vals
+    boots = function(x[np.random.choice(n_vals, size=(n_samp, n_boots))], axis=0)
+    return np.percentile(boots, [pct, 100 - pct])
+
 def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid'):
     '''
     Helper function to bokeh_plotting that iterates through the given DataFrame and plots the
@@ -140,20 +151,30 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     '''
 
     pickers = []
-    for i, color in zip(range(len(groups)), colors):
+    for group, color in zip(groups, colors):
+        df_group = df[df[groupby] == group]
+
         # Get resorted mean syllable data
-        aux_df = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).mean().reindex(sorting)
+        aux_df = df_group.groupby('syllable', as_index=False).mean().reindex(sorting)
 
+        if errorbar == 'CI 95%':
+            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
         # Get SEM values
-        if errorbar == 'SEM':
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
+        elif errorbar == 'SEM':
+            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
         else:
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].std().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).std().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].std().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).std().reindex(sorting)
 
-        miny = aux_df[stat] - sem[stat]
-        maxy = aux_df[stat] + sem[stat]
+        if errorbar == 'CI 95%':
+            errors = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
+            miny = [e[0] for e in errors]
+            maxy = [e[1] for e in errors]
+        else:
+            miny = aux_df[stat] - sem[stat]
+            maxy = aux_df[stat] + sem[stat]
 
         errs_x = [(i, i) for i in range(len(aux_df.index))]
         errs_y = [(min_y, max_y) for min_y, max_y in zip(miny, maxy)]
@@ -172,11 +193,10 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=range(len(aux_df.index)),
             y=aux_df[stat].to_numpy(),
             usage=aux_df['usage'].to_numpy(),
-            speed=aux_df['speed'].to_numpy(),
             speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
             height=aux_df['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_df['dist_to_center'].to_numpy(),
+            dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
             sem=aux_sem[stat].to_numpy(),
             number=sem.index,
             label=labels,
@@ -189,11 +209,10 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             x=errs_x,
             y=errs_y,
             usage=aux_sem['usage'].to_numpy(),
-            speed=aux_sem['speed'].to_numpy(),
             speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
             speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
             height=aux_sem['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_sem['dist_to_center'].to_numpy(),
+            dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
             sem=aux_sem[stat].to_numpy(),
             number=sem.index,
             label=labels,
@@ -203,20 +222,19 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         # Draw glyphs
         line = fig.line('x', 'y', source=source, alpha=0.8, muted_alpha=0.1, line_dash=line_dash,
-                        legend_label=groups[i], color=color)
+                        legend_label=group, color=color)
         circle = fig.circle('x', 'y', source=source, alpha=0.8, muted_alpha=0.1,
-                            legend_label=groups[i], color=color, size=6)
+                            legend_label=group, color=color, size=6)
 
         tooltips = """
                     <div>
                         <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                         <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                        <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                         <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                        <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center{0.000}</span></div>
-                        <div><span style="font-size: 12px;">group-SEM: @sem{0.000}</span></div>
+                        <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
+                        <div><span style="font-size: 12px;">group-error: +/- @sem{0.000}</span></div>
                         <div><span style="font-size: 12px;">label: @label</span></div>
                         <div><span style="font-size: 12px;">description: @desc</span></div>
                         <div>
@@ -235,11 +253,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                           line_policy='nearest')
         fig.add_tools(hover)
 
-        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=groups[i],
+        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
                                     color=color)
 
         if groupby == 'group':
-            picker = ColorPicker(title=f"{groups[i]} Line Color")
+            picker = ColorPicker(title=f"{group} Line Color")
             picker.js_link('color', line.glyph, 'line_color')
             picker.js_link('color', circle.glyph, 'fill_color')
             picker.js_link('color', circle.glyph, 'line_color')
@@ -272,7 +290,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     tools = 'pan, box_zoom, wheel_zoom, save, reset'
 
     # Instantiate Bokeh figure with the HoverTool data
-    p = figure(title=f'Syllable Statistics - Sorted by {sort_name}',
+    p = figure(title=f'Syllable {stat} Statistics - Sorted by {sort_name}',
                width=850,
                height=500,
                tools=tools,
@@ -281,7 +299,6 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
                y_axis_label=f'{stat}',
                output_backend="svg")
 
-    # TODO: allow users to set their own colors
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
@@ -398,7 +415,7 @@ def format_graphs(graphs, group):
 
     return list(group_grid)
 
-def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, group_name):
+def get_neighbors(graph, node_indices, group_name):
     '''
     Computes the incoming and outgoing syllable entropies, entropy rates, previous nodes and
      neighboring nodes for all the nodes included in node_indices.
@@ -407,14 +424,10 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
     ----------
     graph (networkx DiGraph): Generated DiGraph to convert to Bokeh glyph and plot.
     node_indices (list): List of node indices included in the given graph
-    entropies (list): Syllable usage entropy values for each included syllable in the graph
-    entropy_rates (list): Syllable transition entropy rates for all possible edge transitions in the graph
     group_name (str): Graph's group name.
 
     Returns
     -------
-    entropy_in (list): List of computed incoming syllable entropy values for all the given node indices
-    entropy_out (list): List of computed outgoing syllable entropy values for all the given node indices
     prev_states (list): List of previous nodes for each node index in the graph.
     next_states (list): List of successor nodes/syllables for each node in the graph
     neighbor_edge_colors (list): List of colors determining whether an edge is incoming or outgoing from each node.
@@ -427,25 +440,16 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
     # get node directed neighbors
     prev_states, next_states = [], []
 
-    # get average entropy_in and out
-    entropy_in, entropy_out = [], []
     for n in node_indices:
         try:
             # Get predecessor and neighboring states
             pred = np.array(list(graph.predecessors(n)))
             neighbors = np.array(list(graph.neighbors(n)))
 
-            e_ins, e_outs = [], []
             for p in pred:
-                e_in = entropy_rates[p][n] + (entropies[n] + entropies[p])
-                e_ins.append(e_in)
-
                 neighbor_edge_colors[(p, n)] = 'orange'
 
             for nn in neighbors:
-                e_out = entropy_rates[n][nn] + (entropies[nn] + entropies[n])
-                e_outs.append(e_out)
-
                 neighbor_edge_colors[(n, nn)] = 'purple'
 
             # Get predecessor and next state transition weights
@@ -460,17 +464,37 @@ def get_neighbors_and_entropies(graph, node_indices, entropies, entropy_rates, g
             prev_states.append(pred[pred_sort_idx])
             next_states.append(neighbors[next_sort_idx])
 
-            entropy_in.append(np.nanmean(e_ins))
-            entropy_out.append(np.nanmean(e_outs))
         except nx.NetworkXError:
             # handle orphans
             print('missing', group_name, n)
             pass
 
-    return entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors
+    return prev_states, next_states, neighbor_edge_colors
+
+def format_plot(plot):
+    '''
+    Turns off all major and minor x,y ticks on the transition plot graphs
+
+    Parameters
+    ----------
+    plot (bokeh Plot): Current graph being generated
+
+    Returns
+    -------
+    '''
+
+    plot.xaxis.major_tick_line_color = None  # turn off x-axis major ticks
+    plot.xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
+
+    plot.yaxis.major_tick_line_color = None  # turn off y-axis major ticks
+    plot.yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
+
+    plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
+    plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
+
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
-                                      syll_info, entropies, entropy_rates,
+                                      syll_info, incoming_transition_entropy, outgoing_transition_entropy,
                                       scalars, scalar_color='default'):
     '''
 
@@ -505,17 +529,18 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
             # Connecting pan-zoom interaction across plots
             plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
 
+        format_plot(plot)
+
         tooltips = """
                         <div>
                             <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                             <div><span style="font-size: 12px;">label: @label</span></div>
                             <div><span style="font-size: 12px;">description: @desc</span></div>
                             <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                            <div><span style="font-size: 12px;">centroid speed: @speed{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                             <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                            <div><span style="font-size: 12px;">Normalized Distance to Center: @dist_to_center{0.000}</span></div>
+                            <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
                             <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
                             <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
@@ -535,8 +560,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                        TapTool(),
                        BoxSelectTool())
 
-        entropy_in, entropy_out, prev_states, next_states, neighbor_edge_colors = \
-            get_neighbors_and_entropies(graph, node_indices, entropies[i], entropy_rates[i], group_names[i])
+        prev_states, next_states, neighbor_edge_colors = \
+            get_neighbors(graph, node_indices, group_names[i])
 
         # edge colors for difference graphs
         if i >= len(group):
@@ -557,7 +582,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         group_usage = [usages[i][j] for j in node_indices if j in usages[i].keys()]
 
         # get speeds
-        group_speed = [scalars['speed'][i][j] for j in node_indices if j in scalars['speed'][i].keys()]
         group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i].keys()]
         group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i].keys()]
 
@@ -598,31 +622,28 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         graph_renderer.node_renderer.data_source.add(prev_states, 'prev')
         graph_renderer.node_renderer.data_source.add(next_states, 'next')
         graph_renderer.node_renderer.data_source.add(group_usage, 'usage')
-        graph_renderer.node_renderer.data_source.add(group_speed, 'speed')
         graph_renderer.node_renderer.data_source.add(group_speed_2d, 'speed_2d')
         graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
         graph_renderer.node_renderer.data_source.add(group_height, 'height')
-        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center')
-        graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_in), 'ent_in')
-        graph_renderer.node_renderer.data_source.add(np.nan_to_num(entropy_out), 'ent_out')
+        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center_px')
+        graph_renderer.node_renderer.data_source.add(incoming_transition_entropy[i], 'ent_in')
+        graph_renderer.node_renderer.data_source.add(outgoing_transition_entropy[i], 'ent_out')
 
         text_color = 'white'
 
         # node interactions
-        if scalar_color == 'Centroid Speed':
-            fill_color = linear_cmap('speed', "Spectral4", 0, max(group_speed))
-        elif scalar_color == '2D velocity':
+        if scalar_color == '2D velocity':
             fill_color = linear_cmap('speed_2d', "Spectral4", 0, max(group_speed_2d))
         elif scalar_color == '3D velocity':
             fill_color = linear_cmap('speed_3d', "Spectral4", 0, max(group_speed_3d))
         elif scalar_color == 'Height':
             fill_color = linear_cmap('height', "Spectral4", 0, max(group_height))
         elif scalar_color == 'Distance to Center':
-            fill_color = linear_cmap('dist_to_center', "Spectral4", 0, max(group_dist))
+            fill_color = linear_cmap('dist_to_center_px', "Spectral4", 0, max(group_dist))
         elif scalar_color == 'Entropy-In':
-            fill_color = linear_cmap('ent_in', "Spectral4", 0, max(np.nan_to_num(entropy_in)))
+            fill_color = linear_cmap('ent_in', "Spectral4", 0, max(incoming_transition_entropy[i]))
         elif scalar_color == 'Entropy-Out':
-            fill_color = linear_cmap('ent_out', "Spectral4", 0, max(entropy_out))
+            fill_color = linear_cmap('ent_out', "Spectral4", 0, max(outgoing_transition_entropy[i]))
         else:
             fill_color = 'white'
             text_color = 'black'
@@ -654,15 +675,19 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         # added rendered graph to plot
         plot.renderers.append(graph_renderer)
 
-        # get node positions
-        if len(plots) == 0:
-            x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
-            syllable = list(graph.nodes)
-        else:
-            new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
-                          graph_renderer.layout_provider.graph_layout.keys()}
-            x, y = zip(*new_layout.values())
-            syllable = [a if a in node_indices else '' for a in list(new_layout.keys())]
+        try:
+            # get node positions
+            if len(plots) == 0:
+                x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
+                syllable = list(graph.nodes)
+            else:
+                new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
+                              graph_renderer.layout_provider.graph_layout.keys()}
+                x, y = zip(*new_layout.values())
+                syllable = [a if a in node_indices else '' for a in list(new_layout.keys())]
+        except:
+            x, y = [], []
+            syllable = []
 
         # create DataSource for node info
         label_source = ColumnDataSource({'x': x,
@@ -692,8 +717,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         ]
 
         if i >= len(group):
-            items += [LegendItem(label="Up-regulated", renderers=[r_line])]
-            items += [LegendItem(label="Down-regulated", renderers=[b_line])]
+            items += [LegendItem(label="Up-regulated in G1", renderers=[r_line])]
+            items += [LegendItem(label="Down-regulated in G1", renderers=[b_line])]
 
         legend = Legend(items=items,
                        border_line_color="black", background_fill_color='white',

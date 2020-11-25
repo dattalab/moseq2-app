@@ -6,7 +6,7 @@ from moseq2_app.util import index_to_dataframe
 from moseq2_viz.scalars.util import compute_all_pdf_data
 from moseq2_app.roi.validation import get_scalar_df, check_timestamp_error_percentage, count_nan_rows, \
     count_missing_mouse_frames, count_frames_with_small_areas, count_stationary_frames, compute_kl_divergences, \
-    get_kl_divergence_outliers, make_session_status_dicts, get_iqr_anomaly_sessions, run_heatmap_kl_divergence_test, \
+    get_kl_divergence_outliers, make_session_status_dicts, get_scalar_anomaly_sessions, run_heatmap_kl_divergence_test, \
     run_validation_tests, plot_heatmap, print_validation_results
 
 class TestExtractionValidation(TestCase):
@@ -22,7 +22,7 @@ class TestExtractionValidation(TestCase):
 
         percent_error = check_timestamp_error_percentage(timestamps)
 
-        assert percent_error == 1.1003544858038812
+        assert percent_error == 0.011003544858038812
 
     def test_count_nan_rows(self):
 
@@ -131,19 +131,6 @@ class TestExtractionValidation(TestCase):
                                                 'dropped_frames', 'corrupted', 'stationary', 'missing',
                                                 'size_anomaly', 'position_heatmap']
 
-    def test_get_iqr_anomaly_sessions(self):
-        paths = {
-            'session_1': 'data/test_session/proc/results_00.mp4'
-        }
-
-        status_dicts = make_session_status_dicts(paths)
-
-        scalar_df = get_scalar_df(paths)
-
-        new_status_dicts = get_iqr_anomaly_sessions(scalar_df, deepcopy(status_dicts))
-
-        assert list(new_status_dicts.values()) == list(status_dicts.values())
-
     def test_run_heatmap_kl_divergence_test(self):
         paths = {
             'session_1': 'data/test_session/proc/results_00.mp4'
@@ -157,6 +144,20 @@ class TestExtractionValidation(TestCase):
 
         assert new_status_dicts == status_dicts
 
+    def test_get_scalar_anomaly_sessions(self):
+        paths = {
+            'session_1': 'data/test_session/proc/results_00.mp4'
+        }
+
+        status_dicts = make_session_status_dicts(paths)
+
+        scalar_df = get_scalar_df(paths)
+
+        test_x = get_scalar_anomaly_sessions(scalar_df, status_dicts)
+        print(test_x)
+        assert test_x['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['scalar_anomaly'] == False
+
+
     def test_run_validation_tests(self):
         paths = {
             'session_1': 'data/test_session/proc/results_00.mp4'
@@ -169,7 +170,7 @@ class TestExtractionValidation(TestCase):
         new_status_dicts = run_validation_tests(scalar_df, deepcopy(status_dicts))
 
         assert new_status_dicts == status_dicts
-        assert new_status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['dropped_frames'] > 0.05
+        assert new_status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']['dropped_frames'] == False
 
     def test_plot_heatmap(self):
 
