@@ -118,7 +118,7 @@ def colorscale(hexstr, scalefactor):
 
     return "#%02x%02x%02x" % (r, g, b)
 
-def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.mean, pct=5):
+def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, pct=5):
     if isinstance(x, pd.core.series.Series):
         x = x.values
     pct /= 2
@@ -170,14 +170,8 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         if errorbar == 'CI 95%':
             errors = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
-            miny, maxy = [], []
-            for e in errors:
-                if isinstance(e, list):
-                    miny.append(e[0])
-                    maxy.append(e[1])
-                else:
-                    miny.append(0)
-                    maxy.append(0)
+            miny = [e[0] for e in errors]
+            maxy = [e[1] for e in errors]
         else:
             miny = aux_df[stat] - sem[stat]
             maxy = aux_df[stat] + sem[stat]
