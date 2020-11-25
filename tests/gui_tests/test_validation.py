@@ -33,7 +33,7 @@ class TestExtractionValidation(TestCase):
         # Get scalar dataframe including all sessions
         scalar_df = get_scalar_df(paths)
 
-        assert scalar_df.shape == (900, 29)
+        assert scalar_df.shape == (900, 21)
 
         n_missing_frames = count_nan_rows(scalar_df)
         assert n_missing_frames == 0
@@ -85,7 +85,7 @@ class TestExtractionValidation(TestCase):
         # Get scalar dataframe including all sessions
         scalar_df = get_scalar_df(paths)
 
-        assert scalar_df.shape == (900, 29)
+        assert scalar_df.shape == (900, 21)
 
     def test_compute_kl_divergences(self):
 
