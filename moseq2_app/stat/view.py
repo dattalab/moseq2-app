@@ -498,6 +498,52 @@ def format_plot(plot):
     plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
     plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
 
+def get_minmax_tp(edge_width, diff=False):
+    '''
+    Computes the min and max transition probabilities given the rescaled edge-widths.
+    If diff = True, the function will return 4 variables: min/max for down and up-regulated syllables,
+
+    Parameters
+    ----------
+    edge_width (dict): dict of syllables paired with drawn edge widths
+    diff (bool): indicates whether to compute min/max transition probs. for up and down-regulated syllables.
+
+    Returns
+    -------
+    min_tp (float): min transition probability (min_down_tp if diff=True)
+    max_tp (float): max transition probability (max_down_tp if diff=True)
+     if diff == True
+    min_up_tp (float): min transition probability in up-regulated syllable
+    max_up_tp (float): max transition probability in up-regulated syllable
+    '''
+
+    if not diff:
+        try:
+            min_tp = min(list(edge_width.values())) / 200
+            max_tp = max(list(edge_width.values())) / 200
+        except ValueError:
+            # handle empty list
+            min_tp, max_tp = 0, 0
+        return min_tp, max_tp
+    else:
+        # get min/max down
+        try:
+            min_down_tp = min([e for e in edge_width.values() if e < 0]) / 350
+            max_down_tp = max([e for e in edge_width.values() if e < 0]) / 350
+        except ValueError:
+            # empty list
+            min_down_tp, max_down_tp = 0, 0
+
+        # get min/max up
+        try:
+            min_up_tp = min([e for e in edge_width.values() if e > 0]) / 350
+            max_up_tp = max([e for e in edge_width.values() if e > 0]) / 350
+        except ValueError:
+            min_up_tp, max_up_tp = 0, 0
+
+        return min_down_tp, max_down_tp, min_up_tp, max_up_tp
+
+
 def get_difference_legend_items(plot, edge_width, group_name):
     '''
     Creates the difference graph legend items with the min and max transition probabilities
@@ -522,13 +568,7 @@ def get_difference_legend_items(plot, edge_width, group_name):
 
     G1 = group_name.split('-')[0]
 
-    # get min/max down
-    min_down_tp = min([e for e in edge_width.values() if e < 0]) / 350
-    max_down_tp = max([e for e in edge_width.values() if e < 0]) / 350
-
-    # get min/max up
-    min_up_tp = min([e for e in edge_width.values() if e > 0]) / 350
-    max_up_tp = max([e for e in edge_width.values() if e > 0]) / 350
+    min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True)
 
     min_down_line = plot.line(line_color='blue', line_width=min_down_tp * 350)
     max_down_line = plot.line(line_color='blue', line_width=max_down_tp * 350)
@@ -771,12 +811,10 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         o_line = plot.line(line_color='orange')
         p_line = plot.line(line_color='purple')
 
-        # re-adjust edge width values back to weights
-        min_tp = min(list(edge_width.values())) / 200
-        max_tp = max(list(edge_width.values())) / 200
+        min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
 
-        mink_line = plot.line(line_color='black', line_width=min(list(edge_width.values())))
-        maxk_line = plot.line(line_color='black', line_width=max(list(edge_width.values())))
+        mink_line = plot.line(line_color='black', line_width=min_tp*200)
+        maxk_line = plot.line(line_color='black', line_width=max_tp*200)
 
         group_items = [
             LegendItem(label="Incoming Transition", renderers=[o_line]),
