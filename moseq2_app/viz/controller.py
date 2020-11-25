@@ -16,6 +16,7 @@ from copy import deepcopy
 from bokeh.io import show
 import ruamel.yaml as yaml
 import ipywidgets as widgets
+from os.path import basename
 from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
@@ -28,6 +29,9 @@ from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
 from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_position_heatmaps, get_syllable_pdfs)
+
+yml = yaml.YAML()
+yml.indent(mapping=3, offset=2)
 
 class SyllableLabeler(SyllableLabelerWidgets):
     '''
@@ -88,8 +92,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
             self.syll_info = {str(i): {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in
                               range(max_sylls)}
-            yml = yaml.YAML()
-            yml.indent(mapping=3, offset=2)
 
             # Write to file
             with open(self.save_path, 'w+') as f:
@@ -118,6 +120,22 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         clear_output()
 
+    def write_syll_info(self):
+        '''
+        Writes current syllable info data to a YAML file.
+
+        Returns
+        -------
+        '''
+
+        tmp = deepcopy(self.syll_info)
+        for syll in range(self.max_sylls):
+            del tmp[str(syll)]['group_info']
+
+        # Write to file
+        with open(self.save_path, 'w+') as f:
+            yml.dump(tmp, f)
+
     def on_next(self, event):
         '''
         Callback function to trigger an view update when the user clicks the "Next" button.
@@ -144,6 +162,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Updating input values with current dict entries
         self.lbl_name_input.value = self.syll_info[str(self.syll_select.index)]['label']
         self.desc_input.value = self.syll_info[str(self.syll_select.index)]['desc']
+
+        self.write_syll_info()
 
     def on_prev(self, event):
         '''
@@ -172,6 +192,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.lbl_name_input.value = self.syll_info[str(self.syll_select.index)]['label']
         self.desc_input.value = self.syll_info[str(self.syll_select.index)]['desc']
 
+        self.write_syll_info()
+
     def on_set(self, event):
         '''
         Callback function to save the dict to syllable information file.
@@ -188,16 +210,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.syll_info[str(self.syll_select.index)]['label'] = self.lbl_name_input.value
         self.syll_info[str(self.syll_select.index)]['desc'] = self.desc_input.value
 
-        yml = yaml.YAML()
-        yml.indent(mapping=3, offset=2)
-
-        tmp = deepcopy(self.syll_info)
-        for syll in range(self.max_sylls):
-            del tmp[str(syll)]['group_info']
-
-        # Write to file
-        with open(self.save_path, 'w+') as f:
-            yml.dump(tmp, f)
+        self.write_syll_info()
 
         # Update button style
         self.set_button.button_style = 'success'
@@ -274,11 +287,26 @@ class SyllableLabeler(SyllableLabelerWidgets):
         -------
         '''
 
-        output_table = Div(text=pd.DataFrame(group_info).to_html())
+        full_df = pd.DataFrame(group_info)
+        columns = full_df.columns
+
+        output_tables = []
+        if len(self.groups) < 4:
+            # if there are less than 4 groups, plot the table in one row
+            output_tables = [Div(text=full_df.to_html())]
+        else:
+            # plot 4 groups per row to avoid table being cut off by movie
+            n_rows = int(len(columns) / 4)
+            row_cols = np.split(columns, n_rows)
+
+            for i in range(len(row_cols)):
+                row_df = full_df[row_cols[i]]
+                output_tables += [Div(text=row_df.to_html())]
 
         ipy_output = widgets.Output()
         with ipy_output:
-            show(output_table)
+            for ot in output_tables:
+                show(ot)
 
         self.info_boxes.children = [self.syll_info_lbl, ipy_output, ]
 
@@ -337,7 +365,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Create grid layout to display all the widgets
         grid = widgets.AppLayout(left_sidebar=vid_out,
                                  right_sidebar=self.data_box,
-                                 pane_widths=[3, 0, 2.5])
+                                 pane_widths=[3, 0, 3])
 
         # Display all widgets
         display(grid, self.button_box)
@@ -410,9 +438,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if set(crowd_movie_paths) != set(info_cm_paths):
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                syll_num = str(int(re.findall(r'\d+', cm)[0]))
+                syll_num = str(int(re.findall(r'\d+', basename(cm))[0]))
                 if syll_num in self.syll_info.keys():
                     self.syll_info[syll_num]['crowd_movie_path'] = cm
+
+        # Write to file
+        with open(self.save_path, 'w+') as f:
+            yml.dump(self.syll_info, f)
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
     '''
@@ -510,8 +542,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data['medfilter_space'] = [0]
         self.config_data['sort'] = True
         self.config_data['pad'] = 10
-        self.config_data['min_dur'] = 3
+        self.config_data['min_dur'] = 40
         self.config_data['max_dur'] = 60
+        self.config_data['max_movie_dur'] = 40
         self.config_data['raw_size'] = (512, 424)
         self.config_data['scale'] = 1
         self.config_data['legacy_jitter_fix'] = False

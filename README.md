@@ -39,6 +39,13 @@ A stand-alone notebook containing all the interactive data exploration tools for
 modeled data. Simply enter the paths to your selected model(s) and index file
 to use to syllable exploration tools.
 
+### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./Model-Results-Extension.ipynb))
+
+A stand-alone notebook demonstrating the `moseq2_viz` functionality. With examples for how to obtain
+syllable usages and other scalar statistics, and plot the syllables reordered by different statistics or by
+group difference. Additional examples include computing behavioral similarity distances, transition matrices,
+and hypothesis testing.
+
 ### Flip Classifier Training Notebook ([link](./Flip%20Classifier%20Training%20Notebook.ipynb))
 
 This notebook is a stand-alone tool that can be used to train a new 

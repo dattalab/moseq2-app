@@ -52,7 +52,8 @@ class SyllableLabelerWidgets:
                                               justify_content='space-around',
                                               width='100%')
 
-        self.center_layout = widgets.Layout(display='flex', align_items='center')
+        self.center_layout = widgets.Layout(justify_content='space-around',
+                                            align_items='center')
 
         # label box
         self.lbl_box = VBox([self.syll_lbl, self.desc_lbl], layout=self.label_layout)

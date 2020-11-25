@@ -154,9 +154,10 @@ def get_scalar_df(path_dict):
 
         sess_df = pd.DataFrame.from_dict(tmp)
         for mk, mv in metadata.items():
-            if isinstance(mv, list):
-                mv = mv[0]
-            sess_df[mk] = mv
+            if mk in ['SessionName', 'SubjectName']:
+                if isinstance(mv, list):
+                    mv = mv[0]
+                sess_df[mk] = mv
 
         scalar_dfs.append(sess_df)
 
@@ -437,7 +438,7 @@ def print_validation_results(scalar_df, status_dicts):
         error, warning = False, False
         for k1, v1 in anomaly_dict[k].items():
             if k1 != 'metadata':
-                if k1 in errors and v1 != False:
+                if k1 in errors and v1 == True:
                     error = True
                 elif isinstance(v1, dict):
                     # scalar anomalies
@@ -447,7 +448,6 @@ def print_validation_results(scalar_df, status_dicts):
                     warning = True
                 elif v1 == True:
                     warning = True
-
 
         if warning:
             n_warnings += 1
@@ -475,10 +475,11 @@ def print_validation_results(scalar_df, status_dicts):
                     x = f'{k1} - {v1*100:.2f}%'
                 elif k1 == 'position_heatmap' and not isinstance(v1, bool): 
                     x = 'position heatmaps'
-                    t = 'Warning - Position Heatmap was flagged'
+                    t = 'Warning - Position Heatmap flag raised'
                     try:
                         plot_heatmap(v1, f'{session_name}_{subject_name}')
                     except:
+                        print(f'Could not plot heatmap: {session_name}_{subject_name}')
                         pass
                 elif isinstance(v1, dict):
                     t = 'Warning'
@@ -486,7 +487,10 @@ def print_validation_results(scalar_df, status_dicts):
                         x = list(v1.keys())
                 elif v1 == True:
                     t = 'Warning'
-                    x = f'{k1} was flagged'
+                    x = f'{k1} flag raised'
+                elif isinstance(v1, float):
+                    t = 'Warning'
+                    x = f'{k1} flag raised: {v1*100:.2f}%'
             if len(x) > 0:
                 if 'Warning' in t:
                     t = f'{bcolors.WARNING}{t}'
