@@ -119,7 +119,7 @@ def plot_roi_results(sessionName, bground_im, roi, overlay, filtered_frames, dep
     '''
 
     # ignore flip classifier sklearn version warnings
-    warnings.filterwarnings('ignore')
+    # warnings.filterwarnings('ignore')
 
     # set bokeh tools
     tools = 'pan, box_zoom, wheel_zoom, hover, reset'
