@@ -16,7 +16,6 @@ from moseq2_viz.util import get_sorted_index
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from scipy.cluster.hierarchy import linkage, dendrogram
-from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.dist import get_behavioral_distance
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
@@ -64,7 +63,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.df = None
 
-        self.ar_mats = None
         self.results = None
         self.icoord, self.dcoord = None, None
         self.cladogram = None
@@ -278,7 +276,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
     '''
 
-    def __init__(self, model_path, index_path, info_path, df_path, max_sylls, load_parquet):
+    def __init__(self, model_path, index_path, info_path, df_path, max_sylls, plot_vertically, load_parquet):
         '''
         Initializes context variables
 
@@ -297,6 +295,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.info_path = info_path
         self.df_path = df_path
         self.max_sylls = max_sylls
+        self.plot_vertically = plot_vertically
 
         if load_parquet:
             if df_path is not None and not os.path.exists(df_path):
@@ -311,7 +310,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.sorted_index = get_sorted_index(index_path)
 
         if set(self.sorted_index['files']) != set(self.model_fit['metadata']['uuids']):
-            print('Error: Index file UUIDs do not match model UUIDs.')
+            print('Warning: Index file UUIDs do not match model UUIDs.')
 
         # Load and store transition graph data
         self.initialize_transition_data()
@@ -482,7 +481,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                 print('Loading parquet files')
                 df = pd.read_parquet(self.df_path, engine='fastparquet')
             else:
-                print('Syllable DataFrame not found. Creating new dataframe and  computing syllable statistics...')
+                print('Syllable DataFrame not found. Creating new dataframe and computing syllable statistics...')
                 df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
             self.df = df
 
@@ -526,8 +525,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             usages = [normalize_usages(u) for u in self.usages]
             usages_anchor = usages[anchor]
 
-            weights = self.trans_mats
-
             # Get anchored group scalars
             scalars = defaultdict(list)
             _scalar_map = {
@@ -556,7 +553,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             # Create graph with nodes and edges
             ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
-                weights[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
+                self.trans_mats[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
                 keep_orphans=True, max_syllable=self.max_sylls, **usage_kwargs, **speed_kwargs)
             indices = [e[:-1] for e in ebunch_anchor]
 
@@ -586,4 +583,4 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             plot_interactive_transition_graph(graphs, pos, self.group,
                                             group_names, usages, self.syll_info,
                                             self.incoming_transition_entropy, self.outgoing_transition_entropy,
-                                            scalars=scalars, scalar_color=scalar_color)
+                                            scalars=scalars, scalar_color=scalar_color, plot_vertically=self.plot_vertically)

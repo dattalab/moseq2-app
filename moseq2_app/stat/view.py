@@ -118,7 +118,7 @@ def colorscale(hexstr, scalefactor):
 
     return "#%02x%02x%02x" % (r, g, b)
 
-def get_ci_vect_vectorized(x, n_boots=1000, n_samp=None, function=np.mean, pct=5):
+def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, pct=5):
     if isinstance(x, pd.core.series.Series):
         x = x.values
     pct /= 2
@@ -151,25 +151,25 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     '''
 
     pickers = []
-    for i, color in zip(range(len(groups)), colors):
+    for group, color in zip(groups, colors):
+        df_group = df[df[groupby] == group]
 
         # Get resorted mean syllable data
-        aux_df = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).mean().reindex(sorting)
+        aux_df = df_group.groupby('syllable', as_index=False).mean().reindex(sorting)
 
         if errorbar == 'CI 95%':
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
         # Get SEM values
         elif errorbar == 'SEM':
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).sem().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
         else:
-            sem = df[df[groupby] == groups[i]].groupby('syllable')[[stat]].std().reindex(sorting)
-            aux_sem = df[df[groupby] == groups[i]].groupby('syllable', as_index=False).std().reindex(sorting)
+            sem = df_group.groupby('syllable')[[stat]].std().reindex(sorting)
+            aux_sem = df_group.groupby('syllable', as_index=False).std().reindex(sorting)
 
         if errorbar == 'CI 95%':
-            errors = df[df[groupby] == groups[i]].groupby('syllable')[stat].apply(get_ci_vect_vectorized,
-                                                                               n_boots=10000).reindex(sorting).to_numpy()
+            errors = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
             miny = [e[0] for e in errors]
             maxy = [e[1] for e in errors]
         else:
@@ -222,9 +222,9 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         # Draw glyphs
         line = fig.line('x', 'y', source=source, alpha=0.8, muted_alpha=0.1, line_dash=line_dash,
-                        legend_label=groups[i], color=color)
+                        legend_label=group, color=color)
         circle = fig.circle('x', 'y', source=source, alpha=0.8, muted_alpha=0.1,
-                            legend_label=groups[i], color=color, size=6)
+                            legend_label=group, color=color, size=6)
 
         tooltips = """
                     <div>
@@ -253,11 +253,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                           line_policy='nearest')
         fig.add_tools(hover)
 
-        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=groups[i],
+        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
                                     color=color)
 
         if groupby == 'group':
-            picker = ColorPicker(title=f"{groups[i]} Line Color")
+            picker = ColorPicker(title=f"{group} Line Color")
             picker.js_link('color', line.glyph, 'line_color')
             picker.js_link('color', circle.glyph, 'fill_color')
             picker.js_link('color', circle.glyph, 'line_color')
@@ -492,10 +492,103 @@ def format_plot(plot):
     plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
     plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
 
+def get_minmax_tp(edge_width, diff=False):
+    '''
+    Computes the min and max transition probabilities given the rescaled edge-widths.
+    If diff = True, the function will return 4 variables: min/max for down and up-regulated syllables,
+
+    Parameters
+    ----------
+    edge_width (dict): dict of syllables paired with drawn edge widths
+    diff (bool): indicates whether to compute min/max transition probs. for up and down-regulated syllables.
+
+    Returns
+    -------
+    min_tp (float): min transition probability (min_down_tp if diff=True)
+    max_tp (float): max transition probability (max_down_tp if diff=True)
+     if diff == True
+    min_up_tp (float): min transition probability in up-regulated syllable
+    max_up_tp (float): max transition probability in up-regulated syllable
+    '''
+
+    if not diff:
+        try:
+            min_tp = min(list(edge_width.values())) / 200
+            max_tp = max(list(edge_width.values())) / 200
+        except ValueError:
+            # handle empty list
+            min_tp, max_tp = 0, 0
+        return min_tp, max_tp
+    else:
+        # get min/max down
+        try:
+            min_down_tp = min([e for e in edge_width.values() if e < 0]) / 350
+            max_down_tp = max([e for e in edge_width.values() if e < 0]) / 350
+        except ValueError:
+            # empty list
+            min_down_tp, max_down_tp = 0, 0
+
+        # get min/max up
+        try:
+            min_up_tp = min([e for e in edge_width.values() if e > 0]) / 350
+            max_up_tp = max([e for e in edge_width.values() if e > 0]) / 350
+        except ValueError:
+            min_up_tp, max_up_tp = 0, 0
+
+        return min_down_tp, max_down_tp, min_up_tp, max_up_tp
+
+
+def get_difference_legend_items(plot, edge_width, group_name):
+    '''
+    Creates the difference graph legend items with the min and max transition probabilities
+     for both the up and down-regulated transition probabilities.
+
+    Parameters
+    ----------
+    plot (bokeh.figure): Bokeh plot to add legend to.
+    edge_width (dict): Dictionary of edge widths
+    group_name (str): Difference graph title.
+
+    Returns
+    -------
+    diff_items (list): List of LegendItem objects to display
+    '''
+
+    r_line = plot.line(line_color='red')
+    b_line = plot.line(line_color='blue')
+
+    r_circle = plot.circle(line_color='red', fill_color='white')
+    b_circle = plot.circle(line_color='blue', fill_color='white')
+
+    G1 = group_name.split('-')[0]
+
+    min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True)
+
+    min_down_line = plot.line(line_color='blue', line_width=min_down_tp * 350)
+    max_down_line = plot.line(line_color='blue', line_width=max_down_tp * 350)
+
+    min_up_line = plot.line(line_color='red', line_width=min_up_tp * 350)
+    max_up_line = plot.line(line_color='red', line_width=max_up_tp * 350)
+
+    diff_main_items = [
+        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[r_circle]),
+        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[b_circle]),
+        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[r_line]),
+        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[b_line]),
+    ]
+
+    diff_width_items = [
+        LegendItem(label=f"Min Up-regulated P(transition): {min_up_tp:.4f}", renderers=[min_up_line]),
+        LegendItem(label=f"Max Up-regulated P(transition): {max_up_tp:.4f}", renderers=[max_up_line]),
+        LegendItem(label=f"Min Down-regulated P(transition): {min_down_tp:.4f}", renderers=[min_down_line]),
+        LegendItem(label=f"Max Down-regulated P(transition): {max_down_tp:.4f}", renderers=[max_down_line]),
+    ]
+
+    return diff_main_items, diff_width_items
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, incoming_transition_entropy, outgoing_transition_entropy,
-                                      scalars, scalar_color='default'):
+                                      scalars, scalar_color='default', plot_vertically=False, legend_loc='above'):
     '''
 
     Converts the computed networkx transition graphs to Bokeh glyph objects that can be interacted with
@@ -514,6 +607,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     Returns
     -------
     '''
+
+    if plot_vertically:
+        legend_loc = 'right'
 
     rendered_graphs, plots = [], []
 
@@ -706,29 +802,58 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
         o_line = plot.line(line_color='orange')
         p_line = plot.line(line_color='purple')
-        r_line = plot.line(line_color='red')
-        b_line = plot.line(line_color='blue')
 
-        items = [
+        min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
+
+        mink_line = plot.line(line_color='black', line_width=min_tp*200)
+        maxk_line = plot.line(line_color='black', line_width=max_tp*200)
+
+        group_items = [
             LegendItem(label="Incoming Transition", renderers=[o_line]),
             LegendItem(label="Outgoing Transition", renderers=[p_line]),
         ]
 
-        if i >= len(group):
-            items += [LegendItem(label="Up-regulated in G1", renderers=[r_line])]
-            items += [LegendItem(label="Down-regulated in G1", renderers=[b_line])]
+        info_items = [
+            LegendItem(label=f"Min P(transition): {min_tp:.4f}", renderers=[mink_line]),
+            LegendItem(label=f"Max P(transition): {max_tp:.4f}", renderers=[maxk_line]),
+        ]
 
-        legend = Legend(items=items,
-                       border_line_color="black", background_fill_color='white',
-                       background_fill_alpha=1.0)
-        plot.renderers.append(legend)
+        if i >= len(group):
+            diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_names[i])
+            group_items += diff_main_items
+
+        main_legend = Legend(items=group_items,
+                             location='top_left',
+                             border_line_color="black",
+                             background_fill_color='white',
+                             background_fill_alpha=0.7)
+
+        info_legend = Legend(items=info_items,
+                             location='bottom_left',
+                             border_line_color="black",
+                             background_fill_color='white',
+                             background_fill_alpha=0.7)
+
+        plot.renderers.append(main_legend)
+        plot.renderers.append(info_legend)
+
+        if not plot_vertically:
+            plot.add_layout(main_legend, legend_loc)
+            #plot.add_layout(info_legend, legend_loc)
 
         plots.append(plot)
         rendered_graphs.append(graph_renderer)
 
-    # Format grid of transition graphs
-    formatted_plots = format_graphs(plots, group)
+    ncols = None
+    plot_width, plot_height = 550, 675
+    if not plot_vertically:
+        # Format grid of transition graphs
+        formatted_plots = format_graphs(plots, group)
+    else:
+        formatted_plots = list(plots)
+        ncols = 1
+        plot_height, plot_width = 550, 550
 
     # Create Bokeh grid plot object
-    gp = gridplot(formatted_plots, plot_width=550, plot_height=550)
+    gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
     show(gp)

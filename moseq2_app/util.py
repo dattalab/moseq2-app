@@ -4,11 +4,10 @@ General utility functions.
 
 '''
 
-import numpy as np
 import pandas as pd
 import ruamel.yaml as yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
-from moseq2_viz.model.util import get_syllable_usages, compute_behavioral_statistics
+from moseq2_viz.model.util import compute_behavioral_statistics
 
 def merge_labels_with_scalars(sorted_index, model_path):
     '''
@@ -34,29 +33,6 @@ def merge_labels_with_scalars(sorted_index, model_path):
                                        groupby=['group', 'uuid', 'SessionName', 'SubjectName'])
 
     return df, scalar_df
-
-def compute_syllable_explained_variance(model, n_explained=99):
-    '''
-    Computes the maximum number of syllables to include that explain the given
-     percentage of explained variance.
-
-    Parameters
-    ----------
-    model (dict): ARHMM results dict
-    n_explained (int): Percentage of explained variance
-
-    Returns
-    -------
-    max_sylls (int): Number of syllables that explain the given percentage of the variance
-    '''
-
-    syllable_usages = list(get_syllable_usages(model['labels'], count='usage').values())
-    cumulative_explanation = 100 * np.cumsum(syllable_usages / sum(syllable_usages))
-
-    max_sylls = np.argwhere(cumulative_explanation >= n_explained)[0][0]
-    print(f'Number of syllables explaining {n_explained}% variance: {max_sylls}')
-
-    return max_sylls
 
 def index_to_dataframe(index_path):
     '''

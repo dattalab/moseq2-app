@@ -93,7 +93,7 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:
-            path_dict = {basename(dirname(p)): p for p in sessions}
+            path_dict = {basename(p): p for p in sessions}
     else:
         for sess in sessions:
             # get path to session directory
@@ -108,7 +108,7 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:
-            path_dict = {basename(dirname(p)): p for p in sessions}
+            path_dict = {basename(p): p for p in sessions}
 
     return path_dict
 
@@ -179,7 +179,87 @@ def update_progress(progress_file, varK, varV):
 
     return progress
 
+def find_progress(base_progress):
+    '''
+    Searches for paths to all existing MosSeq2-Notebook dependencies
+     and updates the progress paths dictionary.
+
+    Parameters
+    ----------
+    base_progress (dict): base dictionary of progress variables
+
+    Returns
+    -------
+    base_progress (dict): updated dictionary of progress variables
+    '''
+
+    base_dir = base_progress['base_dir']
+    yamls = glob(join(base_dir, '*.yaml'))
+
+    if join(base_dir, 'config.yaml') in yamls:
+        base_progress['config_file'] = join(base_dir, 'config.yaml')
+
+    if join(base_dir, 'session_config.yaml') in yamls:
+        base_progress['session_config'] = join(base_dir, 'session_config.yaml')
+
+    if join(base_dir, 'moseq2-index.yaml') in yamls:
+        base_progress['index_file'] = join(base_dir, 'moseq2-index.yaml')
+
+    if exists(join(base_dir, 'aggregate_results/')):
+        base_progress['train_data_dir'] = join(base_dir, 'aggregate_results/')
+
+    if exists(join(base_dir, '_pca/')):
+        base_progress['pca_dirname'] = join(base_dir, '_pca/')
+        base_progress['scores_filename'] = 'pca_scores'
+        if exists(join(base_progress['pca_dirname'], base_progress['scores_filename'] +'.h5')):
+            base_progress['scores_path'] = join(base_dir, '_pca/', 'pca_scores.h5')
+
+        if exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
+            base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
+
+    models = glob(join(base_dir, '**/model.p'), recursive=True)
+    if len(models) == 1:
+        base_progress['model_path'] = models[0]
+        base_progress['model_session_path'] = dirname(models[0])
+
+        if exists(join(dirname(models[0]), 'syll_info.yaml')):
+            base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
+
+    elif len(models) > 1:
+        paths = sorted(models, key=os.path.getmtime)
+
+        print(f'More than 1 model found. Setting model path to latest generated model: {paths[0]}')
+
+        base_progress['model_path'] = paths[0]
+        base_progress['model_session_path'] = dirname(paths[0])
+
+        if exists(join(dirname(paths[0]), 'syll_info.yaml')):
+            base_progress['syll_info'] = join(dirname(paths[0]), 'syll_info.yaml')
+
+        if exists(join(dirname(paths[0]), 'crowd_movies/')):
+            base_progress['crowd_dir'] = join(dirname(paths[0]), 'crowd_movies/')
+
+        print('To change the model path, run the following commands')
+        print(">>> update_progress(progress_filepath, 'model_session_path', [YOUR_PATH_HERE]")
+        print(">>> update_progress(progress_filepath, 'model_path', [YOUR_PATH_HERE]")
+
+    return base_progress
+
 def generate_intital_progressfile(filename='progress.yaml'):
+    '''
+    Generates a progress YAML file with the scanned parameter paths.
+     It will either load a previous progress file if the progress log and pickle file
+     or will scan the given base directory to find all relative paths
+
+    Parameters
+    ----------
+    filename  (str): path to file to write progress YAML to
+
+    Returns
+    -------
+    base_progress_vars (dict): Loaded/Found progress variables
+    '''
+
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
@@ -190,6 +270,7 @@ def generate_intital_progressfile(filename='progress.yaml'):
     # Create basic progress file
     base_progress_vars = {'base_dir': base_dir,
                           'config_file': '',
+                          'session_config': '',
                           'index_file': '',
                           'train_data_dir': '',
                           'pca_dirname': '',
@@ -199,8 +280,27 @@ def generate_intital_progressfile(filename='progress.yaml'):
                           'model_path': '',
                           'crowd_dir': '',
                           'syll_info': '',
-                          'plot_path': os.path.join(base_dir, 'plots/'),
+                          'plot_path': join(base_dir, 'plots/'),
                           'snapshot': str(uuid.uuid4())}
+
+    if (not exists(join(base_dir, 'progress.log'))) or (not exists(join(base_dir, 'progress_log.pkl'))):
+        # Find progress in given base directory
+        base_progress_vars = find_progress(base_progress_vars)
+    else:
+        ### Get latest uuid from log and load it from pkl
+        with open(join(base_dir, 'progress.log'), 'r') as f:
+            try:
+                latest_log = f.readlines()[-1].split()[-1]
+            except:
+                latest_log = 'default'
+
+        with open(join(base_dir, 'progress_log.pkl'), 'rb') as f:
+            pickle_logs = pickle.load(f)
+            if latest_log in pickle_logs:
+                base_progress_vars = pickle_logs[latest_log]
+            else:
+                # fallback
+                base_progress_vars = find_progress(base_progress_vars)
 
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)
@@ -209,17 +309,29 @@ def generate_intital_progressfile(filename='progress.yaml'):
     log_dict = {curr_id: base_progress_vars}
     update_pickle_log(log_dict)
 
-    logging.info(f'New progress file created: \n{json.dumps(base_progress_vars, indent=4)}')
+    logging.info(f'New progress file created with uuid: {curr_id}')
 
     return base_progress_vars
 
 def load_progress(progress_file):
+    '''
+    Loads progress file variables
+
+    Parameters
+    ----------
+    progress_file (str): path to progress file.
+
+    Returns
+    -------
+    progress_vars (dict): dictionary of loaded progress variables
+    '''
+
     if exists(progress_file):
         print('Updating notebook variables...')
         with open(progress_file, 'r') as f:
             progress_vars = yaml.safe_load(f)
     else:
-        print('Progress file not found.')
+        print('Progress file not found. To generate a new one, set restore_progress_vars(progress_file, init=True)')
         progress_vars = None
 
     return progress_vars
@@ -318,9 +430,6 @@ def get_pca_progress(progress_vars, pca_progress):
         if progress_vars.get(key, None) != None:
             if key == 'pca_dirname':
                 if exists(join(progress_vars[key], 'pca.h5')):
-                    pca_progress[key] = True
-            elif key == 'changepoints_path':
-                if exists(join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
                     pca_progress[key] = True
             else:
                 if exists(progress_vars[key]):
