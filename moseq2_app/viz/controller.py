@@ -784,7 +784,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                                                 syllables=[self.cm_syll_select.value],
                                                 groupby=self.cm_sources_dropdown.value,
                                                 syllable_key='syllable')[0].drop('syllable', axis=1).reset_index()
-            for i, group in enumerate(g_iter):
+            for group in g_iter:
                 self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs['group'] == group]['pdf']
 
         # Remove previously displayed data

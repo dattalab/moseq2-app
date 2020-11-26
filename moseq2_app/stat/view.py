@@ -61,7 +61,7 @@ def graph_dendrogram(obj, syll_info):
         # Draw glyphs
         cladogram.line(x='x', y='y', source=source)
 
-    xtick_labels = [syll_info[str(lbl)]['label'] for lbl in labels]
+    xtick_labels = [syll_info[lbl]['label'] for lbl in labels]
     xticks = [f'{lbl} ({num})' for num, lbl in zip(labels, xtick_labels)]
 
     # Set x-axis ticks

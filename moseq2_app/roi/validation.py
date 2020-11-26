@@ -139,7 +139,7 @@ def get_scalar_df(path_dict):
     scalar_dfs = []
 
     # Get scalar dicts for all the sessions
-    for k, v in path_dict.items():
+    for v in path_dict.values():
         # Get relevant extraction paths
         h5path = v.replace('mp4', 'h5')
         yamlpath = v.replace('mp4', 'yaml')
@@ -247,7 +247,7 @@ def make_session_status_dicts(paths):
     }
 
     # Get flags
-    for k, v in paths.items():
+    for v in paths.values():
         # get yaml metadata
         yamlpath = v.replace('mp4', 'yaml')
         h5path = v.replace('mp4', 'h5')
