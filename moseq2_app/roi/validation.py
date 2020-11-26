@@ -12,6 +12,7 @@ import pandas as pd
 from copy import deepcopy
 import ruamel.yaml as yaml
 import matplotlib.pyplot as plt
+from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_extract.util import scalar_attributes
 from moseq2_viz.scalars.util import compute_all_pdf_data
@@ -400,17 +401,6 @@ def plot_heatmap(heatmap, title):
     plt.title(f'{title}')
     plt.show(block=False)
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
 def print_validation_results(scalar_df, status_dicts):
     '''
 
@@ -473,7 +463,7 @@ def print_validation_results(scalar_df, status_dicts):
                 if k1 in errors and isinstance(v1, float):
                     t = 'Error'
                     x = f'{k1} - {v1*100:.2f}%'
-                elif k1 == 'position_heatmap' and not isinstance(v1, bool): 
+                elif k1 == 'position_heatmap' and not isinstance(v1, bool):
                     x = 'position heatmaps'
                     t = 'Warning - Position Heatmap flag raised'
                     try:
