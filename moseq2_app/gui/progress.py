@@ -9,7 +9,6 @@ import uuid
 import json
 import pickle
 import logging
-import warnings
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
@@ -387,7 +386,7 @@ def show_progress_bar(nfound, total, desc):
     '''
 
     for e in tqdm(list(range(total)), total=total, desc=desc, bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        sleep(0.1)
+        sleep(0.03)
         if e == nfound:
             break
 

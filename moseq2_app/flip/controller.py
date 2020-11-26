@@ -9,11 +9,11 @@ import ipywidgets as widgets
 from bokeh.plotting import figure, show
 from IPython.display import display, clear_output
 from moseq2_app.roi.view import bokeh_plot_helper
-from moseq2_extract.util import recursive_find_h5s
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.flip.widgets import FlipClassifierWidgets
+from moseq2_extract.util import recursive_find_h5s, h5_to_dict
 
 class FlipRangeTool(FlipClassifierWidgets):
 
@@ -132,8 +132,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                 unique_h5s.append(h5s[i])
 
         data = []
-        for h5 in tqdm(unique_h5s, desc='Loading Data', total=len(unique_h5s)):
-            dset = h5py.File(h5, mode='r')['frames'][()]
+        for h5 in tqdm(unique_h5s, desc='Loading Data'):
+            dset = h5_to_dict(h5, path='frames')['frames']
             # TODO: potentially add crop size readjustment
             data.append(dset)
 

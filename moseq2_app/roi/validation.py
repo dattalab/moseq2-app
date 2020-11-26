@@ -4,23 +4,18 @@ The module contains extraction validation functions that test extractions' scala
  timestamps, and position heatmaps.
 
 '''
-
-import h5py
 import scipy
 import numpy as np
 import pandas as pd
-from copy import deepcopy
-import ruamel.yaml as yaml
 import matplotlib.pyplot as plt
-from moseq2_viz.util import read_yaml
+from copy import deepcopy
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
-from moseq2_extract.util import scalar_attributes
-from moseq2_viz.util import h5_to_dict
+from moseq2_viz.util import h5_to_dict, read_yaml
 from moseq2_viz.scalars.util import compute_all_pdf_data
 
 
-def check_timestamp_error_percentage(timestamps, fps=30):
+def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     '''
     https://www.mathworks.com/help/imaq/examples/determining-the-rate-of-acquisition.html
 
@@ -30,6 +25,7 @@ def check_timestamp_error_percentage(timestamps, fps=30):
     ----------
     timestamps (1D np.array): Session's recorded timestamp array.
     fps (int): Frames per second
+    scaling_factor (float): factor to divide timestamps by to convert timestamp units into seconds
 
     Returns
     -------
@@ -37,7 +33,7 @@ def check_timestamp_error_percentage(timestamps, fps=30):
     '''
 
     # Find the time difference between frames.
-    diff = np.diff(timestamps) / 1000
+    diff = np.diff(timestamps) / scaling_factor
 
     # Find the average time difference between frames.
     avgTime = np.mean(diff)
@@ -85,7 +81,6 @@ def count_missing_mouse_frames(scalar_df):
     return (scalar_df["area_px"] == 0).sum()
 
 
-# warning: min height may be too high
 def count_frames_with_small_areas(scalar_df):
     '''
 
@@ -148,7 +143,6 @@ def get_scalar_df(path_dict):
 
         metadata = stat_dict['metadata']
 
-
         tmp = h5_to_dict(h5path, path='scalars')
         tmp = {**tmp, 'uuid': stat_dict['uuid'], 'group': 'default'}
         for mk in ['SessionName', 'SubjectName']:
@@ -160,6 +154,7 @@ def get_scalar_df(path_dict):
 
     scalar_df = pd.concat(scalar_dfs)
     return scalar_df
+
 
 def compute_kl_divergences(pdfs, groups, sessions, sessionNames, oob=False):
     '''
@@ -197,7 +192,6 @@ def compute_kl_divergences(pdfs, groups, sessions, sessionNames, oob=False):
 
 def get_kl_divergence_outliers(kl_divergences):
     '''
-
     Returns the position PDFs that are over 2 standard deviations away from the mean position divergence.
 
     Parameters
@@ -219,7 +213,6 @@ def get_kl_divergence_outliers(kl_divergences):
 
 def make_session_status_dicts(paths):
     '''
-
     Returns the flag status dicts for all the found completed extracted sessions. Additionally performs
      dropped frames test on all sessions.
 
@@ -268,9 +261,9 @@ def make_session_status_dicts(paths):
 
     return status_dicts
 
+
 def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     '''
-
     Detects outlier sessions using an EllipticEnvelope model based on a subset of their mean scalar values.
 
     Parameters
@@ -300,6 +293,7 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
 
     return status_dicts
 
+
 def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
     '''
 
@@ -328,6 +322,7 @@ def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
         status_dicts[o]['position_heatmap'] = pdf
 
     return status_dicts
+
 
 def run_validation_tests(scalar_df, status_dicts):
     '''

@@ -646,11 +646,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             print('Using plane fit for background...')
             self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
 
-        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 0:
+        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
             print('Graduating Background')
             bground_im = get_bground_im_file(self.curr_session)
             self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
-        elif self.dilate_iters.value == 0:
+        else:
             self.curr_bground_im = get_bground_im_file(self.curr_session)
 
         if self.config_data['autodetect']:

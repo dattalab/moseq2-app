@@ -6,9 +6,7 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 
 import re
 import os
-import time
 import shutil
-import warnings
 import numpy as np
 import pandas as pd
 from glob import glob
@@ -20,7 +18,7 @@ from os.path import basename
 from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
-from moseq2_viz.util import parse_index
+from moseq2_viz.util import get_sorted_index
 from moseq2_extract.util import read_yaml
 from IPython.display import display, clear_output
 from moseq2_extract.io.video import get_video_info
@@ -60,7 +58,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         self.model_fit = model_fit
         self.model_path = model_path
-        self.sorted_index = parse_index(index_file)[1]
+        self.sorted_index = get_sorted_index(index_file)
 
         # Syllable Info DataFrame path
         output_dir = os.path.dirname(save_path)
@@ -753,10 +751,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                       dh=group_syllable_pdf.shape[0],
                       palette="Viridis256")
 
-        #fill_color = linear_cmap(group_syllable_pdf, "Viridis256", 0, 1.0)
-        #color_bar = ColorBar(color_mapper=fill_color['transform'])
-        #pdf_fig.add_layout(color_bar, 'right')
-
         return pdf_fig
 
     def generate_crowd_movie_divs(self):
@@ -798,9 +792,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 if key == 'velocity_2d_mm':
                     new_key = '2D velocity (mm/s)'
                     curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
-                elif key == 'dist_to_center_px':
-                    new_key = 'dist_to_center_px'
-                    curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
                 else:
                     curr_grouped_syll_dict[group][key] = self.grouped_syll_dict[group][key]
 
@@ -832,9 +823,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
             self.base_tmpdir = os.path.join(cm_dir, 'tmp')
 
-            if not os.path.exists(tmp_dirname):
-                os.makedirs(tmp_dirname)
-
+            os.makedirs(tmp_dirname, exist_ok=True)
             shutil.copy2(cm_path[0], tmp_path)
 
             video_dims = get_video_info(tmp_path)['dims']

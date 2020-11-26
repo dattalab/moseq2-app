@@ -8,8 +8,6 @@ main.py.
 import os
 import qgrid
 import shutil
-import joblib
-import warnings
 import pandas as pd
 import ruamel.yaml as yaml
 import ipywidgets as widgets
@@ -208,7 +206,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
         shutil.copy2(index_file, new_index_path)
 
     # Load the model
-    model = parse_model_results(joblib.load(model_path))
+    model = parse_model_results(model_path)
 
     # Compute the sorted labels
     model['labels'] = relabel_by_usage(model['labels'], count='usage')[0]

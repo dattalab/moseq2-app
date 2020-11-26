@@ -5,11 +5,9 @@ Main interactive model syllable statistics results app functionality.
 '''
 
 import os
-import joblib
 import warnings
 import numpy as np
 import pandas as pd
-import ruamel.yaml as yaml
 from collections import defaultdict
 from IPython.display import clear_output
 from moseq2_viz.util import get_sorted_index, read_yaml
@@ -64,8 +62,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = None
 
         # Load Syllable Info
-        with open(self.info_path, 'r') as f:
-            self.syll_info = yaml.safe_load(f)
+        self.syll_info = read_yaml(self.info_path)
 
         self.results = None
         self.icoord, self.dcoord = None, None

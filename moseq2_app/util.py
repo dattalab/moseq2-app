@@ -3,7 +3,6 @@
 General utility functions.
 
 '''
-
 import pandas as pd
 from moseq2_viz.util import read_yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
