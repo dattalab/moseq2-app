@@ -1,3 +1,4 @@
+import re
 import cv2
 import h5py
 import joblib
@@ -7,17 +8,18 @@ from copy import deepcopy
 from tqdm.auto import tqdm
 import ipywidgets as widgets
 from bokeh.plotting import figure, show
+from os.path import dirname, join, exists
 from IPython.display import display, clear_output
 from moseq2_app.roi.view import bokeh_plot_helper
-from moseq2_extract.util import recursive_find_h5s
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
+from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.flip.widgets import FlipClassifierWidgets
 
 class FlipRangeTool(FlipClassifierWidgets):
 
-    def __init__(self, input_dir, max_frames, output_file, tail_filter_iters, prefilter_kernel_size):
+    def __init__(self, input_dir, max_frames, output_file, tail_filter_iters, prefilter_kernel_size, continuous_slider_update):
         '''
 
         Initialization for the Flip Classifier Training tool
@@ -32,30 +34,75 @@ class FlipRangeTool(FlipClassifierWidgets):
         '''
 
         warnings.filterwarnings('ignore')
-        super().__init__()
+        super().__init__(continuous_update=continuous_slider_update)
 
         # User input parameters
         self.input_dir = input_dir
         self.max_frames = max_frames
         self.output_file = output_file
-        self.cleaned_data = self.load_sessions(input_dir, max_frames, tail_filter_iters, prefilter_kernel_size)
+
+        self.sessions = get_session_paths(input_dir, extracted=True)
+
+        self.data_dict, self.path_dict = self.load_sessions()
+        self.selected_frame_ranges_dict = {k: [] for k in self.data_dict}
+        self.curr_total_selected_frames = 0
+
+        self.clean_parameters = {
+            'iters_tail': tail_filter_iters,
+            'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
+            'prefilter_space': (prefilter_kernel_size,)
+        }
+
+        # observe dropdown value changes
+        self.session_select_dropdown.observe(self.changed_selected_session, names='value')
+        self.session_select_dropdown.options = self.path_dict
 
         # Widget values
-        self.frame_num_slider.max = int(max_frames) - 1
         self.frame_ranges = []
+        self.display_frame_ranges = []
 
         self.start = self.frame_num_slider.value
         self.stop = 0
-
-        # Flip Classifier Model to train
-        self.clf = RandomForestClassifier(n_estimators=100, random_state=0, n_jobs=-1,
-                                          max_depth=10, class_weight='balanced', warm_start=False)
 
         self.selected_ranges.options = self.frame_ranges
 
         # Callbacks
         self.clear_button.on_click(self.clear_on_click)
         self.start_button.on_click(self.start_stop_frame_range)
+        self.frame_num_slider.observe(self.curr_frame_update, names='value')
+
+    def changed_selected_session(self, event):
+        '''
+        Callback function to load newly selected session.
+
+        Parameters
+        ----------
+        event (ipywidgets Event): self.session_select_dropdown.value is changed
+
+        Returns
+        -------
+        '''
+
+        self.frame_num_slider.max = self.data_dict[self.session_select_dropdown.label].shape[0] - 1
+        self.frame_num_slider.value = 0
+        clear_output(wait=True)
+        self.interactive_launch_frame_selector()
+
+    def curr_frame_update(self, event):
+        '''
+        Updates the currently displayed frame when the slider is moved.
+
+        Parameters
+        ----------
+        event (ipywidgets Event): self.frame_num_slider.value is changed.
+
+        Returns
+        -------
+        '''
+
+        self.frame_num_slider.value = event['new']
+        clear_output(wait=True)
+        self.interactive_launch_frame_selector()
 
     def start_stop_frame_range(self, b):
         '''
@@ -80,8 +127,25 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.stop = self.frame_num_slider.value
             done = False
             if self.stop > self.start:
-                self.frame_ranges.append(range(self.start, self.stop))
-                self.selected_ranges.options = self.frame_ranges
+                selected_range = range(self.start, self.stop)
+                display_selected_range = f'{self.session_select_dropdown.label} - {selected_range}'
+                self.curr_total_selected_frames += len(selected_range)
+
+                old_lbl = self.curr_total_label.value
+                old_val = re.findall(r': \d+', old_lbl)[0]
+                new_val = old_lbl.replace(old_val, f': {str(self.curr_total_selected_frames)}')
+                if self.curr_total_selected_frames >= self.max_frames:
+                    new_val = f'<center><h4><font color="green";>{new_val}</h4></center>'
+
+                self.curr_total_label.value = new_val
+
+                # appending session list to get frames from later on
+                self.selected_frame_ranges_dict[self.session_select_dropdown.label] += [selected_range]
+
+                # appending to frame ranges to display in table
+                self.frame_ranges.append(selected_range)
+                self.display_frame_ranges.append(display_selected_range)
+                self.selected_ranges.options = self.display_frame_ranges
 
             if not done:
                 self.start_button.description = 'Start Range'
@@ -104,7 +168,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         clear_output()
 
-    def load_sessions(self, input_dir, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
+    def load_sessions(self):
         '''
         Recursively searches for completed h5 extraction files, and loads total_frames=max_frames to
          include in the total dataset. Additionally applies some image filtering prior to returning the data.
@@ -121,45 +185,33 @@ class FlipRangeTool(FlipClassifierWidgets):
         clean_merged_data (3D np.ndarray): Loaded and filtered data to get correctly oriented frame ranges from.
         '''
 
-        h5s, dicts, yamls = recursive_find_h5s(root_dir=input_dir)
+        path_dict = {}
 
-        unique_uuids, unique_h5s = [], []
+        # Get h5 paths
+        for key, path in self.sessions.items():
+            h5_path = join(dirname(path), 'proc/', 'results_00.h5')
+            if exists(h5_path):
+                path_dict[key] = h5_path
+            elif exists(path) and path.endswith('.h5'):
+                path_dict[key] = path
+            elif exists(path) and path.endswith('.mp4') and exists(path.replace('.mp4', '.h5')):
+                path_dict[key] = path.replace('.mp4', '.h5')
+            else:
+                del path_dict[key]
 
-        for i, d in enumerate(dicts):
-            if d['uuid'] not in unique_uuids:
-                unique_uuids.append(d['uuid'])
-                unique_h5s.append(h5s[i])
+        # Get references to h5 files
+        data_dict = {}
+        for key, path in path_dict.items():
+            dset = h5py.File(path, mode='r')['frames']
+            data_dict[key] = dset
 
-        data = []
-        for h5 in tqdm(unique_h5s, desc='Loading Data', total=len(unique_h5s)):
-            dset = h5py.File(h5, mode='r')['frames'][()]
-            # TODO: potentially add crop size readjustment
-            data.append(dset)
+        return data_dict, path_dict
 
-        merged_data = np.concatenate(data, axis=0)
-
-        if merged_data.shape[0] > max_frames:
-            merged_data = merged_data[np.random.choice(merged_data.shape[0], int(max_frames), replace=False)]
-
-        clean_parameters = {
-            'iters_tail': tail_filter_iters,
-            'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
-            'prefilter_space': (space_filter_size,)
-        }
-
-        clean_merged_data = clean_frames(merged_data, **clean_parameters)
-
-        return clean_merged_data
-
-    def interactive_launch_frame_selector(self, num):
+    def interactive_launch_frame_selector(self):
         '''
 
         Interactive tool that displays the frame to display with the selected data box.
         Users will use the start_range button to add frame ranges to the range box list.
-
-        Parameters
-        ----------
-        num (int or ipywidgets.IntSlider): Currently displayed frame number.
 
         Returns
         -------
@@ -167,12 +219,14 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         tools = 'pan, box_zoom, wheel_zoom, reset'
 
+        num = self.frame_num_slider.value
+
         # plot current frame
         bg_fig = figure(title=f"Current Frame: {num}",
                         tools=tools,
                         output_backend="webgl")
 
-        displayed_frame = self.cleaned_data[num]
+        displayed_frame = clean_frames(np.array([self.data_dict[self.session_select_dropdown.label][num]]), **self.clean_parameters)[0]
 
         data = dict(image=[displayed_frame],
                     x=[0],
@@ -182,14 +236,14 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         bokeh_plot_helper(bg_fig, data)
 
-        output = widgets.Output(layout=widgets.Layout(align_items='center'))
+        output = widgets.Output(layout=widgets.Layout(align_items='center', height='600px'))
         with output:
             show(bg_fig)
 
         output_box = widgets.HBox([output, self.range_box])
 
         # Display centered grid plot
-        display(output_box, self.button_box)
+        display(self.clear_button, self.session_select_dropdown, output_box, self.button_box)
 
     def get_corrected_data(self):
         '''
@@ -200,15 +254,24 @@ class FlipRangeTool(FlipClassifierWidgets):
         -------
         '''
 
+        corrected_dataset = []
         # Get corrected frame ranges
-        flips = self.frame_ranges
-        correct_idx = np.concatenate([list(flip) for flip in flips])
+        for session, frs in tqdm(self.selected_frame_ranges_dict.items(), desc='Computing Corrected Dataset'):
+            if len(frs) > 0:
+                flips = frs
+                correct_idx = np.concatenate([list(flip) for flip in flips])
 
-        # Get list of frame indices where the mouse is facing east
-        flip_idx = np.setdiff1d(np.arange(self.cleaned_data.shape[0]), correct_idx)
+                # get the session
+                cleaned_data = clean_frames(self.data_dict[session][correct_idx], **self.clean_parameters)
 
-        self.corrected_data = deepcopy(self.cleaned_data)
-        self.corrected_data[flip_idx] = np.flip(self.corrected_data[flip_idx], axis=2)
+                # Get list of frame indices where the mouse is facing east
+                flip_idx = np.setdiff1d(np.arange(cleaned_data.shape[0]), correct_idx)
+
+                corrected_data = deepcopy(cleaned_data)
+                corrected_data[flip_idx] = np.flip(corrected_data[flip_idx], axis=2)
+                corrected_dataset.append(corrected_data)
+
+        self.corrected_dataset = np.concatenate(corrected_dataset, axis=0)
 
     def augment_dataset(self):
         '''
@@ -220,16 +283,16 @@ class FlipRangeTool(FlipClassifierWidgets):
         '''
 
         # Get flipped data
-        data_xflip = np.flip(self.corrected_data, axis=2)
-        data_yflip = np.flip(self.corrected_data, axis=1)
+        data_xflip = np.flip(self.corrected_dataset, axis=2)
+        data_yflip = np.flip(self.corrected_dataset, axis=1)
         data_xyflip = np.flip(data_yflip, axis=2)
 
         # Pack X and y training sets
-        npixels = self.corrected_data.shape[1] * self.corrected_data.shape[2]
-        ntrials = self.corrected_data.shape[0]
+        npixels = self.corrected_dataset.shape[1] * self.corrected_dataset.shape[2]
+        ntrials = self.corrected_dataset.shape[0]
 
         self.x = np.vstack((data_xflip.reshape((-1, npixels)), data_xyflip.reshape((-1, npixels)),
-                       data_yflip.reshape((-1, npixels)), self.corrected_data.reshape((-1, npixels))))
+                       data_yflip.reshape((-1, npixels)), self.corrected_dataset.reshape((-1, npixels))))
 
         # class 1 is x facing west
         self.y = np.concatenate((np.ones((ntrials * 2,)), np.zeros((ntrials * 2,))))
@@ -257,9 +320,17 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x,
                                                                                 self.y,
                                                                                 test_size=test_size/100,
-                                                                                random_state=0)
+                                                                                random_state=42)
 
-    def train_and_evaluate_model(self):
+    def train_and_evaluate_model(self,
+                                 n_estimators=100,
+                                 n_jobs=4,
+                                 max_depth=6,
+                                 min_samples_split=2,
+                                 min_samples_leaf=1,
+                                 oob_score=False,
+                                 class_weight=None,
+                                 verbose=0):
         '''
 
         Trains the flip classifier and prints its performance accuracy on the test set.
@@ -267,6 +338,17 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
+
+        # Flip Classifier Model to train
+        self.clf = RandomForestClassifier(n_estimators=n_estimators,
+                                          random_state=42,
+                                          n_jobs=n_jobs,
+                                          min_samples_split=min_samples_split,
+                                          min_samples_leaf=min_samples_leaf,
+                                          verbose=verbose,
+                                          class_weight=class_weight,
+                                          oob_score=oob_score,
+                                          max_depth=max_depth)
 
         self.clf.fit(self.x_train, self.y_train)
 
@@ -279,8 +361,10 @@ class FlipRangeTool(FlipClassifierWidgets):
             print('You have achieved acceptable model accuracy.')
             print('Save the model trained on all the data, re-extract the data and continue to the PCA step.')
         else:
-            print('Model performance is not high enough. Either try selecting more accurate frame indices, '
-                  'or re-extract the data with your latest flip classifier (with highest accuracy).')
+            print('Model performance is not high enough to extract a valid dataset. '
+                  'Either try selecting more accurate frame indices,\n'
+                  'or re-extract the data with your latest flip classifier (with highest accuracy) '
+                  'and retry selecting frame ranges with less random flips.')
 
         joblib.dump(self.clf, self.output_file)
         print(f'Saved model in {self.output_file}')
