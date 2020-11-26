@@ -29,7 +29,7 @@ from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.io.video import load_movie_data, get_video_info
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
-from moseq2_extract.util import (get_bucket_center, get_strels, select_strel,
+from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, set_bg_roi_weights,
                                  check_filter_sizes, graduate_dilated_wall_area)
 
@@ -50,8 +50,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         super().__init__()
 
         # Read default config parameters
-        with open(config_file, 'r') as f:
-            self.config_data = yaml.safe_load(f)
+        self.config_data = read_yaml(config_file)
 
         self.session_config = session_config
         self.session_parameters = {}
@@ -59,8 +58,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Read individual session config if it exists
         if session_config is not None:
             if os.path.exists(session_config):
-                with open(session_config, 'r') as f:
-                    self.session_parameters = yaml.safe_load(f)
+                self.session_parameters = read_yaml(session_config)
             else:
                 warnings.warn('Session configuration file was not found. Generating a new one.')
 

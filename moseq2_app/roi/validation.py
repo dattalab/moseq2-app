@@ -12,8 +12,10 @@ import pandas as pd
 from copy import deepcopy
 import ruamel.yaml as yaml
 import matplotlib.pyplot as plt
+from moseq2_viz.util import read_yaml
 from sklearn.covariance import EllipticEnvelope
 from moseq2_extract.util import scalar_attributes
+from moseq2_viz.util import h5_to_dict
 from moseq2_viz.scalars.util import compute_all_pdf_data
 
 
@@ -133,32 +135,26 @@ def get_scalar_df(path_dict):
     scalar_df (pd.DataFrame): DataFrame containing loaded scalar info from each h5 extraction file.
     '''
 
-    scalars = scalar_attributes()
     scalar_dfs = []
 
     # Get scalar dicts for all the sessions
     for k, v in path_dict.items():
         # Get relevant extraction paths
-        h5path = path_dict[k].replace('mp4', 'h5')
-        yamlpath = path_dict[k].replace('mp4', 'yaml')
+        h5path = v.replace('mp4', 'h5')
+        yamlpath = v.replace('mp4', 'yaml')
 
-        with open(yamlpath, 'r') as f:
-            stat_dict = yaml.safe_load(f)
+        stat_dict = read_yaml(yamlpath)
 
         metadata = stat_dict['metadata']
 
-        f = h5py.File(h5path, 'r')['scalars']
-        tmp = {'uuid': stat_dict['uuid'], 'group': 'default'}
-        for key in scalars:
-            tmp[key] = f[key][()]
 
-        sess_df = pd.DataFrame.from_dict(tmp)
-        for mk, mv in metadata.items():
-            if mk in ['SessionName', 'SubjectName']:
-                if isinstance(mv, list):
-                    mv = mv[0]
-                sess_df[mk] = mv
+        tmp = h5_to_dict(h5path, path='scalars')
+        tmp = {**tmp, 'uuid': stat_dict['uuid'], 'group': 'default'}
+        for mk in ['SessionName', 'SubjectName']:
+            mv = metadata[mk]
+            tmp[mk] = mv[0] if isinstance(mv, list) else mv
 
+        sess_df = pd.DataFrame(tmp)
         scalar_dfs.append(sess_df)
 
     scalar_df = pd.concat(scalar_dfs)
@@ -252,23 +248,21 @@ def make_session_status_dicts(paths):
     # Get flags
     for k, v in paths.items():
         # get yaml metadata
-        yamlpath = paths[k].replace('mp4', 'yaml')
-        with open(yamlpath, 'r') as f:
-            stat_dict = yaml.safe_load(f)
-            status_dicts[stat_dict['uuid']] = deepcopy(flags)
-            status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
+        yamlpath = v.replace('mp4', 'yaml')
+        h5path = v.replace('mp4', 'h5')
+
+        stat_dict = read_yaml(yamlpath)
+        status_dicts[stat_dict['uuid']] = deepcopy(flags)
+        status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
 
         # read timestamps from h5
-        h5path = paths[k].replace('mp4', 'h5')
         try:
-            timestamps = h5py.File(h5path, 'r')['timestamps'][()]
-
+            timestamps = h5_to_dict(h5path, path='timestamps')['timestamps']
             # Count dropped frame percentage
             dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
             if dropped_frames >= 0.05:
                 status_dicts[stat_dict['uuid']]['dropped_frames'] = dropped_frames
         except KeyError:
-            pass
             print(f'{h5path} timestamps not found.')
 
     return status_dicts

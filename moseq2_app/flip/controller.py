@@ -122,7 +122,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         clean_merged_data (3D np.ndarray): Loaded and filtered data to get correctly oriented frame ranges from.
         '''
 
-        h5s, dicts, yamls = recursive_find_h5s(root_dir=input_dir)
+        h5s, dicts, _ = recursive_find_h5s(root_dir=input_dir)
 
         unique_uuids, unique_h5s = [], []
 

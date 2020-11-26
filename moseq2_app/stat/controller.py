@@ -12,7 +12,7 @@ import pandas as pd
 import ruamel.yaml as yaml
 from collections import defaultdict
 from IPython.display import clear_output
-from moseq2_viz.util import get_sorted_index
+from moseq2_viz.util import get_sorted_index, read_yaml
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -142,12 +142,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         Returns
         -------
         '''
-
         # Get Pairwise distances
         X = get_behavioral_distance(self.sorted_index,
                                     self.model_path,
                                     max_syllable=self.max_sylls,
-                                    distances=['ar[init]'])['ar[init]']
+                                    distances='ar[init]')['ar[init]']
         Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
@@ -173,8 +172,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         -------
         '''
         # Read syllable information dict
-        with open(self.info_path, 'r') as f:
-            syll_info = yaml.safe_load(f)
+        syll_info = read_yaml(self.info_path)
 
         # Getting number of syllables included in the info dict
         max_sylls = len(syll_info)
@@ -260,7 +258,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             mean_df = None
 
         # Compute cladogram if it does not already exist
-        if self.cladogram == None:
+        if self.cladogram is None:
             self.cladogram = graph_dendrogram(self)
             self.results['cladogram'] = self.cladogram
 
@@ -467,8 +465,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             warnings.simplefilter('ignore')
 
             # Load Syllable Info
-            with open(self.info_path, 'r') as f:
-                self.syll_info = yaml.safe_load(f)
+            self.syll_info = read_yaml(self.info_path)
 
             # Get labels and optionally relabel them by usage sorting
             labels = self.model_fit['labels']
@@ -486,7 +483,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             self.df = df
 
             # Get groups and matching session uuids
-            label_group, label_uuids = get_trans_graph_groups(self.model_fit)
+            label_group, _ = get_trans_graph_groups(self.model_fit)
             self.group = list(set(label_group))
 
             labels = relabel_by_usage(labels, count='usage')[0]
@@ -519,7 +516,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             warnings.simplefilter('ignore')
 
             # Get graph node anchors
-            ngraphs = len(self.trans_mats)
             anchor = 0
             # make a list of normalized usages
             usages = [normalize_usages(u) for u in self.usages]

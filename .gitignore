@@ -36,3 +36,6 @@ dlc_utils/.DS_Store
 dlc_utils/
 data/
 test_run/
+
+.vscode
+__pycache__

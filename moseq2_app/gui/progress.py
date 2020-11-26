@@ -426,8 +426,8 @@ def get_pca_progress(progress_vars, pca_progress):
     '''
 
     # Get PCA Progress
-    for key in pca_progress.keys():
-        if progress_vars.get(key, None) != None:
+    for key in pca_progress:
+        if progress_vars.get(key) is not None:
             if key == 'pca_dirname':
                 if exists(join(progress_vars[key], 'pca.h5')):
                     pca_progress[key] = True
@@ -435,7 +435,7 @@ def get_pca_progress(progress_vars, pca_progress):
                 if exists(progress_vars[key]):
                     pca_progress[key] = True
 
-        if pca_progress[key] != True:
+        if not pca_progress[key]:
             print(f'PCA path missing: {key}')
     return pca_progress
 
@@ -506,11 +506,11 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     pca_progress = get_pca_progress(progress_vars, pca_progress)
 
     # Get Modeling Path
-    if progress_vars.get('model_path', None) != None:
+    if progress_vars.get('model_path') is not None:
         if exists(progress_vars['model_path']):
             modeling_progress['model_path'] = True
 
-    if progress_vars.get('syll_info', None) != None:
+    if progress_vars.get('syll_info') is not None:
         if exists(progress_vars['syll_info']):
             analysis_progress['syll_info'] = True
 

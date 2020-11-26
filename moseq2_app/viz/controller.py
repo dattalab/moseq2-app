@@ -259,7 +259,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if not os.path.exists(self.df_output_file):
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
             scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
@@ -482,6 +482,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.index_path = index_path
         self.model_path = model_path
         self.df_path = df_path
+        self.scalar_df_path = os.path.join(os.path.dirname(df_path), 'moseq_dataframe.parquet')
 
         self.get_pdfs = get_pdfs
         self.syll_info = syll_info
@@ -492,22 +493,21 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.cm_syll_select.options = list(range(self.max_sylls))
 
         if load_parquet:
-            if df_path is not None:
-                if not os.path.exists(df_path):
-                    self.df_path = None
+            if df_path is not None and not os.path.exists(df_path):
+                self.df_path = None
         else:
             self.df_path = None
 
         # Prepare current context's base session syllable info dict
         self.session_dict = {i: {'session_info': {}} for i in range(self.max_sylls)}
 
-        index, self.sorted_index = init_wrapper_function(index_file=index_path, output_dir=output_dir)
+        _, self.sorted_index = init_wrapper_function(index_file=index_path, output_dir=output_dir)
         self.model_fit = parse_model_results(model_path)
 
         # Set Session MultipleSelect widget options
-        self.sessions = sorted(list(set(self.model_fit['metadata']['uuids'])))
+        self.sessions = sorted(set(self.model_fit['metadata']['uuids']))
 
-        index_uuids = sorted(list(self.sorted_index['files'].keys()))
+        index_uuids = sorted(self.sorted_index['files'])
         if index_uuids != self.sessions:
             print('Error: Index file UUIDs do not match model UUIDs.')
 
@@ -549,9 +549,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data['medfilter_space'] = [0]
         self.config_data['sort'] = True
         self.config_data['pad'] = 10
-        self.config_data['min_dur'] = 40
+        self.config_data['min_dur'] = 4
         self.config_data['max_dur'] = 60
-        self.config_data['max_movie_dur'] = 40
         self.config_data['raw_size'] = (512, 424)
         self.config_data['scale'] = 1
         self.config_data['legacy_jitter_fix'] = False
@@ -661,13 +660,19 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         Returns
         -------
         '''
-        if self.df_path is not None:
+        if self.df_path is not None and os.path.exists(self.df_path):
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
-            self.scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
+            if not os.path.exists(self.scalar_df_path):
+                self.scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
+                self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
+            else:
+                self.scalar_df = pd.read_parquet(self.scalar_df_path)
         else:
-            print('Syllable DataFrame not found. Computing syllable statistics...')
+            print('Syllable DataFrame not found. Computing and saving syllable statistics...')
             df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df.to_parquet(self.df_path, compression='gzip')
+            self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
 
         if self.get_pdfs:
             # Compute syllable position PDFs
@@ -766,9 +771,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         '''
 
         # Compute paths to crowd movies
-        path_dict = make_crowd_movies_wrapper(self.index_path, self.model_path, self.config_data, self.output_dir)
-
-        time.sleep(1)
+        path_dict = make_crowd_movies_wrapper(self.index_path, self.model_path, self.output_dir, self.config_data)
 
         if self.cm_sources_dropdown.value == 'group':
             g_iter = self.groups

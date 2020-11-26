@@ -42,9 +42,8 @@ def graph_dendrogram(obj):
     sources = []
 
     # Each (icoord, dcoord) pair represents a single branch in the dendrogram
-    for ii, (i, d) in enumerate(zip(obj.icoord, obj.dcoord)):
-        d = list(map(lambda x: x, d))
-        tmp = [[x, y] for x, y in zip(i, d)]
+    for i, d in zip(obj.icoord, obj.dcoord):
+        tmp = list(zip(i, d))
         lbls = []
 
         # Get labels
