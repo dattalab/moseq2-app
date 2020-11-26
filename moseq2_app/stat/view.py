@@ -15,7 +15,7 @@ from bokeh.plotting import figure, show, from_networkx
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
 
-def graph_dendrogram(obj):
+def graph_dendrogram(obj, syll_info):
     '''
     Graphs the distance sorted dendrogram representing syllable neighborhoods. Distance sorting
     is computed by processing the respective syllable AR matrices.
@@ -23,6 +23,7 @@ def graph_dendrogram(obj):
     Parameters
     ----------
     obj (InteractiveSyllableStats object): Syllable Stats object containing syllable stat information.
+    syll_info (dict): dict object containing syllable numbers paired with dicts of their labels and descriptions.
 
     Returns
     -------
@@ -61,9 +62,13 @@ def graph_dendrogram(obj):
         # Draw glyphs
         cladogram.line(x='x', y='y', source=source)
 
+    xtick_labels = [syll_info[str(lbl)]['label'] for lbl in labels]
+    xticks = [f'{lbl} ({num})' for num, lbl in zip(labels, xtick_labels)]
+
     # Set x-axis ticks
     cladogram.xaxis.ticker = FixedTicker(ticks=labels)
-    cladogram.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(labels)}
+    cladogram.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
+    cladogram.xaxis.major_label_orientation = np.pi / 4
 
     return cladogram
 

@@ -62,6 +62,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.df = None
 
+        # Load Syllable Info
+        with open(self.info_path, 'r') as f:
+            self.syll_info = yaml.safe_load(f)
+
         self.results = None
         self.icoord, self.dcoord = None, None
         self.cladogram = None
@@ -174,17 +178,13 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         warnings.filterwarnings('ignore')
 
-        # Read syllable information dict
-        with open(self.info_path, 'r') as f:
-            syll_info = yaml.safe_load(f)
-
         # Getting number of syllables included in the info dict
-        max_sylls = len(syll_info)
+        max_sylls = len(self.syll_info)
         for k in range(max_sylls):
-            if 'group_info' in syll_info[str(k)].keys():
-                del syll_info[str(k)]['group_info']
+            if 'group_info' in self.syll_info[str(k)].keys():
+                del self.syll_info[str(k)]['group_info']
 
-        info_df = pd.DataFrame(syll_info).T
+        info_df = pd.DataFrame(self.syll_info).T
         info_df.index = info_df.index.astype(int)
         info_df['syllable'] = info_df.index
 
@@ -264,7 +264,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         # Compute cladogram if it does not already exist
         if self.cladogram == None:
-            self.cladogram = graph_dendrogram(self)
+            self.cladogram = graph_dendrogram(self, self.syll_info)
             self.results['cladogram'] = self.cladogram
 
         self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby,
