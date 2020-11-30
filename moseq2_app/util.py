@@ -62,6 +62,10 @@ def index_to_dataframe(index_path):
     return index_data, df
 
 class bcolors:
+    '''
+    Class containing color UNICODE values used to color printed output.
+    '''
+
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'

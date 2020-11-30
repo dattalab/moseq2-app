@@ -414,6 +414,7 @@ def print_validation_results(scalar_df, status_dicts):
     Returns
     -------
     '''
+
     # Run tests
     anomaly_dict = run_validation_tests(scalar_df, status_dicts)
 

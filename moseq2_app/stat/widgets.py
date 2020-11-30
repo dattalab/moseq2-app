@@ -1,3 +1,10 @@
+'''
+
+Widgets module containing classes with components for each of the interactive syllable
+ statistics tools: Syllable Stats plot, and Transition Graph plot.
+
+'''
+
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 

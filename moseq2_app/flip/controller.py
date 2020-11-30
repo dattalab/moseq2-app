@@ -1,3 +1,10 @@
+'''
+
+Interactive Flip classifier frame selection functionality. This module utilizes the widgets from
+the widgets.py file to facilitate the real-time interaction.
+
+'''
+
 import re
 import cv2
 import h5py

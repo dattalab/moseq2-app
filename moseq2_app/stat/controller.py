@@ -1,6 +1,8 @@
 '''
 
-Main interactive model syllable statistics results app functionality.
+Main interactive model syllable statistics results application functionality.
+This module facilitates the interactive functionality for the statistics plotting, and
+ transition graph features.
 
 '''
 

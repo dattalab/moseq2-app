@@ -1,3 +1,9 @@
+'''
+
+Widgets module containing all the interactive components of the frame selection GUI.
+
+'''
+
 from ipywidgets import VBox
 import ipywidgets as widgets
 

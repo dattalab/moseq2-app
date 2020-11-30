@@ -1,3 +1,10 @@
+'''
+
+View module to facilitate graphing of interactive statistics tools: the Dendrogram, statistics plot,
+ and transition graph grid. Module primarily uses Bokeh to facilitate the interactive graphing functionality.
+
+'''
+
 import random
 import warnings
 import itertools

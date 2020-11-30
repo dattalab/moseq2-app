@@ -1,6 +1,7 @@
 '''
 
 Main syllable crowd movie viewing, comparing, and labeling functionality.
+ Included tools are the Syllable labeler, and the crowd movie/position pdf comparison tool.
 
 '''
 
