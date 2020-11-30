@@ -54,6 +54,16 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         # get input session paths
         self.sessions = get_session_paths(input_dir, extracted=True)
+        if len(self.sessions) == 0:
+            if 'aggregate_results/' not in input_dir:
+                found_agg = exists(join(input_dir, 'aggregate_results/'))
+                if found_agg:
+                    self.input_dir = join(input_dir, 'aggregate_results/')
+                    print(f'Loading data from: {self.input_dir}')
+                    self.sessions = get_session_paths(self.input_dir, extracted=True)
+
+                if not found_agg or len(self.sessions) == 0:
+                    print('Error: No extracted sessions were found.')
 
         # open h5 files and get reference dict
         self.data_dict, self.path_dict = self.load_sessions()
