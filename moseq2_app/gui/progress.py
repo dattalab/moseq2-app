@@ -49,6 +49,9 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
     Find all depth recording sessions and their paths (with given extensions)
     to work on given base directory.
 
+    Function also generates metadata.json files for un-extracted directories that
+     are missing them.
+
     Parameters
     ----------
     data_dir (str): path to directory containing all session folders.
