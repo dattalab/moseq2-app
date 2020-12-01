@@ -1,3 +1,10 @@
+'''
+
+Widgets module containing classes with components for each of the interactive syllable
+ visualization tools: Syllable Labeler, and Crowd Movie Comparison.
+
+'''
+
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 from bokeh.models.widgets import PreText

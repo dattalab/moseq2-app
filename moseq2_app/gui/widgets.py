@@ -1,3 +1,10 @@
+'''
+
+This module contains the widget components that comprise the group setting table functionality.
+These widgets will work in tandem with the qgrid functionality to facilitate the real time updates.
+
+'''
+
 import qgrid
 import ipywidgets as widgets
 

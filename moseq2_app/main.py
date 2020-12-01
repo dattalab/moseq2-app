@@ -27,7 +27,12 @@ def validate_inputs(inputs, progress_paths):
     return error
 
 @filter_warnings
-def flip_classifier_tool(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
+def flip_classifier_tool(input_dir,
+                         output_file,
+                         max_frames=1e6,
+                         tail_filter_iters=1,
+                         space_filter_size=3,
+                         continuous_slider_update=True):
     '''
 
     Flip Classifier Notebook main functionality access point.
@@ -46,7 +51,12 @@ def flip_classifier_tool(input_dir, output_file, max_frames=1e6, tail_filter_ite
      notebook.
     '''
 
-    flip_obj = get_frame_flips_wrapper(input_dir, output_file, max_frames, tail_filter_iters, space_filter_size)
+    flip_obj = get_frame_flips_wrapper(input_dir,
+                                       output_file,
+                                       max_frames,
+                                       tail_filter_iters,
+                                       space_filter_size,
+                                       continuous_slider_update)
     return flip_obj
 
 @filter_warnings

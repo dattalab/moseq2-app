@@ -362,7 +362,12 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     # Display widgets and bokeh network plots
     display(i_trans_graph.clear_button, i_trans_graph.thresholding_box, out)
 
-def get_frame_flips_wrapper(input_dir, output_file, max_frames=1e6, tail_filter_iters=1, space_filter_size=3):
+def get_frame_flips_wrapper(input_dir,
+                            output_file,
+                            max_frames=1e6,
+                            tail_filter_iters=1,
+                            space_filter_size=3,
+                            continuous_slider_update=True):
     '''
 
     Wrapper function that facilitates the interactive
@@ -385,12 +390,7 @@ def get_frame_flips_wrapper(input_dir, output_file, max_frames=1e6, tail_filter_
                                 max_frames=max_frames,
                                 output_file=output_file,
                                 tail_filter_iters=tail_filter_iters,
-                                prefilter_kernel_size=space_filter_size)
-
-    from bokeh.io import output_notebook
-    output_notebook()
-    out = interactive_output(flip_finder.interactive_launch_frame_selector, {'num': flip_finder.frame_num_slider})
-
-    display(flip_finder.clear_button, out)
+                                prefilter_kernel_size=space_filter_size,
+                                continuous_slider_update=continuous_slider_update)
 
     return flip_finder
