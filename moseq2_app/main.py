@@ -120,7 +120,7 @@ def preview_extractions(input_dir):
     Returns
     -------
     '''
-
+    output_notebook()
     interactive_extraction_preview_wrapper(input_dir)
 
 @filter_warnings

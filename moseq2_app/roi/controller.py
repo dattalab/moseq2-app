@@ -603,6 +603,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
             # Compute bucket distance thresholding value
             threshold_value = np.mean(bground_im) - np.std(bground_im)
+            self.config_data['bg_threshold'] = threshold_value
 
             # Threshold image to find depth at bucket center: the true depth
             cX, cY = get_bucket_center(bground_im, limit, threshold=threshold_value)

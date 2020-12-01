@@ -264,6 +264,14 @@ If you get any errors running that script, open the script in a text file and ru
 of the script independently. This will help you (and us) figure out where the
 error is occurring.
 
+You can check that you have the correct dependency versions using the commands below:
+```bash
+moseq2-extract --version
+moseq2-extract --version
+moseq2-extract --version
+moseq2-extract --version
+```
+
 ## Downloading a test dataset
 
 To try MoSeq2 on some sample data, we have provided 2 scripts to either download
