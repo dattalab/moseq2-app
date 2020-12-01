@@ -1,0 +1,12 @@
+name: moseq2-app
+channels:
+  - conda-forge
+  - default
+dependencies:
+  - python=3.7
+  - pip
+  - jupyter
+  - qgrid
+  - conda-forge::ffmpeg=4.2.0
+  - conda-forge::opencv
+  - jupyter_nbextensions_configurator
