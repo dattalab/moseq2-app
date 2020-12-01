@@ -224,7 +224,7 @@ can't figure out on your own or aren't documented here, please [sumbit an issue]
 
 - download the `moseq2-app` GitHub repository, and navigate to it:
 ```bash
-git clone -b jupyter https://github.com/dattalab/moseq2-app.git
+git clone -b release https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 ```
 You'll be asked for your github username and password since this is a private repository.
