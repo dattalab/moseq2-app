@@ -259,6 +259,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            df['SubjectName'] = df['SubjectName'].astype(str)
+            df['SessionName'] = df['SessionName'].astype(str)
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
             scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
@@ -421,7 +423,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             config_data = self.set_default_cm_parameters(config_data)
 
             # Generate movies if directory does not exist
-            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, config_data, crowd_movie_dir)['all']
+            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, crowd_movie_dir, config_data)['all']
         else:
             # get existing crowd movie paths
             crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
@@ -431,7 +433,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             config_data = self.set_default_cm_parameters(config_data)
 
             # Generate movies if directory does not exist
-            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, config_data, crowd_movie_dir)['all']
+            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, crowd_movie_dir, config_data)['all']
 
         # Get syll_info paths
         info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
@@ -670,7 +672,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         else:
             print('Syllable DataFrame not found. Computing and saving syllable statistics...')
             df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            df.to_parquet(self.df_path, compression='gzip')
             self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
 
         if self.get_pdfs:
@@ -679,6 +680,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                                                        syllables=range(self.max_sylls),
                                                        normalize=True).reset_index().rename(columns={'labels (usage sort)': 'syllable', 0: 'pdf'})
             self.df = pd.merge(df, hists, on=['group', 'SessionName', 'SubjectName', 'uuid', 'syllable'])
+            self.df['SubjectName'] = self.df['SubjectName'].astype(str)
+            self.df['SessionName'] = self.df['SessionName'].astype(str)
 
         # Get grouped DataFrame
         self.session_df = df.groupby(['SessionName', 'syllable'], as_index=False).mean()
@@ -765,10 +768,12 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         bk_plots (list): list of corresponding position heatmap figures.
         '''
 
+        cm_source = self.cm_sources_dropdown.value
+
         # Compute paths to crowd movies
         path_dict = make_crowd_movies_wrapper(self.index_path, self.model_path, self.output_dir, self.config_data)
 
-        if self.cm_sources_dropdown.value == 'group':
+        if cm_source == 'group':
             g_iter = self.groups
         else:
             g_iter = self.cm_session_sel.value
@@ -777,10 +782,10 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Get corresponding syllable position PDF
             group_syll_pdfs = get_syllable_pdfs(self.df,
                                                 syllables=[self.cm_syll_select.value],
-                                                groupby=self.cm_sources_dropdown.value,
+                                                groupby=cm_source,
                                                 syllable_key='syllable')[0].drop('syllable', axis=1).reset_index()
             for group in g_iter:
-                self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs['group'] == group]['pdf']
+                self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs[cm_source] == group]['pdf']
 
         # Remove previously displayed data
         clear_output()
@@ -858,6 +863,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         # Compute current selected syllable's session dict.
         self.grouped_syll_dict = self.session_dict[self.cm_syll_select.value]['session_info']
+
+        self.config_data['session_names'] = list(self.grouped_syll_dict.keys())
 
         # Get Crowd Movie Divs
         divs, self.bk_plots = self.generate_crowd_movie_divs()

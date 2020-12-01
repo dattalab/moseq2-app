@@ -207,6 +207,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
+        self.df['SubjectName'] = self.df['SubjectName'].astype(str)
+        self.df['SessionName'] = self.df['SessionName'].astype(str)
 
     def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group):
         '''
