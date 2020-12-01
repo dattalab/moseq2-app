@@ -89,7 +89,7 @@ class CrowdMovieCompareWidgets:
         self.layout_visible = widgets.Layout(display='flex',  align_items='stretch', justify_items='center')
 
         self.cm_syll_select = widgets.Dropdown(options=[], description='Syllable #:', disabled=False)
-        self.num_examples = widgets.IntSlider(value=20, min=1, max=40, step=1, description='# of Example Mice:',
+        self.num_examples = widgets.IntSlider(value=20, min=1, max=100, step=1, description='# of Example Mice:',
                                               disabled=False, continuous_update=False, style=style,
                                               layout=widgets.Layout(display='flex', align_items='stretch'))
 

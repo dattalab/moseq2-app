@@ -24,6 +24,7 @@ from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.flip.widgets import FlipClassifierWidgets
+from moseq2_extract.util import recursive_find_h5s, h5_to_dict
 
 class FlipRangeTool(FlipClassifierWidgets):
 
@@ -44,58 +45,59 @@ class FlipRangeTool(FlipClassifierWidgets):
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
         '''
 
-        warnings.filterwarnings('ignore')
-        super().__init__(continuous_update=continuous_slider_update)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            super().__init__(continuous_update=continuous_slider_update)
 
-        # User input parameters
-        self.input_dir = input_dir
-        self.max_frames = max_frames
-        self.output_file = output_file
+            # User input parameters
+            self.input_dir = input_dir
+            self.max_frames = max_frames
+            self.output_file = output_file
 
-        # initialize frame cleaning parameter dict
-        self.clean_parameters = {
-            'iters_tail': tail_filter_iters,
-            'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
-            'prefilter_space': (prefilter_kernel_size,)
-        }
+            # initialize frame cleaning parameter dict
+            self.clean_parameters = {
+                'iters_tail': tail_filter_iters,
+                'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
+                'prefilter_space': (prefilter_kernel_size,)
+            }
 
-        # get input session paths
-        self.sessions = get_session_paths(input_dir, extracted=True)
-        if len(self.sessions) == 0:
-            if 'aggregate_results/' not in input_dir:
-                found_agg = exists(join(input_dir, 'aggregate_results/'))
-                if found_agg:
-                    self.input_dir = join(input_dir, 'aggregate_results/')
-                    print(f'Loading data from: {self.input_dir}')
-                    self.sessions = get_session_paths(self.input_dir, extracted=True)
+            # get input session paths
+            self.sessions = get_session_paths(input_dir, extracted=True)
+            if len(self.sessions) == 0:
+                if 'aggregate_results/' not in input_dir:
+                    found_agg = exists(join(input_dir, 'aggregate_results/'))
+                    if found_agg:
+                        self.input_dir = join(input_dir, 'aggregate_results/')
+                        print(f'Loading data from: {self.input_dir}')
+                        self.sessions = get_session_paths(self.input_dir, extracted=True)
 
-                if not found_agg or len(self.sessions) == 0:
-                    print('Error: No extracted sessions were found.')
+                    if not found_agg or len(self.sessions) == 0:
+                        print('Error: No extracted sessions were found.')
 
-        # open h5 files and get reference dict
-        self.data_dict, self.path_dict = self.load_sessions()
+            # open h5 files and get reference dict
+            self.data_dict, self.path_dict = self.load_sessions()
 
-        # initialize selected frame range dictionary
-        self.selected_frame_ranges_dict = {k: [] for k in self.data_dict}
-        self.curr_total_selected_frames = 0
+            # initialize selected frame range dictionary
+            self.selected_frame_ranges_dict = {k: [] for k in self.data_dict}
+            self.curr_total_selected_frames = 0
 
-        # observe dropdown value changes
-        self.session_select_dropdown.observe(self.changed_selected_session, names='value')
-        self.session_select_dropdown.options = self.path_dict
+            # observe dropdown value changes
+            self.session_select_dropdown.observe(self.changed_selected_session, names='value')
+            self.session_select_dropdown.options = self.path_dict
 
-        # Widget values
-        self.frame_ranges = []
-        self.display_frame_ranges = []
+            # Widget values
+            self.frame_ranges = []
+            self.display_frame_ranges = []
 
-        self.start = self.frame_num_slider.value
-        self.stop = 0
+            self.start = self.frame_num_slider.value
+            self.stop = 0
 
-        self.selected_ranges.options = self.frame_ranges
+            self.selected_ranges.options = self.frame_ranges
 
-        # Callbacks
-        self.clear_button.on_click(self.clear_on_click)
-        self.start_button.on_click(self.start_stop_frame_range)
-        self.frame_num_slider.observe(self.curr_frame_update, names='value')
+            # Callbacks
+            self.clear_button.on_click(self.clear_on_click)
+            self.start_button.on_click(self.start_stop_frame_range)
+            self.frame_num_slider.observe(self.curr_frame_update, names='value')
 
     def changed_selected_session(self, event):
         '''

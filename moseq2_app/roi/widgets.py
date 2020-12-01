@@ -1,9 +1,6 @@
 '''
-
 Ipywidgets used to facilitate interactive ROI detection
-
 '''
-
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 

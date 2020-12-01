@@ -1,12 +1,8 @@
 '''
-
 Interactive ROI/Extraction Bokeh visualization functions.
-
 '''
-
 import os
 import shutil
-import warnings
 import numpy as np
 import ipywidgets as widgets
 from bokeh.models import Div
@@ -117,9 +113,6 @@ def plot_roi_results(sessionName, bground_im, roi, overlay, filtered_frames, dep
     Returns
     -------
     '''
-
-    # ignore flip classifier sklearn version warnings
-    warnings.filterwarnings('ignore')
 
     # set bokeh tools
     tools = 'pan, box_zoom, wheel_zoom, hover, reset'

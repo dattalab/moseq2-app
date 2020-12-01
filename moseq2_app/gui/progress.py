@@ -9,7 +9,6 @@ import uuid
 import json
 import pickle
 import logging
-import warnings
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
@@ -352,9 +351,6 @@ def restore_progress_vars(progress_file, init=False, overwrite=False):
     vars (dict): All progress file variables
     '''
 
-
-    warnings.filterwarnings('ignore')
-
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
@@ -393,7 +389,7 @@ def show_progress_bar(nfound, total, desc):
     '''
 
     for e in tqdm(list(range(total)), total=total, desc=desc, bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        sleep(0.1)
+        sleep(0.03)
         if e == nfound:
             break
 
@@ -432,8 +428,8 @@ def get_pca_progress(progress_vars, pca_progress):
     '''
 
     # Get PCA Progress
-    for key in pca_progress.keys():
-        if progress_vars.get(key, None) != None:
+    for key in pca_progress:
+        if progress_vars.get(key) is not None:
             if key == 'pca_dirname':
                 if exists(join(progress_vars[key], 'pca.h5')):
                     pca_progress[key] = True
@@ -441,7 +437,7 @@ def get_pca_progress(progress_vars, pca_progress):
                 if exists(progress_vars[key]):
                     pca_progress[key] = True
 
-        if pca_progress[key] != True:
+        if not pca_progress[key]:
             print(f'PCA path missing: {key}')
     return pca_progress
 
@@ -512,11 +508,11 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     pca_progress = get_pca_progress(progress_vars, pca_progress)
 
     # Get Modeling Path
-    if progress_vars.get('model_path', None) != None:
+    if progress_vars.get('model_path') is not None:
         if exists(progress_vars['model_path']):
             modeling_progress['model_path'] = True
 
-    if progress_vars.get('syll_info', None) != None:
+    if progress_vars.get('syll_info') is not None:
         if exists(progress_vars['syll_info']):
             analysis_progress['syll_info'] = True
 
@@ -538,8 +534,6 @@ def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.
     -------
     All restored variables or None.
     '''
-
-    warnings.filterwarnings('ignore')
 
     # Check if progress file exists
     if exists(progress_filepath):

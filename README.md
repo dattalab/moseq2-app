@@ -86,7 +86,7 @@ Don't worry, we'll walk through installation steps for each of these packages in
      - anaconda3/miniconda3
      - git
      - curl (it should be installed by default on all systems)
-     - gcc and g++: accepted and tested versions: 6, 7, and 9
+     - gcc and g++: accepted and tested versions: 6, 7, 9, 10
      - [`moseq2-extract==0.6.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
      - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
      - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
@@ -125,9 +125,10 @@ $HOME/miniconda3_latest.sh
 We recommend that you say "yes" when the installation prompt asks if you want
 to initialize Miniconda3 by running conda init.
 
-You will need to restart your terminal and/or run `conda init` to initialize conda and
-have it become recognized as a command. You now installed a new python distribution as
-well as some essential tools, like `pip`, which you can use to install other python packages.
+**You will need to restart your terminal** and/or run `conda init` to initialize conda and
+have it become recognized as a command. Congratulations, you've installed a new python
+distribution as well as some essential tools, like `pip`, which you will use to
+install other python packages.
 
 If you prefer to install the full Anaconda package, we refer you to the
 [official installation documentation](https://docs.anaconda.com/anaconda/install/).
@@ -155,6 +156,8 @@ If gcc cannot be found, then follow these steps to install them for your respect
 
 1. Install [brew](https://brew.sh/), the macOS package manager, via their website.
 2. Install the xcode command line tools. Command: `xcode-select --install`
+**IMPORTANT: YOU CANNOT SKIP THIS STEP**. If you skip this step, you will see installation
+errors for `cytoolz`, `autoregressive`, and `psutil`
 3. Install gcc: `brew install gcc@7`
 
 Confirm you have `gcc-7` installed by running:
@@ -172,6 +175,8 @@ export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
 ```
 
+If you could not install MoSeq using `gcc-7`, try `gcc-10`: `brew install gcc@10`.
+We've had success installing MoSeq with this `gcc` version too.
 #### For WSL/Linux:
 
 How to install on Ubuntu or Debian:
@@ -201,9 +206,9 @@ you have it installed. Otherwise, refer to the [official installation guide](htt
 :bulb: **Helpful tip!** :bulb:
 
 If you don't want to repeatedly type your GitHub username and password when installing
-the MoSeq packages, you can set up `git` to temporarily remember them for 15 minutes:
+the MoSeq packages, you can set up `git` to temporarily remember them for 15 minutes.
 ```bash
-git config credential.helper cache
+git config --global credential.helper cache
 ```
 
 ### MoSeq2 packages and notebook

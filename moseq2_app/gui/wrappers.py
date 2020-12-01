@@ -8,12 +8,11 @@ main.py.
 import os
 import qgrid
 import shutil
-import joblib
-import warnings
 import pandas as pd
-from bokeh.io import show
 import ruamel.yaml as yaml
 import ipywidgets as widgets
+from bokeh.io import show
+from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
 from moseq2_app.util import index_to_dataframe
 from IPython.display import display, clear_output
@@ -27,8 +26,6 @@ from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionV
 from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
-
-warnings.filterwarnings('ignore')
 
 def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True):
     '''
@@ -200,8 +197,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     '''
 
     # Load the config file
-    with open(config_file, 'r') as f:
-        config_data = yaml.safe_load(f)
+    config_data = read_yaml(config_file)
 
     # Copy index file to modeling session directory
     modeling_session_dir = os.path.dirname(model_path)
@@ -210,13 +206,13 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
         shutil.copy2(index_file, new_index_path)
 
     # Load the model
-    model = parse_model_results(joblib.load(model_path))
+    model = parse_model_results(model_path)
 
     # Compute the sorted labels
     model['labels'] = relabel_by_usage(model['labels'], count='usage')[0]
 
     # Get Maximum number of syllables to include
-    if max_syllables == None:
+    if max_syllables is None:
         max_sylls = compute_syllable_explained_variance(model, n_explained=n_explained)
     else:
         max_sylls = max_syllables
@@ -317,11 +313,8 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     -------
     '''
 
-    with open(config_filepath, 'r') as f:
-        config_data = yaml.safe_load(f)
-
-    with open(syll_info_path, 'r') as f:
-        syll_info = yaml.safe_load(f)
+    config_data = read_yaml(config_filepath)
+    syll_info = read_yaml(syll_info_path)
 
     cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path, df_path=df_path,
                                       model_path=model_path, syll_info=syll_info, output_dir=output_dir,

@@ -3,9 +3,8 @@
 General utility functions.
 
 '''
-
 import pandas as pd
-import ruamel.yaml as yaml
+from moseq2_viz.util import read_yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.util import compute_behavioral_statistics
 
@@ -48,8 +47,7 @@ def index_to_dataframe(index_path):
     df (pd.DataFrame): Formatted dict in DataFrame form including each session's metadata
     '''
 
-    with open(index_path, 'r') as f:
-        index_data = yaml.safe_load(f)
+    index_data = read_yaml(index_path)
 
     files = index_data['files']
     meta = [f['metadata'] for f in files]
