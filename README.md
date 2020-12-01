@@ -4,7 +4,7 @@
 
 <center><img src="https://drive.google.com/uc?export=view&id=1jCpb4AQKBasne2SoXw_S1kwU7R9esAF6"></center>
 
-Last Updated: 10/12/2020
+Last Updated: 11/30/2020
 
 ## Overview
 
@@ -22,7 +22,7 @@ If you experience any issues using MoSeq or have comments on how you'd like to s
 MoSeq improved, please [file an issue here](https://github.com/dattalab/moseq2-docs/issues) (but first [see if it's been addressed before](https://github.com/dattalab/moseq2-docs/issues?q=is%3Aissue+is%3Aclosed))
 and/or fill out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
-Currently, we offer 3 notebooks that provide tutorials for using MoSeq's pipeline
+Currently, we offer 4 notebooks that provide tutorials for using MoSeq's pipeline
 to extract, preprocess, model, and perform basic analysis on experimental data. We
 hope to expand our selection of notebooks based on user feedback and the
 project's trajectory.
