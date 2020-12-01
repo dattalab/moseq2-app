@@ -87,10 +87,10 @@ Don't worry, we'll walk through installation steps for each of these packages in
      - git
      - curl (it should be installed by default on all systems)
      - gcc and g++: accepted and tested versions: 6, 7, 9, 10
-     - [`moseq2-extract==0.6.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
-     - [`moseq2-pca==0.3.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
-     - [`moseq2-model==0.4.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
-     - [`moseq2-viz==0.4.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
+     - [`moseq2-extract==0.7.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
+     - [`moseq2-pca==0.4.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
+     - [`moseq2-model==0.5.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
+     - [`moseq2-viz==0.5.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
  - macOS:
      - XCode command line tools
 
