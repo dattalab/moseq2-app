@@ -596,6 +596,43 @@ def get_difference_legend_items(plot, edge_width, group_name):
 
     return diff_main_items, diff_width_items
 
+def set_fill_color(scalar_color, data_dict):
+    '''
+    Sets the node fill coloring based on the selected scalar value.
+    Uses the inputted data_dict to get the key and array for the requested scalar.
+
+    Parameters
+    ----------
+    scalar_color (str): name of scalar to color nodes by.
+    data_dict (dict): dict containing dicts of scalar_df keys and their corresponding
+     values to create the linear color map from.
+
+    Returns
+    -------
+    fill_color (str or list): list of colors per node, or single color (white)
+    empty (bool): indicator for whether to display a color bar.
+    '''
+
+    empty = False
+
+    for arr in data_dict.values():
+        if len(arr['values']) == 0:
+            empty = True
+
+    fill_color = 'white'
+
+    try:
+        if not empty and scalar_color in data_dict:
+            fill_color = linear_cmap(data_dict[scalar_color]['key'],
+                                     "Spectral4",
+                                     0,
+                                     max(data_dict[scalar_color]['values']))
+    except ValueError:
+        pass
+
+    return fill_color, empty
+
+
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, incoming_transition_entropy, outgoing_transition_entropy,
                                       scalars, scalar_color='default', plot_vertically=False, legend_loc='above'):
@@ -733,28 +770,22 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         graph_renderer.node_renderer.data_source.add(incoming_transition_entropy[i], 'ent_in')
         graph_renderer.node_renderer.data_source.add(outgoing_transition_entropy[i], 'ent_out')
 
-        text_color = 'white'
+        data_dict = {
+            '2D velocity': {'key': 'speed_2d', 'values': group_speed_2d},
+            '3D velocity': {'key': 'speed_3d', 'values': group_speed_3d},
+            'Height': {'key': 'height', 'values': group_height},
+            'Distance to Center': {'key': 'dist_to_center_px', 'values': group_dist},
+            'Entropy-In': {'key': 'ent_in', 'values': incoming_transition_entropy[i]},
+            'Entropy-Out': {'key': 'ent_out', 'values': outgoing_transition_entropy[i]},
+        }
 
         # node interactions
-        if scalar_color == '2D velocity' and len(group_speed_2d) > 0:
-            fill_color = linear_cmap('speed_2d', "Spectral4", 0, max(group_speed_2d))
-        elif scalar_color == '3D velocity' and len(group_speed_3d) > 0:
-            fill_color = linear_cmap('speed_3d', "Spectral4", 0, max(group_speed_3d))
-        elif scalar_color == 'Height' and len(group_height) > 0:
-            fill_color = linear_cmap('height', "Spectral4", 0, max(group_height))
-        elif scalar_color == 'Distance to Center' and len(group_dist) > 0:
-            fill_color = linear_cmap('dist_to_center_px', "Spectral4", 0, max(group_dist))
-        elif scalar_color == 'Entropy-In' and len(incoming_transition_entropy[i]) > 0:
-            fill_color = linear_cmap('ent_in', "Spectral4", 0, max(incoming_transition_entropy[i]))
-        elif scalar_color == 'Entropy-Out' and len(outgoing_transition_entropy[i]) > 0:
-            fill_color = linear_cmap('ent_out', "Spectral4", 0, max(outgoing_transition_entropy[i]))
-        else:
-            fill_color = 'white'
-            text_color = 'black'
+        text_color = 'black'
+        fill_color, empty = set_fill_color(scalar_color, data_dict)
 
-        if fill_color != 'white':
-            color_bar = ColorBar(color_mapper=fill_color['transform'], location=(0, 0))
-            plot.add_layout(color_bar, 'below')
+        color_bar = None
+        if fill_color != 'white' and not empty:
+            color_bar = ColorBar(color_mapper=fill_color['transform'])
 
         graph_renderer.node_renderer.glyph = Circle(size='node_size', fill_color=fill_color, line_color='node_color')
         graph_renderer.node_renderer.selection_glyph = Circle(size='node_size', line_color='node_color', fill_color=fill_color)
@@ -849,7 +880,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
         if not plot_vertically:
             plot.add_layout(main_legend, legend_loc)
-            #plot.add_layout(info_legend, legend_loc)
+
+        if color_bar is not None:
+            plot.renderers.append(color_bar)
 
         plots.append(plot)
         rendered_graphs.append(graph_renderer)
