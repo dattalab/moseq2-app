@@ -27,7 +27,7 @@ from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTran
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
 
-def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True):
+def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True, autodetect_depths=False):
     '''
 
     Interactive ROI detection wrapper function. Users can use run this wrapper
@@ -44,7 +44,11 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
     -------
     '''
 
-    roi_app = InteractiveFindRoi(data_path, config_file, session_config, compute_bgs=compute_bgs)
+    roi_app = InteractiveFindRoi(data_path,
+                                 config_file,
+                                 session_config,
+                                 compute_bgs=compute_bgs,
+                                 autodetect_depths=autodetect_depths)
 
     # Run interactive application
     roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)

@@ -36,7 +36,7 @@ from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, re
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 
-    def __init__(self, data_path, config_file, session_config, compute_bgs=True):
+    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=False):
         '''
 
         Parameters
@@ -48,6 +48,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         super().__init__()
+
+        self.autodetect_depths = autodetect_depths
 
         # Read default config parameters
         self.config_data = read_yaml(config_file)
@@ -508,7 +510,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Autodetect reference depth range and min-max height values at launch
         if self.config_data['autodetect']:
             self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
-            if not self.curr_results['flagged']:
+            if not self.curr_results['flagged'] and not self.autodetect_depths:
                 self.config_data['autodetect'] = False
 
             # Update the session flag result
