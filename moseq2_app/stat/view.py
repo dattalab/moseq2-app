@@ -10,6 +10,7 @@ import itertools
 import numpy as np
 import pandas as pd
 import networkx as nx
+from os.path import relpath
 from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
@@ -196,7 +197,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         # Pack data into numpy arrays
         labels = desc_data['label'].to_numpy()
         desc = desc_data['desc'].to_numpy()
-        cm_paths = desc_data['crowd_movie_path'].to_numpy()
+        cm_paths = [relpath(cm) for cm in desc_data['crowd_movie_path'].to_numpy()]
 
         # stat data source
         source = ColumnDataSource(data=dict(
@@ -753,7 +754,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         for n in node_indices:
             labels.append(syll_info[n]['label'])
             descs.append(syll_info[n]['desc'])
-            cm_paths.append(syll_info[n]['crowd_movie_path'])
+            cm_paths.append(relpath(syll_info[n]['crowd_movie_path']))
 
         # setting common data source to display via HoverTool
         graph_renderer.node_renderer.data_source.add(node_indices, 'number')

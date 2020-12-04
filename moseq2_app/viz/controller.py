@@ -14,8 +14,8 @@ from glob import glob
 from copy import deepcopy
 from bokeh.io import show
 import ruamel.yaml as yaml
+from os.path import relpath
 import ipywidgets as widgets
-from os.path import basename
 from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
@@ -350,7 +350,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         video_div = f'''
                         <h2>{self.syll_select.index}: {syllables['label']}</h2>
                         <video
-                            src="{cm_path}"; alt="{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
+                            src="{relpath(cm_path)}"; alt="{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
                             style="float: left; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
@@ -842,7 +842,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                     border="2"; autoplay controls loop>
                 </video>
-            '''.format(group_info=group_info, src=tmp_path, alt=tmp_path, height=int(video_dims[1] * 0.8),
+            '''.format(group_info=group_info, src=relpath(tmp_path), alt=tmp_path, height=int(video_dims[1] * 0.8),
                        width=int(video_dims[0] * 0.8))
 
             divs.append(group_txt)

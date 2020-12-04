@@ -9,6 +9,7 @@ from bokeh.models import Div
 from bokeh.layouts import gridplot
 from IPython.display import display
 from bokeh.plotting import figure, show
+from os.path import dirname, join, relpath, exists
 from moseq2_extract.io.video import get_video_info
 
 
@@ -29,11 +30,11 @@ def show_extraction(input_file, video_file):
     '''
 
     # Copy generated movie to temporary directory
-    vid_dir = os.path.dirname(video_file)
-    tmp_path = os.path.join(vid_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(video_file)}')
-    tmp_dirname = os.path.dirname(tmp_path)
+    vid_dir = dirname(video_file)
+    tmp_path = join(vid_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(video_file)}')
+    tmp_dirname = dirname(tmp_path)
 
-    if not os.path.exists(tmp_dirname):
+    if not exists(tmp_dirname):
         os.makedirs(tmp_dirname)
 
     if video_file != tmp_path:
@@ -44,7 +45,7 @@ def show_extraction(input_file, video_file):
     video_div = f'''
                     <h2>{input_file}</h2>
                     <video
-                        src="{tmp_path}"; alt="{tmp_path}"; 
+                        src="{relpath(tmp_path)}"; alt="{tmp_path}"; 
                         height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                         style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                         border="2"; autoplay controls loop>

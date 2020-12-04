@@ -19,8 +19,8 @@ import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 import ipywidgets as widgets
 from bokeh.models import Div
-from os.path import dirname, basename, join
 from IPython.display import display, clear_output
+from os.path import dirname, basename, join, relpath
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
@@ -883,7 +883,7 @@ class InteractiveExtractionViewer:
         video_div = f'''
                         <h2>{input_file}</h2>
                         <video
-                            src="{input_file}"; alt="{input_file}"; 
+                            src="{relpath(input_file)}"; alt="{input_file}"; 
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                             style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
