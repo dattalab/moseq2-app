@@ -54,6 +54,13 @@ utilized if the current flip classifier is not working as expected.
 For example, the current flip classifier does not work well with datasets
 acquired with the Azure or RealSense depth cameras.
 
+## Hands-Free MoSeq2 Notebook ([link](./Handsfree-MoSeq2-Notebook.ipynb))
+
+A streamlined version of the main notebook that can be used to run the 
+entire moseq2 pipeline with no user input. This would be useful for users 
+who are already familiar with the MoSeq pipeline and would like an 
+expedited means of processing some data. 
+
 ### Our goal for the notebooks
 
 These notebooks are built with the intention that users will copy and adapt them for
