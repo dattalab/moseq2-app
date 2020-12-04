@@ -182,6 +182,6 @@ class TestNotebookProgress(TestCase):
         with open(stdin, 'w') as f:
             f.write('N')
 
-        check_progress(base_dir, progress_file)
+        check_progress(progress_file)
 
         os.remove(progress_file)

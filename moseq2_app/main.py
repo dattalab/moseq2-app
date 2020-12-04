@@ -89,13 +89,12 @@ def view_extraction(extractions, default=0):
     return extractions
 
 @filter_warnings
-def interactive_roi_detector(input_dir, progress_paths, compute_all_bgs=True):
+def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=False):
     '''
     Function to launch ROI detector interactive GUI in jupyter notebook
 
     Parameters
     ----------
-    input_dir (str): path to parent directory containing session folders
     progress_paths (dict): dictionary of notebook progress paths.
     compute_all_bgs (bool): if True, computes all the sessions' background images to speed up the UI.
 
@@ -106,7 +105,11 @@ def interactive_roi_detector(input_dir, progress_paths, compute_all_bgs=True):
     config_file = progress_paths['config_file']
     session_config = progress_paths['session_config']
 
-    interactive_roi_wrapper(input_dir, config_file, session_config, compute_bgs=compute_all_bgs)
+    interactive_roi_wrapper(progress_paths.get('base_dir', './'),
+                            config_file,
+                            session_config,
+                            compute_bgs=compute_all_bgs,
+                            autodetect_depths=autodetect_depths)
 
 @filter_warnings
 def preview_extractions(input_dir):
@@ -120,7 +123,7 @@ def preview_extractions(input_dir):
     Returns
     -------
     '''
-
+    output_notebook()
     interactive_extraction_preview_wrapper(input_dir)
 
 @filter_warnings

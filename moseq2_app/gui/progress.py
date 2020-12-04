@@ -14,7 +14,7 @@ from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 from datetime import datetime
-from os.path import dirname, basename, exists, join
+from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
 
 progress_log = 'progress.log'
@@ -270,7 +270,7 @@ def generate_intital_progressfile(filename='progress.yaml'):
     print(f'Generating progress path at: {filename}')
 
     # Create basic progress file
-    base_progress_vars = {'base_dir': base_dir,
+    base_progress_vars = {'base_dir': abspath(base_dir),
                           'config_file': '',
                           'session_config': '',
                           'index_file': '',
@@ -338,7 +338,7 @@ def load_progress(progress_file):
 
     return progress_vars
 
-def restore_progress_vars(progress_file, init=False, overwrite=False):
+def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, overwrite=False):
     '''
     Restore all saved progress variables to Jupyter Notebook.
 
@@ -521,7 +521,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     show_progress_bar(count_total_found_items(modeling_progress), len(modeling_progress.keys()), desc="Modeling Progress")
     show_progress_bar(count_total_found_items(analysis_progress), len(analysis_progress.keys()), desc="Analysis Progress")
 
-def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.gz']):
+def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'mkv', 'avi', 'tar.gz']):
     '''
     Checks whether progress file exists and prompts user input on whether to overwrite, load old, or generate a new one.
 
@@ -542,4 +542,4 @@ def check_progress(base_dir, progress_filepath, exts=['dat', 'mkv', 'avi', 'tar.
 
         print('Found progress file, displaying progress...\n')
         # Display progress bars
-        print_progress(base_dir, progress_vars, exts=exts)
+        print_progress(progress_vars['base_dir'], progress_vars, exts=exts)

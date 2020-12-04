@@ -22,7 +22,7 @@ If you experience any issues using MoSeq or have comments on how you'd like to s
 MoSeq improved, please [file an issue here](https://github.com/dattalab/moseq2-docs/issues) (but first [see if it's been addressed before](https://github.com/dattalab/moseq2-docs/issues?q=is%3Aissue+is%3Aclosed))
 and/or fill out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
-Currently, we offer 4 notebooks that provide tutorials for using MoSeq's pipeline
+Currently, we offer 5 notebooks that provide tutorials for using MoSeq's pipeline
 to extract, preprocess, model, and perform basic analysis on experimental data. We
 hope to expand our selection of notebooks based on user feedback and the
 project's trajectory.
@@ -264,6 +264,14 @@ If you get any errors running that script, open the script in a text file and ru
 of the script independently. This will help you (and us) figure out where the
 error is occurring.
 
+You can check that you have the correct dependency versions using the commands below:
+```bash
+moseq2-extract --version
+moseq2-extract --version
+moseq2-extract --version
+moseq2-extract --version
+```
+
 ## Downloading a test dataset
 
 To try MoSeq2 on some sample data, we have provided 2 scripts to either download
@@ -280,6 +288,12 @@ Run the following command in the `moseq2-app` directory
 ./scripts/download_small_dataset.sh  # or ./scripts/download_full_dataset.sh
 ```
 
+We also provide an extracted version of the complete dataset, allowing you jump
+ directly into the model results visualization step. To download it, run the following command:
+```bash
+./scripts/download_extracted_full_dataset.sh
+```
+
 The shell scripts will create a new folder within `moseq2-app` to download the data.
 Be warned, this process will take a long time to finish (hours), and requires 20-60 GB
 of disk space.
@@ -287,18 +301,28 @@ of disk space.
 ## Getting started
 
 At this point, you should have MoSeq installed and some data to extract.
-As discussed above, we've provided 3 jupyter notebooks that describe
+As discussed above, we've provided 3 (main) jupyter notebooks that describe
 MoSeq's pipeline in detail. To use the notebooks, make sure that you've
 activated the conda environment you installed MoSeq in (likely `moseq2-app`)
 and you have navigated to the folder that contains the jupyter notebook(s).
+
 __:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
-your dataset so that the videos you generate will load into the notebooks
-properly.__ 
+your dataset so that the videos you generate will load into the notebooks properly.__ Moreover, we
+recommend each modeling project have its own dedicated set of notebooks, especially for analysis to 
+improve reproducibility.
+
+You can easily copy all your notebooks to your modeling project(s) by running the following command:
+```
+cp *.ipynb /path/to/data/dir/
+```
 
 Run the following command to launch the jupyter notebook:
 ```bash
 jupyter notebook
 ```
+
+Running jupyter using a remote machine/server? 
+[Here is a link to a SLURM example for how to run jupyter on a remote machine.](https://alexanderlabwhoi.github.io/post/2019-03-08_jpn-slurm/)
 
 Then, when your browser launches, click on the notebook you want to run.
 The notebooks contain tutorial materials to walk you through the process
