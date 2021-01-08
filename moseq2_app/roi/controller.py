@@ -632,7 +632,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         try:
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(self.curr_bground_im,
+            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
