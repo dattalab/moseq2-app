@@ -274,9 +274,9 @@ error is occurring.
 You can check that you have the correct dependency versions using the commands below:
 ```bash
 moseq2-extract --version
-moseq2-extract --version
-moseq2-extract --version
-moseq2-extract --version
+moseq2-pca --version
+moseq2-model --version
+moseq2-viz --version
 ```
 
 ## Downloading a test dataset
