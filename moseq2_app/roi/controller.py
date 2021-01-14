@@ -838,12 +838,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
-            self.curr_bground_im = np.flip(self.curr_bground_im, 0)
             overlay = np.flip(overlay, 0) # overlayed roi
             filtered_frames = np.flip(filtered_frames, 0) # segmented
 
         # Make and display plots
-        plot_roi_results(self.formatted_key, self.curr_bground_im, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
+        plot_roi_results(self.formatted_key, np.flip(self.curr_bground_im.copy(), 0), roi, overlay, filtered_frames, result['depth_frames'][0], fn)
         gc.collect()
 
 class InteractiveExtractionViewer:
