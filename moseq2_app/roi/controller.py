@@ -604,7 +604,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             limit = np.max(bground_im)
 
             # Compute bucket distance thresholding value
-            threshold_value = np.mean(bground_im) - np.std(bground_im)
+            threshold_value = limit - 2*np.std(bground_im)
             self.config_data['bg_threshold'] = float(threshold_value)
 
             # Threshold image to find depth at bucket center: the true depth
@@ -630,15 +630,23 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         strel_dilate = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_dilate']))
         strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
 
+        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
+            print('Graduating Background')
+            bground_im = get_bground_im_file(self.curr_session)
+            self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
+        else:
+            self.curr_bground_im = get_bground_im_file(self.curr_session)
+
         try:
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
+            rois, plane, bboxes, _, _, _ = get_roi(self.curr_bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
                                                    get_all_data=True
                                                    )
-        except:
+        except Exception as e:
+            print(e)
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
             curr_results['roi'] = np.zeros_like(self.curr_bground_im)
@@ -648,13 +656,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
             self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
-
-        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
-            print('Graduating Background')
-            bground_im = get_bground_im_file(self.curr_session)
-            self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
-        else:
-            self.curr_bground_im = get_bground_im_file(self.curr_session)
 
         if self.config_data['autodetect']:
             # Get pixel dims from bounding box
@@ -777,7 +778,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
         # get segmented frame
-        raw_frames = load_movie_data(self.curr_session, range(fn, fn + 30), frame_dims=self.curr_bground_im.shape[::-1])
+        raw_frames = load_movie_data(self.curr_session, 
+                                    range(fn, fn + 30), 
+                                    frame_dims=self.curr_bground_im.shape[::-1], 
+                                    pixel_format=self.config_data.get('pixel_format', 'gray16le'),
+                                    frame_dtype=self.config_data.get('frame_dtype', 'uint16'))
 
         if self.dilate_iters.value <= 1:
             curr_frame = (self.curr_bground_im - raw_frames)
@@ -789,6 +794,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # filter out regions outside of ROI
         try:
             filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
+            
         except:
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
@@ -821,7 +827,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
-
+        
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
@@ -829,6 +835,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         else:
             self.indicator.value = "<center><h2><font color='green';>Passing</h2></center>"
             self.curr_results['flagged'] = False
+
+        if self.config_data.get('camera_type', 'kinect') == 'azure':
+            # orienting preview images to match sample extraction
+            self.curr_bground_im = np.flip(self.curr_bground_im, 0)
+            overlay = np.flip(overlay, 0) # overlayed roi
+            filtered_frames = np.flip(filtered_frames, 0) # segmented
 
         # Make and display plots
         plot_roi_results(self.formatted_key, self.curr_bground_im, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
