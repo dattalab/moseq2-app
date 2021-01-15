@@ -785,7 +785,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                     pixel_format=self.config_data.get('pixel_format', 'gray16le'),
                                     frame_dtype=self.config_data.get('frame_dtype', 'uint16'))
 
-        if self.dilate_iters.value <= 1:
+        if not self.config_data.get('graduate_walls', False):
             curr_frame = (self.curr_bground_im - raw_frames)
         else:
             mouse_on_edge = (self.curr_bground_im < self.true_depth) & (raw_frames < self.curr_bground_im)
@@ -839,11 +839,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
+            display_bg = np.flip(self.curr_bground_im.copy(), 0)
             overlay = np.flip(overlay, 0) # overlayed roi
             filtered_frames = np.flip(filtered_frames, 0) # segmented
+        else:
+            display_bg = self.curr_bground_im
 
         # Make and display plots
-        plot_roi_results(self.formatted_key, np.flip(self.curr_bground_im.copy(), 0), roi, overlay, filtered_frames, result['depth_frames'][0], fn)
+        plot_roi_results(self.formatted_key, display_bg, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
         gc.collect()
 
 class InteractiveExtractionViewer:
