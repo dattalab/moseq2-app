@@ -188,7 +188,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
                 # Compute background image; saving the image to a file
-                get_bground_im_file(p)
+                get_bground_im_file(p, **self.config_data)
             except:
                 # Print error if an issue arises
                 display(f'Error, could not compute background for session: {s}.')
@@ -388,7 +388,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
                 # Get background image for each session and test the current parameters on it
-                bground_im = get_bground_im_file(sessionPath)
+                bground_im = get_bground_im_file(input_file, **self.config_data)
                 try:
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                 except:
@@ -445,7 +445,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.curr_session = self.sessions[self.formatted_key]
 
         # Get background and display UI plots
-        self.curr_bground_im = get_bground_im_file(self.curr_session)
+        self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
         self.main_out = widgets.interactive_output(self.interactive_depth_finder, {'minmax_heights': self.minmax_heights,
                                                                                    'fn': self.frame_num,
                                                                                    'dr': self.bg_roi_depth_range,
@@ -604,7 +604,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             limit = np.max(bground_im)
 
             # Compute bucket distance thresholding value
-            threshold_value = limit - 2*np.std(bground_im)
+            threshold_value = np.median(bground_im)
             self.config_data['bg_threshold'] = float(threshold_value)
 
             # Threshold image to find depth at bucket center: the true depth
@@ -632,10 +632,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
             print('Graduating Background')
-            bground_im = get_bground_im_file(self.curr_session)
+            bground_im = get_bground_im_file(self.curr_session, **self.config_data)
             self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
         else:
-            self.curr_bground_im = get_bground_im_file(self.curr_session)
+            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
 
         try:
             # Get ROI
@@ -780,6 +780,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # get segmented frame
         raw_frames = load_movie_data(self.curr_session, 
                                     range(fn, fn + 30), 
+                                    rescale_depth=self.config_data.get('rescale_depth', False),
                                     frame_dims=self.curr_bground_im.shape[::-1], 
                                     pixel_format=self.config_data.get('pixel_format', 'gray16le'),
                                     frame_dtype=self.config_data.get('frame_dtype', 'uint16'))
