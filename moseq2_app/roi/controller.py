@@ -388,7 +388,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
                 # Get background image for each session and test the current parameters on it
-                bground_im = get_bground_im_file(input_file, **self.config_data)
+                bground_im = get_bground_im_file(sessionPath, **self.config_data)
                 try:
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                 except:
@@ -779,11 +779,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # get segmented frame
         raw_frames = load_movie_data(self.curr_session, 
-                                    range(fn, fn + 30), 
-                                    rescale_depth=self.config_data.get('rescale_depth', False),
-                                    frame_dims=self.curr_bground_im.shape[::-1], 
-                                    pixel_format=self.config_data.get('pixel_format', 'gray16le'),
-                                    frame_dtype=self.config_data.get('frame_dtype', 'uint16'))
+                                    range(fn, fn + 30),
+                                    **self.config_data,
+                                    frame_size=self.curr_bground_im.shape[::-1])
 
         if not self.config_data.get('graduate_walls', False):
             curr_frame = (self.curr_bground_im - raw_frames)
