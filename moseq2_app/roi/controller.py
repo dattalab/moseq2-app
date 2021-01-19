@@ -61,6 +61,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if session_config is not None:
             if os.path.exists(session_config):
                 self.session_parameters = read_yaml(session_config)
+                for key in self.session_parameters.keys():
+                    self.session_parameters[key].update(self.config_data)
             else:
                 warnings.warn('Session configuration file was not found. Generating a new one.')
 
@@ -633,7 +635,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
             print('Graduating Background')
             bground_im = get_bground_im_file(self.curr_session, **self.config_data)
-            self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
+            self.curr_bground_im = graduate_dilated_wall_area(bground_im.copy(), self.config_data, strel_dilate, join(dirname(session), 'proc'))
         else:
             self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
 
@@ -790,25 +792,24 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             curr_frame = (self.curr_bground_im - raw_frames) * np.logical_not(mouse_on_edge) + \
                          (self.true_depth - raw_frames) * mouse_on_edge
 
-        # filter out regions outside of ROI
-        try:
-            filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
-            
-        except:
-            # Display ROI error and flag
-            filtered_frames = curr_frame.copy()[0]
-            if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
-                self.curr_results['flagged'] = True
-
         # filter for included mouse height range
         try:
-            filtered_frames = threshold_chunk(filtered_frames, minmax_heights[0], minmax_heights[1])
+            filtered_frames = threshold_chunk(curr_frame, minmax_heights[0], minmax_heights[1])
         except:
             # Display min-max heights error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
+                self.curr_results['flagged'] = True
+
+        # filter out regions outside of ROI
+        try:
+            filtered_frames = apply_roi(filtered_frames, roi)[0]#.astype(self.config_data['frame_dtype'])
+        except:
+            # Display ROI error and flag
+            filtered_frames = curr_frame.copy()[0]
+            if not self.curr_results['flagged']:
+                self.indicator.value = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
                 self.curr_results['flagged'] = True
 
         # Get overlayed ROI
