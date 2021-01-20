@@ -657,8 +657,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
 
         try:
+            # get graduated background to accurately recompute roi region
+            if self.graduate_walls:
+                roi_bground = self.curr_bground_im
+            else:
+                roi_bground = bground_im
+
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
+            rois, plane, bboxes, _, _, _ = get_roi(roi_bground,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
