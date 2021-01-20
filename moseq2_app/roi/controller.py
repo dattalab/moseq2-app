@@ -630,16 +630,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         strel_dilate = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_dilate']))
         strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
 
-        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
-            print('Graduating Background')
-            bground_im = get_bground_im_file(self.curr_session, **self.config_data)
-            self.curr_bground_im = graduate_dilated_wall_area(bground_im.copy(), self.config_data, strel_dilate, join(dirname(session), 'proc'))
-        else:
-            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
-
         try:
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(self.curr_bground_im,
+            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
@@ -656,6 +649,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
             self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
+
+        if self.graduate_walls and self.dilate_iters.value > 1:
+            print('Graduating Background')
+            bground_im = get_bground_im_file(self.curr_session, **self.config_data)
+            self.curr_bground_im = graduate_dilated_wall_area(bground_im.copy(), self.config_data, strel_dilate, join(dirname(session), 'proc'))
+        else:
+            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
 
         if self.config_data['autodetect']:
             # Get pixel dims from bounding box
