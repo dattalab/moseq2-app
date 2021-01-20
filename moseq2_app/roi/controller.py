@@ -61,8 +61,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if session_config is not None:
             if os.path.exists(session_config):
                 self.session_parameters = read_yaml(session_config)
-                for key in self.session_parameters.keys():
-                    self.session_parameters[key].update(self.config_data)
             else:
                 warnings.warn('Session configuration file was not found. Generating a new one.')
 
@@ -614,7 +612,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
             # True depth is at the center of the bucket
             self.true_depth = bground_im[cY][cX]
-            self.config_data['true_depth'] = self.true_depth
+            self.config_data['true_depth'] = int(self.true_depth)
 
             # Get true depth range difference
             range_diff = 10 ** (len(str(int(self.true_depth))) - 1)
@@ -623,7 +621,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             bg_roi_range_min = self.true_depth - range_diff
             bg_roi_range_max = self.true_depth + range_diff
 
-            self.config_data['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
+            self.config_data['bg_roi_depth_range'] = [int(bg_roi_range_min), int(bg_roi_range_max)]
 
             if bg_roi_range_max > self.bg_roi_depth_range.max:
                 self.bg_roi_depth_range.max = bg_roi_range_max + range_diff
