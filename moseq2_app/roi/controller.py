@@ -646,16 +646,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.update_checked_list(results=curr_results)
             return curr_results
 
-        if self.config_data['use_plane_bground']:
-            print('Using plane fit for background...')
-            self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
-
         if self.graduate_walls and self.dilate_iters.value > 1:
             print('Graduating Background')
             bground_im = get_bground_im_file(self.curr_session, **self.config_data)
             self.curr_bground_im = graduate_dilated_wall_area(bground_im.copy(), self.config_data, strel_dilate, join(dirname(session), 'proc'))
         else:
             self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
+
+        if self.config_data['use_plane_bground']:
+            print('Using plane fit for background...')
+            self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
 
         if self.config_data['autodetect']:
             # Get pixel dims from bounding box
