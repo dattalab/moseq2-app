@@ -53,22 +53,39 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Read default config parameters
         self.config_data = read_yaml(config_file)
+        self.config_file = config_file
 
         self.session_config = session_config
         self.session_parameters = {}
 
+        # get dict of found sessions with folder_name dict keys pointing to depth file path
+        self.sessions = get_session_paths(data_path)
+
+        # Session selection dict key names
+        self.keys = list(self.sessions.keys())
+
         # Read individual session config if it exists
         if session_config is not None:
             if os.path.exists(session_config):
-                self.session_parameters = read_yaml(session_config)
+                try:
+                    self.session_parameters = read_yaml(session_config)
+                except:
+                    # file is zero bytes
+                    warnings.warn('Session configuration file was empty. Generating a new one.')
+                    self.generate_session_config()
             else:
                 warnings.warn('Session configuration file was not found. Generating a new one.')
+                self.generate_session_config()
 
-                # Generate session config file if it does not exist
-                session_config = join(dirname(config_file), 'session_config.yaml')
-                self.session_parameters = {}
-                with open(session_config, 'w+') as f:
-                    yaml.safe_dump(self.session_parameters, f)
+        # Handle broken session config files
+        if self.session_parameters is None:
+            self.session_parameters = {}
+
+        # Populate session dict with different config dict instances
+        if len(self.session_parameters) != len(self.keys):
+            for k in self.keys:
+                if k not in self.session_parameters:
+                    self.session_parameters[k] = deepcopy(self.config_data)
 
         self.all_results = {}
 
@@ -76,12 +93,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data['config_file'] = config_file
 
         # Update DropDown menu items
-        self.sessions = get_session_paths(data_path)
         states = [0] * len(self.sessions.keys())
-
-        # Session selection dict key names
-        self.keys = list(self.sessions.keys())
-
         c_base = int("1F534", base=16)
         options = list(self.sessions.keys())
         colored_options = ['{} {}'.format(chr(c_base + s), o) for s, o in zip(states, options)]
@@ -137,6 +149,20 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if compute_bgs:
             self.compute_all_bgs()
+
+    def generate_session_config(self):
+        '''
+        Generates the default/initial session configuration file.
+
+        Returns
+        -------
+        '''
+
+        # Generate session config file if it does not exist
+        session_config = join(dirname(self.config_file), 'session_config.yaml')
+        self.session_parameters = {}
+        with open(session_config, 'w+') as f:
+            yaml.safe_dump(self.session_parameters, f)
 
     def clear_on_click(self, b):
         '''
@@ -283,10 +309,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Update session parameters
         with open(self.config_data['session_config_path'], 'w+') as f:
-            yaml.safe_dump(self.session_parameters, f)
+            yaml.dump(self.session_parameters, f)
 
         with open(self.config_data['config_file'], 'w+') as f:
-            yaml.safe_dump(self.config_data, f)
+            yaml.dump(self.config_data, f)
 
         self.save_parameters.button_style = 'success'
         self.save_parameters.icon = 'check'
