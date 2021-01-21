@@ -200,8 +200,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         bokeh.io.reset_output()
         bokeh.io.output_notebook(hide_banner=True)
         clear_output(wait=True)
-        self.interactive_find_roi_session_selector(self.checked_list.value)
         self.config_data['detect'] = True
+        if self.autodetect_depths:
+            self.config_data['autodetect'] = True
+        self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def compute_all_bgs(self):
         '''
@@ -309,10 +311,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Update session parameters
         with open(self.config_data['session_config_path'], 'w+') as f:
-            yaml.dump(self.session_parameters, f)
+            yaml.safe_dump(self.session_parameters, f)
 
         with open(self.config_data['config_file'], 'w+') as f:
-            yaml.dump(self.config_data, f)
+            yaml.safe_dump(self.config_data, f)
 
         self.save_parameters.button_style = 'success'
         self.save_parameters.icon = 'check'
@@ -536,7 +538,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Autodetect reference depth range and min-max height values at launch
         if self.config_data['autodetect']:
             self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
-            if not self.curr_results['flagged'] and not self.autodetect_depths:
+            if not self.curr_results['flagged']:
                 self.config_data['autodetect'] = False
 
             # Update the session flag result
@@ -657,14 +659,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
 
         try:
-            # get graduated background to accurately recompute roi region
-            if self.graduate_walls:
-                roi_bground = self.curr_bground_im
-            else:
-                roi_bground = bground_im
-
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(roi_bground,
+            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
