@@ -190,8 +190,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         bokeh.io.reset_output()
         bokeh.io.output_notebook(hide_banner=True)
         clear_output(wait=True)
-        self.interactive_find_roi_session_selector(self.checked_list.value)
+
         self.config_data['detect'] = True
+        if self.autodetect_depths:
+            self.config_data['autodetect'] = True
+        self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def compute_all_bgs(self):
         '''
@@ -404,7 +407,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
                 # Get background image for each session and test the current parameters on it
-                bground_im = get_bground_im_file(input_file, **self.config_data)
+                bground_im = get_bground_im_file(sessionPath, **self.config_data)
                 try:
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                 except:
@@ -526,7 +529,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Autodetect reference depth range and min-max height values at launch
         if self.config_data['autodetect']:
             self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
-            if not self.curr_results['flagged'] and not self.autodetect_depths:
+            if not self.curr_results['flagged']:
                 self.config_data['autodetect'] = False
 
             # Update the session flag result
@@ -655,7 +658,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         try:
             # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(self.curr_bground_im,
+            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
                                                    **self.config_data,
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
@@ -795,12 +798,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # get segmented frame
         raw_frames = load_movie_data(self.curr_session, 
-                                    range(fn, fn + 30), 
-                                    rescale_depth=self.config_data.get('rescale_depth', False),
-                                    frame_dims=self.curr_bground_im.shape[::-1], 
-                                    pixel_format=self.config_data.get('pixel_format', 'gray16le'),
-                                    frame_dtype=self.config_data.get('frame_dtype', 'uint16'))
-
+                                    range(fn, fn + 30),
+                                    **self.config_data,
+                                    frame_size=self.curr_bground_im.shape[::-1])
         if not self.config_data.get('graduate_walls', False):
             curr_frame = (self.curr_bground_im - raw_frames)
         else:
