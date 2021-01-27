@@ -55,32 +55,35 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data = read_yaml(config_file)
 
         self.session_config = session_config
-        self.session_parameters = {}
+
+        # Update DropDown menu items
+        self.sessions = get_session_paths(data_path)
+
+        # Session selection dict key names
+        self.keys = list(self.sessions.keys())
+
+        self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
 
         # Read individual session config if it exists
         if session_config is not None:
             if os.path.exists(session_config):
-                self.session_parameters = read_yaml(session_config)
+                if os.stat(session_config).st_size > 0:
+                    self.session_parameters = read_yaml(session_config)
+                else:
+                    self.generate_session_config(session_config)
             else:
-                warnings.warn('Session configuration file was not found. Generating a new one.')
+                self.generate_session_config(session_config)
 
-                # Generate session config file if it does not exist
-                session_config = join(dirname(config_file), 'session_config.yaml')
-                self.session_parameters = {}
-                with open(session_config, 'w+') as f:
-                    yaml.safe_dump(self.session_parameters, f)
+        # Handle broken session config files
+        if self.session_parameters is None:
+            self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys if k not in self.session_parameters}
 
         self.all_results = {}
 
         self.config_data['session_config_path'] = session_config
         self.config_data['config_file'] = config_file
 
-        # Update DropDown menu items
-        self.sessions = get_session_paths(data_path)
         states = [0] * len(self.sessions.keys())
-
-        # Session selection dict key names
-        self.keys = list(self.sessions.keys())
 
         c_base = int("1F534", base=16)
         options = list(self.sessions.keys())
@@ -137,6 +140,19 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if compute_bgs:
             self.compute_all_bgs()
+
+    def generate_session_config(self, path):
+        '''
+        Generates the default/initial session configuration file.
+
+        Returns
+        -------
+        '''
+        warnings.warn('Session configuration file was not found. Generating a new one.')
+
+        # Generate session config file if it does not exist
+        with open(path, 'w+') as f:
+            yaml.safe_dump(self.session_parameters, f)
 
     def clear_on_click(self, b):
         '''
