@@ -1,4 +1,3 @@
-name: moseq2-app
 channels:
   - conda-forge
   - default
@@ -10,3 +9,6 @@ dependencies:
   - conda-forge::ffmpeg=4.2.0
   - conda-forge::opencv
   - jupyter_nbextensions_configurator
+  - pip:
+      - numpy==1.18.3
+      - pandas==1.0.5

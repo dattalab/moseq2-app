@@ -157,7 +157,13 @@ You should expect to see a path to your gcc-7 installation, like this:
 /usr/local/bin/gcc-7  # or /usr/bin/gcc
 ```
 
-If gcc cannot be found, then follow these steps to install them for your respective OS:
+Another way to confirm if your default gcc version is compatible is by running the following commands:
+```.bash
+gcc --version
+g++ --version
+```
+
+If gcc (or appropriate version of gcc) cannot be found, then follow these steps to install them for your respective OS:
 
 #### For macOS:
 
@@ -190,6 +196,7 @@ How to install on Ubuntu or Debian:
 ```bash
 sudo apt update
 sudo apt install build-essential
+sudo apt install g++-7 gcc-7 -y
 ```
 If you're using a different linux distribution, refer to their package manager to
 install gcc.
@@ -198,7 +205,7 @@ The gcc version that's installed through `build-essential` should be able to com
 `moseq2-model`'s dependencies, and there are no extra steps you need to take to make
 MoSeq recognize gcc (like you do for [macOS](#for-macos)).
 
-Alternatively, you can also install `gcc-7.3` with `conda`:
+Alternatively, if the Ubuntu install isn't working, you can also install `gcc-7.3` with `conda`:
 ```bash
 # automatically sets CC/CXX after installing, too
 conda install -c anaconda gcc_linux-64
@@ -256,6 +263,12 @@ above](#for-macos) (remember to replace `7` with the gcc version you have)
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
 ```
+
+You can check if the paths do exist by running the following command:
+```.bash
+echo $CC
+echo $CXX
+``` 
 
 #### Installing MoSeq
 
