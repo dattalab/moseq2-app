@@ -24,7 +24,6 @@ from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.flip.widgets import FlipClassifierWidgets
-from moseq2_extract.util import recursive_find_h5s, h5_to_dict
 
 class FlipRangeTool(FlipClassifierWidgets):
 
@@ -97,6 +96,8 @@ class FlipRangeTool(FlipClassifierWidgets):
             # Callbacks
             self.clear_button.on_click(self.clear_on_click)
             self.start_button.on_click(self.start_stop_frame_range)
+            self.face_left_button.on_click(self.facing_range_callback)
+            self.face_right_button.on_click(self.facing_range_callback)
             self.frame_num_slider.observe(self.curr_frame_update, names='value')
 
     def changed_selected_session(self, event):
@@ -140,12 +141,45 @@ class FlipRangeTool(FlipClassifierWidgets):
         clear_output(wait=True)
         self.interactive_launch_frame_selector()
 
-    def update_state_on_selected_range(self):
+    def facing_range_callback(self, event):
+        '''
+        Callback function to handle when a user clicks either of the left or right facing buttons
+         after selecting a frame range. It will call a helper function: update_state_on_selected_range() if
+         the stop frame num. > start.
+        It will also hide the buttons after a successful selection, and redisplay the start range selection button.
+
+        Returns
+        -------
+        '''
+
+        self.stop = self.frame_num_slider.value
+
+        left = False
+        if 'left' in event.description.lower():
+            left = True
+
+        if self.stop > self.start:
+            self.update_state_on_selected_range(left)
+
+            # Update left and right button visibility
+            self.face_left_button.layout.visibility = 'hidden'
+            self.face_right_button.layout.visibility = 'hidden'
+
+            # Update range selection button
+            self.start_button.description = 'Start Range'
+            self.start_button.button_style = 'info'
+
+
+    def update_state_on_selected_range(self, left):
         '''
         Helper function that updates the view upon a correct frame range addition (stop > start).
          Callback function to update the table of selected frame ranges upon
          button click. Function will will add the selected ranges to the table
           and session dict to train the model downstream.
+
+        Parameters
+        ----------
+        left (bool): Indicates which direction the mouse is facing the selected range. if True, facing left, else right.
 
         Returns
         -------
@@ -154,6 +188,13 @@ class FlipRangeTool(FlipClassifierWidgets):
         # Updating list of displayed session + selected frame ranges
         selected_range = range(self.start, self.stop)
         display_selected_range = f'{self.session_select_dropdown.label} - {selected_range}'
+
+        # Set the directional indicators in the displayed range list
+        if left:
+            display_selected_range = f'L - {display_selected_range}'
+        else:
+            display_selected_range = f'R - {display_selected_range}'
+
         self.curr_total_selected_frames += len(selected_range)
 
         # Update the current frame selector indicator
@@ -169,7 +210,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         # appending session list to get frames from for the flip classifier later on
         if selected_range not in self.selected_frame_ranges_dict[self.session_select_dropdown.label]:
-            self.selected_frame_ranges_dict[self.session_select_dropdown.label] += [selected_range]
+            self.selected_frame_ranges_dict[self.session_select_dropdown.label] += [(left, selected_range)]
 
         # appending to frame ranges to display in table
         self.frame_ranges.append(selected_range)
@@ -180,8 +221,8 @@ class FlipRangeTool(FlipClassifierWidgets):
         '''
         Callback function that triggers the "Add Range" functionality.
          If user clicks the button == 'Start Range', then the function will start including frames
-         in the correct flip set. Else, it will end the included range and truncate the slider range
-         from the start index.
+         in the correct flip set. After it is clicked, the button will function as a "Cancel Selection"
+         button, hiding the direction selection buttons.
 
         Parameters
         ----------
@@ -192,17 +233,17 @@ class FlipRangeTool(FlipClassifierWidgets):
         '''
 
         if self.start_button.description == 'Start Range':
-            self.start_button.button_style = 'success'
             self.start = self.frame_num_slider.value
-            self.start_button.description = 'End Range'
-        elif self.start_button.description == 'End Range':
-            self.stop = self.frame_num_slider.value
-            if self.stop > self.start:
-                self.update_state_on_selected_range()
-
-            # Update button based on current selection state
+            self.start_button.description = 'Cancel Select'
+            self.start_button.button_style = 'danger'
+            self.face_left_button.layout.visibility = 'visible'
+            self.face_right_button.layout.visibility = 'visible'
+        else:
             self.start_button.description = 'Start Range'
             self.start_button.button_style = 'info'
+            self.face_left_button.layout.visibility = 'hidden'
+            self.face_right_button.layout.visibility = 'hidden'
+
 
     def clear_on_click(self, b):
         '''
@@ -300,24 +341,40 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
+        print(self.selected_frame_ranges_dict)
 
         corrected_dataset = []
         # Get corrected frame ranges
         for session, frs in tqdm(self.selected_frame_ranges_dict.items(), desc='Computing Corrected Dataset'):
             if len(frs) > 0:
-                flips = frs
-                # remove frames possibly selected twice
-                correct_idx = sorted(set(np.concatenate([list(flip) for flip in flips])))
+                # get the indicated directions
+                directions = [f[0] for f in frs]
 
-                # get the session
-                cleaned_data = clean_frames(self.data_dict[session][correct_idx], **self.clean_parameters)
+                # get the separate lists of flip ranges to correct
+                correct_flips = [f[1] for f, d in zip(frs, directions) if d is False]
+                incorrect_flips = [f[1] for f, d in zip(frs, directions) if d is True]
 
-                # Get list of frame indices where the mouse is facing east
-                flip_idx = np.setdiff1d(np.arange(cleaned_data.shape[0]), correct_idx)
+                # handle frames that are indicated as correctly flipped
+                if len(correct_flips) > 0:
+                    # remove frames possibly selected twice
+                    correct_idx = sorted(set(np.concatenate([list(flip) for flip in correct_flips])))
 
-                corrected_data = deepcopy(cleaned_data)
-                corrected_data[flip_idx] = np.flip(corrected_data[flip_idx], axis=2)
-                corrected_dataset.append(corrected_data)
+                    # get the session and load only the selected frame range and apply filtering
+                    correct_cleaned_data = clean_frames(self.data_dict[session][correct_idx], **self.clean_parameters)
+
+                    # add the data to the dataset
+                    corrected_dataset.append(deepcopy(correct_cleaned_data))
+
+                # handle frames indicated incorrectly flipped
+                if len(incorrect_flips) > 0:
+                    incorrect_idx = sorted(set(np.concatenate([list(flip) for flip in incorrect_flips])))
+                    incorrect_cleaned_data = clean_frames(self.data_dict[session][incorrect_idx], **self.clean_parameters)
+
+                    # flip the data that is facing left
+                    flip_corrected_data = np.flip(incorrect_cleaned_data, axis=2)
+
+                    # add the data to the dataset
+                    corrected_dataset.append(deepcopy(flip_corrected_data))
 
         self.corrected_dataset = np.concatenate(corrected_dataset, axis=0)
 
