@@ -34,7 +34,7 @@ jobs:
 
     - env: ISOLATED=true
       python: '3.6'
-      stage: install-script
+      stage: conda-script
       before_install:
         - pip install -U pip
         - pip install awscli
@@ -44,7 +44,14 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
       install:
+        - bash miniconda.sh -b -p $HOME/miniconda
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
+        - hash -r
+        - conda config --set always_yes yes --set changeps1 no
+        - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+        - conda activate moseq2-app
         - ./scripts/install_moseq2_app.sh
       before_script:
         - make

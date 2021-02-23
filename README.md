@@ -4,7 +4,7 @@
 
 <center><img src="https://drive.google.com/uc?export=view&id=1kHdmkBx_XlueTJocREDx4YeHGrjfYKJv"></center>
 
-Last Updated: 11/30/2020
+Last Updated: 02/23/2021
 
 ## Overview
 
@@ -162,8 +162,10 @@ Another way to confirm if your default gcc version is compatible is by running t
 gcc --version
 g++ --version
 ```
+If they are compatible, you may omit the `-7` from the `export` commands later on.
 
-If gcc (or appropriate version of gcc) cannot be found, then follow these steps to install them for your respective OS:
+Otherwise, if gcc (or appropriate version of gcc) cannot be found, 
+then follow these steps to install them for your respective OS:
 
 #### For macOS:
 
@@ -190,14 +192,27 @@ export CXX="$(which g++-7)"
 
 If you could not install MoSeq using `gcc-7`, try `gcc-10`: `brew install gcc@10`.
 We've had success installing MoSeq with this `gcc` version too.
+
 #### For WSL/Linux:
 
 How to install on Ubuntu or Debian:
 ```bash
 sudo apt update
-sudo apt install build-essential
+sudo apt install build-essential # this will install gcc-9 on the latest version of Ubuntu
+```
+
+To check which version of gcc you have installed, simply run:
+```bash
+gcc --version
+g++ --version
+```
+
+If your currently installed version of gcc is not included in the compatible version list, 
+run the following command to install gcc-7:
+```bash
 sudo apt install g++-7 gcc-7 -y
 ```
+
 If you're using a different linux distribution, refer to their package manager to
 install gcc.
 
@@ -205,12 +220,8 @@ The gcc version that's installed through `build-essential` should be able to com
 `moseq2-model`'s dependencies, and there are no extra steps you need to take to make
 MoSeq recognize gcc (like you do for [macOS](#for-macos)).
 
-Alternatively, if the Ubuntu install isn't working, you can also install `gcc-7.3` with `conda`:
-```bash
-# automatically sets CC/CXX after installing, too
-conda install -c anaconda gcc_linux-64
-conda install -c anaconda gxx_linux-64
-```
+Alternatively, if the Ubuntu install isn't working, you can also install `gcc-7.3` with `conda`. 
+You can find the commands to install it below, to run after the newly created conda environment is activated.
 
 ### Git
 
@@ -259,6 +270,8 @@ conda activate moseq2-app
 
 - If on a mac, link to the gcc compilers via 2 environment variables, like [we said
 above](#for-macos) (remember to replace `7` with the gcc version you have)
+
+Note: Only run these commands if gcc/g++ was __not__ installed using conda. 
 ```bash
 export CC="$(which gcc-7)"
 export CXX="$(which g++-7)"
@@ -269,6 +282,15 @@ You can check if the paths do exist by running the following command:
 echo $CC
 echo $CXX
 ``` 
+
+##### GCC Note for Linux Users 
+For users who were unable to install gcc/g++ using Ubuntu, use the following commands to install 
+`gcc-7.3`/`g++-7.3` using `conda`. If you already have it installed, skip this step:
+```bash
+# automatically sets CC/CXX after installing, too
+conda install -c anaconda gcc_linux-64
+conda install -c anaconda gxx_linux-64
+```
 
 #### Installing MoSeq
 
