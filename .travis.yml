@@ -65,12 +65,41 @@ jobs:
 
     - env: ISOLATED=true
       os: osx
-      python: '3.6'
+      osx_image: xcode10.2  # Python 3.7.5 running on macOS 10.14.3
+      language: shell
       stage: conda-script
       before_install:
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
         - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew update; fi
         - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install ffmpeg; fi
+        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+        - bash miniconda.sh -b -p $HOME/miniconda
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
+        - hash -r
+        - conda config --set always_yes yes --set changeps1 no
+        - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+        - conda activate moseq2-app
+        - pip install awscli
+        - pip install pytest==5.4.1 codecov pytest-cov
+      install:
+        - ./scripts/install_moseq2_app.sh
+      before_script:
+        - make
+        - source ~/.bashrc
+        - conda activate moseq2-app
+      script:
+        - pytest --cov-report xml --cov-report term
+      after_success:
+        - codecov -t $CC_TEST_REPORTER_ID
+
+    - name: "Python 3.6.8 on Windows"
+      os: windows           # Windows 10.0.17134 N/A Build 17134
+      language: shell       # 'language: python' is an error on Travis CI Windows
+      stage: conda-script
+      before_install:
+        - choco install python --version 3.6.8
+        - export PYTHONPATH=$PYTHONPATH:$(pwd)
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
         - bash miniconda.sh -b -p $HOME/miniconda
