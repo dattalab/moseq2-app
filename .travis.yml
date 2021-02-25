@@ -46,7 +46,7 @@ jobs:
         - ./miniconda3_latest.sh -b -f -p $HOME/miniconda
         - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
-        - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+        - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
         - conda activate moseq2-app
         - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
@@ -122,7 +122,7 @@ jobs:
         - ./miniconda3_latest.sh -b -p $HOME/miniconda
         - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
-        - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+        - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
         - conda activate moseq2-app
         - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov

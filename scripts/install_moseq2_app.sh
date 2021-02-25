@@ -1,13 +1,5 @@
 #!/bin/bash
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  conda install -c anaconda clang_osx-64 -y
-  conda install -c anaconda clangxx_osx-64 -y
-else
-  conda install -c anaconda gcc_linux-64 -y
-  conda install -c anaconda gxx_linux-64 -y
-fi
-
 pip install -e .
 
 # Install and Enable widget extensions configurator
