@@ -34,46 +34,17 @@ jobs:
         - codecov -t $CC_TEST_REPORTER_ID
 
     - env: ISOLATED=true
-      os: linux
-      python: '3.6'
-      stage: conda-script
-      before_install:
-        - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
-        - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-        - bash miniconda.sh -b -p $HOME/miniconda
-        - source "$HOME/miniconda/etc/profile.d/conda.sh"
-        - hash -r
-        - conda config --set always_yes yes --set changeps1 no
-        - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
-        - conda activate moseq2-app
-        - pip install awscli
-        - pip install pytest==5.4.1 codecov pytest-cov
-      install:
-        - ./scripts/install_moseq2_app.sh
-      before_script:
-        - make
-        - source ~/.bashrc
-        - conda activate moseq2-app
-      script:
-        - pytest --cov-report xml --cov-report term
-      after_success:
-        - codecov -t $CC_TEST_REPORTER_ID
-
-    - env: ISOLATED=true
       os: osx
-      osx_image: xcode10.2  # Python 3.7.5 running on macOS 10.14.3
+      osx_image: xcode10.2
       language: shell
       stage: conda-script
       before_install:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
-        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "$HOME/miniconda3_latest.sh"
-        - chmod +x $HOME/miniconda3_latest.sh  # turn script into excutable
+        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "miniconda3_latest.sh"
+        - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
-        - $HOME/miniconda3_latest.sh
+        - miniconda3_latest.sh -b -p miniconda
+        - source ~/.bash_profile
         - conda config --set always_yes yes --set changeps1 no
         - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
         - sed -i -e "s/gxx_linux-64/clangxx_osx-64/g" scripts/moseq2-env.yaml
@@ -93,16 +64,47 @@ jobs:
         - codecov -t $CC_TEST_REPORTER_ID
 
     - env: ISOLATED=true
+      dist: xenial
       os: windows
       language: shell       # 'language: python' is an error on Travis CI Windows
       stage: conda-script
       before_install:
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
+        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~\.netrc
+        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.sh -o "miniconda3_latest.sh"
+        - hash -r
+        - bash miniconda.sh -b -p miniconda
+        - source ~\.bashrc
+        - conda config --set always_yes yes --set changeps1 no
+        - conda env create -n moseq2-app --file scripts\moseq2-env.yaml
+        - conda activate moseq2-app
+        - pip install awscli
+        - pip install pytest==5.4.1 codecov pytest-cov
+      install:
+        - bash scripts\install_moseq2_app.sh
+      before_script:
+        - make
+        - bash ~\.bashrc
+        - conda activate moseq2-app
+      script:
+        - pytest --cov-report xml --cov-report term
+      after_success:
+        - codecov -t $CC_TEST_REPORTER_ID
+
+    - env: ISOLATED=true
+      os: linux
+      python: '3.6'
+      stage: conda-script
+      before_install:
+        - export PYTHONPATH=$PYTHONPATH:$(pwd)
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+        - bash miniconda.sh -b
+        - source "miniconda/etc/profile.d/conda.sh"
         - hash -r
-        - bash miniconda.sh -b -p $HOME/miniconda
-        - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
         - conda activate moseq2-app
@@ -143,14 +145,16 @@ jobs:
 
     - env: ISOLATED=true
       os: osx
+      osx_image: xcode10.2
       python: '3.7'
       stage: latest-pythons
       before_install:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
-        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "$HOME/miniconda3_latest.sh"
-        - chmod +x $HOME/miniconda3_latest.sh  # turn script into excutable
+        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o miniconda3_latest.sh
+        - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
-        - $HOME/miniconda3_latest.sh
+        - ./miniconda3_latest.sh -b
+        - source ~/.bash_profile
         - conda config --set always_yes yes --set changeps1 no
         - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
         - sed -i -e "s/gxx_linux-64/clangxx_osx-64/g" scripts/moseq2-env.yaml
