@@ -43,7 +43,7 @@ jobs:
         - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "miniconda3_latest.sh"
         - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
-        - miniconda3_latest.sh -b -p miniconda
+        - ./miniconda3_latest.sh -b -f -p $HOME/miniconda
         - source ~/.bash_profile
         - conda config --set always_yes yes --set changeps1 no
         - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
@@ -73,7 +73,7 @@ jobs:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~\.netrc
         - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.sh -o "miniconda3_latest.sh"
         - hash -r
-        - bash miniconda.sh -b -p miniconda
+        - bash miniconda3_latest.sh -b -p $HOME\miniconda
         - source ~\.bashrc
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts\moseq2-env.yaml
@@ -102,8 +102,8 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-        - bash miniconda.sh -b
-        - source "miniconda/etc/profile.d/conda.sh"
+        - bash miniconda.sh -b -p $HOME/miniconda
+        - source ~/.bashrc
         - hash -r
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
@@ -153,7 +153,7 @@ jobs:
         - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o miniconda3_latest.sh
         - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
-        - ./miniconda3_latest.sh -b
+        - ./miniconda3_latest.sh -b -p $HOME/miniconda
         - source ~/.bash_profile
         - conda config --set always_yes yes --set changeps1 no
         - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
