@@ -46,8 +46,6 @@ jobs:
         - ./miniconda3_latest.sh -b -f -p $HOME/miniconda
         - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
-        - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
-        - sed -i -e "s/gxx_linux-64/clangxx_osx-64/g" scripts/moseq2-env.yaml
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
         - conda activate moseq2-app
         - pip install awscli
@@ -56,34 +54,6 @@ jobs:
         - ./scripts/install_moseq2_app.sh
       before_script:
         - make
-      script:
-        - pytest --cov-report xml --cov-report term
-      after_success:
-        - codecov -t $CC_TEST_REPORTER_ID
-
-    - env: ISOLATED=true
-      dist: xenial
-      os: windows
-      language: shell       # 'language: python' is an error on Travis CI Windows
-      stage: conda-script
-      before_install:
-        - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~\.netrc
-        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -o "miniconda3_latest.exe"
-        - hash -r
-        - start /wait "" miniconda3_latest.exe /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\Miniconda3
-        - $profile
-        - conda config --set always_yes yes --set changeps1 no
-        - conda env create -n moseq2-app --file scripts\moseq2-env.yaml
-        - conda activate moseq2-app
-        - pip install awscli
-        - pip install pytest==5.4.1 codecov pytest-cov
-      install:
-        - bash scripts\install_moseq2_app.sh
-      before_script:
-        - make
-        - $profile
-        - conda activate moseq2-app
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
@@ -152,8 +122,6 @@ jobs:
         - ./miniconda3_latest.sh -b -p $HOME/miniconda
         - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
-        - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
-        - sed -i -e "s/gxx_linux-64/clangxx_osx-64/g" scripts/moseq2-env.yaml
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
         - conda activate moseq2-app
         - pip install awscli
