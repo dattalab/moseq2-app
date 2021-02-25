@@ -44,7 +44,7 @@ jobs:
         - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
         - ./miniconda3_latest.sh -b -f -p $HOME/miniconda
-        - source ~/.bash_profile
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
         - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
         - sed -i -e "s/gxx_linux-64/clangxx_osx-64/g" scripts/moseq2-env.yaml
@@ -56,8 +56,6 @@ jobs:
         - ./scripts/install_moseq2_app.sh
       before_script:
         - make
-        - source ~/.bash_profile
-        - conda activate moseq2-app
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
@@ -71,10 +69,10 @@ jobs:
       before_install:
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~\.netrc
-        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.sh -o "miniconda3_latest.sh"
+        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -o "miniconda3_latest.exe"
         - hash -r
-        - bash miniconda3_latest.sh -b -p $HOME\miniconda
-        - source ~\.bashrc
+        - bash miniconda3_latest.exe -b -p $HOME\miniconda
+        - source "$HOME\miniconda\etc\profile.d\conda.sh"
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts\moseq2-env.yaml
         - conda activate moseq2-app
@@ -103,7 +101,7 @@ jobs:
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
         - bash miniconda.sh -b -p $HOME/miniconda
-        - source ~/.bashrc
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - hash -r
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
@@ -114,8 +112,6 @@ jobs:
         - ./scripts/install_moseq2_app.sh
       before_script:
         - make
-        - source ~/.bashrc
-        - conda activate moseq2-app
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
@@ -154,7 +150,7 @@ jobs:
         - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
         - ./miniconda3_latest.sh -b -p $HOME/miniconda
-        - source ~/.bash_profile
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - conda config --set always_yes yes --set changeps1 no
         - sed -i -e "s/gcc_linux-64/clang_osx-64/g" scripts/moseq2-env.yaml
         - sed -i -e "s/gxx_linux-64/clangxx_osx-64/g" scripts/moseq2-env.yaml
@@ -166,8 +162,6 @@ jobs:
         - ./scripts/install_moseq2_app.sh
       before_script:
         - make
-        - source ~/.bash_profile
-        - conda activate moseq2-app
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
