@@ -24,6 +24,7 @@ from os.path import dirname, basename, join, relpath
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
+from moseq2_extract.helpers.data import handle_extract_metadata
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
@@ -206,6 +207,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
+                acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(p, dirname(p))
                 # Compute background image; saving the image to a file
                 get_bground_im_file(p, **self.config_data)
             except:
@@ -406,6 +408,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # test saved config data parameters on all sessions
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
+                acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(
+                    sessionPath, dirname(sessionPath))
                 # Get background image for each session and test the current parameters on it
                 bground_im = get_bground_im_file(sessionPath, **self.config_data)
                 try:
@@ -462,6 +466,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.formatted_key in self.keys:
             self.curr_session = self.sessions[self.formatted_key]
+
+        acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(
+            self.curr_session, dirname(self.curr_session))
 
         # Get background and display UI plots
         self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
@@ -759,7 +766,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # load chunk to display
         process_extract_batches(input_file, self.config_data,
                                 bground_im, roi, frame_batches,
-                                0, str_els, view_path)
+                                str_els, view_path)
 
         # display extracted video as HTML Div using Bokeh
         show_extraction(basename(dirname(input_file)), view_path)
