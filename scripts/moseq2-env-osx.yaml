@@ -10,8 +10,8 @@ dependencies:
   - conda-forge::ffmpeg=4.2.0
   - conda-forge::opencv
   - jupyter_nbextensions_configurator
-  - gcc_linux-64=9.3.0
-  - gxx_linux-64=9.3.0
+  - clang_osx-64=11.0.1
+  - clangxx_osx-64=11.0.1
   - pip:
       - numpy==1.18.3
       - pandas==1.0.5
