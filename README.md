@@ -4,7 +4,7 @@
 
 <center><img src="https://drive.google.com/uc?export=view&id=1kHdmkBx_XlueTJocREDx4YeHGrjfYKJv"></center>
 
-Last Updated: 11/30/2020
+Last Updated: 02/23/2021
 
 ## Overview
 
@@ -93,7 +93,6 @@ Don't worry, we'll walk through installation steps for each of these packages in
      - anaconda3/miniconda3
      - git
      - curl (it should be installed by default on all systems)
-     - gcc and g++: accepted and tested versions: 6, 7, 9, 10
      - [`moseq2-extract==0.7.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
      - [`moseq2-pca==0.4.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
      - [`moseq2-model==0.5.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
@@ -142,69 +141,6 @@ If you prefer to install the full Anaconda package, we refer you to the
 
 Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
 
-### gcc
-
-We're going to walk through the process of installing `gcc-7` but you can install any of the
-supported versions listed above. Just replace `7` with the version you want to install.
-
-To check if you have `gcc-7`/`g++-7` is installed, run this command:
-```bash
-which gcc-7 # if you're on macOS
-which gcc   # if you're on linux
-```
-You should expect to see a path to your gcc-7 installation, like this:
-```bash
-/usr/local/bin/gcc-7  # or /usr/bin/gcc
-```
-
-If gcc cannot be found, then follow these steps to install them for your respective OS:
-
-#### For macOS:
-
-1. Install [brew](https://brew.sh/), the macOS package manager, via their website.
-2. Install the xcode command line tools. Command: `xcode-select --install`
-**IMPORTANT: YOU CANNOT SKIP THIS STEP**. If you skip this step, you will see installation
-errors for `cytoolz`, `autoregressive`, and `psutil`
-3. Install gcc: `brew install gcc@7`
-
-Confirm you have `gcc-7` installed by running:
-```bash
-which gcc-7
-```
-
-The following step is important installing the `moseq2-model` dependency.
-Once you have confirmed gcc-7 is installed, run the next 2 commands to set
-them as default gcc versions. You need to run these two commands for
-the installation process only. Not every time you open a new terminal.
-
-```bash
-export CC="$(which gcc-7)"
-export CXX="$(which g++-7)"
-```
-
-If you could not install MoSeq using `gcc-7`, try `gcc-10`: `brew install gcc@10`.
-We've had success installing MoSeq with this `gcc` version too.
-#### For WSL/Linux:
-
-How to install on Ubuntu or Debian:
-```bash
-sudo apt update
-sudo apt install build-essential
-```
-If you're using a different linux distribution, refer to their package manager to
-install gcc.
-
-The gcc version that's installed through `build-essential` should be able to compile
-`moseq2-model`'s dependencies, and there are no extra steps you need to take to make
-MoSeq recognize gcc (like you do for [macOS](#for-macos)).
-
-Alternatively, you can also install `gcc-7.3` with `conda`:
-```bash
-# automatically sets CC/CXX after installing, too
-conda install -c anaconda gcc_linux-64
-conda install -c anaconda gxx_linux-64
-```
-
 ### Git
 
 To check if you have it installed, run `which git`. If it prints a path to git,
@@ -237,10 +173,19 @@ cd moseq2-app
 You'll be asked for your github username and password since this is a private repository.
 
 - We recommend that you create a new [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html) named `moseq2-app`:
+
+For Linux and WSL:
 ```bash
 # assuming you're in the moseq2-app directory:
 conda env create -n moseq2-app --file scripts/moseq2-env.yaml
 ```
+
+For MacOS:
+```bash
+# assuming you're in the moseq2-app directory:
+conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
+```
+
 If you're already a conda master, feel free to install MoSeq in any environment you want.
 Just make sure the dependencies described in `scripts/moseq2-env.yaml` are installed in
 that environment.
@@ -248,13 +193,6 @@ that environment.
 - activate the new conda environment
 ```bash
 conda activate moseq2-app
-```
-
-- If on a mac, link to the gcc compilers via 2 environment variables, like [we said
-above](#for-macos) (remember to replace `7` with the gcc version you have)
-```bash
-export CC="$(which gcc-7)"
-export CXX="$(which g++-7)"
 ```
 
 #### Installing MoSeq
