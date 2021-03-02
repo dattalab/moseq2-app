@@ -643,14 +643,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
             # True depth is at the center of the bucket
             self.true_depth = bground_im[cY][cX]
-            self.config_data['true_depth'] = self.true_depth
+            self.config_data['true_depth'] = int(self.true_depth)
 
             # Get true depth range difference
             range_diff = 10 ** (len(str(int(self.true_depth))) - 1)
 
             # Center the depth ranges around the true depth
-            bg_roi_range_min = self.true_depth - range_diff
-            bg_roi_range_max = self.true_depth + range_diff
+            bg_roi_range_min = int(self.true_depth - range_diff)
+            bg_roi_range_max = int(self.true_depth + range_diff)
 
             self.config_data['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
 
@@ -796,8 +796,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         # update adjusted min and max heights
-        self.config_data['min_height'] = minmax_heights[0]
-        self.config_data['max_height'] = minmax_heights[1]
+        self.config_data['min_height'] = int(minmax_heights[0])
+        self.config_data['max_height'] = int(minmax_heights[1])
 
         # prepare extraction metadatas
         str_els = get_strels(self.config_data)
