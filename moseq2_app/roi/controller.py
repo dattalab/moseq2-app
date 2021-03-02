@@ -299,15 +299,20 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
+        self.config_data.pop('timestamps', None)
+        for k in self.session_parameters.keys():
+            self.session_parameters[k].pop('timestamps', None)
+
         # Update current session with current configuration parameters
         self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
+
+        # Update main config file
+        with open(self.config_data['config_file'], 'w+') as f:
+            yaml.safe_dump(self.config_data, f)
 
         # Update session parameters
         with open(self.config_data['session_config_path'], 'w+') as f:
             yaml.safe_dump(self.session_parameters, f)
-
-        with open(self.config_data['config_file'], 'w+') as f:
-            yaml.safe_dump(self.config_data, f)
 
         self.save_parameters.button_style = 'success'
         self.save_parameters.icon = 'check'
