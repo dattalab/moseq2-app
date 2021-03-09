@@ -66,7 +66,9 @@ class InteractiveROIWidgets:
         self.extract_button = widgets.Button(description='Extract Sample', disabled=False, layout=self.button_layout,
                                              tooltip='Preview extraction output')
         self.mark_passing = widgets.Button(description='Mark Passing', disabled=False, layout=self.label_layout,
-                                           tooltip='Mark current session as passing')
+                                           tooltip='If a session is incorrectly flagged, click this button to '
+                                                   'mark the current session as passing, adding it to the list'
+                                                   ' of acceptable ROI sizes.')
 
         self.checked_list = widgets.Select(options=[], description='', continuous_update=False, disabled=False)
 

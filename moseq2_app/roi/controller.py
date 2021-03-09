@@ -28,8 +28,8 @@ from moseq2_extract.helpers.data import handle_extract_metadata
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
-from moseq2_extract.io.video import load_movie_data, get_video_info
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
+from moseq2_extract.io.video import load_movie_data, get_video_info, get_movie_info
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, set_bg_roi_weights,
                                  check_filter_sizes, graduate_dilated_wall_area)
@@ -49,6 +49,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         super().__init__()
+
+        # main output gui to be reused
+        self.main_out = None
+        self.output = None
 
         self.autodetect_depths = autodetect_depths
 
@@ -77,9 +81,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Handle broken session config files
         if self.session_parameters is None:
-            self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys if k not in self.session_parameters}
-
+            self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
+        elif self.session_parameters == {}:
+            self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
         self.all_results = {}
+        self.config_data['pixel_areas'] = []
 
         self.config_data['session_config_path'] = session_config
         self.config_data['config_file'] = config_file
@@ -139,6 +145,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data['autodetect'] = True
         self.config_data['detect'] = True
 
+        # update manually set config parameters
+        for k in self.session_parameters:
+            self.session_parameters[k].update(self.config_data)
+
         if compute_bgs:
             self.compute_all_bgs()
 
@@ -155,7 +165,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         with open(path, 'w+') as f:
             yaml.safe_dump(self.session_parameters, f)
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 
@@ -170,6 +180,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         bokeh.io.state.State().reset()
         bokeh.io.reset_output()
         clear_output()
+        del self
 
     def get_selected_session(self, event):
         '''
@@ -183,19 +194,22 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-        self.checked_list.value = event.new
 
-        gc.collect()
-        bokeh.io.curdoc().clear()
-        bokeh.io.state.State().reset()
-        bokeh.io.reset_output()
-        bokeh.io.output_notebook(hide_banner=True)
-        clear_output(wait=True)
+        if event.old.split(' ')[1] != event.new.split(' ')[1]:
+            self.checked_list.value = event.new
 
-        self.config_data['detect'] = True
-        if self.autodetect_depths:
-            self.config_data['autodetect'] = True
-        self.interactive_find_roi_session_selector(self.checked_list.value)
+            gc.collect()
+            bokeh.io.curdoc().clear()
+            bokeh.io.state.State().reset()
+            bokeh.io.reset_output()
+            bokeh.io.output_notebook(hide_banner=True)
+            clear_output(wait=True)
+            self.main_out = None
+
+            self.config_data['detect'] = True
+            if self.autodetect_depths:
+                self.config_data['autodetect'] = True
+            self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def compute_all_bgs(self):
         '''
@@ -208,14 +222,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
                 acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(p, dirname(p))
+                self.session_parameters[s]['finfo'] = get_movie_info(p)
+
                 # Compute background image; saving the image to a file
-                get_bground_im_file(p, **self.config_data)
+                get_bground_im_file(p, **self.session_parameters[s])
             except:
                 # Print error if an issue arises
                 display(f'Error, could not compute background for session: {s}.')
                 pass
 
-    def extract_button_clicked(self, b):
+    def extract_button_clicked(self, b=None):
         '''
         Updates the true depth autodetection parameter
          such that the true depth is autodetected for each found session
@@ -232,7 +248,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         display(self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
-    def mark_passing_button_clicked(self, b):
+    def mark_passing_button_clicked(self, b=None):
         '''
         Callback function that sets the current session as Passing. The indicator will still remain Flagged if the
         segmented frame or the crop-rotated frame are not appearing.
@@ -250,13 +266,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.curr_results['ret_code'] = "0x1f7e2"
 
         # Update checked list
-        self.config_data['pixel_area'] = self.curr_results['counted_pixels']
-        self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
+        self.config_data['pixel_areas'].append(self.curr_results['counted_pixels'])
         self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
         self.update_checked_list(self.curr_results)
 
-    def check_all_sessions(self, b):
+    def check_all_sessions(self, b=None):
         '''
         Callback function to run the ROI area comparison test on all the existing sessions.
         Saving their individual session parameter sets in the session_parameters dict in the process.
@@ -286,7 +301,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.save_parameters.layout = self.layout_visible
 
-    def save_clicked(self, b):
+    def save_clicked(self, b=None):
         '''
         Callback function to save the current session_parameters dict into
         the file of their choice (given in the top-most wrapper function).
@@ -300,11 +315,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         self.config_data.pop('timestamps', None)
+        self.config_data.pop('pixel_areas', None)
         for k in self.session_parameters.keys():
             self.session_parameters[k].pop('timestamps', None)
-
-        # Update current session with current configuration parameters
-        self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
+            self.session_parameters[k].pop('pixel_areas', None)
 
         # Update main config file
         with open(self.config_data['config_file'], 'w+') as f:
@@ -316,8 +330,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.save_parameters.button_style = 'success'
         self.save_parameters.icon = 'check'
+        self.config_data['pixel_areas'] = []
 
-    def update_minmax_config(self, event):
+    def update_minmax_config(self, event=None):
         '''
         Callback function to update config dict with current UI min/max height range values
 
@@ -333,7 +348,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data['max_height'] = self.minmax_heights.value[1]
         self.config_data['detect'] = False
 
-    def update_config_dr(self, event):
+    def update_config_dr(self, event=None):
         '''
         Callback function to update config dict with current UI depth range values
 
@@ -347,7 +362,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.config_data['detect'] = False
 
-    def update_config_di(self, event):
+        self.config_data['bg_roi_depth_range'] = (int(self.bg_roi_depth_range.value[0]), int(self.bg_roi_depth_range.value[1]))
+
+        self.session_parameters[self.keys[self.checked_list.index]]['bg_roi_depth_range'] = deepcopy(self.config_data['bg_roi_depth_range'])
+
+    def update_config_di(self, event=None):
         '''
         Callback function to update config dict with current UI dilation iterations
 
@@ -359,9 +378,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
+        self.config_data['dilate_iterations'] = int(self.dilate_iters.value)
+        self.session_parameters[self.keys[self.checked_list.index]]['dilate_iterations'] = int(self.dilate_iters.value)
         self.config_data['detect'] = True
 
-    def update_config_fr(self, event):
+    def update_config_fr(self, event=None):
         '''
         Callback function to update config dict with current UI depth range values
 
@@ -374,9 +395,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         self.config_data['frame_range'] = self.frame_range.value
+        self.session_parameters[self.keys[self.checked_list.index]]['frame_range'] = self.frame_range.value
         self.config_data['detect'] = False
 
-    def update_config_fn(self, event):
+    def update_config_fn(self, event=None):
         '''
         Callback function to update config dict with current UI depth range values
 
@@ -389,6 +411,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         self.config_data['frame_num'] = self.frame_num.value
+        self.session_parameters[self.keys[self.checked_list.index]]['frame_num'] = self.frame_num.value
         self.config_data['detect'] = False
 
     def test_all_sessions(self, session_dict):
@@ -413,10 +436,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # test saved config data parameters on all sessions
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
-                acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(
-                    sessionPath, dirname(sessionPath))
+                acquisition_metadata, \
+                self.session_parameters[sessionName]['timestamps'], \
+                self.session_parameters[sessionName]['tar'] = handle_extract_metadata(sessionPath, dirname(sessionPath))
+
                 # Get background image for each session and test the current parameters on it
-                bground_im = get_bground_im_file(sessionPath, **self.config_data)
+                bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
                 try:
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                 except:
@@ -425,28 +450,37 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 # Save session parameters if it is not flagged
                 if not sess_res['flagged']:
                     self.npassing += 1
-                    self.session_parameters[sessionName] = deepcopy(self.config_data)
 
                 # Update label
-                self.checked_lbl.value = f'Passing Sessions: {self.npassing}/{len(self.checked_list.options)}'
+                self.checked_lbl.value = f'Sessions with Passing ROI Sizes: {self.npassing}/{len(self.checked_list.options)}'
 
                 # Set index passing value
                 checked_options[i] = f'{chr(int(sess_res["ret_code"], base=16))} {sessionName}'
+                # Safely updating displayed list
+                self.checked_list._initializing_traits_ = True
+                self.checked_list.options = checked_options
+
+                self.checked_list._initializing_traits_ = False
 
                 # Updating progress
                 self.all_results[sessionName] = sess_res['flagged']
                 gc.collect()
 
-        # Updating displayed list
-        self.checked_list.options = checked_options
         self.checked_list.value = checked_options[self.checked_list.index]
 
         if self.npassing == len(self.checked_list.options):
-            self.message.value = 'All sessions passed with the current parameter set. \
-            Save the parameters and move to the "Extract All" cell.'
+            self.save_clicked()
+            self.message.value = 'All sessions passed with the current parameter set. ' \
+                                 'The config and session-specific config files have also been saved. \n' \
+                                 'You can now safely clear the output, and move to the "Extract All" cell.\n' \
+                                 'We recommend also restarting the kernel to clear any ' \
+                                 'stale memory from the interactive tool.'
         else:
-            self.message.value = 'Some sessions were flagged. Save the parameter set for the current passing sessions, \
-             then find and save the correct set for the remaining sessions.'
+            tmp_message = 'Some sessions were flagged. Save the parameter set for the current passing sessions, \
+             then find and save the correct set for the remaining sessions.\n'
+            if self.autodetect_depths == False:
+                tmp_message += ' Try Clearing the output, and rerunning the cell with autodetect_depths = True'
+            self.message.value = tmp_message
 
     def interactive_find_roi_session_selector(self, session):
         '''
@@ -468,19 +502,32 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Get current session name to look up path
         self.formatted_key = session.split(' ')[1]
+        curr_session_key = self.keys[self.checked_list.index]
 
         if self.formatted_key in self.keys:
             self.curr_session = self.sessions[self.formatted_key]
 
-        acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(
-            self.curr_session, dirname(self.curr_session))
+
+        acquisition_metadata, \
+        self.session_parameters[curr_session_key]['timestamps'], \
+        self.session_parameters[curr_session_key]['tar'] = \
+            handle_extract_metadata(self.curr_session, dirname(self.curr_session))
+
+        # Update sliders with corresponding session's previously set values
+        self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
+        self.minmax_heights.value = [self.session_parameters[curr_session_key]['min_height'],
+                                     self.session_parameters[curr_session_key]['max_height']]
 
         # Get background and display UI plots
-        self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
-        self.main_out = widgets.interactive_output(self.interactive_depth_finder, {'minmax_heights': self.minmax_heights,
+        self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
+
+        if self.main_out is None:
+            self.main_out = widgets.interactive_output(self.interactive_depth_finder, {
+                                                                                   'minmax_heights': self.minmax_heights,
                                                                                    'fn': self.frame_num,
                                                                                    'dr': self.bg_roi_depth_range,
-                                                                                   'di': self.dilate_iters}
+                                                                                   'di': self.dilate_iters
+                                                                                  }
                                                    )
 
         display(self.clear_button, self.ui_tools)
@@ -530,10 +577,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
-        if '.tar' in self.curr_session:
-            self.config_data['tar'] = True
-        else:
-            self.config_data['tar'] = False
+        curr_session_key = self.keys[self.checked_list.index]
 
         self.save_parameters.button_style = 'primary'
         self.save_parameters.icon = 'none'
@@ -545,23 +589,24 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.config_data['autodetect'] = False
 
             # Update the session flag result
-            self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
+            self.all_results[curr_session_key] = self.curr_results['flagged']
 
             # Set initial frame range tuple value
-            self.config_data['frame_range'] = self.frame_range.value
+            self.session_parameters[curr_session_key]['frame_range'] = self.frame_range.value
 
-            # Update sliders with autodetected values
-            self.bg_roi_depth_range.value = self.config_data['bg_roi_depth_range']
-            self.minmax_heights.value = [self.config_data['min_height'], self.config_data['max_height']]
+            # Update sliders with corresponding session's autodetected values
+            self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
+            self.minmax_heights.value = [self.session_parameters[curr_session_key]['min_height'],
+                                         self.session_parameters[curr_session_key]['max_height']]
         else:
             # Test updated parameters
-            self.config_data['bg_roi_depth_range'] = (int(dr[0]), int(dr[1]))
-            self.config_data['dilate_iterations'] = di
+            self.session_parameters[curr_session_key]['bg_roi_depth_range'] = (int(dr[0]), int(dr[1]))
+            self.session_parameters[curr_session_key]['dilate_iterations'] = di
 
             if self.config_data['detect']:
                 # Update the session flag result
                 self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
-                self.all_results[self.keys[self.checked_list.index]] = self.curr_results['flagged']
+                self.all_results[curr_session_key] = self.curr_results['flagged']
 
         # set indicator
         if self.curr_results['flagged']:
@@ -569,8 +614,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                    ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
         else:
             self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
-            # Save passing session parameters
-            self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
 
         # Clear output to update view
         clear_output()
@@ -630,20 +673,22 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         curr_results = {'flagged': False,
                         'ret_code': "0x1f7e2"}
 
+        curr_session_key = self.keys[self.checked_list.index]
+
         if self.config_data['autodetect']:
             # Get max depth as a thresholding limit (this would be the DTD if it already was computed)
             limit = np.max(bground_im)
 
             # Compute bucket distance thresholding value
             threshold_value = np.median(bground_im)
-            self.config_data['bg_threshold'] = float(threshold_value)
+            self.session_parameters[curr_session_key]['bg_threshold'] = int(threshold_value)
 
             # Threshold image to find depth at bucket center: the true depth
             cX, cY = get_bucket_center(bground_im, limit, threshold=threshold_value)
 
             # True depth is at the center of the bucket
             self.true_depth = bground_im[cY][cX]
-            self.config_data['true_depth'] = int(self.true_depth)
+            self.session_parameters[curr_session_key]['true_depth'] = int(self.true_depth)
 
             # Get true depth range difference
             range_diff = 10 ** (len(str(int(self.true_depth))) - 1)
@@ -652,7 +697,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             bg_roi_range_min = int(self.true_depth - range_diff)
             bg_roi_range_max = int(self.true_depth + range_diff)
 
-            self.config_data['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
+            self.session_parameters[curr_session_key]['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
 
             if bg_roi_range_max > self.bg_roi_depth_range.max:
                 self.bg_roi_depth_range.max = bg_roi_range_max + range_diff
@@ -663,24 +708,33 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
             print('Graduating Background')
-            bground_im = get_bground_im_file(self.curr_session, **self.config_data)
-            self.curr_bground_im = graduate_dilated_wall_area(bground_im, self.config_data, strel_dilate, join(dirname(session), 'proc'))
+            bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
+            self.curr_bground_im = graduate_dilated_wall_area(bground_im,
+                                                              self.session_parameters[curr_session_key],
+                                                              strel_dilate, join(dirname(session), 'proc'))
         else:
-            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.config_data)
+            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
         try:
             # Get ROI
             rois, plane, bboxes, _, _, _ = get_roi(bground_im,
-                                                   **self.config_data,
+                                                   **self.session_parameters[curr_session_key],
                                                    strel_dilate=strel_dilate,
                                                    strel_erode=strel_erode,
                                                    get_all_data=True
                                                    )
+        except ValueError:
+            # bg depth range did not capture any area
+            curr_results['flagged'] = True
+            curr_results['ret_code'] = "0x1f534"
+            curr_results['roi'] = np.ones_like(self.curr_bground_im)
+            self.update_checked_list(results=curr_results)
+            return curr_results
         except Exception as e:
             print(e)
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
-            curr_results['roi'] = np.zeros_like(self.curr_bground_im)
+            curr_results['roi'] = np.ones_like(self.curr_bground_im)
             self.update_checked_list(results=curr_results)
             return curr_results
 
@@ -689,45 +743,28 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
 
         if self.config_data['autodetect']:
-            # Get pixel dims from bounding box
-            xmin = bboxes[0][0][1]
-            xmax = bboxes[0][1][1]
-
-            ymin = bboxes[0][0][0]
-            ymax = bboxes[0][1][0]
-
-            # bucket width in pixels
-            pixel_width = xmax - xmin
-            pixel_height = ymax - ymin
-
-            pixels_per_inch = self.get_pixels_per_metric(pixel_width)
-
-            self.config_data['pixels_per_inch'] = float(pixels_per_inch)
             # Corresponds to a rough pixel area estimate
             r = float(cv2.countNonZero(rois[0].astype('uint8')))
-            self.config_data['pixel_area'] = r
+            self.config_data['pixel_areas'].append(r)
+            self.session_parameters[curr_session_key]['pixel_area'] = r
         else:
-            pixels_per_inch = self.config_data['pixels_per_inch']
             # Corresponds to a rough pixel area estimate
             r = float(cv2.countNonZero(rois[0].astype('uint8')))
+            self.session_parameters[curr_session_key]['pixel_area'] = r
 
-        # Compute pixel area per metric
-        if self.config_data.get('arena_width') is not None:
-            # Compute arena area
-            if self.config_data['arena_shape'] == 'ellipse':
-                area = math.pi * (self.config_data['arena_width'] / 2) ** 2
-            elif 'rect' in self.config_data['arena_shape']:
-                estimated_height = pixel_height / pixels_per_inch
-                area = self.config_data['arena_width'] * estimated_height
+        res = False
+        # check if the current measured area is within is the current list of ROI areas
+        for area in self.config_data.get('pixel_areas', []):
+            if isclose(area, r, abs_tol=50e2) or r > area:
+                res = True
+                break
 
-            self.config_data['area_px_per_inch'] = r / area / pixels_per_inch
-
-        try:
-            assert isclose(self.config_data['pixel_area'], r, abs_tol=50e2)
-        except AssertionError:
-            if self.config_data.get('pixel_area', 0) > r:
-                curr_results['flagged'] = True
-                curr_results['ret_code'] = "0x1f534"
+        if not res and (len(self.config_data.get('pixel_areas', [])) > 0):
+            curr_results['flagged'] = True
+            curr_results['ret_code'] = "0x1f534"
+        else:
+            # add accepted area size to
+            self.config_data['pixel_areas'].append(r)
 
         # Save ROI
         curr_results['roi'] = rois[0]
@@ -753,6 +790,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
+        curr_session_key = self.keys[self.checked_list.index]
+
         # Get structuring elements
         str_els = get_strels(self.config_data)
 
@@ -762,19 +801,22 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         view_path = join(output_dir, outpath + '.mp4')
 
         # Get frames to extract
-        frame_batches = [range(self.config_data['frame_range'][0], self.config_data['frame_range'][1])]
+        frame_batches = [range(self.session_parameters[curr_session_key]['frame_range'][0],
+                               self.session_parameters[curr_session_key]['frame_range'][1])]
 
         # Remove previous preview
         if os.path.exists(view_path):
             os.remove(view_path)
 
         # load chunk to display
-        process_extract_batches(input_file, self.config_data,
+        process_extract_batches(input_file, self.session_parameters[curr_session_key],
                                 bground_im, roi, frame_batches,
                                 str_els, view_path)
 
         # display extracted video as HTML Div using Bokeh
-        show_extraction(basename(dirname(input_file)), view_path)
+        if self.output is not None:
+            self.output = None
+        self.output = show_extraction(basename(dirname(input_file)), view_path)
         gc.collect()
 
     def prepare_data_to_plot(self, roi, minmax_heights, fn):
@@ -795,23 +837,22 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
+        curr_session_key = self.keys[self.checked_list.index]
+
         # update adjusted min and max heights
-        self.config_data['min_height'] = int(minmax_heights[0])
-        self.config_data['max_height'] = int(minmax_heights[1])
+        self.session_parameters[curr_session_key]['min_height'] = int(minmax_heights[0])
+        self.session_parameters[curr_session_key]['max_height'] = int(minmax_heights[1])
 
         # prepare extraction metadatas
         str_els = get_strels(self.config_data)
-        self.config_data['tracking_init_mean'] = None
-        self.config_data['tracking_init_cov'] = None
-        self.config_data['true_depth'] = int(self.true_depth)
-
-        # update current session parameters
-        self.session_parameters[self.keys[self.checked_list.index]] = deepcopy(self.config_data)
+        self.session_parameters[curr_session_key]['tracking_init_mean'] = None
+        self.session_parameters[curr_session_key]['tracking_init_cov'] = None
+        self.session_parameters[curr_session_key]['true_depth'] = int(self.true_depth)
 
         # get segmented frame
         raw_frames = load_movie_data(self.curr_session, 
                                     range(fn, fn + 30),
-                                    **self.config_data,
+                                    **self.session_parameters[curr_session_key],
                                     frame_size=self.curr_bground_im.shape[::-1])
         if not self.config_data.get('graduate_walls', False):
             curr_frame = (self.curr_bground_im - raw_frames)
@@ -847,7 +888,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # extract crop-rotated selected frame
         try:
-            result = extract_chunk(**self.config_data,
+            result = extract_chunk(**self.session_parameters[curr_session_key],
                                    **str_els,
                                    chunk=raw_frames.copy(),
                                    roi=roi,
@@ -894,7 +935,7 @@ class InteractiveExtractionViewer:
 
         self.clear_button.on_click(self.clear_on_click)
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 

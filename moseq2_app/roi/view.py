@@ -27,6 +27,7 @@ def show_extraction(input_file, video_file):
 
     Returns
     -------
+    output (ipywidgets.Output widget): HTML canvas where the video is being displayed.
     '''
 
     # Copy generated movie to temporary directory
@@ -61,6 +62,7 @@ def show_extraction(input_file, video_file):
 
     display(output)
 
+    return output
 
 def bokeh_plot_helper(bk_fig, image):
     '''
