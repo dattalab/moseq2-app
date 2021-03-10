@@ -33,7 +33,9 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     '''
 
     # Find the time difference between frames.
-    diff = np.diff(timestamps) / scaling_factor
+    diff = np.diff(timestamps)
+    if np.mean(diff) > 10:
+        diff /= scaling_factor
 
     # Find the average time difference between frames.
     avgTime = np.mean(diff)
@@ -134,11 +136,15 @@ def get_scalar_df(path_dict):
     scalar_dfs = []
 
     # Get scalar dicts for all the sessions
-    for v in path_dict.values():
+    for k, v in path_dict.items():
         # Get relevant extraction paths
         h5path = v.replace('mp4', 'h5')
         yamlpath = v.replace('mp4', 'yaml')
 
+
+        if not yamlpath.endswith('.yaml'):
+            print(f'No valid yaml path for session: {k}')
+            continue
         stat_dict = read_yaml(yamlpath)
 
         metadata = stat_dict['metadata']
@@ -240,11 +246,14 @@ def make_session_status_dicts(paths):
     }
 
     # Get flags
-    for v in paths.values():
+    for k, v in paths.items():
         # get yaml metadata
-        yamlpath = v.replace('mp4', 'yaml')
-        h5path = v.replace('mp4', 'h5')
+        yamlpath = v.replace('.mp4', '.yaml')
+        h5path = v.replace('.mp4', '.h5')
 
+        if not yamlpath.endswith('.yaml'):
+            print(f'No valid yaml path for session: {k}')
+            continue
         stat_dict = read_yaml(yamlpath)
         status_dicts[stat_dict['uuid']] = deepcopy(flags)
         status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
@@ -418,7 +427,7 @@ def print_validation_results(scalar_df, status_dicts):
         error, warning = False, False
         for k1, v1 in anomaly_dict[k].items():
             if k1 != 'metadata':
-                if k1 in errors and v1 == True:
+                if k1 in errors and v1 != False:
                     error = True
                 elif isinstance(v1, dict):
                     # scalar anomalies

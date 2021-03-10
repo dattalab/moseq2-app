@@ -3,6 +3,7 @@ import numpy as np
 from copy import deepcopy
 from unittest import TestCase
 from moseq2_app.util import index_to_dataframe
+from moseq2_extract.io.video import load_mkv_timestamps
 from moseq2_viz.scalars.util import compute_all_pdf_data
 from moseq2_app.roi.validation import get_scalar_df, check_timestamp_error_percentage, count_nan_rows, \
     count_missing_mouse_frames, count_frames_with_small_areas, count_stationary_frames, compute_kl_divergences, \
@@ -14,7 +15,8 @@ class TestExtractionValidation(TestCase):
     def test_check_timestamp_error_percentage(self):
 
         paths = {
-            'session_1': 'data/test_session/proc/results_00.mp4'
+            'session_1': 'data/test_session/proc/results_00.mp4',
+            'azure_test': 'data/azure_test/nfov_test.mkv'
         }
 
         h5path = paths['session_1'].replace('mp4', 'h5')
@@ -23,6 +25,11 @@ class TestExtractionValidation(TestCase):
         percent_error = check_timestamp_error_percentage(timestamps)
 
         assert percent_error == 0.011003544858038812
+
+        azure_ts = load_mkv_timestamps(paths['azure_test'])
+        percent_error = check_timestamp_error_percentage(azure_ts)
+
+        assert percent_error == 0.2615314701204273
 
     def test_count_nan_rows(self):
 
@@ -180,7 +187,8 @@ class TestExtractionValidation(TestCase):
 
     def test_print_validation_results(self):
         paths = {
-            'session_1': 'data/test_session/proc/results_00.mp4'
+            'session_1': 'data/test_session/proc/results_00.mp4',
+            'azure_test': 'data/azure_test/nfov_test.mkv'
         }
 
         status_dicts = make_session_status_dicts(paths)
