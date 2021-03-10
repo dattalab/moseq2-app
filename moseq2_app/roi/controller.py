@@ -30,7 +30,7 @@ from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from moseq2_extract.io.video import load_movie_data, get_video_info, get_movie_info
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
-                                 set_bground_to_plane_fit, set_bg_roi_weights,
+                                 set_bground_to_plane_fit, detect_and_set_camera_parameters,
                                  check_filter_sizes, graduate_dilated_wall_area)
 
 
@@ -139,7 +139,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
         self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
         self.graduate_walls = self.config_data.get('graduate_walls', False)
-        self.config_data = set_bg_roi_weights(self.config_data)
+
+        for k in self.keys:
+            self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
+
         self.config_data = check_filter_sizes(self.config_data)
         self.config_data['pixel_areas'] = []
         self.config_data['autodetect'] = True
