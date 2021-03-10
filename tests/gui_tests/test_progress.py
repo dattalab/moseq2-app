@@ -26,7 +26,7 @@ class TestNotebookProgress(TestCase):
         data_dir = 'data/'
         paths = get_session_paths(data_dir)
 
-        assert len(paths.keys()) == 1
+        assert len(paths.keys()) == 2
 
         paths = get_session_paths(data_dir, extracted=True)
 
@@ -138,7 +138,7 @@ class TestNotebookProgress(TestCase):
         path_dict, num_extracted = get_extraction_progress(base_dir)
 
         assert num_extracted == 0
-        assert len(list(path_dict.keys())) == 1
+        assert len(list(path_dict.keys())) == 2
 
     def test_print_progress(self):
         base_dir = 'data/'

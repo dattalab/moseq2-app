@@ -97,7 +97,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.clear_button.on_click(self.clear_on_click)
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 
@@ -110,6 +110,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         '''
 
         clear_output()
+        del self
 
     def on_grouping_update(self, event):
         '''
@@ -334,7 +335,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             'Distance to Center': 'dists'
         }
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 

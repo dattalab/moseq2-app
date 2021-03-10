@@ -8,7 +8,6 @@ the widgets.py file to facilitate the real-time interaction.
 import gc
 import os
 import cv2
-import math
 import bokeh
 import warnings
 import numpy as np
@@ -84,8 +83,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
         elif self.session_parameters == {}:
             self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
+
         self.all_results = {}
-        self.config_data['pixel_areas'] = []
 
         self.config_data['session_config_path'] = session_config
         self.config_data['config_file'] = config_file
@@ -142,6 +141,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.graduate_walls = self.config_data.get('graduate_walls', False)
         self.config_data = set_bg_roi_weights(self.config_data)
         self.config_data = check_filter_sizes(self.config_data)
+        self.config_data['pixel_areas'] = []
         self.config_data['autodetect'] = True
         self.config_data['detect'] = True
 
@@ -221,7 +221,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
-                acquisition_metadata, self.config_data['timestamps'], self.config_data['tar'] = handle_extract_metadata(p, dirname(p))
+                acquisition_metadata, self.session_parameters[s]['timestamps'], self.config_data['tar'] = handle_extract_metadata(p, dirname(p))
                 self.session_parameters[s]['finfo'] = get_movie_info(p)
 
                 # Compute background image; saving the image to a file
@@ -315,7 +315,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         '''
 
         self.config_data.pop('timestamps', None)
-        self.config_data.pop('pixel_areas', None)
+        saved_areas = self.config_data.pop('pixel_areas', None)
         for k in self.session_parameters.keys():
             self.session_parameters[k].pop('timestamps', None)
             self.session_parameters[k].pop('pixel_areas', None)
@@ -330,7 +330,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.save_parameters.button_style = 'success'
         self.save_parameters.icon = 'check'
-        self.config_data['pixel_areas'] = []
+        self.config_data['pixel_areas'] = saved_areas
 
     def update_minmax_config(self, event=None):
         '''
@@ -625,32 +625,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
 
         gc.collect()
-
-    def get_pixels_per_metric(self, pixel_width):
-        '''
-        Helper function that computes a pixels_per_metric value, and handles
-         cases without user input.
-
-        Parameters
-        ----------
-        pixel_width (int): width of the ROI bounding box in pixels
-
-        Returns
-        -------
-        pixels_per_inch (float): Computed ratio of real life
-        '''
-
-        if self.config_data.get('arena_width') is not None:
-            pixels_per_inch = pixel_width / self.config_data['arena_width']
-        elif self.config_data.get('true_height') is not None:
-            pixels_per_inch = pixel_width / self.config_data['true_height']
-        else:
-            warnings.warn('Warning: arena_width and true_height were not provided. '
-                          'Using arbitrary comparison distance value.')
-            self.config_data['true_height'] = float(self.true_depth)
-            pixels_per_inch = pixel_width / self.config_data['true_height']
-
-        return pixels_per_inch
 
     def get_roi_and_depths(self, bground_im, session):
         '''
