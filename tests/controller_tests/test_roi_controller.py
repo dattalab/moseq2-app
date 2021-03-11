@@ -1,8 +1,6 @@
 import os
 import bokeh.io
-import ipywidgets
 from copy import deepcopy
-import ruamel.yaml as yaml
 from os.path import exists
 from unittest import TestCase
 from moseq2_app.roi.controller import InteractiveFindRoi
@@ -12,25 +10,14 @@ class TestROIController(TestCase):
 
     def setUp(self):
 
-        bokeh.io.output_file('data/test_figures.html', mode='inline')
+        bokeh.io.output_notebook()
         self.gui = InteractiveFindRoi(data_path='data/',
                                       config_file='data/config.yaml',
                                       session_config='data/session_config.yaml',
                                       compute_bgs=True,
                                       autodetect_depths=True)
-
-        self.gui.session_parameters['azure_test']['camera_type'] = 'azure'
         self.gui.session_parameters['azure_test']['threads'] = 6
-        self.gui.session_parameters['azure_test']['pixel_format'] = 'gray16be'
-        self.gui.session_parameters['azure_test']['movie_dtype'] = 'uint16'
-        self.gui.session_parameters['azure_test']['frame_dtype'] = '>u2'
-        self.gui.session_parameters['azure_test']['bg_roi_depth_range'] = [500, 700]
-
-        self.gui.session_parameters['test_session']['camera_type'] = 'kinect'
-        self.gui.session_parameters['test_session']['pixel_format'] = 'gray16le'
-        self.gui.session_parameters['test_session']['movie_dtype'] = 'uint16'
-        self.gui.session_parameters['test_session']['frame_dtype'] = '<u2'
-        self.gui.session_parameters['test_session']['bg_roi_depth_range'] = [500, 700]
+        self.gui.session_parameters['test_session']['threads'] = 6
 
     def tearDown(self):
         del self.gui
@@ -94,14 +81,10 @@ class TestROIController(TestCase):
         assert len(self.gui.session_parameters['test_session']['timestamps']) == 53801
 
     def test_extract_button_clicked(self):
-        self.gui.session_parameters['azure_test']['camera_type'] = 'azure'
-        self.gui.session_parameters['azure_test']['threads'] = 6
-        self.gui.session_parameters['azure_test']['pixel_format'] = 'gray16be'
-        self.gui.session_parameters['azure_test']['movie_dtype'] = 'uint16'
-        self.gui.session_parameters['azure_test']['frame_dtype'] = '>u2'
-        self.gui.session_parameters['azure_test']['bg_roi_depth_range'] = [500, 700]
-
+        self.gui.session_parameters['azure_test']['bg_roi_depth_range'] = [300, 600]
         self.gui.session_parameters['azure_test']['bg_roi_erode'] = [1, 1]
+
+        self.gui.main_out = None
 
         self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
         self.gui.session_parameters['azure_test']['frame_range'] = [0, 60]
@@ -109,7 +92,6 @@ class TestROIController(TestCase):
         self.gui.extract_button_clicked()
 
     def test_mark_passing_button_clicked(self):
-
 
         num_areas = len(self.gui.config_data['pixel_areas'])
         self.gui.curr_results = {
@@ -134,13 +116,7 @@ class TestROIController(TestCase):
         assert all(list(self.gui.all_results.values())) == False
 
     def test_save_clicked(self):
-        self.gui.config_data['camera_type'] = 'azure'
-        self.gui.config_data['threads'] = 6
-        self.gui.config_data['pixel_format'] = 'gray16be'
-        self.gui.config_data['movie_dtype'] = 'uint16'
-        self.gui.config_data['frame_dtype'] = '>u2'
         self.gui.config_data['bg_roi_depth_range'] = [500, 700]
-
         self.gui.config_data['bg_roi_erode'] = [1, 1]
 
         self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
