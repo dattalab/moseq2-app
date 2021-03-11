@@ -22,7 +22,7 @@ data/azure_test/nfov_test.mkv:
 	aws s3 cp s3://moseq2-testdata/extract/nfov_test.mkv data/azure_test/ --request-payer=requester
 
 data/test_scores.h5:
-	aws s3 cp s3://moseq2-app-test-data/moseq2-viz/ data/_pca/ --request-payer=requester
+	aws s3 cp s3://moseq2-testdata/viz/_pca/test_scores.h5 data/_pca/ --request-payer=requester
 
 data/test_model.p:
-	aws s3 cp s3://moseq2-app-test-data/moseq2-model data/ --request-payer=requester
+	aws s3 cp s3://moseq2-testdata/model/test_model.p data/ --request-payer=requester
