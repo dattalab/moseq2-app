@@ -219,7 +219,7 @@ def find_progress(base_progress):
         if exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
             base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
 
-    models = glob(join(base_dir, '**/model.p'), recursive=True)
+    models = glob(join(base_dir, '**/*.p'), recursive=True)
     if len(models) == 1:
         base_progress['model_path'] = models[0]
         base_progress['model_session_path'] = dirname(models[0])
@@ -285,24 +285,8 @@ def generate_intital_progressfile(filename='progress.yaml'):
                           'plot_path': join(base_dir, 'plots/'),
                           'snapshot': str(uuid.uuid4())}
 
-    if (not exists(join(base_dir, 'progress.log'))) or (not exists(join(base_dir, 'progress_log.pkl'))):
-        # Find progress in given base directory
-        base_progress_vars = find_progress(base_progress_vars)
-    else:
-        ### Get latest uuid from log and load it from pkl
-        with open(join(base_dir, 'progress.log'), 'r') as f:
-            try:
-                latest_log = f.readlines()[-1].split()[-1]
-            except:
-                latest_log = 'default'
-
-        with open(join(base_dir, 'progress_log.pkl'), 'rb') as f:
-            pickle_logs = pickle.load(f)
-            if latest_log in pickle_logs:
-                base_progress_vars = pickle_logs[latest_log]
-            else:
-                # fallback
-                base_progress_vars = find_progress(base_progress_vars)
+    # Find progress in given base directory
+    base_progress_vars = find_progress(base_progress_vars)
 
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)

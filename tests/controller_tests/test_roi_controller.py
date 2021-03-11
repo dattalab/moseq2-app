@@ -8,6 +8,11 @@ from moseq2_extract.extract.proc import get_bground_im_file
 
 class TestROIController(TestCase):
 
+    @classmethod
+    def tearDownClass(cls):
+        if exists('data/session_config.yaml'):
+            os.remove('data/session_config.yaml')
+
     def setUp(self):
 
         bokeh.io.output_notebook()
