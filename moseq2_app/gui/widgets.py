@@ -72,7 +72,7 @@ class GroupSettingWidgets:
         x = selected_rows.index
 
         for i in x:
-            self.qgrid_widget.edit_cell(i, 'group', self.index_grid.group_input.value)
+            self.qgrid_widget.edit_cell(i, 'group', self.group_input.value)
 
     def update_clicked(self, b=None):
         '''

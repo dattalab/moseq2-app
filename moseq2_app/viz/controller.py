@@ -114,7 +114,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Set the syllable dropdown options
         self.syll_select.options = self.syll_info
-        print(self.syll_select.options)
 
     def clear_on_click(self, b=None):
         '''
