@@ -151,6 +151,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                                     self.model_path,
                                     max_syllable=self.max_sylls,
                                     distances='ar[init]')['ar[init]']
+
+        is_missing = np.isnan(X)
+        if is_missing.any():
+            print('Existing model does not have equal amount of requested states.')
+            max_states = int(max(np.where(is_missing.any(1), is_missing.argmax(1), np.nan)))
+            print(f'Visualizing max number of available states: {max_states}')
+            X = X[:max_states, :max_states]
+
         Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
@@ -203,6 +211,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
+            if len(df.syllable.unique()) < self.max_sylls:
+                print('Requested more syllables than the parquet file holds, recomputing requested dataset.')
+                df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
@@ -511,6 +522,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         Parameters
         ----------
+        layout (string)
+        scalar_color (string)
         edge_threshold (tuple or ipywidgets.FloatRangeSlider): Transition probability range to include in graphs.
         usage_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable usage range to include in graphs.
         speed_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable speed range to include in graphs.

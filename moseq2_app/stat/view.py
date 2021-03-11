@@ -48,7 +48,6 @@ def graph_dendrogram(obj, syll_info):
     # Get distance sorted label ordering
     labels = list(map(int, obj.results['ivl']))
     sources = []
-
     # Each (icoord, dcoord) pair represents a single branch in the dendrogram
     for i, d in zip(obj.icoord, obj.dcoord):
         tmp = list(zip(i, d))
@@ -68,7 +67,7 @@ def graph_dendrogram(obj, syll_info):
         # Draw glyphs
         cladogram.line(x='x', y='y', source=source)
 
-    xtick_labels = [syll_info[lbl]['label'] for lbl in labels]
+    xtick_labels = [syll_info.get(lbl, {'label': ''})['label'] for lbl in labels]
     xticks = [f'{lbl} ({num})' for num, lbl in zip(labels, xtick_labels)]
 
     # Set x-axis ticks
@@ -197,7 +196,13 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         # Pack data into numpy arrays
         labels = desc_data['label'].to_numpy()
         desc = desc_data['desc'].to_numpy()
-        cm_paths = [relpath(cm) for cm in desc_data['crowd_movie_path'].to_numpy()]
+        cm_paths = []
+        for cm in desc_data['crowd_movie_path'].to_numpy():
+            try:
+                cm_paths.append(relpath(cm))
+            except ValueError:
+                # cm path does not exist
+                cm_paths.append('')
 
         # stat data source
         source = ColumnDataSource(data=dict(
