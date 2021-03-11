@@ -19,8 +19,8 @@ import ipywidgets as widgets
 from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
-from moseq2_viz.util import get_sorted_index
 from moseq2_extract.util import read_yaml
+from moseq2_viz.util import get_sorted_index
 from IPython.display import display, clear_output
 from moseq2_extract.io.video import get_video_info
 from moseq2_app.viz.view import display_crowd_movies
@@ -41,7 +41,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     '''
 
-    def __init__(self, model_fit, model_path, index_file, max_sylls, save_path):
+    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, crowd_movie_dir, save_path):
         '''
         Initializes class context parameters, reads and creates the syllable information dict.
 
@@ -56,6 +56,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
         super().__init__()
         self.save_path = save_path
         self.max_sylls = max_sylls
+        self.crowd_movie_dir = crowd_movie_dir
+
+        self.config_data = read_yaml(config_file)
 
         self.model_fit = model_fit
         self.model_path = model_path
@@ -64,7 +67,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Syllable Info DataFrame path
         output_dir = os.path.dirname(save_path)
         self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
-        self.scalar_df_output = os.path.join(output_dir, 'moseq_dataframe.parquet')
+        self.scalar_df_output = os.path.join(output_dir, 'moseq_scalar_dataframe.parquet')
 
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
@@ -106,7 +109,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         self.clear_button.on_click(self.clear_on_click)
 
-    def clear_on_click(self, b):
+        # Populate syllable info dict with relevant syllable information
+        self.get_crowd_movie_paths(index_file, model_path, self.config_data, crowd_movie_dir)
+
+        # Set the syllable dropdown options
+        self.syll_select.options = self.syll_info
+        print(self.syll_select.options)
+
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 
@@ -119,6 +129,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         '''
 
         clear_output()
+        del self
 
     def write_syll_info(self):
         '''
@@ -136,7 +147,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         with open(self.save_path, 'w+') as f:
             yml.dump(tmp, f)
 
-    def on_next(self, event):
+    def on_next(self, event=None):
         '''
         Callback function to trigger an view update when the user clicks the "Next" button.
 
@@ -165,7 +176,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         self.write_syll_info()
 
-    def on_prev(self, event):
+    def on_prev(self, event=None):
         '''
         Callback function to trigger an view update when the user clicks the "Previous" button.
 
@@ -194,7 +205,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         self.write_syll_info()
 
-    def on_set(self, event):
+    def on_set(self, event=None):
         '''
         Callback function to save the dict to syllable information file.
 
@@ -483,10 +494,20 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.index_path = index_path
         self.model_path = model_path
         self.df_path = df_path
-        self.scalar_df_path = os.path.join(os.path.dirname(df_path), 'moseq_dataframe.parquet')
+        self.scalar_df_path = os.path.join(os.path.dirname(df_path), 'moseq_scalar_dataframe.parquet')
 
         self.get_pdfs = get_pdfs
-        self.syll_info = syll_info
+
+        if isinstance(syll_info, str):
+            self.syll_info = read_yaml(syll_info)
+        elif isinstance(syll_info, dict):
+            self.syll_info = syll_info
+
+        if isinstance(config_data, str):
+            self.config_data = read_yaml(config_data)
+        elif isinstance(syll_info, dict):
+            self.config_data = config_data
+
         self.output_dir = output_dir
         self.max_sylls = len(syll_info)
 
@@ -527,7 +548,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         self.clear_button.on_click(self.clear_on_click)
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 
@@ -545,6 +566,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         self.config_data['max_syllable'] = self.max_sylls
         self.config_data['separate_by'] = 'groups'
+        self.config_data['specific_syllable'] = None
+
 
         self.config_data['gaussfilter_space'] = [0, 0]
         self.config_data['medfilter_space'] = [0]
@@ -593,7 +616,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             self.cm_trigger_button.layout.display = 'none'
             self.config_data['separate_by'] = 'groups'
 
-    def select_session(self, event):
+    def select_session(self, event=None):
         '''
         Callback function to save the list of selected sessions to config_data,
          and get session syllable info to pass to crowd_movie_wrapper and create the
@@ -635,13 +658,15 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.group_syll_info = deepcopy(self.syll_info)
 
         for i in range(self.max_sylls):
-            if 'group_info' not in self.group_syll_info[i].keys():
+            if i not in self.group_syll_info:
+                self.group_syll_info[i] = {'label': '', 'desc': '', 'crowd_movie_path': ''}
+            if 'group_info' not in self.group_syll_info[i]:
                 self.group_syll_info[i]['group_info'] = {}
 
         # Update syllable info dict
         for gd in group_dicts:
             group_name = list(gd.keys())[0]
-            for syll in range(self.max_sylls):
+            for syll in range(len(gd.keys())):
                 self.group_syll_info[syll]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
@@ -849,7 +874,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         return divs, bk_plots
 
-    def on_click_trigger_button(self, b):
+    def on_click_trigger_button(self, b=None):
         '''
         Generates crowd movies and displays them when the user clicks the trigger button
 
