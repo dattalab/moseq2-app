@@ -101,7 +101,7 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.face_right_button.on_click(self.facing_range_callback)
             self.frame_num_slider.observe(self.curr_frame_update, names='value')
 
-    def changed_selected_session(self, event):
+    def changed_selected_session(self, event=None):
         '''
         Callback function to load newly selected session.
 
@@ -170,7 +170,6 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.start_button.description = 'Start Range'
             self.start_button.button_style = 'info'
 
-    
     def update_state_on_selected_range(self, left):
         '''
         Helper function that updates the view upon a correct frame range addition (stop > start).
@@ -218,7 +217,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.display_frame_ranges.append(display_selected_range)
         self.selected_ranges.options = self.display_frame_ranges
 
-    def start_stop_frame_range(self, b):
+    def start_stop_frame_range(self, b=None):
         '''
         Callback function that triggers the "Add Range" functionality.
          If user clicks the button == 'Start Range', then the function will start including frames
@@ -244,9 +243,8 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.start_button.button_style = 'info'
             self.face_left_button.layout.visibility = 'hidden'
             self.face_right_button.layout.visibility = 'hidden'
-            
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the output.
 
@@ -342,7 +340,6 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
-        print(self.selected_frame_ranges_dict)
 
         corrected_dataset = []
         # Get corrected frame ranges
