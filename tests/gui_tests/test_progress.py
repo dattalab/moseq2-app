@@ -1,5 +1,5 @@
 import os
-import sys
+import shutil
 import ruamel.yaml as yaml
 from unittest import TestCase
 from os.path import exists, join
