@@ -148,9 +148,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.config_data['autodetect'] = True
         self.config_data['detect'] = True
         if 'bg_roi_erode' not in self.config_data:
-            self.gui.config_data['bg_roi_erode'] = (1, 1)
+            self.config_data['bg_roi_erode'] = (1, 1)
         if 'bg_roi_dilate' not in self.config_data:
-            self.gui.config_data['bg_roi_dilate'] = (1, 1)
+            self.config_data['bg_roi_dilate'] = (1, 1)
 
         # update manually set config parameters
         for k in self.session_parameters:
