@@ -3,7 +3,7 @@ import numpy as np
 from copy import deepcopy
 from unittest import TestCase
 from moseq2_app.util import index_to_dataframe
-from moseq2_extract.io.video import load_mkv_timestamps
+from moseq2_extract.io.video import load_timestamps_from_movie
 from moseq2_viz.scalars.util import compute_all_pdf_data
 from moseq2_app.roi.validation import get_scalar_df, check_timestamp_error_percentage, count_nan_rows, \
     count_missing_mouse_frames, count_frames_with_small_areas, count_stationary_frames, compute_kl_divergences, \
@@ -26,7 +26,7 @@ class TestExtractionValidation(TestCase):
 
         assert percent_error == 0.011003544858038812
 
-        azure_ts = load_mkv_timestamps(paths['azure_test'])
+        azure_ts = load_timestamps_from_movie(paths['azure_test'])
         percent_error = check_timestamp_error_percentage(azure_ts)
 
         assert percent_error == 0.2615314701204273

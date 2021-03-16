@@ -83,7 +83,6 @@ class TestROIController(TestCase):
         self.gui.compute_all_bgs()
 
         assert len(self.gui.session_parameters['azure_test']['timestamps']) == 66
-        assert len(self.gui.session_parameters['test_session']['timestamps']) == 53801
 
     def test_extract_button_clicked(self):
         self.gui.session_parameters['azure_test']['bg_roi_depth_range'] = [300, 600]
