@@ -23,12 +23,12 @@ from os.path import dirname, basename, join, relpath
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
-from moseq2_extract.helpers.data import handle_extract_metadata
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
-from moseq2_extract.io.video import load_movie_data, get_video_info, get_movie_info
+from moseq2_extract.io.video import (load_movie_data, get_video_info,
+                                     get_movie_info, load_timestamps_from_movie)
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, detect_and_set_camera_parameters,
                                  check_filter_sizes, graduate_dilated_wall_area)
@@ -228,8 +228,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
-                acquisition_metadata, self.session_parameters[s]['timestamps'], self.config_data['tar'] = handle_extract_metadata(p, dirname(p))
-                self.session_parameters[s]['finfo'] = get_movie_info(p)
+                if 'finfo' not in self.session_parameters[s]:
+                    self.session_parameters[s]['finfo'] = get_movie_info(p)
+                    if p.endswith('.mkv'):
+                        self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
+                                                                                              self.config_data['threads'],
+                                                                                              self.config_data.get('mapping', 'DEPTH'))
+                        self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
 
                 # Compute background image; saving the image to a file
                 get_bground_im_file(p, **self.session_parameters[s])
@@ -443,9 +448,15 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # test saved config data parameters on all sessions
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
-                acquisition_metadata, \
-                self.session_parameters[sessionName]['timestamps'], \
-                self.session_parameters[sessionName]['tar'] = handle_extract_metadata(sessionPath, dirname(sessionPath))
+                if 'finfo' not in self.session_parameters[sessionName]:
+                    self.session_parameters[sessionName]['finfo'] = get_movie_info(sessionPath)
+
+                if sessionPath.endswith('.mkv'):
+                    self.session_parameters[sessionName]['timestamps'] = \
+                        load_timestamps_from_movie(sessionPath, self.config_data['threads'],
+                                                   self.config_data.get('mapping', 'DEPTH'))
+                    self.session_parameters[sessionName]['finfo']['nframes'] = \
+                        len(self.session_parameters[sessionName]['timestamps'])
 
                 # Get background image for each session and test the current parameters on it
                 bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
@@ -514,14 +525,19 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.formatted_key in self.keys:
             self.curr_session = self.sessions[self.formatted_key]
 
+        if 'finfo' not in self.session_parameters[curr_session_key]:
+            self.session_parameters[curr_session_key]['finfo'] = get_movie_info(self.curr_session)
 
-        acquisition_metadata, \
-        self.session_parameters[curr_session_key]['timestamps'], \
-        self.session_parameters[curr_session_key]['tar'] = \
-            handle_extract_metadata(self.curr_session, dirname(self.curr_session))
+        if self.curr_session.endswith('.mkv'):
+            self.session_parameters[curr_session_key]['timestamps'] = \
+                load_timestamps_from_movie(self.curr_session, self.config_data['threads'],
+                                           self.config_data.get('mapping', 'DEPTH'))
+            self.session_parameters[curr_session_key]['finfo']['nframes'] = \
+                len(self.session_parameters[curr_session_key]['timestamps'])
 
         # Update sliders with corresponding session's previously set values
-        self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
+        if not isinstance(self.session_parameters[curr_session_key]['bg_roi_depth_range'], str):
+            self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
         self.minmax_heights.value = [self.session_parameters[curr_session_key]['min_height'],
                                      self.session_parameters[curr_session_key]['max_height']]
 
