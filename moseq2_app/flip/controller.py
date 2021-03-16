@@ -289,8 +289,12 @@ class FlipRangeTool(FlipClassifierWidgets):
         # Get references to h5 files
         data_dict = {}
         for key, path in path_dict.items():
-            dset = h5py.File(path, mode='r')['frames']
-            data_dict[key] = dset
+            try:
+                dset = h5py.File(path, mode='r')['frames']
+                data_dict[key] = dset
+            except OSError:
+                warnings.warn(f"session {key} h5 file is not available to be read, it may be in use by another process.")
+                pass
 
         return data_dict, path_dict
 
