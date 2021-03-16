@@ -140,6 +140,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
         self.graduate_walls = self.config_data.get('graduate_walls', False)
 
+        if self.config_data.get('threads', 8) < 1:
+            self.config_data['threads'] = 8
+
         for k in self.keys:
             self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
 
@@ -232,8 +235,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                     self.session_parameters[s]['finfo'] = get_movie_info(p)
                     if p.endswith('.mkv'):
                         self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
-                                                                                              self.config_data['threads'],
-                                                                                              self.config_data.get('mapping', 'DEPTH'))
+                                                                                              threads=self.config_data['threads'],
+                                                                                              mapping=self.config_data.get('mapping', 'DEPTH'))
                         self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
 
                 # Compute background image; saving the image to a file
@@ -530,8 +533,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.curr_session.endswith('.mkv'):
             self.session_parameters[curr_session_key]['timestamps'] = \
-                load_timestamps_from_movie(self.curr_session, self.config_data['threads'],
-                                           self.config_data.get('mapping', 'DEPTH'))
+                load_timestamps_from_movie(self.curr_session, threads=self.config_data['threads'],
+                                           mapping=self.config_data.get('mapping', 'DEPTH'))
             self.session_parameters[curr_session_key]['finfo']['nframes'] = \
                 len(self.session_parameters[curr_session_key]['timestamps'])
 
