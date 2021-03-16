@@ -12,6 +12,9 @@ dependencies:
   - jupyter_nbextensions_configurator
   - gcc_linux-64=9.3.0
   - gxx_linux-64=9.3.0
+  - pytest=5.4.1
+  - codecov
+  - pytest-cov
   - pip:
       - numpy==1.18.3
       - pandas==1.0.5
