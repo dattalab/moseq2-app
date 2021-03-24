@@ -80,7 +80,7 @@ jobs:
         - conda activate moseq2-app
         - pip install awscli
         - pip install pytest codecov
-        - pip install "pytest-cov>=2.4.0,<2.6"
+        - pip install pytest-cov
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
@@ -129,7 +129,7 @@ jobs:
         - conda activate moseq2-app
         - pip install awscli
         - pip install pytest codecov
-        - pip install "pytest-cov>=2.4.0,<2.6"
+        - pip install pytest-cov
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
