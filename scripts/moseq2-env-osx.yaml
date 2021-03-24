@@ -12,9 +12,7 @@ dependencies:
   - jupyter_nbextensions_configurator
   - clang_osx-64=11.0.1
   - clangxx_osx-64=11.0.1
-  - pytest=5.4.1
-  - codecov
-  - pytest-cov
+  - scikit-image=0.16.2
   - pip:
       - numpy==1.18.3
       - pandas==1.0.5

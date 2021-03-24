@@ -79,8 +79,8 @@ jobs:
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
         - conda activate moseq2-app
         - pip install awscli
-        - pip install pytest==5.4.1 codecov pytest-cov
-        - pip install py==1.10.0 pluggy==0.13.1
+        - pip install pytest codecov
+        - pip install "pytest-cov>=2.4.0,<2.6"
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
@@ -128,7 +128,8 @@ jobs:
         - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
         - conda activate moseq2-app
         - pip install awscli
-        - pip install pytest==5.4.1 codecov pytest-cov
+        - pip install pytest codecov
+        - pip install "pytest-cov>=2.4.0,<2.6"
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:

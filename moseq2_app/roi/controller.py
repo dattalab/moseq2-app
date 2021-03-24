@@ -19,10 +19,10 @@ from tqdm.auto import tqdm
 import ipywidgets as widgets
 from bokeh.models import Div
 from IPython.display import display, clear_output
-from os.path import dirname, basename, join, relpath
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
+from os.path import dirname, basename, join, relpath, abspath
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
@@ -157,7 +157,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # update manually set config parameters
         for k in self.session_parameters:
-            self.session_parameters[k].update(self.config_data)
+            for k1 in self.config_data:
+                self.session_parameters[k][k1] = self.config_data[k1]
 
         if compute_bgs:
             self.compute_all_bgs()
@@ -240,7 +241,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                         self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
 
                 # Compute background image; saving the image to a file
-                get_bground_im_file(p, **self.session_parameters[s])
+                self.session_parameters[s].pop('output_dir', None)
+                get_bground_im_file(p, **self.session_parameters[s], output_dir=None)
             except:
                 # Print error if an issue arises
                 display(f'Error, could not compute background for session: {s}.')
@@ -462,6 +464,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                         len(self.session_parameters[sessionName]['timestamps'])
 
                 # Get background image for each session and test the current parameters on it
+                self.session_parameters[sessionName].pop('output_dir', None)
                 bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
                 try:
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
@@ -545,6 +548,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                      self.session_parameters[curr_session_key]['max_height']]
 
         # Get background and display UI plots
+        self.session_parameters[curr_session_key].pop('output_dir', None)
         self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
         if self.main_out is None:
@@ -708,11 +712,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
             print('Graduating Background')
+            self.session_parameters[curr_session_key].pop('output_dir', None)
             bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
             self.curr_bground_im = graduate_dilated_wall_area(bground_im,
                                                               self.session_parameters[curr_session_key],
                                                               strel_dilate, join(dirname(session), 'proc'))
         else:
+            self.session_parameters[curr_session_key].pop('output_dir', None)
             self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
         try:
@@ -967,7 +973,7 @@ class InteractiveExtractionViewer:
         video_div = f'''
                         <h2>{input_file}</h2>
                         <video
-                            src="{relpath(input_file)}"; alt="{input_file}"; 
+                            src="{relpath(input_file)}"; alt="{abspath(input_file)}"; 
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                             style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
