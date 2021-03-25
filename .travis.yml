@@ -87,8 +87,6 @@ jobs:
         - make
       script:
         - pytest --cov-report xml --cov-report term
-      after_success:
-        - codecov -t $CC_TEST_REPORTER_ID
 
     - env: ISOLATED=true
       dist: xenial
@@ -136,5 +134,3 @@ jobs:
         - make
       script:
         - pytest --cov-report xml --cov-report term
-      after_success:
-        - codecov -t $CC_TEST_REPORTER_ID
