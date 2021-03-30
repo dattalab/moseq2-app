@@ -15,6 +15,7 @@ from IPython.display import display, clear_output
 from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.gui.widgets import GroupSettingWidgets
+from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
                                    compute_syllable_explained_variance)
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
@@ -124,6 +125,23 @@ def interactive_group_setting_wrapper(index_filepath):
     display(index_grid.qgrid_widget)
 
     return index_grid
+
+def interactive_scalar_summary_wrapper(index_filepath):
+    '''
+    Wrapper function to launch the session scalar summary plot.
+
+    Parameters
+    ----------
+    index_filepath (str): Path to index file to plot scalars from.
+
+    Returns
+    -------
+    viewer (InteractiveScalarViewer obj): Scalar summary viewer object.
+    '''
+
+    viewer = InteractiveScalarViewer(index_filepath)
+
+    return viewer
 
 def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file,
                                          max_syllables=None, n_explained=99):
