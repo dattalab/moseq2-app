@@ -57,9 +57,7 @@ jobs:
       before_script:
         - make
       script:
-        - pytest --cov-report xml --cov-report term
-      after_success:
-        - codecov -t $CC_TEST_REPORTER_ID
+        - pytest
 
     - env: ISOLATED=true
       os: linux
@@ -86,7 +84,7 @@ jobs:
       before_script:
         - make
       script:
-        - pytest --cov-report xml --cov-report term
+        - pytest
 
     - env: ISOLATED=true
       dist: xenial
@@ -133,4 +131,4 @@ jobs:
       before_script:
         - make
       script:
-        - pytest --cov-report xml --cov-report term
+        - pytest
