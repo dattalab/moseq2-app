@@ -1,12 +1,12 @@
-import bokeh.io
 import unittest
 from unittest import TestCase
+from plotly.offline import init_notebook_mode
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 
 class TestInteractiveScalarViewer(TestCase):
 
     def setUp(self):
-        bokeh.io.output_notebook()
+        init_notebook_mode()
         self.index_file = 'data/test_index.yaml'
         self.gui = InteractiveScalarViewer(self.index_file)
 
