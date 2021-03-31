@@ -494,11 +494,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         if self.npassing == len(self.checked_list.options):
             self.save_clicked()
-            self.message.value = 'All sessions passed with the current parameter set. ' \
-                                 'The config and session-specific config files have also been saved. \n' \
-                                 'You can now safely clear the output, and move to the "Extract All" cell.\n' \
-                                 'We recommend also restarting the kernel to clear any ' \
-                                 'stale memory from the interactive tool.'
+            self.message.value = 'All sessions passed and the config files have been saved.\n' \
+                                 'You can now safely clear the output, and move to the "Extract All" cell.\n'
         else:
             tmp_message = 'Some sessions were flagged. Save the parameter set for the current passing sessions, \
              then find and save the correct set for the remaining sessions.\n'

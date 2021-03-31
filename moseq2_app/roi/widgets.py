@@ -24,6 +24,8 @@ class InteractiveROIWidgets:
         self.layout_hidden = widgets.Layout(visibility='hidden', display='none')
         self.layout_visible = widgets.Layout(visibility='visible', display='inline-flex')
 
+        self.message_layout = widgets.Layout(display='flex', align_items='center', width='inherit')
+
         # roi widgets
         self.roi_label = widgets.Label(value="ROI Parameters", layout=self.label_layout)
         self.bg_roi_depth_range = widgets.IntRangeSlider(value=[650, 750], min=0, max=1500, step=1,
@@ -54,7 +56,7 @@ class InteractiveROIWidgets:
         self.checked_lbl = widgets.Label(value="Session Select", layout=self.label_layout,
                                          button_style='info', continuous_update=False)
 
-        self.message = widgets.Label(value="", font_size=50, layout=self.label_layout)
+        self.message = widgets.Label(value="", font_size=50, layout=self.message_layout)
 
         self.button_layout = widgets.Layout(flex_flow='column', align_items='center', width='80%')
 
@@ -72,7 +74,7 @@ class InteractiveROIWidgets:
 
         self.checked_list = widgets.Select(options=[], description='', continuous_update=False, disabled=False)
 
-        self.box_layout = widgets.Layout(display='inline-flex',
+        self.box_layout = widgets.Layout(display='flex',
                                          justify_content='center',
                                          height='100%',
                                          align_items='center')
