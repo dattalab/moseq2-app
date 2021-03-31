@@ -213,21 +213,7 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
     istat = InteractiveSyllableStats(index_path=index_path, model_path=model_path, df_path=df_path,
                                      info_path=info_path, max_sylls=max_syllables, load_parquet=load_parquet)
 
-    # Compute the syllable dendrogram values
-    istat.compute_dendrogram()
-
-    # Plot the Bokeh graph with the currently selected data.
-    out = interactive_output(istat.interactive_syll_stats_grapher, {
-        'stat': istat.stat_dropdown,
-        'sort': istat.sorting_dropdown,
-        'groupby': istat.grouping_dropdown,
-        'errorbar': istat.errorbar_dropdown,
-        'sessions': istat.session_sel,
-        'ctrl_group': istat.ctrl_dropdown,
-        'exp_group': istat.exp_dropdown
-    })
-
-    display(istat.clear_button, istat.stat_widget_box, out)
+    display(istat.clear_button, istat.stat_widget_box, istat.out)
     show(istat.cladogram)
 
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,

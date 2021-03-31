@@ -19,7 +19,7 @@ from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Category10_10 as palette
 from bokeh.plotting import figure, show, from_networkx
-from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar,
+from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
 
 def graph_dendrogram(obj, syll_info):
@@ -161,6 +161,10 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     '''
 
     pickers = []
+
+    slider = RangeSlider(start=0, end=0.001, value=(0, 0.001), step=0.001,
+                         format="0[.]000", title=f"Display Syllables Within {stat} Range")
+
     for group, color in zip(groups, colors):
         df_group = df[df[groupby] == group]
 
@@ -205,8 +209,8 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                 cm_paths.append('')
 
         # stat data source
-        source = ColumnDataSource(data=dict(
-            x=range(len(aux_df.index)),
+        src_dict = dict(
+            x=list(range(len(aux_df.index))),
             y=aux_df[stat].to_numpy(),
             usage=aux_df['usage'].to_numpy(),
             speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
@@ -218,10 +222,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             label=labels,
             desc=desc,
             movies=cm_paths,
-        ))
+        )
+        source = ColumnDataSource(data=src_dict)
 
         # SEM data source
-        err_source = ColumnDataSource(data=dict(
+        err_dict = dict(
             x=errs_x,
             y=errs_y,
             usage=aux_sem['usage'].to_numpy(),
@@ -234,7 +239,12 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
             label=labels,
             desc=desc,
             movies=cm_paths,
-        ))
+        )
+        err_source = ColumnDataSource(data=err_dict)
+
+        if aux_df[stat].max() > slider.end:
+            slider.end = aux_df[stat].max()
+            slider.value = (0, slider.end)
 
         # Draw glyphs
         line = fig.line('x', 'y', source=source, alpha=0.8, muted_alpha=0.1, line_dash=line_dash,
@@ -263,14 +273,120 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                     </div>
                   """
 
+        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
+                                    color=color)
+
+        callback = CustomJS(
+            args=dict(source=circle.data_source, err_source=err_source,
+                      data=src_dict, err_data=err_dict,
+                      slider=slider, line=line),
+            code="""
+                    var index = [];
+                    var number = [];
+                    var sem = [];
+                    var x = [];
+                    var y = [];
+                    var usage = []; 
+                    var speed_2d = []; 
+                    var speed_3d = [];
+                    var height = [];
+                    var dist = []; 
+                    var label = [];
+                    var desc = [];
+                    var movies = [];
+                    
+                    var err_x = [];
+                    var err_y = [];
+                    var err_number = [];
+                    var err_usage = []; 
+                    var err_speed_2d = []; 
+                    var err_speed_3d = [];
+                    var err_sem = [];
+                    var err_height = [];
+                    var err_dist = []; 
+                    var err_label = [];
+                    var err_desc = [];
+                    var err_movies = [];
+                    
+                    for (var i = 0; i < data['x'].length; i++) {
+                        if((data['y'][i] >= slider.value[0]) && (data['y'][i] <= slider.value[1])) {
+                            index.push(i);
+                            x.push(data['x'][i]);
+                            y.push(data['y'][i]);
+                            sem.push(data['sem'][i]);
+                            number.push(data['number'][i]);
+                            usage.push(data['usage'][i]);
+                            speed_2d.push(data['speed_2d'][i]);
+                            speed_3d.push(data['speed_3d'][i]);
+                            height.push(data['height'][i]);
+                            dist.push(data['dist_to_center'][i]);
+                            label.push(data['label'][i]);
+                            desc.push(data['desc'][i]);
+                            movies.push(data['movies'][i]);
+                            
+                            err_x.push(err_data['x'][i]);
+                            err_y.push(err_data['y'][i]);
+                            /*
+                            err_number.push(err_data['number'][i]);
+                            err_sem.push(err_data['sem'][i]);
+                            err_number.push(err_data['number'][i]);
+                            err_usage.push(err_data['usage'][i]);
+                            err_speed_2d.push(err_data['speed_2d'][i]);
+                            err_speed_3d.push(err_data['speed_3d'][i]);
+                            err_height.push(err_data['height'][i]);
+                            err_dist.push(err_data['dist_to_center'][i]);
+                            err_label.push(err_data['label'][i]);
+                            err_desc.push(err_data['desc'][i]);
+                            err_movies.push(err_data['movies'][i]);
+                            */
+                        } else {
+                            line.visible = false;
+                        }
+                    }
+                    
+                    source.data.index = index;
+                    source.data.number = number;
+                    source.data.x = x;
+                    source.data.y = y;
+                    source.data.sem = sem;
+                    source.data.usage = usage;
+                    source.data.speed_2d = speed_2d;
+                    source.data.speed_3d = speed_3d;
+                    source.data.height = height;
+                    source.data.dist_to_center = dist;
+                    source.data.label = label;
+                    source.data.desc = desc;
+                    source.data.movies = movies;
+                    source.change.emit();
+                    
+                    err_source.data.index = index;
+                    err_source.data.number = err_number;
+                    err_source.data.x = err_x;
+                    err_source.data.y = err_y;
+                    /*
+                    err_source.data.usage = err_usage;
+                    err_source.data.sem = err_sem;
+                    err_source.data.speed_2d = err_speed_2d;
+                    err_source.data.speed_3d = err_speed_3d;
+                    err_source.data.height = err_height;
+                    err_source.data.dist_to_center = err_dist;
+                    err_source.data.label = err_label;
+                    err_source.data.desc = err_desc;
+                    err_source.data.movies = err_movies;
+                    */
+                    err_source.change.emit();
+                    
+                 """
+        )
+
+        slider.js_on_change('value', callback)
+
         hover = HoverTool(renderers=[circle],
+                          callback=callback,
                           tooltips=tooltips,
                           point_policy='snap_to_data',
                           line_policy='nearest')
         fig.add_tools(hover)
-
-        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
-                                    color=color)
 
         if groupby == 'group':
             picker = ColorPicker(title=f"{group} Line Color")
@@ -281,7 +397,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
             pickers.append(picker)
 
-    return pickers
+    return pickers, slider
 
 def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='SEM', syllable_families=None, sort_name='usage'):
     '''
@@ -343,9 +459,9 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
         draw_stats(p, mean_df, list(df.group.unique()), group_colors, sorting, 'group', stat, errorbar, line_dash='dashed')
 
     if list(sorting) == syllable_families['leaves']:
-        pickers = draw_stats(p, df, list(df.group.unique()), group_colors, sorting, groupby, stat, errorbar)
+        pickers, slider = draw_stats(p, df, list(df.group.unique()), group_colors, sorting, groupby, stat, errorbar)
     else:
-        pickers = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar)
+        pickers, slider = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar)
 
     # Get xtick labels
     label_df = df.groupby(['syllable', 'label'], as_index=False).mean().reindex(sorting)
@@ -363,7 +479,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     p.legend.click_policy = "mute"
     p.legend.location = "top_right"
 
-    output_grid = []
+    output_grid = [slider]
     if len(pickers) > 0:
         color_pickers = gridplot(pickers, ncols=2)
         output_grid.append(color_pickers)
