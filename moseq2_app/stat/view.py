@@ -281,32 +281,16 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                       data=src_dict, err_data=err_dict,
                       slider=slider, line=line),
             code="""
-                    var index = [];
-                    var number = [];
-                    var sem = [];
-                    var x = [];
-                    var y = [];
-                    var usage = []; 
-                    var speed_2d = []; 
-                    var speed_3d = [];
-                    var height = [];
-                    var dist = []; 
-                    var label = [];
-                    var desc = [];
-                    var movies = [];
+                    var index = [], number = [], sem = [];
+                    var x = [], y = [], usage = [], speed_2d = []; 
+                    var speed_3d = [], height = [], dist = []; 
+                    var label = [], desc = [], movies = [];
                     
-                    var err_x = [];
-                    var err_y = [];
-                    var err_number = [];
-                    var err_usage = []; 
-                    var err_speed_2d = []; 
-                    var err_speed_3d = [];
-                    var err_sem = [];
-                    var err_height = [];
-                    var err_dist = []; 
-                    var err_label = [];
-                    var err_desc = [];
-                    var err_movies = [];
+                    var err_x = [], err_y = [];
+                    var err_number = [], err_usage = []; 
+                    var err_speed_2d = [], err_speed_3d = [], err_sem = [];
+                    var err_height = [], err_dist = [], err_label = [];
+                    var err_desc = [], err_movies = [];
                     
                     for (var i = 0; i < data['x'].length; i++) {
                         if((data['y'][i] >= slider.value[0]) && (data['y'][i] <= slider.value[1])) {
@@ -326,10 +310,9 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                             
                             err_x.push(err_data['x'][i]);
                             err_y.push(err_data['y'][i]);
-                            /*
                             err_number.push(err_data['number'][i]);
+                            
                             err_sem.push(err_data['sem'][i]);
-                            err_number.push(err_data['number'][i]);
                             err_usage.push(err_data['usage'][i]);
                             err_speed_2d.push(err_data['speed_2d'][i]);
                             err_speed_3d.push(err_data['speed_3d'][i]);
@@ -338,10 +321,14 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                             err_label.push(err_data['label'][i]);
                             err_desc.push(err_data['desc'][i]);
                             err_movies.push(err_data['movies'][i]);
-                            */
+                            
                         } else {
                             line.visible = false;
                         }
+                    }
+                    
+                    if (x.length == data.x.length) {
+                        line.visible = true;
                     }
                     
                     source.data.index = index;
@@ -357,13 +344,14 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                     source.data.label = label;
                     source.data.desc = desc;
                     source.data.movies = movies;
+                    
                     source.change.emit();
                     
                     err_source.data.index = index;
-                    err_source.data.number = err_number;
                     err_source.data.x = err_x;
                     err_source.data.y = err_y;
-                    /*
+                    
+                    err_source.data.number = err_number;
                     err_source.data.usage = err_usage;
                     err_source.data.sem = err_sem;
                     err_source.data.speed_2d = err_speed_2d;
@@ -373,7 +361,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                     err_source.data.label = err_label;
                     err_source.data.desc = err_desc;
                     err_source.data.movies = err_movies;
-                    */
+                    
                     err_source.change.emit();
                     
                  """

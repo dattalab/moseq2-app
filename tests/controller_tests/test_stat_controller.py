@@ -84,7 +84,6 @@ class TestSyllableStatController(TestCase):
     ## Syllable Stat Tests
     def test_init_stats(self):
         assert len(self.gui.session_names) == 1
-        assert self.gui.results == None
 
     def test_clear_on_click(self):
         self.gui.clear_on_click()
@@ -144,7 +143,6 @@ class TestSyllableStatController(TestCase):
         ctrl_group = 'default'
         exp_group = 'default'
 
-        self.gui.compute_dendrogram()
         self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group)
 
         sort = 'similarity'
@@ -153,12 +151,6 @@ class TestSyllableStatController(TestCase):
 
         sort = 'difference'
         errorbar = 'STD'
-        self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group)
-
-        stat = '2D Velocity'
-        self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group)
-
-        groupby = 'SessionName'
         self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group)
 
 class TestTransitionGraphController(TestCase):
