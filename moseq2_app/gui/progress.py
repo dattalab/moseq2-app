@@ -85,10 +85,10 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
 
     if len(sessions) == 0:
         if extracted:
-            sessions = glob(join(data_dir, '*.mp4'))
+            sessions = sorted(glob(join(data_dir, '*.mp4')))
         else:
             for ext in exts:
-                sessions += glob(join(data_dir, f'*.{ext}'))
+                sessions += sorted(glob(join(data_dir, f'*.{ext}')))
 
     if extracted:
         names = [dirname(sess).split('/')[-2] for sess in sessions]
