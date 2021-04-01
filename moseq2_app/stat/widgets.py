@@ -21,6 +21,10 @@ class SyllableStatWidgets:
         self.stat_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
         self.sorting_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.thresholding_dropdown = widgets.Dropdown(
+            options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
+            description='Threshold By:', disabled=False, style=style)
+
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)
         self.exp_dropdown = widgets.Dropdown(options=[], description='Group 2:', disabled=False)
 
@@ -36,7 +40,7 @@ class SyllableStatWidgets:
         self.stat_box = VBox([self.stat_dropdown, self.errorbar_dropdown])
         self.mutation_box = VBox([self.ctrl_dropdown, self.exp_dropdown])
 
-        self.sorting_box = VBox([self.sorting_dropdown, self.mutation_box])
+        self.sorting_box = VBox([self.sorting_dropdown, self.mutation_box, self.thresholding_dropdown])
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
         self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])

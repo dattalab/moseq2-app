@@ -72,8 +72,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
-        if index_uuids != model_uuids:
-            print('Error: Index file UUIDs do not match model UUIDs.')
+        if not set(model_uuids).issubset(set(index_uuids)):
+            print('Error: Some model UUIDs were not found in the provided index file.')
 
         if os.path.exists(save_path):
             self.syll_info = read_yaml(save_path)

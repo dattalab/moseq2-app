@@ -109,7 +109,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             'errorbar': self.errorbar_dropdown,
             'sessions': self.session_sel,
             'ctrl_group': self.ctrl_dropdown,
-            'exp_group': self.exp_dropdown
+            'exp_group': self.exp_dropdown,
+            'thresh': self.thresholding_dropdown
         })
 
     def clear_on_click(self, b=None):
@@ -216,7 +217,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Read index file
         self.sorted_index = get_sorted_index(self.index_path)
 
-        if set(self.sorted_index['files']) != set(model_data['metadata']['uuids']):
+        if not set(model_data['metadata']['uuids']).issubset(set(self.sorted_index['files'])):
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Get max syllables if None is given
@@ -237,7 +238,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
 
-    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group):
+    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, thresh='usage'):
         '''
         Helper function that is responsible for handling ipywidgets interactions and updating the currently
          displayed Bokeh plot.
@@ -263,6 +264,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Handle names to query DataFrame with
         stat = self.dropdown_mapping[stat.lower()]
         sortby = self.dropdown_mapping[sort.lower()]
+        thresh = self.dropdown_mapping[thresh.lower()]
 
         # Get selected syllable sorting
         if sort.lower() == 'difference':
@@ -294,8 +296,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             self.cladogram = graph_dendrogram(self, self.syll_info)
             self.results['cladogram'] = self.cladogram
 
-        self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby,
-                                       errorbar=errorbar, syllable_families=self.results, sort_name=sort)
+        self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby, errorbar=errorbar,
+                                       syllable_families=self.results, sort_name=sort, thresh=thresh)
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
