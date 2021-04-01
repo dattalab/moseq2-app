@@ -12,9 +12,10 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from IPython.display import clear_output
-from moseq2_viz.util import get_sorted_index, read_yaml
+from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
+from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.model.dist import get_behavioral_distance
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
@@ -96,6 +97,20 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.clear_button.on_click(self.clear_on_click)
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
+
+        # Compute the syllable dendrogram values
+        self.compute_dendrogram()
+
+        # Plot the Bokeh graph with the currently selected data.
+        self.out = interactive_output(self.interactive_syll_stats_grapher, {
+            'stat': self.stat_dropdown,
+            'sort': self.sorting_dropdown,
+            'groupby': self.grouping_dropdown,
+            'errorbar': self.errorbar_dropdown,
+            'sessions': self.session_sel,
+            'ctrl_group': self.ctrl_dropdown,
+            'exp_group': self.exp_dropdown
+        })
 
     def clear_on_click(self, b=None):
         '''
