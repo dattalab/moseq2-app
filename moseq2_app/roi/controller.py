@@ -17,7 +17,7 @@ from copy import deepcopy
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 import ipywidgets as widgets
-from bokeh.models import Div
+from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
@@ -966,16 +966,31 @@ class InteractiveExtractionViewer:
 
         video_dims = get_video_info(input_file)['dims']
 
-        # display extracted video as HTML Div using Bokeh
         video_div = f'''
                         <h2>{input_file}</h2>
                         <video
-                            src="{relpath(input_file)}"; alt="{abspath(input_file)}"; 
+                            src="{relpath(input_file)}"; alt="{abspath(input_file)}"; id="preview";
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                             style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
+                        <script>
+                            document.querySelector('video').playbackRate = 0.1;
+                        </script>
                      '''
 
         div = Div(text=video_div, style={'width': '100%', 'align-items': 'center', 'display': 'contents'})
+
+        slider = Slider(start=0, end=2, value=1, step=0.1,
+                             format="0[.]00", title=f"Playback Speed")
+
+        callback = CustomJS(
+            args=dict(slider=slider),
+            code="""
+                    document.querySelector('video').playbackRate = slider.value;
+                 """
+        )
+
+        slider.js_on_change('value', callback)
+        show(slider)
         show(div)

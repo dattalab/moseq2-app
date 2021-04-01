@@ -16,11 +16,11 @@ from bokeh.io import show
 import ruamel.yaml as yaml
 from os.path import relpath
 import ipywidgets as widgets
-from bokeh.models import Div
 from bokeh.layouts import column
 from bokeh.plotting import figure
 from moseq2_extract.util import read_yaml
 from moseq2_viz.util import get_sorted_index
+from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output
 from moseq2_extract.io.video import get_video_info
 from moseq2_app.viz.view import display_crowd_movies
@@ -72,8 +72,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
-        if index_uuids != model_uuids:
-            print('Error: Index file UUIDs do not match model UUIDs.')
+        if not set(model_uuids).issubset(set(index_uuids)):
+            print('Error: Some model UUIDs were not found in the provided index file.')
 
         if os.path.exists(save_path):
             self.syll_info = read_yaml(save_path)
@@ -368,7 +368,20 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Create embedded HTML Div and view layout
         div = Div(text=video_div, style={'width': '100%'})
-        layout = column([div, self.cm_lbl])
+
+        slider = Slider(start=0, end=2, value=1, step=0.1, width=video_dims[0]-50,
+                        format="0[.]00", title=f"Playback Speed")
+
+        callback = CustomJS(
+            args=dict(slider=slider),
+            code="""
+                    document.querySelector('video').playbackRate = slider.value;
+                 """
+        )
+
+        slider.js_on_change('value', callback)
+
+        layout = column([div, self.cm_lbl, slider])
 
         # Insert Bokeh div into ipywidgets Output widget to display
         vid_out = widgets.Output(layout=widgets.Layout(display='inline-block'))
