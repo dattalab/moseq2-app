@@ -35,7 +35,7 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         self.mean_df = self.scalar_df.groupby(['uuid', 'SessionName', 'SubjectName', 'group'], as_index=False).mean()
         self.std_df = self.scalar_df.groupby(['uuid', 'SessionName', 'SubjectName', 'group'],
                                         as_index=True).std().reset_index()
-        self.colors = px.colors.qualitative.Plotly
+        self.colors = px.colors.qualitative.Alphabet
 
         # populate column selector
         self.columns = self.scalar_df.columns
@@ -149,8 +149,9 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
 
         self.fig.update_xaxes(title_text=f"Mean", row=len(selected_cols), col=1)
         self.fig.update_xaxes(title_text=f"STD", row=len(selected_cols), col=2)
+        self.fig.update_xaxes(tickangle=45)
 
-        self.fig.update_layout(height=250*len(selected_cols), width=1000, title_text="Scalar Summary")
+        self.fig.update_layout(height=300*len(selected_cols), width=1000, title_text="Scalar Summary")
         self.fig.update_traces(box_visible=True, meanline_visible=True)
 
         return self.fig
