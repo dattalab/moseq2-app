@@ -966,12 +966,411 @@ def set_fill_color(scalar_color, data_dict):
 
     return fill_color, empty
 
+def setup_trans_graph_tooltips(plot):
+    '''
+    Adds a hover tool, tap tool, and a box select tool to the plot, allowing the user to view a
+     displayed preview of all the syllable node information, and highlight transitions coming to or from clicked node.
+
+    Parameters
+    ----------
+    plot (bokeh figure): bokeh generated figure to add tools to.
+
+    Returns
+    -------
+    '''
+
+    tooltips = """
+                <div>
+                    <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
+                    <div><span style="font-size: 12px;">label: @label</span></div>
+                    <div><span style="font-size: 12px;">description: @desc</span></div>
+                    <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
+                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
+                    <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
+                    <div>
+                        <video
+                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
+                            border="2"; autoplay loop
+                        ></video>
+                    </div>
+                </div>
+                """
+
+    # adding interactive tools
+    plot.add_tools(HoverTool(tooltips=tooltips, line_policy='interp'),
+                   TapTool(),
+                   BoxSelectTool())
+
+def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False):
+    '''
+    Computes the colors and widths of all the transition edges between nodes. Each individual group
+    will always have edges colored black.If difference_graph is true,
+    then the edges will be colored red if the difference is > 0, and blue otherwise.
+
+    Parameters
+    ----------
+    graph (nx.DiGraph): networkx graph to read edge weights from and compute widths and colors with.
+    neighbor_edge_colors (dict): dictionary of node transition tuples mapped to corresponding colors (str).
+    difference_graph (bool): indicates whether to color the edges based on the transition difference between two groups.
+
+    Returns
+    -------
+    edge_color (dict): dict of edge tuple(node1, node2) object mapped to string values describing edge colors.
+    edge_width (dict): dict of edge tuple(node1, node2) object mapped to float values describing edge widths.
+    selected_edge_colors (dict): dict of edge tuple(node1, node2) object mapped to
+     string values describing neighboring edge colors.
+    '''
+
+    # edge colors for difference graphs
+    if difference_graph:
+        edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
+        edge_width = {e: graph.edges()[e]['weight'] * 350 for e in graph.edges()}
+    else:
+        edge_color = {e: 'black' for e in graph.edges()}
+        edge_width = {e: graph.edges()[e]['weight'] * 200 for e in graph.edges()}
+
+    selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
+
+    # setting edge attributes
+    nx.set_edge_attributes(graph, edge_color, "edge_color")
+    nx.set_edge_attributes(graph, selected_edge_colors, "line_color")
+    nx.set_edge_attributes(graph, edge_width, "edge_width")
+
+    return edge_color, edge_width, selected_edge_colors
+
+def get_trans_graph_group_stats(node_indices, usages, scalars):
+    '''
+    Computes and returns all the syllable statistics to display and filter the graph using the GUI.
+
+    Parameters
+    ----------
+    node_indices (1d list): list of plotted node indices as serialized from a networkX.Digraph.nodes array
+    usages (1d list): list of syllable usages corresponding to the node_indices.
+    scalars (dict): dict of syllable scalar values
+
+    Returns
+    -------
+    group_stats (dict): packed dict of syllable scalar strings mapped to
+     1d lists of the values corresponding to the node_indices.
+     To be reused down the pipeline in plot_interactive_transition_graph().
+    '''
+
+    # get usages
+    group_usage = [usages[j] for j in node_indices if j in usages]
+
+    # get speeds
+    group_speed_2d = [scalars['speeds_2d'][j] for j in node_indices if j in scalars['speeds_2d']]
+    group_speed_3d = [scalars['speeds_3d'][j] for j in node_indices if j in scalars['speeds_3d']]
+
+    # get average height
+    group_height = [scalars['heights'][j] for j in node_indices if j in scalars['heights']]
+
+    # get mean distances to bucket centers
+    group_dist = [scalars['dists'][j] for j in node_indices if j in scalars['dists']]
+
+    group_stats = {
+        'usage': group_usage,
+        'speed_2d': group_speed_2d,
+        'speed_3d': group_speed_3d,
+        'height': group_height,
+        'dist': group_dist
+    }
+
+    return group_stats
+
+def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=False):
+    '''
+    Computes the colors and sizes of all the transition nodes. Each individual group
+    will always have edges colored black. If difference_graph is true,
+     then the nodes will be colored red if the difference is > 0, and blue otherwise.
+
+    Parameters
+    ----------
+    graph (nx.DiGraph): networkx graph to set the new node attributes to.
+    usages (1d list): list of syllable usages corresponding to the node_indices.
+    node_indices (1d list): list of plotted node indices as serialized from a networkX.Digraph.nodes array
+    difference_graph (bool): indicates whether to color the edges based on the transition difference between two groups.
+
+    Returns
+    -------
+    '''
+
+    # node colors for difference graphs
+    if difference_graph:
+        node_color = {s: 'red' if usages[s] > 0 else 'blue' for s in node_indices}
+        node_size = {s: max(15., 10 + abs(usages[s] * 500)) for s in node_indices}
+    else:
+        node_color = {s: 'red' for s in node_indices}
+        node_size = {s: max(15., abs(usages[s] * 500)) for s in node_indices}
+
+    # setting node attributes
+    nx.set_node_attributes(graph, node_color, "node_color")
+    nx.set_node_attributes(graph, node_size, "node_size")
+
+def get_group_node_syllable_info(syll_info, node_indices):
+    '''
+    Reads the given syllable information dict in the ordering provided by the node_indices
+     previously computed via nx.DiGraph.nodes
+
+    Parameters
+    ----------
+    syll_info (dict): dict of syllable label information to read.
+    node_indices (1d list): ordering of syllables to read from the syll info dict
+
+    Returns
+    -------
+    labels (1d list): 1d list of syllable labels corresponding to each node index
+    descs (1d list): 1d list of syllable descriptions corresponding to each node index
+    cm_paths (1d list): 1d list of syllable crowd movie relpaths corresponding to each node index
+    '''
+
+    # getting hovertool info
+    labels, descs, cm_paths = [], [], []
+
+    for n in node_indices:
+        labels.append(syll_info[n]['label'])
+        descs.append(syll_info[n]['desc'])
+        try:
+            cm_paths.append(relpath(syll_info[n]['crowd_movie_path']))
+        except ValueError:
+            # crowd movie path not found
+            cm_paths.append('')
+
+    return labels, descs, cm_paths
+
+def setup_graph_hover_renderers(graph_renderer, group_stats, node_indices):
+    '''
+    Adds all the information enclosed in the group_stats dict to the currently plotted transition graph such that
+     they can be viewed in the hover tool.
+
+    Parameters
+    ----------
+    graph_renderer (bokeh.plotting.GraphRenderer instance): the canvas of the current group's
+     transition graph to add the information to.
+    group_stats (dict): packed dict of syllable scalars to add to the hover tool.
+    node_indices (1d list): ordering of syllables to read from the syll info dict
+
+    Returns
+    -------
+    graph_renderer (bokeh.plotting.GraphRenderer instance): updated reference of the GraphRenderer instance.
+    '''
+
+    # setting common data source to display via HoverTool
+    graph_renderer.node_renderer.data_source.add(node_indices, 'number')
+    graph_renderer.node_renderer.data_source.add(group_stats['labels'], 'label')
+    graph_renderer.node_renderer.data_source.add(group_stats['descs'], 'desc')
+    graph_renderer.node_renderer.data_source.add(group_stats['cm_paths'], 'movies')
+    graph_renderer.node_renderer.data_source.add(group_stats['prev_states'], 'prev')
+    graph_renderer.node_renderer.data_source.add(group_stats['next_states'], 'next')
+    graph_renderer.node_renderer.data_source.add(group_stats['usage'], 'usage')
+    graph_renderer.node_renderer.data_source.add(group_stats['speed_2d'], 'speed_2d')
+    graph_renderer.node_renderer.data_source.add(group_stats['speed_3d'], 'speed_3d')
+    graph_renderer.node_renderer.data_source.add(group_stats['height'], 'height')
+    graph_renderer.node_renderer.data_source.add(group_stats['dist'], 'dist_to_center_px')
+    graph_renderer.node_renderer.data_source.add(group_stats['incoming_transition_entropy'], 'ent_in')
+    graph_renderer.node_renderer.data_source.add(group_stats['outgoing_transition_entropy'], 'ent_out')
+
+    return graph_renderer
+
+def setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color):
+    '''
+    Adds the interactive functionality to hovering and tapping on the nodes and edges of each transition graph.
+
+    Parameters
+    ----------
+    graph_renderer (bokeh.plotting.GraphRenderer instance): the canvas of the current group's
+     transition graph to add the information to.
+    group_stats (dict): packed dict of syllable scalars to add to the hover tool.
+    scalar_color (str): name of scalar to color nodes by.
+
+    Returns
+    -------
+    graph_renderer (bokeh.plotting.GraphRenderer instance): updated reference of the GraphRenderer instance.
+    color_bar (bokeh.models.ColorBar instance): a color bar Bokeh glyph to add to the current graph
+     if the scalar colors are not all white.
+    '''
+
+    data_dict = {
+        '2D velocity': {'key': 'speed_2d', 'values': group_stats['speed_2d']},
+        '3D velocity': {'key': 'speed_3d', 'values': group_stats['speed_3d']},
+        'Height': {'key': 'height', 'values': group_stats['height']},
+        'Distance to Center': {'key': 'dist_to_center_px', 'values': group_stats['dist']},
+        'Entropy-In': {'key': 'ent_in', 'values': group_stats['incoming_transition_entropy']},
+        'Entropy-Out': {'key': 'ent_out', 'values': group_stats['outgoing_transition_entropy']},
+    }
+
+    fill_color, empty = set_fill_color(scalar_color, data_dict)
+
+    # Get color bar if node colors are not white
+    color_bar = None
+    if fill_color != 'white' and not empty:
+        color_bar = ColorBar(color_mapper=fill_color['transform'])
+
+    # node interactions
+    graph_renderer.node_renderer.glyph = Circle(size='node_size', fill_color=fill_color, line_color='node_color')
+    graph_renderer.node_renderer.selection_glyph = Circle(size='node_size', line_color='node_color',
+                                                          fill_color=fill_color)
+    graph_renderer.node_renderer.nonselection_glyph = Circle(size='node_size', line_color='node_color',
+                                                             fill_color=fill_color)
+    graph_renderer.node_renderer.hover_glyph = Circle(size='node_size', fill_color=Spectral4[1])
+
+    # edge interactions
+    graph_renderer.edge_renderer.glyph = MultiLine(line_color='edge_color', line_alpha=0.7,
+                                                   line_width='edge_width', line_join='miter')
+    graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color='line_color', line_width='edge_width',
+                                                             line_join='miter', line_alpha=0.8, )
+    graph_renderer.edge_renderer.nonselection_glyph = MultiLine(line_color='edge_color', line_alpha=0.0,
+                                                                line_width='edge_width', line_join='miter')
+    ## Change line color to match difference colors
+    graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color='line_color', line_width=5,
+                                                         line_join='miter', line_alpha=0.8)
+
+    # selection policies
+    graph_renderer.selection_policy = NodesAndLinkedEdges()
+    graph_renderer.inspection_policy = NodesAndLinkedEdges()
+
+    return graph_renderer, color_bar
+
+def set_node_labels(x, y, syllable):
+    '''
+    Given the x and y coordinates of the nodes in the graph, and the syllable numbers they correspond to,
+     the function will create a LabelSet instance to render the syllables numbers on each graphed transition node.
+
+    Parameters
+    ----------
+    x (1d list): list of x coordinates corresponding to each node in the current graph
+    y (1d list): list of y coordinates corresponding to each node in the current graph
+    syllable (1d list): list of syllable numbers corresponding to each node in the current graph
+
+    Returns
+    -------
+    labels (bokeh.models.LabelSet instance): glyph to render on the graph such that the nodes are numbered.
+    '''
+
+    # Get fill colors
+    text_color = 'black'
+
+    # create DataSource for node info
+    label_source = ColumnDataSource({'x': x,
+                                     'y': y,
+                                     'syllable': syllable
+                                     })
+
+    # create the LabelSet to render
+    labels = LabelSet(x='x', y='y',
+                      x_offset=-7, y_offset=-7,
+                      text='syllable', source=label_source,
+                      text_color=text_color, text_font_size="12px",
+                      background_fill_color=None,
+                      render_mode='canvas')
+
+    return labels
+
+def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices):
+    '''
+    Will read the nx.DiGraph object to use the return node x,y coordinates and syllable/node numbers
+     to then create a LabelSet instance to display each group's corresponding syllable numbers of the correct
+      corresponding nodes on each plot/for each group.
+
+    Parameters
+    ----------
+    plots (1d list): list of plots currently generated in the plot_interactive_transition_graph loop.
+    graph_renderer (bokeh.plotting.GraphRenderer instance): the canvas of the current group's
+     transition graph to add the information to.
+    rendered_graphs (1d list): list of GraphRenderers currently generated in the plot_interactive_transition_graph loop.
+    graph (nx.DiGraph): networkx graph to read the node coordinates from.
+    node_indices (1d list): ordering of syllables to read from the syll info dict
+
+    Returns
+    -------
+    labels (bokeh.models.LabelSet instance): glyph to render on the graph such that the nodes are numbered.
+    '''
+
+    try:
+        # get node positions
+        if len(plots) == 0:
+            x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
+            syllable = list(graph.nodes)
+        else:
+            new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
+                          graph_renderer.layout_provider.graph_layout}
+            x, y = zip(*new_layout.values())
+            syllable = [a if a in node_indices else '' for a in new_layout]
+    except:
+        x, y = [], []
+        syllable = []
+
+    labels = set_node_labels(x, y, syllable)
+
+    return labels
+
+def get_legend_items(plot, edge_width, group_name, difference_graph=False):
+    '''
+    Will generate two legend items to describe the main group incoming and outgoing transition colors (main_legend),
+     and an info_legend containing references to the displayed node widths
+     and their corresponding transition probabilities.
+
+    Parameters
+    ----------
+    plot (bokeh figure): bokeh generated figure to add legends to.
+    edge_width (dict): dict of edge tuple(node1, node2) object mapped to float values describing edge widths.
+    group_name (str): name of currently plotted group
+    difference_graph (bool): indicator for whether the currently plotted graph is a difference graph between two groups.
+
+    Returns
+    -------
+    main_legend (bokeh Legend instance): Legend containing colors describing incoming and outgoing transitions.
+    info_legend (bokeh Legend instance): Legend containing edge widths corresponding
+     to min and max transition probabilities.
+    '''
+
+    o_line = plot.line(line_color='orange')
+    p_line = plot.line(line_color='purple')
+
+    min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
+
+    mink_line = plot.line(line_color='black', line_width=min_tp * 200)
+    maxk_line = plot.line(line_color='black', line_width=max_tp * 200)
+
+    group_items = [
+        LegendItem(label="Incoming Transition", renderers=[o_line]),
+        LegendItem(label="Outgoing Transition", renderers=[p_line]),
+    ]
+
+    info_items = [
+        LegendItem(label=f"Min P(transition): {min_tp:.4f}", renderers=[mink_line]),
+        LegendItem(label=f"Max P(transition): {max_tp:.4f}", renderers=[maxk_line]),
+    ]
+
+    if difference_graph:
+        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name)
+        group_items += diff_main_items
+
+    main_legend = Legend(items=group_items,
+                         location='top_left',
+                         border_line_color="black",
+                         background_fill_color='white',
+                         background_fill_alpha=0.7)
+
+    info_legend = Legend(items=info_items,
+                         location='bottom_left',
+                         border_line_color="black",
+                         background_fill_color='white',
+                         background_fill_alpha=0.7)
+
+    return main_legend, info_legend
 
 def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
                                       syll_info, incoming_transition_entropy, outgoing_transition_entropy,
                                       scalars, scalar_color='default', plot_vertically=False, legend_loc='above'):
     '''
-
     Converts the computed networkx transition graphs to Bokeh glyph objects that can be interacted with
     and updated throughout run-time.
 
@@ -996,240 +1395,87 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
     for i, graph in enumerate(graphs):
 
+        # get boolean for whether current plot is a group difference graph
+        difference_graph = i >= len(group)
+
         node_indices = [n for n in graph.nodes if n in usages[i]]
 
+        # initialize bokeh plot with title and joined panning/zooming coordinates
         if len(plots) == 0:
             plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2))
         else:
             # Connecting pan-zoom interaction across plots
             plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
 
+        # format the plot and set up the tooltips
         format_plot(plot)
+        setup_trans_graph_tooltips(plot)
 
-        tooltips = """
-                        <div>
-                            <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
-                            <div><span style="font-size: 12px;">label: @label</span></div>
-                            <div><span style="font-size: 12px;">description: @desc</span></div>
-                            <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                            <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                            <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
-                            <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                            <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
-                            <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
-                            <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
-                            <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
-                            <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
-                            <div>
-                                <video
-                                    src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
-                                    style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
-                                    border="2"; autoplay loop
-                                ></video>
-                            </div>
-                        </div>
-                   """
+        # compute group stats for each node
+        group_scalars = {k: v[i] for k, v in scalars.items()}
+        group_stats = get_trans_graph_group_stats(node_indices, usages[i], group_scalars)
+        group_stats['incoming_transition_entropy'] = incoming_transition_entropy[i]
+        group_stats['outgoing_transition_entropy'] = outgoing_transition_entropy[i]
 
-        # adding interactive tools
-        plot.add_tools(HoverTool(tooltips=tooltips, line_policy='interp'),
-                       TapTool(),
-                       BoxSelectTool())
-
-        prev_states, next_states, neighbor_edge_colors = \
+        # get state neighbor lists for each node
+        group_stats['prev_states'], group_stats['next_states'], group_stats['neighbor_edge_colors'] = \
             get_neighbors(graph, node_indices, group_names[i])
 
-        # edge colors for difference graphs
-        if i >= len(group):
-            edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
-            edge_width = {e: graph.edges()[e]['weight'] * 350 for e in graph.edges()}
-        else:
-            edge_color = {e: 'black' for e in graph.edges()}
-            edge_width = {e: graph.edges()[e]['weight'] * 200 for e in graph.edges()}
+        # format graph edge colors and widths
+        edge_color, edge_width, selected_edge_colors = \
+            format_trans_graph_edges(graph, group_stats['neighbor_edge_colors'], difference_graph)
 
-        selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
-
-        # setting edge attributes
-        nx.set_edge_attributes(graph, edge_color, "edge_color")
-        nx.set_edge_attributes(graph, selected_edge_colors, "line_color")
-        nx.set_edge_attributes(graph, edge_width, "edge_width")
-
-        # get usages
-        group_usage = [usages[i][j] for j in node_indices if j in usages[i]]
-
-        # get speeds
-        group_speed_2d = [scalars['speeds_2d'][i][j] for j in node_indices if j in scalars['speeds_2d'][i]]
-        group_speed_3d = [scalars['speeds_3d'][i][j] for j in node_indices if j in scalars['speeds_3d'][i]]
-
-        # get average height
-        group_height = [scalars['heights'][i][j] for j in node_indices if j in scalars['heights'][i]]
-
-        # get mean distances to bucket centers
-        group_dist = [scalars['dists'][i][j] for j in node_indices if j in scalars['dists'][i]]
-
-        # node colors for difference graphs
-        if i >= len(group):
-            node_color = {s: 'red' if usages[i][s] > 0 else 'blue' for s in node_indices}
-            node_size = {s: max(15., 10 + abs(usages[i][s] * 500)) for s in node_indices}
-        else:
-            node_color = {s: 'red' for s in node_indices}
-            node_size = {s: max(15., abs(usages[i][s] * 500)) for s in node_indices}
-
-        # setting node attributes
-        nx.set_node_attributes(graph, node_color, "node_color")
-        nx.set_node_attributes(graph, node_size, "node_size")
+        # format graph node colors and sizes
+        set_node_colors_and_sizes(graph, usages[i], node_indices, difference_graph)
 
         # create bokeh-fied networkx transition graph
         graph_renderer = from_networkx(graph, pos, scale=1, center=(0, 0))
 
-        # getting hovertool info
-        labels, descs, cm_paths = [], [], []
+        # get syllable info for each node
+        group_stats['labels'], group_stats['descs'], group_stats['cm_paths'] = \
+            get_group_node_syllable_info(syll_info, node_indices)
 
-        for n in node_indices:
-            labels.append(syll_info[n]['label'])
-            descs.append(syll_info[n]['desc'])
-            cm_paths.append(relpath(syll_info[n]['crowd_movie_path']))
+        # setup hover tool information
+        graph_renderer = setup_graph_hover_renderers(graph_renderer, group_stats, node_indices)
 
-        # setting common data source to display via HoverTool
-        graph_renderer.node_renderer.data_source.add(node_indices, 'number')
-        graph_renderer.node_renderer.data_source.add(labels, 'label')
-        graph_renderer.node_renderer.data_source.add(descs, 'desc')
-        graph_renderer.node_renderer.data_source.add(cm_paths, 'movies')
-        graph_renderer.node_renderer.data_source.add(prev_states, 'prev')
-        graph_renderer.node_renderer.data_source.add(next_states, 'next')
-        graph_renderer.node_renderer.data_source.add(group_usage, 'usage')
-        graph_renderer.node_renderer.data_source.add(group_speed_2d, 'speed_2d')
-        graph_renderer.node_renderer.data_source.add(group_speed_3d, 'speed_3d')
-        graph_renderer.node_renderer.data_source.add(group_height, 'height')
-        graph_renderer.node_renderer.data_source.add(group_dist, 'dist_to_center_px')
-        graph_renderer.node_renderer.data_source.add(incoming_transition_entropy[i], 'ent_in')
-        graph_renderer.node_renderer.data_source.add(outgoing_transition_entropy[i], 'ent_out')
-
-        data_dict = {
-            '2D velocity': {'key': 'speed_2d', 'values': group_speed_2d},
-            '3D velocity': {'key': 'speed_3d', 'values': group_speed_3d},
-            'Height': {'key': 'height', 'values': group_height},
-            'Distance to Center': {'key': 'dist_to_center_px', 'values': group_dist},
-            'Entropy-In': {'key': 'ent_in', 'values': incoming_transition_entropy[i]},
-            'Entropy-Out': {'key': 'ent_out', 'values': outgoing_transition_entropy[i]},
-        }
-
-        # node interactions
-        text_color = 'black'
-        fill_color, empty = set_fill_color(scalar_color, data_dict)
-
-        color_bar = None
-        if fill_color != 'white' and not empty:
-            color_bar = ColorBar(color_mapper=fill_color['transform'])
-
-        graph_renderer.node_renderer.glyph = Circle(size='node_size', fill_color=fill_color, line_color='node_color')
-        graph_renderer.node_renderer.selection_glyph = Circle(size='node_size', line_color='node_color', fill_color=fill_color)
-        graph_renderer.node_renderer.nonselection_glyph = Circle(size='node_size', line_color='node_color', fill_color=fill_color)
-        graph_renderer.node_renderer.hover_glyph = Circle(size='node_size', fill_color=Spectral4[1])
-
-        # edge interactions
-        graph_renderer.edge_renderer.glyph = MultiLine(line_color='edge_color', line_alpha=0.7,
-                                                       line_width='edge_width', line_join='miter')
-        graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color='line_color', line_width='edge_width',
-                                                                 line_join='miter', line_alpha=0.8, )
-        graph_renderer.edge_renderer.nonselection_glyph = MultiLine(line_color='edge_color', line_alpha=0.0,
-                                                                    line_width='edge_width', line_join='miter')
-        ## Change line color to match difference colors
-        graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color='line_color', line_width=5,
-                                                             line_join='miter', line_alpha=0.8)
-
-        # selection policies
-        graph_renderer.selection_policy = NodesAndLinkedEdges()
-        graph_renderer.inspection_policy = NodesAndLinkedEdges()
+        graph_renderer, color_bar = setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color)
 
         # added rendered graph to plot
         plot.renderers.append(graph_renderer)
 
-        try:
-            # get node positions
-            if len(plots) == 0:
-                x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
-                syllable = list(graph.nodes)
-            else:
-                new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
-                                graph_renderer.layout_provider.graph_layout}
-                x, y = zip(*new_layout.values())
-                syllable = [a if a in node_indices else '' for a in new_layout]
-        except:
-            x, y = [], []
-            syllable = []
-
-        # create DataSource for node info
-        label_source = ColumnDataSource({'x': x,
-                                         'y': y,
-                                         'syllable': syllable
-                                         })
-
-        # create the LabelSet to render
-        labels = LabelSet(x='x', y='y',
-                          x_offset=-7, y_offset=-7,
-                          text='syllable', source=label_source,
-                          text_color=text_color, text_font_size="12px",
-                          background_fill_color=None,
-                          render_mode='canvas')
+        # get node labels and draw their numbers on each node
+        labels = get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
 
         # render labels
         plot.renderers.append(labels)
 
-        o_line = plot.line(line_color='orange')
-        p_line = plot.line(line_color='purple')
+        # get plot legends
+        main_legend, info_legend = get_legend_items(plot, edge_width, group_names[i], difference_graph)
 
-        min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
-
-        mink_line = plot.line(line_color='black', line_width=min_tp*200)
-        maxk_line = plot.line(line_color='black', line_width=max_tp*200)
-
-        group_items = [
-            LegendItem(label="Incoming Transition", renderers=[o_line]),
-            LegendItem(label="Outgoing Transition", renderers=[p_line]),
-        ]
-
-        info_items = [
-            LegendItem(label=f"Min P(transition): {min_tp:.4f}", renderers=[mink_line]),
-            LegendItem(label=f"Max P(transition): {max_tp:.4f}", renderers=[maxk_line]),
-        ]
-
-        if i >= len(group):
-            diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_names[i])
-            group_items += diff_main_items
-
-        main_legend = Legend(items=group_items,
-                             location='top_left',
-                             border_line_color="black",
-                             background_fill_color='white',
-                             background_fill_alpha=0.7)
-
-        info_legend = Legend(items=info_items,
-                             location='bottom_left',
-                             border_line_color="black",
-                             background_fill_color='white',
-                             background_fill_alpha=0.7)
-
+        # add legends to plot
         plot.renderers.append(main_legend)
         plot.renderers.append(info_legend)
 
+        # set legend layouts for grid plot
         if not plot_vertically:
             plot.add_layout(main_legend, legend_loc)
 
+        # add color bar to graph
         if color_bar is not None:
             plot.renderers.append(color_bar)
 
         plots.append(plot)
         rendered_graphs.append(graph_renderer)
 
-    ncols = None
-    plot_width, plot_height = 550, 675
+    # format all the generated bokeh transition graphs
+    ncols = 1
+    formatted_plots = list(plots)
+    plot_height, plot_width = 550, 550
     if not plot_vertically:
         # Format grid of transition graphs
+        ncols = None
+        plot_width, plot_height = 550, 675
         formatted_plots = format_graphs(plots, group)
-    else:
-        formatted_plots = list(plots)
-        ncols = 1
-        plot_height, plot_width = 550, 550
 
     # Create Bokeh grid plot object
     gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)

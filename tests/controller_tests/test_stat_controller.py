@@ -318,14 +318,6 @@ class TestTransitionGraphController(TestCase):
 
     def test_interactive_transition_graph_helper(self):
 
-        self.gui = InteractiveTransitionGraph(model_path=self.progress_paths['model_path'],
-                                              index_path=self.progress_paths['index_file'],
-                                              info_path=self.progress_paths['syll_info'],
-                                              df_path=self.progress_paths['df_info_path'],
-                                              max_sylls=None,
-                                              plot_vertically=False,
-                                              load_parquet=True)
-
         layout = 'spring'
         scalar_color = 'speeds_2d'
         edge_threshold = (1, 4)
