@@ -813,6 +813,14 @@ def get_neighbors(graph, node_indices, group_name):
             print('missing', group_name, n)
             pass
 
+    # correct colors for edges where the transition is both incoming and outgoing
+    for k, v in neighbor_edge_colors.items():
+        k1 = k[::-1]
+        if k1 in neighbor_edge_colors:
+            if v != neighbor_edge_colors[k1]:
+                neighbor_edge_colors[k] = 'green'
+                neighbor_edge_colors[k1] = 'green'
+
     return prev_states, next_states, neighbor_edge_colors
 
 def format_plot(plot):
@@ -880,7 +888,6 @@ def get_minmax_tp(edge_width, diff=False):
             min_up_tp, max_up_tp = 0, 0
 
         return min_down_tp, max_down_tp, min_up_tp, max_up_tp
-
 
 def get_difference_legend_items(plot, edge_width, group_name):
     '''
@@ -1331,8 +1338,9 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
      to min and max transition probabilities.
     '''
 
-    o_line = plot.line(line_color='orange')
-    p_line = plot.line(line_color='purple')
+    o_line = plot.line(line_color='orange', line_width=4)
+    p_line = plot.line(line_color='purple', line_width=4)
+    g_line = plot.line(line_color='green', line_width=4)
 
     min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
 
@@ -1342,6 +1350,7 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
     group_items = [
         LegendItem(label="Incoming Transition", renderers=[o_line]),
         LegendItem(label="Outgoing Transition", renderers=[p_line]),
+        LegendItem(label="Bidirectional Transition", renderers=[g_line]),
     ]
 
     info_items = [
