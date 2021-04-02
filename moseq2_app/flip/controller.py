@@ -99,7 +99,65 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.start_button.on_click(self.start_stop_frame_range)
             self.face_left_button.on_click(self.facing_range_callback)
             self.face_right_button.on_click(self.facing_range_callback)
+            self.delete_selection_button.on_click(self.on_delete_selection_clicked)
+            self.selected_ranges.observe(self.on_selected_range_value, names='value')
             self.frame_num_slider.observe(self.curr_frame_update, names='value')
+
+    def on_selected_range_value(self, event=None):
+        '''
+        Callback function to make the delete button visible once the user selects one of the frame ranges.
+
+        Returns
+        -------
+        '''
+
+        self.delete_selection_button.layout.visibility = 'visible'
+
+    def on_delete_selection_clicked(self, b=None):
+        '''
+        Button callback function that deletes the currently selected frame range from the list upon
+         clicking the Delete button.
+
+        Parameters
+        ----------
+        b (ipywidgets.Event): Button click event.
+
+        Returns
+        -------
+        '''
+
+        new_list = list(self.selected_ranges.options)
+
+        if len(new_list) > 0:
+            curr_index = new_list.index(self.selected_ranges.value)
+
+            # parse selected frame range value
+            vals = new_list[curr_index].split(' - ')
+            delete_key = vals[1]
+            direction = False if vals[0] == 'R' else True
+            range_to_delete = eval(vals[2])
+
+            # delete the selection from the session range dictionary
+            to_drop = (direction, range_to_delete)
+            self.selected_frame_ranges_dict[delete_key].remove(to_drop)
+
+            # update the current total selected frames indicator
+            self.curr_total_selected_frames -= len(list(range_to_delete))
+            old_lbl = self.curr_total_label.value
+            old_val = re.findall(r': \d+', old_lbl)[0]
+            new_val = old_lbl.replace(old_val, f': {str(self.curr_total_selected_frames)}')
+
+            if self.curr_total_selected_frames >= self.max_frames:
+                new_val = f'<center><h4><font color="green";>{new_val}</h4></center>'
+            else:
+                new_val = f'<center><h4><font color="black";>{new_val}</h4></center>'
+            self.curr_total_label.value = new_val
+
+            # update the remainder of the helper lists
+            new_list.pop(curr_index)
+            self.frame_ranges.pop(curr_index)
+            self.display_frame_ranges.pop(curr_index)
+            self.selected_ranges.options = new_list
 
     def changed_selected_session(self, event=None):
         '''
@@ -206,6 +264,8 @@ class FlipRangeTool(FlipClassifierWidgets):
         # frames exceeds selected max number of frames
         if self.curr_total_selected_frames >= self.max_frames:
             new_val = f'<center><h4><font color="green";>{new_val}</h4></center>'
+        else:
+            new_val = f'<center><h4><font color="black";>{new_val}</h4></center>'
         self.curr_total_label.value = new_val
 
         # appending session list to get frames from for the flip classifier later on
