@@ -10,9 +10,10 @@ from bokeh.io import output_notebook
 from moseq2_extract.util import filter_warnings
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
-     validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
-     interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
-     interactive_plot_transition_graph_wrapper, get_frame_flips_wrapper
+     validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_scalar_summary_wrapper, \
+     interactive_syllable_labeler_wrapper, interactive_syllable_stat_wrapper, \
+     interactive_crowd_movie_comparison_preview_wrapper, interactive_plot_transition_graph_wrapper,\
+     get_frame_flips_wrapper
 
 output_notebook()
 
@@ -158,6 +159,25 @@ def interactive_group_setting(index_file):
     '''
 
     interactive_group_setting_wrapper(index_file)
+
+@filter_warnings
+def interactive_scalar_summary(index_file):
+    '''
+    Interactive Scalar summary visualization tool accessible from jupyter notebook.
+
+    Parameters
+    ----------
+    index_file (str): Path to index file containing session paths to plot scalars for.
+
+    Returns
+    -------
+    '''
+
+    if not exists(index_file):
+        print('Index file does not exist. Input path to an existing file and run the function again.')
+        return
+
+    interactive_scalar_summary_wrapper(index_file)
 
 @filter_warnings
 def label_syllables(progress_paths, max_syllables=None, n_explained=99):
