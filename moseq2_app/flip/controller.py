@@ -146,11 +146,12 @@ class FlipRangeTool(FlipClassifierWidgets):
             old_lbl = self.curr_total_label.value
             old_val = re.findall(r': \d+', old_lbl)[0]
             new_val = old_lbl.replace(old_val, f': {str(self.curr_total_selected_frames)}')
+            new_lbl = new_val.split('>')[3].replace('</h4', '')
 
             if self.curr_total_selected_frames >= self.max_frames:
-                new_val = f'<center><h4><font color="green";>{new_val}</h4></center>'
+                new_val = f'<center><h4><font color="green";>{new_lbl}</h4></center>'
             else:
-                new_val = f'<center><h4><font color="black";>{new_val}</h4></center>'
+                new_val = f'<center><h4><font color="black";>{new_lbl}</h4></center>'
             self.curr_total_label.value = new_val
 
             # update the remainder of the helper lists
@@ -246,7 +247,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         # Updating list of displayed session + selected frame ranges
         selected_range = range(self.start, self.stop)
         display_selected_range = f'{self.session_select_dropdown.label} - {selected_range}'
-        
+
         # Set the directional indicators in the displayed range list
         if left:
             display_selected_range = f'L - {display_selected_range}'
@@ -259,13 +260,12 @@ class FlipRangeTool(FlipClassifierWidgets):
         old_lbl = self.curr_total_label.value
         old_val = re.findall(r': \d+', old_lbl)[0]
         new_val = old_lbl.replace(old_val, f': {str(self.curr_total_selected_frames)}')
+        new_lbl = new_val.split('>')[3].replace('</h4', '')
 
         # Change indicator color to green if number of total selected
         # frames exceeds selected max number of frames
         if self.curr_total_selected_frames >= self.max_frames:
-            new_val = f'<center><h4><font color="green";>{new_val}</h4></center>'
-        else:
-            new_val = f'<center><h4><font color="black";>{new_val}</h4></center>'
+            new_val = f'<center><h4><font color="green";>{new_lbl}</h4></center>'
         self.curr_total_label.value = new_val
 
         # appending session list to get frames from for the flip classifier later on

@@ -44,7 +44,7 @@ class FlipClassifierWidgets:
 
         self.button_box = VBox([self.frame_num_slider, self.selector_box])
 
-        self.curr_total_label = widgets.HTML(value="<center><h4>Current Total Selected Frames: 0</h4></center>", layout=layout)
+        self.curr_total_label = widgets.HTML(value='<center><h4><font color="black";>Current Total Selected Frames: 0</h4></center>', layout=layout)
 
         self.selected_ranges_label = widgets.Label('Selected Correct Frame Ranges')
         self.selected_ranges = widgets.Select(options=[], description='', layout=widgets.Layout(height='100%', width='auto'),
