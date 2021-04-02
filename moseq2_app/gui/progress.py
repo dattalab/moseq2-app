@@ -219,7 +219,7 @@ def find_progress(base_progress):
         if exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
             base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
 
-    models = glob(join(base_dir, '**/model.p'), recursive=True)
+    models = glob(join(base_dir, '**/*.p'), recursive=True)
     if len(models) == 1:
         base_progress['model_path'] = models[0]
         base_progress['model_session_path'] = dirname(models[0])
@@ -303,6 +303,9 @@ def generate_intital_progressfile(filename='progress.yaml'):
             else:
                 # fallback
                 base_progress_vars = find_progress(base_progress_vars)
+
+    # Find progress in given base directory
+    base_progress_vars = find_progress(base_progress_vars)
 
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)

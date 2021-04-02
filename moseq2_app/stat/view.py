@@ -19,7 +19,7 @@ from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Category10_10 as palette
 from bokeh.plotting import figure, show, from_networkx
-from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar,
+from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
 
 def graph_dendrogram(obj, syll_info):
@@ -48,7 +48,6 @@ def graph_dendrogram(obj, syll_info):
     # Get distance sorted label ordering
     labels = list(map(int, obj.results['ivl']))
     sources = []
-
     # Each (icoord, dcoord) pair represents a single branch in the dendrogram
     for i, d in zip(obj.icoord, obj.dcoord):
         tmp = list(zip(i, d))
@@ -68,7 +67,7 @@ def graph_dendrogram(obj, syll_info):
         # Draw glyphs
         cladogram.line(x='x', y='y', source=source)
 
-    xtick_labels = [syll_info[lbl]['label'] for lbl in labels]
+    xtick_labels = [syll_info.get(lbl, {'label': ''})['label'] for lbl in labels]
     xticks = [f'{lbl} ({num})' for num, lbl in zip(labels, xtick_labels)]
 
     # Set x-axis ticks
@@ -130,6 +129,22 @@ def colorscale(hexstr, scalefactor):
     return "#%02x%02x%02x" % (r, g, b)
 
 def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, pct=5):
+    '''
+    Compute min and max values within a (default) 95th percentile of the inputted syllable statistic.
+
+    Parameters
+    ----------
+    x (pandas Series): 1D list of syllable statistics.
+    n_boots (int): Number of bootstrapped examples to generate to compute the percentile.
+    n_samp (int): Number of inputted syllables.
+    function (numpy function): Function to apply to bootstrapped data.
+    pct (int): Percentile to compute.
+
+    Returns
+    -------
+    percentile (2d numpy array): an array of min and max values for each syllable's stat value
+    '''
+
     if isinstance(x, pd.core.series.Series):
         x = x.values
     pct /= 2
@@ -137,9 +152,340 @@ def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, p
     if n_samp is None:
         n_samp = n_vals
     boots = function(x[np.random.choice(n_vals, size=(n_samp, n_boots))], axis=0)
-    return np.percentile(boots, [pct, 100 - pct])
 
-def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid'):
+    percentile = np.percentile(boots, [pct, 100 - pct])
+    return percentile
+
+def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat='usage'):
+    '''
+    Initializes the CustomJS script callback function used to update the plot upon changing the
+     value of the RangeSlider.
+     The JS script will iterate through each syllable and update the ColumnDataSource objects based the selected
+     statistic to threshold, and the current range to threshold.
+     Once the ColumnDataSource objects are updated, the bokeh plot will automatically be updated.
+
+    Parameters
+    ----------
+    src_dict (dict): dict object containing all the stats information contained in the main ColumnDataSource.
+    err_dict (dict): dict object containing all the error margins for the src_dict statistics.
+    err_source (bokeh.models.ColumnDataSource): data source to update based on slider values.
+     (Will hide error bars for excluded syllables).
+    slider (bokeh.models.RangeSlider): slider object with the currently displayed values used to filter
+     out syllables in the callback function.
+    circle (bokeh.glyph circle): drawn bokeh glyph representing syllables, that will be updated in the callback function
+    line (bokeh.glyph line): drawn line connecting all the circle nodes in the bokeh figure.
+     (To be hidden in the callback function if the syllable list is discontinuous)
+    thresh_stat (str): name of the statistic to threshold by.
+
+    Returns
+    -------
+    callback (bokeh.models.CustomJS): javascript callback function to embed to slider and hover tool objects.
+    '''
+
+    # map the dropdown values back to datasource names to retrieve in the javascript callback function
+    dict_mapping = {
+        'usage': 'usage',
+        'velocity_2d_mm': 'speed_2d',
+        'velocity_3d_mm': 'speed_3d',
+        'height_ave_mm': 'height',
+        'dist_to_center_px': 'dist_to_center'
+    }
+
+    callback = CustomJS(
+        args=dict(source=circle.data_source, err_source=err_source,
+                  data=src_dict, err_data=err_dict, thresh_stat=dict_mapping[thresh_stat],
+                  slider=slider, line=line),
+        code="""
+                        var index = [], number = [], sem = [];
+                        var x = [], y = [], usage = [], speed_2d = []; 
+                        var speed_3d = [], height = [], dist = []; 
+                        var label = [], desc = [], movies = [];
+
+                        var err_x = [], err_y = [];
+                        var err_number = [], err_usage = []; 
+                        var err_speed_2d = [], err_speed_3d = [], err_sem = [];
+                        var err_height = [], err_dist = [], err_label = [];
+                        var err_desc = [], err_movies = [];
+
+                        for (var i = 0; i < data['x'].length; i++) {
+                            if((data[thresh_stat][i] >= slider.value[0]) && (data[thresh_stat][i] <= slider.value[1])) {
+                                index.push(i);
+                                x.push(data['x'][i]);
+                                y.push(data['y'][i]);
+                                sem.push(data['sem'][i]);
+                                number.push(data['number'][i]);
+                                usage.push(data['usage'][i]);
+                                speed_2d.push(data['speed_2d'][i]);
+                                speed_3d.push(data['speed_3d'][i]);
+                                height.push(data['height'][i]);
+                                dist.push(data['dist_to_center'][i]);
+                                label.push(data['label'][i]);
+                                desc.push(data['desc'][i]);
+                                movies.push(data['movies'][i]);
+
+                                err_x.push(err_data['x'][i]);
+                                err_y.push(err_data['y'][i]);
+                                err_number.push(err_data['number'][i]);
+
+                                err_sem.push(err_data['sem'][i]);
+                                err_usage.push(err_data['usage'][i]);
+                                err_speed_2d.push(err_data['speed_2d'][i]);
+                                err_speed_3d.push(err_data['speed_3d'][i]);
+                                err_height.push(err_data['height'][i]);
+                                err_dist.push(err_data['dist_to_center'][i]);
+                                err_label.push(err_data['label'][i]);
+                                err_desc.push(err_data['desc'][i]);
+                                err_movies.push(err_data['movies'][i]);
+
+                            } else {
+                                line.visible = false;
+                            }
+                        }
+
+                        if (x.length == data.x.length) {
+                            line.visible = true;
+                        }
+
+                        source.data.index = index;
+                        source.data.number = number;
+                        source.data.x = x;
+                        source.data.y = y;
+                        source.data.sem = sem;
+                        source.data.usage = usage;
+                        source.data.speed_2d = speed_2d;
+                        source.data.speed_3d = speed_3d;
+                        source.data.height = height;
+                        source.data.dist_to_center = dist;
+                        source.data.label = label;
+                        source.data.desc = desc;
+                        source.data.movies = movies;
+
+                        source.change.emit();
+
+                        err_source.data.index = index;
+                        err_source.data.x = err_x;
+                        err_source.data.y = err_y;
+
+                        err_source.data.number = err_number;
+                        err_source.data.usage = err_usage;
+                        err_source.data.sem = err_sem;
+                        err_source.data.speed_2d = err_speed_2d;
+                        err_source.data.speed_3d = err_speed_3d;
+                        err_source.data.height = err_height;
+                        err_source.data.dist_to_center = err_dist;
+                        err_source.data.label = err_label;
+                        err_source.data.desc = err_desc;
+                        err_source.data.movies = err_movies;
+
+                        err_source.change.emit();
+
+                     """
+    )
+
+    return callback
+
+def setup_hovertool(circle, callback=None):
+    '''
+    Initialize hover tool with tooltips showing all the syllable information and the crowd movies upon
+     hovering over a syllable circle glyph.
+
+    Parameters
+    ----------
+    circle (bokeh.glyph circle): drawn bokeh glyph representing syllables, that will be updated in the callback function
+    callback (bokeh.models.CustomJS): javascript callback function to embed to hover tool objects to preserve alignment.
+
+    Returns
+    -------
+    hover (bokeh.models.HoverTool): hover tool to embed into the created figure.
+    '''
+    
+    # html divs to display within the HoverTool
+    tooltips = """
+                <div>
+                    <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
+                    <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
+                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
+                    <div><span style="font-size: 12px;">group-error: +/- @sem{0.000}</span></div>
+                    <div><span style="font-size: 12px;">label: @label</span></div>
+                    <div><span style="font-size: 12px;">description: @desc</span></div>
+                    <div>
+                        <video
+                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
+                            border="2"; autoplay loop
+                        ></video>
+                    </div>
+                </div>
+                """
+
+    hover = HoverTool(renderers=[circle],
+                      callback=callback,
+                      tooltips=tooltips,
+                      point_policy='snap_to_data',
+                      line_policy='nearest')
+
+    return hover
+
+def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', stat='usage'):
+    '''
+    Computes the group-specific syllable statistics dataframe, and the selected error values to
+     later draw the line plot and error bars.
+
+    Parameters
+    ----------
+    df (pd.DataFrame): DataFrame containing all relevant data to plot.
+    group (str): group name to get auxiliary statistics dataframe for.
+    sorting (1D list): list of syllable index values to resort the dataframe by.
+    groupby (str): column to group the syllable stats by.
+    errorbar (str): name of the error bar type to compute values for.
+    stat (str): name of the statistic to plot.
+
+    Returns
+    -------
+    aux_df (pd.DataFrame): dataframe that only contains the selected group's mean statistics.
+    stat_err (pd.DataFrame): dataframe that contains the error values for the selected statistic.
+    aux_err (pd.DataFrame): dataframe that contains the error values for all the statistics.
+    errs_x (list): list of x-indices to plot the error bar lines within.
+    errs_y (list): list of y-indices to plot the error bar lines within.
+    '''
+
+    # Get group specific dataframe indices
+    df_group = df[df[groupby] == group]
+    grouped = df_group.groupby('syllable')[[stat]]
+
+    # Get resorted mean syllable data
+    aux_df = df_group.groupby('syllable', as_index=False).mean().reindex(sorting)
+
+    # Get SEM
+    if errorbar == 'CI 95%':
+        stat_err = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
+        aux_err = {}
+        for s in ['usage', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
+            aux_err[s] = df_group.groupby('syllable')[s].apply(get_ci_vect_vectorized).reindex(sorting)
+    elif errorbar == 'SEM':
+        stat_err = grouped.sem().reindex(sorting)
+        aux_err = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
+    else:
+        stat_err = grouped.std().reindex(sorting)
+        aux_err = df_group.groupby('syllable', as_index=False).std().reindex(sorting)
+
+    # Get min and max error bar values
+    if errorbar == 'CI 95%':
+        miny = [e[0] for e in stat_err]
+        maxy = [e[1] for e in stat_err]
+    else:
+        miny = aux_df[stat] - stat_err[stat]
+        maxy = aux_df[stat] + stat_err[stat]
+
+    # get error bar coordinates to plot in the figure
+    errs_x = [(i, i) for i in range(len(aux_df.index))]
+    errs_y = [(min_y, max_y) for min_y, max_y in zip(miny, maxy)]
+
+    return aux_df, stat_err, aux_err, errs_x, errs_y
+
+def get_syllable_info(df, sorting):
+    '''
+    Returns the labels, descriptions and crowd movie paths for all the syllables to display in the x-axis,
+     and hover tool.
+
+    Parameters
+    ----------
+    df (pd.DataFrame): DataFrame containing all relevant data to plot.
+    sorting (1D list): list of syllable index values to resort the dataframe by.
+
+    Returns
+    -------
+    labels (1D numpy array): syllable label list sorted by the given sorting order.
+    desc (1D numpy array): syllable description list sorted by the given sorting order.
+    cm_paths (1D numpy array): syllable crowd movie path list sorted by the given sorting order.
+    '''
+
+    # Get Labeled Syllable Information
+    info_columns = ['syllable', 'label', 'desc', 'crowd_movie_path']
+    desc_data = df.groupby(info_columns, as_index=False).mean()[info_columns].reindex(sorting)
+
+    # Pack data into numpy arrays
+    labels = desc_data['label'].to_numpy()
+    desc = desc_data['desc'].to_numpy()
+
+    cm_paths = []
+    for cm in desc_data['crowd_movie_path'].to_numpy():
+        try:
+            cm_paths.append(relpath(cm))
+        except ValueError:
+            # cm path does not exist
+            cm_paths.append('')
+
+    return labels, desc, cm_paths
+
+def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y, stat):
+    '''
+    Creates Bokeh ColumnDataSources that will be used to draw all the bokeh glyphs (circle, line plots, and errorbars).
+    Additionally, the data sources will be used by the figure's JS callbacks in order to update the graph in real time
+    when users edit the slider or color picker widget values.
+
+    Parameters
+    ----------
+    aux_df (pd.DataFrame): DataFrame that only contains the selected group's mean statistics.
+    aux_sem (pd.DataFrame): DataFrame that contains the error values for all the statistics.
+    sem (pd.DataFrame): DataFrame that contains the error values for the selected statistic.
+    labels (1D numpy array): Syllable label list sorted by the given sorting order.
+    desc (1D numpy array): Syllable description list sorted by the given sorting order.
+    cm_paths (1D numpy array): Syllable crowd movie path list sorted by the given sorting order.
+    errs_x (list): List of x-indices to plot the error bar lines within.
+    errs_y (list): List of y-indices to plot the error bar lines within.
+    stat (str): Statistic to display.
+
+    Returns
+    -------
+    source (bokeh.models.ColumnDataSource): Bokeh data source of mean syllable stats,
+     used to plot interactive figure glyphs, hovertools and widgets.
+    src_dict (dict): dict version of the ColumnDataSource object that will be passed to the JS Callback.
+    err_source (bokeh.models.ColumnDataSource): Bokeh data source of syllable stats error values,
+     used to plot interactive figure errorbars, hovertool and widget values.
+    err_dict (dict): dict version of the errorbar ColumnDataSource object that will be passed to the JS Callback.
+    '''
+
+    # stat data source
+    src_dict = dict(
+        x=list(range(len(aux_df.index))),
+        y=aux_df[stat].to_numpy(),
+        usage=aux_df['usage'].to_numpy(),
+        speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
+        speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
+        height=aux_df['height_ave_mm'].to_numpy(),
+        dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
+        sem=aux_sem[stat].to_numpy(),
+        number=sem.index,
+        label=labels,
+        desc=desc,
+        movies=cm_paths,
+    )
+    source = ColumnDataSource(data=src_dict)
+
+    # SEM data source
+    err_dict = dict(
+        x=errs_x,
+        y=errs_y,
+        usage=aux_sem['usage'].to_numpy(),
+        speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
+        speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
+        height=aux_sem['height_ave_mm'].to_numpy(),
+        dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
+        sem=aux_sem[stat].to_numpy(),
+        number=sem.index,
+        label=labels,
+        desc=desc,
+        movies=cm_paths,
+    )
+    err_source = ColumnDataSource(data=err_dict)
+
+    return source, src_dict, err_source, err_dict
+
+def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid', thresh_stat='usage'):
     '''
     Helper function to bokeh_plotting that iterates through the given DataFrame and plots the
     data grouped by some user defined column ('group', 'SessionName', 'SubjectName'), with the errorbars of their
@@ -158,78 +504,31 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
     Returns
     -------
-    pickers (list of ColorPickers): List of interactive color picker widgets to update the graph colors
+    pickers (list of ColorPickers): List of interactive color picker widgets to update the graph colors.
+    slider (bokeh.models.RangeSlider): RangeSlider object used to threshold/filter the displayed syllables.
     '''
 
     pickers = []
+
+    slider = RangeSlider(start=0, end=0.001, value=(0, 0.001), step=0.001,
+                         format="0[.]000", title=f"Display Syllables Within {thresh_stat} Range")
+
     for group, color in zip(groups, colors):
-        df_group = df[df[groupby] == group]
 
-        # Get resorted mean syllable data
-        aux_df = df_group.groupby('syllable', as_index=False).mean().reindex(sorting)
+        aux_df, sem, aux_sem, errs_x, errs_y = get_aux_stat_dfs(df, group, sorting, groupby, errorbar, stat)
 
-        if errorbar == 'CI 95%':
-            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
-        # Get SEM values
-        elif errorbar == 'SEM':
-            sem = df_group.groupby('syllable')[[stat]].sem().reindex(sorting)
-            aux_sem = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
-        else:
-            sem = df_group.groupby('syllable')[[stat]].std().reindex(sorting)
-            aux_sem = df_group.groupby('syllable', as_index=False).std().reindex(sorting)
+        # get syllable info
+        labels, desc, cm_paths = get_syllable_info(df, sorting)
 
-        if errorbar == 'CI 95%':
-            errors = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
-            miny = [e[0] for e in errors]
-            maxy = [e[1] for e in errors]
-        else:
-            miny = aux_df[stat] - sem[stat]
-            maxy = aux_df[stat] + sem[stat]
+        # get bokeh data sources
+        source, src_dict, err_source, err_dict = get_datasources(aux_df, aux_sem, sem,
+                                                                 labels, desc, cm_paths,
+                                                                 errs_x, errs_y, stat)
 
-        errs_x = [(i, i) for i in range(len(aux_df.index))]
-        errs_y = [(min_y, max_y) for min_y, max_y in zip(miny, maxy)]
-
-        # Get Labeled Syllable Information
-        desc_data = df.groupby(['syllable', 'label', 'desc', 'crowd_movie_path'], as_index=False).mean()[
-            ['syllable', 'label', 'desc', 'crowd_movie_path']].reindex(sorting)
-
-        # Pack data into numpy arrays
-        labels = desc_data['label'].to_numpy()
-        desc = desc_data['desc'].to_numpy()
-        cm_paths = [relpath(cm) for cm in desc_data['crowd_movie_path'].to_numpy()]
-
-        # stat data source
-        source = ColumnDataSource(data=dict(
-            x=range(len(aux_df.index)),
-            y=aux_df[stat].to_numpy(),
-            usage=aux_df['usage'].to_numpy(),
-            speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
-            speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
-            height=aux_df['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
-            sem=aux_sem[stat].to_numpy(),
-            number=sem.index,
-            label=labels,
-            desc=desc,
-            movies=cm_paths,
-        ))
-
-        # SEM data source
-        err_source = ColumnDataSource(data=dict(
-            x=errs_x,
-            y=errs_y,
-            usage=aux_sem['usage'].to_numpy(),
-            speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
-            speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
-            height=aux_sem['height_ave_mm'].to_numpy(),
-            dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
-            sem=aux_sem[stat].to_numpy(),
-            number=sem.index,
-            label=labels,
-            desc=desc,
-            movies=cm_paths,
-        ))
+        # adjust slider min-max values
+        if aux_df[thresh_stat].max() > slider.end:
+            slider.end = aux_df[thresh_stat].max()
+            slider.value = (0, slider.end)
 
         # Draw glyphs
         line = fig.line('x', 'y', source=source, alpha=0.8, muted_alpha=0.1, line_dash=line_dash,
@@ -237,36 +536,18 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         circle = fig.circle('x', 'y', source=source, alpha=0.8, muted_alpha=0.1,
                             legend_label=group, color=color, size=6)
 
-        tooltips = """
-                    <div>
-                        <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
-                        <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                        <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                        <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
-                        <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                        <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
-                        <div><span style="font-size: 12px;">group-error: +/- @sem{0.000}</span></div>
-                        <div><span style="font-size: 12px;">label: @label</span></div>
-                        <div><span style="font-size: 12px;">description: @desc</span></div>
-                        <div>
-                            <video
-                                src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
-                                style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
-                                border="2"; autoplay loop
-                            ></video>
-                        </div>
-                    </div>
-                  """
-
-        hover = HoverTool(renderers=[circle],
-                          tooltips=tooltips,
-                          point_policy='snap_to_data',
-                          line_policy='nearest')
-        fig.add_tools(hover)
-
         error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
                                     color=color)
 
+        # setup slider callback function to update the plot
+        callback = setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat)
+        slider.js_on_change('value', callback)
+
+        # update hover tools to match the thresholded plot points
+        hover = setup_hovertool(circle, callback)
+        fig.add_tools(hover)
+
+        # set up color pickers and link the selection to all the drawn glyphs
         if groupby == 'group':
             picker = ColorPicker(title=f"{group} Line Color")
             picker.js_link('color', line.glyph, 'line_color')
@@ -276,39 +557,24 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
             pickers.append(picker)
 
-    return pickers
+    return pickers, slider
 
-def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='SEM', syllable_families=None, sort_name='usage'):
+def set_grouping_colors(df, groupby):
     '''
-    Generates a Bokeh plot with interactive tools such as the HoverTool, which displays
-    additional syllable information and the associated crowd movie.
+    Based on the selected grouping to plot, will return the unique group names,
+     and their associated colors to use when plotting the default figure.
 
     Parameters
     ----------
-    df (pd.DataFrame): Mean syllable statistic DataFrame.
-    stat (str): Statistic to plot
-    sorting (list): List of the current/selected syllable ordering
-    groupby (str): Value to group data by. Either by unique group name, session name, or subject name.
-    errorbar (str): Error bar type to display
-    syllable_families (dict): dict containing cladogram figure
-    sort_name (str): Syllable sorting name displayed in title.
+    df (pd.DataFrame): DataFrame containing all relevant data to plot.
+    groupby (str): column to group the syllable stats by.
 
     Returns
     -------
-    p (bokeh figure): Displayed stat plot with optional color pickers.
+    groups (list): list of group names to plot line plots for.
+    group_colors (list): list of colors corresponding to each plotted group.
+    colors (list): list of all the colors used to plot the glyphs
     '''
-
-    tools = 'pan, box_zoom, wheel_zoom, save, reset'
-
-    # Instantiate Bokeh figure with the HoverTool data
-    p = figure(title=f'Syllable {stat} Statistics - Sorted by {sort_name}',
-               width=850,
-               height=500,
-               tools=tools,
-               x_range=syllable_families['cladogram'].x_range,
-               x_axis_label='Syllables',
-               y_axis_label=f'{stat}',
-               output_backend="svg")
 
     colors = itertools.cycle(palette)
 
@@ -334,13 +600,27 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
 
         colors = [colorscale(group_color_map[sg], 0.5 + random.random()) for sg in sess_groups]
 
-    if groupby != 'group':
-        draw_stats(p, mean_df, list(df.group.unique()), group_colors, sorting, 'group', stat, errorbar, line_dash='dashed')
+    return groups, group_colors, colors
 
-    if list(sorting) == syllable_families['leaves']:
-        pickers = draw_stats(p, df, list(df.group.unique()), group_colors, sorting, groupby, stat, errorbar)
-    else:
-        pickers = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar)
+def format_stat_plot(p, df, slider, pickers, sorting):
+    '''
+    Edits the bokeh figures x-axis such that the syllable labels are also displayed, and are slanted 45 degrees.
+     Sets the legend to be interactive where users can hide line plots by clicking on their legend item.
+     Finally creates the bokeh gridplot to hold all of the displayed widgets above the graph to display.
+
+    Parameters
+    ----------
+    p (bokeh.Figure): bokeh figure with all the glyphs already drawn.
+    df (pd.DataFrame): DataFrame containing all relevant data to plot
+    slider (bokeh.models.RangeSlider): slider object with the currently displayed values used to filter
+     out syllables in the callback function.
+    pickers (list of ColorPickers): List of interactive color picker widgets to insert into a gridplot to display.
+    sorting (1D list): list of syllable index values to resort the dataframe by.
+
+    Returns
+    -------
+    graph_n_pickers (bokeh.layout.column): Bokeh Layout object of the widgets and figure to display.
+    '''
 
     # Get xtick labels
     label_df = df.groupby(['syllable', 'label'], as_index=False).mean().reindex(sorting)
@@ -358,15 +638,68 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     p.legend.click_policy = "mute"
     p.legend.location = "top_right"
 
-    output_grid = []
+    # Create gridplot of color pickers
+    output_grid = [slider]
     if len(pickers) > 0:
         color_pickers = gridplot(pickers, ncols=2)
         output_grid.append(color_pickers)
     output_grid.append(p)
 
+    # Pack widgets together with figure
     graph_n_pickers = column(output_grid)
 
-    ## Display
+    return graph_n_pickers
+
+def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='SEM', syllable_families=None, sort_name='usage', thresh='usage'):
+    '''
+    Generates a Bokeh plot with interactive tools such as the HoverTool, which displays
+    additional syllable information and the associated crowd movie.
+
+    Parameters
+    ----------
+    df (pd.DataFrame): Mean syllable statistic DataFrame.
+    stat (str): Statistic to plot
+    sorting (list): List of the current/selected syllable ordering
+    groupby (str): Value to group data by. Either by unique group name, session name, or subject name.
+    errorbar (str): Error bar type to display
+    syllable_families (dict): dict containing cladogram figure
+    sort_name (str): Syllable sorting name displayed in title.
+    thresh (str): Statistic to threshold syllables by using the Range Slider
+
+    Returns
+    -------
+    p (bokeh figure): Displayed stat plot with optional color pickers.
+    '''
+
+    tools = 'pan, box_zoom, wheel_zoom, save, reset'
+
+    # Instantiate Bokeh figure with the HoverTool data
+    p = figure(title=f'Syllable {stat} Statistics - Sorted by {sort_name}',
+               width=850,
+               height=500,
+               tools=tools,
+               x_range=syllable_families['cladogram'].x_range,
+               x_axis_label='Syllables',
+               y_axis_label=f'{stat}',
+               output_backend="svg")
+
+    # get default colors to display each group's line plots
+    groups, group_colors, colors = set_grouping_colors(df, groupby)
+
+    if groupby != 'group':
+        # draw session based statistics, without returning individual bokeh widgets to display
+        draw_stats(p, mean_df, list(df.group.unique()), group_colors, sorting, 'group', stat, errorbar, line_dash='dashed', thresh_stat=thresh)
+
+    # draw line plots, setup hovertool, thresholding slider and group color pickers
+    if list(sorting) == syllable_families['leaves']:
+        pickers, slider = draw_stats(p, df, list(df.group.unique()), group_colors, sorting, groupby, stat, errorbar, thresh_stat=thresh)
+    else:
+        pickers, slider = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar, thresh_stat=thresh)
+
+    # Format Bokeh plot with widgets
+    graph_n_pickers = format_stat_plot(p, df, slider, pickers, sorting)
+
+    # Display figure and widgets
     show(graph_n_pickers)
 
     return p

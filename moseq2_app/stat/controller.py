@@ -12,9 +12,10 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from IPython.display import clear_output
-from moseq2_viz.util import get_sorted_index, read_yaml
+from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
+from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.model.dist import get_behavioral_distance
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
@@ -97,7 +98,22 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.clear_button.on_click(self.clear_on_click)
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
-    def clear_on_click(self, b):
+        # Compute the syllable dendrogram values
+        self.compute_dendrogram()
+
+        # Plot the Bokeh graph with the currently selected data.
+        self.out = interactive_output(self.interactive_syll_stats_grapher, {
+            'stat': self.stat_dropdown,
+            'sort': self.sorting_dropdown,
+            'groupby': self.grouping_dropdown,
+            'errorbar': self.errorbar_dropdown,
+            'sessions': self.session_sel,
+            'ctrl_group': self.ctrl_dropdown,
+            'exp_group': self.exp_dropdown,
+            'thresh': self.thresholding_dropdown
+        })
+
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 
@@ -110,6 +126,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         '''
 
         clear_output()
+        del self
 
     def on_grouping_update(self, event):
         '''
@@ -150,6 +167,14 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                                     self.model_path,
                                     max_syllable=self.max_sylls,
                                     distances='ar[init]')['ar[init]']
+
+        is_missing = np.isnan(X)
+        if is_missing.any():
+            print('Existing model does not have equal amount of requested states.')
+            max_states = int(max(np.where(is_missing.any(1), is_missing.argmax(1), np.nan)))
+            print(f'Visualizing max number of available states: {max_states}')
+            X = X[:max_states, :max_states]
+
         Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
@@ -192,7 +217,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Read index file
         self.sorted_index = get_sorted_index(self.index_path)
 
-        if set(self.sorted_index['files']) != set(model_data['metadata']['uuids']):
+        if not set(model_data['metadata']['uuids']).issubset(set(self.sorted_index['files'])):
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Get max syllables if None is given
@@ -202,6 +227,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
+            if len(df.syllable.unique()) < self.max_sylls:
+                print('Requested more syllables than the parquet file holds, recomputing requested dataset.')
+                df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
@@ -210,7 +238,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
 
-    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group):
+    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, thresh='usage'):
         '''
         Helper function that is responsible for handling ipywidgets interactions and updating the currently
          displayed Bokeh plot.
@@ -236,6 +264,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Handle names to query DataFrame with
         stat = self.dropdown_mapping[stat.lower()]
         sortby = self.dropdown_mapping[sort.lower()]
+        thresh = self.dropdown_mapping[thresh.lower()]
 
         # Get selected syllable sorting
         if sort.lower() == 'difference':
@@ -267,8 +296,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             self.cladogram = graph_dendrogram(self, self.syll_info)
             self.results['cladogram'] = self.cladogram
 
-        self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby,
-                                       errorbar=errorbar, syllable_families=self.results, sort_name=sort)
+        self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby, errorbar=errorbar,
+                                       syllable_families=self.results, sort_name=sort, thresh=thresh)
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
@@ -334,7 +363,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             'Distance to Center': 'dists'
         }
 
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the cell output
 
@@ -510,6 +539,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         Parameters
         ----------
+        layout (string)
+        scalar_color (string)
         edge_threshold (tuple or ipywidgets.FloatRangeSlider): Transition probability range to include in graphs.
         usage_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable usage range to include in graphs.
         speed_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable speed range to include in graphs.

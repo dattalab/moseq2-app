@@ -100,7 +100,7 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.face_right_button.on_click(self.facing_range_callback)
             self.frame_num_slider.observe(self.curr_frame_update, names='value')
 
-    def changed_selected_session(self, event):
+    def changed_selected_session(self, event=None):
         '''
         Callback function to load newly selected session.
 
@@ -144,7 +144,7 @@ class FlipRangeTool(FlipClassifierWidgets):
     def facing_range_callback(self, event):
         '''
         Callback function to handle when a user clicks either of the left or right facing buttons
-         after selecting a frame range. It will call a helper function: update_state_on_selected_range() if
+         after selecting a frame range. It will call a helper function: update_state_on_selected_range() if 
          the stop frame num. > start.
         It will also hide the buttons after a successful selection, and redisplay the start range selection button.
 
@@ -169,7 +169,6 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.start_button.description = 'Start Range'
             self.start_button.button_style = 'info'
 
-
     def update_state_on_selected_range(self, left):
         '''
         Helper function that updates the view upon a correct frame range addition (stop > start).
@@ -188,7 +187,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         # Updating list of displayed session + selected frame ranges
         selected_range = range(self.start, self.stop)
         display_selected_range = f'{self.session_select_dropdown.label} - {selected_range}'
-
+        
         # Set the directional indicators in the displayed range list
         if left:
             display_selected_range = f'L - {display_selected_range}'
@@ -217,7 +216,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.display_frame_ranges.append(display_selected_range)
         self.selected_ranges.options = self.display_frame_ranges
 
-    def start_stop_frame_range(self, b):
+    def start_stop_frame_range(self, b=None):
         '''
         Callback function that triggers the "Add Range" functionality.
          If user clicks the button == 'Start Range', then the function will start including frames
@@ -244,8 +243,7 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.face_left_button.layout.visibility = 'hidden'
             self.face_right_button.layout.visibility = 'hidden'
 
-
-    def clear_on_click(self, b):
+    def clear_on_click(self, b=None):
         '''
         Clears the output.
 
@@ -290,8 +288,12 @@ class FlipRangeTool(FlipClassifierWidgets):
         # Get references to h5 files
         data_dict = {}
         for key, path in path_dict.items():
-            dset = h5py.File(path, mode='r')['frames']
-            data_dict[key] = dset
+            try:
+                dset = h5py.File(path, mode='r')['frames']
+                data_dict[key] = dset
+            except OSError:
+                warnings.warn(f"session {key} h5 file is not available to be read, it may be in use by another process.")
+                pass
 
         return data_dict, path_dict
 
@@ -349,11 +351,11 @@ class FlipRangeTool(FlipClassifierWidgets):
             if len(frs) > 0:
                 # get the indicated directions
                 directions = [f[0] for f in frs]
-
+                
                 # get the separate lists of flip ranges to correct
                 correct_flips = [f[1] for f, d in zip(frs, directions) if d is False]
                 incorrect_flips = [f[1] for f, d in zip(frs, directions) if d is True]
-
+                
                 # handle frames that are indicated as correctly flipped
                 if len(correct_flips) > 0:
                     # remove frames possibly selected twice
@@ -361,15 +363,15 @@ class FlipRangeTool(FlipClassifierWidgets):
 
                     # get the session and load only the selected frame range and apply filtering
                     correct_cleaned_data = clean_frames(self.data_dict[session][correct_idx], **self.clean_parameters)
-
+                    
                     # add the data to the dataset
                     corrected_dataset.append(deepcopy(correct_cleaned_data))
-
+                
                 # handle frames indicated incorrectly flipped
                 if len(incorrect_flips) > 0:
                     incorrect_idx = sorted(set(np.concatenate([list(flip) for flip in incorrect_flips])))
                     incorrect_cleaned_data = clean_frames(self.data_dict[session][incorrect_idx], **self.clean_parameters)
-
+                    
                     # flip the data that is facing left
                     flip_corrected_data = np.flip(incorrect_cleaned_data, axis=2)
 
