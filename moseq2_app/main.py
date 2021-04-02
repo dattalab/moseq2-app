@@ -33,7 +33,8 @@ def flip_classifier_tool(input_dir,
                          max_frames=1e6,
                          tail_filter_iters=1,
                          space_filter_size=3,
-                         continuous_slider_update=True):
+                         continuous_slider_update=True,
+                         launch_gui=True):
     '''
 
     Flip Classifier Notebook main functionality access point.
@@ -45,6 +46,8 @@ def flip_classifier_tool(input_dir,
     output_file (str): Path to save the outputted flip classifier.
     tail_filter_iters (int): Number of tail filtering iterations
     prefilter_kernel_size (int): Size of the median spatial filter.
+    continuous_slider_update (bool): Indicates whether to continuously update the view upon slider widget interactions.
+    launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
 
     Returns
     -------
@@ -52,12 +55,14 @@ def flip_classifier_tool(input_dir,
      notebook.
     '''
 
-    flip_obj = get_frame_flips_wrapper(input_dir,
-                                       output_file,
-                                       max_frames,
-                                       tail_filter_iters,
-                                       space_filter_size,
-                                       continuous_slider_update)
+    flip_obj = get_frame_flips_wrapper(input_dir=input_dir,
+                                       output_file=output_file,
+                                       max_frames=max_frames,
+                                       tail_filter_iters=tail_filter_iters,
+                                       space_filter_size=space_filter_size,
+                                       continuous_slider_update=continuous_slider_update,
+                                       launch_gui=launch_gui
+                                       )
     return flip_obj
 
 @filter_warnings

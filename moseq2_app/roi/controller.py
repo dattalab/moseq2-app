@@ -981,7 +981,7 @@ class InteractiveExtractionViewer:
 
         div = Div(text=video_div, style={'width': '100%', 'align-items': 'center', 'display': 'contents'})
 
-        slider = Slider(start=0, end=2, value=1, step=0.1,
+        slider = Slider(start=0, end=4, value=1, step=0.1,
                              format="0[.]00", title=f"Playback Speed")
 
         callback = CustomJS(

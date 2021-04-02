@@ -18,7 +18,9 @@ import matplotlib.pyplot as plt
 from bokeh.plotting import figure, show
 from os.path import dirname, join, exists
 from IPython.display import display, clear_output
+from moseq2_extract.extract.proc import get_flips
 from moseq2_app.roi.view import bokeh_plot_helper
+from moseq2_extract.util import gen_batch_sequence
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
@@ -27,7 +29,9 @@ from moseq2_app.flip.widgets import FlipClassifierWidgets
 
 class FlipRangeTool(FlipClassifierWidgets):
 
-    def __init__(self, input_dir, max_frames, output_file, tail_filter_iters, prefilter_kernel_size, continuous_slider_update):
+    def __init__(self, input_dir, max_frames, output_file,
+                 tail_filter_iters, prefilter_kernel_size,
+                 launch_gui=True, continuous_slider_update=True):
         '''
 
         Initialization for the Flip Classifier Training tool.
@@ -41,17 +45,20 @@ class FlipRangeTool(FlipClassifierWidgets):
         output_file (str): Path to save the outputted flip classifier.
         tail_filter_iters (int): Number of tail filtering iterations
         prefilter_kernel_size (int): Size of the median spatial filter.
+        launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
         '''
 
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
+            warnings.simplefilter('ignore', FutureWarning)
             super().__init__(continuous_update=continuous_slider_update)
 
             # User input parameters
             self.input_dir = input_dir
             self.max_frames = max_frames
             self.output_file = output_file
+            self.launch_gui = launch_gui
+            self.clf = None
 
             # initialize frame cleaning parameter dict
             self.clean_parameters = {
@@ -182,7 +189,9 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.frame_num_slider.max = self.data_dict[self.session_select_dropdown.label].shape[0] - 1
         self.frame_num_slider.value = 0
         clear_output(wait=True)
-        self.interactive_launch_frame_selector()
+
+        if self.launch_gui:
+            self.interactive_launch_frame_selector()
 
     def curr_frame_update(self, event):
         '''
@@ -349,7 +358,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         data_dict = {}
         for key, path in path_dict.items():
             try:
-                dset = h5py.File(path, mode='r')['frames']
+                dset = h5py.File(path, mode='r+')['frames']
                 data_dict[key] = dset
             except OSError:
                 warnings.warn(f"session {key} h5 file is not available to be read, it may be in use by another process.")
@@ -546,7 +555,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                                  min_samples_leaf=1,
                                  oob_score=False,
                                  random_state=0,
-                                 verbose=0):
+                                 verbose=0,
+                                 train=True):
         '''
 
         Trains the flip classifier the pre-augmented dataset given some optionally adjustable
@@ -564,26 +574,48 @@ class FlipRangeTool(FlipClassifierWidgets):
         oob_score (bool): whether to use out-of-bag samples to estimate the R^2 on unseen data.
         random_state (int): The seed used by the random number generator.
         verbose (int): Controls the verbosity when fitting and predicting.
+        train (bool): If True, trains or retrains a model, if False only tests the model on the test set.
 
         Returns
         -------
         '''
 
-        # Flip Classifier Model to train
-        self.clf = RandomForestClassifier(n_estimators=n_estimators,
-                                          criterion=criterion,
-                                          min_samples_split=min_samples_split,
-                                          min_samples_leaf=min_samples_leaf,
-                                          oob_score=oob_score,
-                                          max_depth=max_depth,
-                                          random_state=random_state,
-                                          n_jobs=n_jobs,
-                                          verbose=verbose)
+        if not exists(self.output_file):
+            # Flip Classifier Model to train
+            self.clf = RandomForestClassifier(n_estimators=n_estimators,
+                                              criterion=criterion,
+                                              min_samples_split=min_samples_split,
+                                              min_samples_leaf=min_samples_leaf,
+                                              oob_score=oob_score,
+                                              max_depth=max_depth,
+                                              random_state=random_state,
+                                              n_jobs=n_jobs,
+                                              verbose=verbose)
+        else:
+            print('Loading pre-existing flip classifier')
+            try:
+                self.clf = joblib.load(self.output_file)
+            except Exception as e:
+                print(f'Error could not load existing flip classifier: {e}')
+                print('Creating and training a new flip classifier.')
+                train = True
+                self.clf = RandomForestClassifier(n_estimators=n_estimators,
+                                                  criterion=criterion,
+                                                  min_samples_split=min_samples_split,
+                                                  flip_indicesmin_samples_leaf=min_samples_leaf,
+                                                  oob_score=oob_score,
+                                                  max_depth=max_depth,
+                                                  random_state=random_state,
+                                                  n_jobs=n_jobs,
+                                                  verbose=verbose)
 
-        self.clf.fit(self.x_train, self.y_train)
+        if train:
+            self.clf.fit(self.x_train, self.y_train)
 
+        # get model test set predictions
         y_predict = self.clf.predict(self.x_test)
 
+        # compute performace
         percent_correct = np.mean(self.y_test == y_predict) * 1e2
         print('Performance: {0:3f}% correct'.format(percent_correct))
 
@@ -596,5 +628,48 @@ class FlipRangeTool(FlipClassifierWidgets):
                   'or re-extract the data with your latest flip classifier (with highest accuracy) '
                   'and retry selecting frame ranges with less random flips.')
 
+        # save model
         joblib.dump(self.clf, self.output_file)
         print(f'Saved model in {self.output_file}')
+
+    def apply_flip_classifier(self, chunk_size=4000, chunk_overlap=0, smoothing=51, verbose=True):
+        '''
+
+        Parameters
+        ----------
+        chunk_size
+        chunk_overlap
+        smoothing
+        verbose
+
+        Returns
+        -------
+
+        '''
+
+        if self.clf is None:
+            try:
+                joblib.load(self.output_file)
+            except:
+                print('Could not load provided classifier.')
+                return
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            for key, path in tqdm(self.path_dict.items(), desc='Flipping extracted sessions...'):
+                dset = h5py.File(path, mode='r+')
+
+                frames = dset['frames']
+                frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
+
+                for batch in tqdm(frame_batches, desc=f'Applying flip classifier on {key} session\'s frame batches...', disable=not verbose):
+                    frame_batch = frames[batch]
+
+                    # apply flip classifier on each batch to find which frames to flip
+                    flips = get_flips(frame_batch.copy(), flip_file=self.clf, smoothing=smoothing)
+                    flip_indices = np.where(flips)
+
+                    # rewrite the frames with the newly classified orientation
+                    dset['frames'][batch][flip_indices] = np.rot90(frame_batch[flip_indices], k=2, axes=(1, 2))
+
+                dset.close()

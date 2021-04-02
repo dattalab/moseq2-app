@@ -309,7 +309,8 @@ def get_frame_flips_wrapper(input_dir,
                             max_frames=1e6,
                             tail_filter_iters=1,
                             space_filter_size=3,
-                            continuous_slider_update=True):
+                            continuous_slider_update=True,
+                            launch_gui=True):
     '''
 
     Wrapper function that facilitates the interactive
@@ -321,6 +322,8 @@ def get_frame_flips_wrapper(input_dir,
     max_frames (int): Maximum number of frames to load from the extracted data.
     tail_filter_iters (int): Number of tail filtering iterations
     prefilter_kernel_size (int): Size of the median spatial filter.
+    continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
+    launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
 
     Returns
     -------
@@ -333,6 +336,7 @@ def get_frame_flips_wrapper(input_dir,
                                 output_file=output_file,
                                 tail_filter_iters=tail_filter_iters,
                                 prefilter_kernel_size=space_filter_size,
+                                launch_gui=launch_gui,
                                 continuous_slider_update=continuous_slider_update)
 
     return flip_finder
