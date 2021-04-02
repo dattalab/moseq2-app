@@ -98,7 +98,7 @@ class TestFlipController(TestCase):
 
         self.gui.update_state_on_selected_range(left)
         assert self.gui.curr_total_label.value != prev_indicator_value
-        assert self.gui.curr_total_label.value == '<center><h4>Current Total Selected Frames: 40</h4></center>'
+        assert self.gui.curr_total_label.value == '<center><h4><font color="black";>Current Total Selected Frames: 40</h4></center>'
 
         assert self.gui.frame_ranges == [range(0, 40)]
         assert self.gui.display_frame_ranges == ['L - azure_test - range(0, 40)']
@@ -106,7 +106,7 @@ class TestFlipController(TestCase):
         left = False
         self.gui.start, self.gui.stop = 41, 51
         self.gui.update_state_on_selected_range(left)
-        assert self.gui.curr_total_label.value == '<center><h4><font color="green";><center><h4>Current Total Selected Frames: 50</h4></center></h4></center>'
+        assert self.gui.curr_total_label.value == '<center><h4><font color="green";>Current Total Selected Frames: 50</h4></center>'
         assert self.gui.frame_ranges == [range(0, 40), range(41, 51)]
         assert self.gui.display_frame_ranges == ['L - azure_test - range(0, 40)', 'R - azure_test - range(41, 51)']
 
