@@ -24,7 +24,6 @@ from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.flip.widgets import FlipClassifierWidgets
-from moseq2_extract.util import recursive_find_h5s, h5_to_dict
 
 class FlipRangeTool(FlipClassifierWidgets):
 
@@ -220,7 +219,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         if self.stop > self.start:
             self.update_state_on_selected_range(left)
-            
+
             # Update left and right button visibility
             self.face_left_button.layout.visibility = 'hidden'
             self.face_right_button.layout.visibility = 'hidden'
@@ -404,6 +403,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
+        print(self.selected_frame_ranges_dict)
 
         corrected_dataset = []
         # Get corrected frame ranges
@@ -431,7 +431,7 @@ class FlipRangeTool(FlipClassifierWidgets):
                 if len(incorrect_flips) > 0:
                     incorrect_idx = sorted(set(np.concatenate([list(flip) for flip in incorrect_flips])))
                     incorrect_cleaned_data = clean_frames(self.data_dict[session][incorrect_idx], **self.clean_parameters)
-                
+                    
                     # flip the data that is facing left
                     flip_corrected_data = np.flip(incorrect_cleaned_data, axis=2)
 
