@@ -118,19 +118,20 @@ def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_de
                             autodetect_depths=autodetect_depths)
 
 @filter_warnings
-def preview_extractions(input_dir):
+def preview_extractions(input_dir, flipped=False):
     '''
     Function to launch a dynamic video loader that displays extraction session mp4s.
 
     Parameters
     ----------
     input_dir (str): Path to parent directory containing extracted sessions folders
+    flipped (bool): indicates whether to show corrected flip videos
 
     Returns
     -------
     '''
     output_notebook()
-    interactive_extraction_preview_wrapper(input_dir)
+    interactive_extraction_preview_wrapper(input_dir, flipped=flipped)
 
 @filter_warnings
 def validate_extractions(input_dir):

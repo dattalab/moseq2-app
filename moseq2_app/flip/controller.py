@@ -15,6 +15,7 @@ from copy import deepcopy
 from tqdm.auto import tqdm
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 from bokeh.plotting import figure, show
 from os.path import dirname, join, exists
 from IPython.display import display, clear_output
@@ -25,6 +26,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.gui.progress import get_session_paths
+from moseq2_extract.io.video import write_frames_preview
 from moseq2_app.flip.widgets import FlipClassifierWidgets
 
 class FlipRangeTool(FlipClassifierWidgets):
@@ -68,14 +70,14 @@ class FlipRangeTool(FlipClassifierWidgets):
             }
 
             # get input session paths
-            self.sessions = get_session_paths(input_dir, extracted=True)
+            self.sessions = get_session_paths(input_dir, extracted=True, flipped=False)
             if len(self.sessions) == 0:
                 if 'aggregate_results/' not in input_dir:
                     found_agg = exists(join(input_dir, 'aggregate_results/'))
                     if found_agg:
                         self.input_dir = join(input_dir, 'aggregate_results/')
                         print(f'Loading data from: {self.input_dir}')
-                        self.sessions = get_session_paths(self.input_dir, extracted=True)
+                        self.sessions = get_session_paths(self.input_dir, extracted=True, flipped=False)
 
                     if not found_agg or len(self.sessions) == 0:
                         print('Error: No extracted sessions were found.')
@@ -340,19 +342,20 @@ class FlipRangeTool(FlipClassifierWidgets):
         path_dict (dict): dict of session names and paths filtered for sessions missing an h5 or mp4 files.
         '''
 
-        path_dict = {}
+        path_dict = OrderedDict()
 
         # Get h5 paths
         for key, path in self.sessions.items():
             h5_path = join(dirname(path), 'proc/', 'results_00.h5')
-            if exists(h5_path):
-                path_dict[key] = h5_path
-            elif exists(path) and path.endswith('.h5'):
-                path_dict[key] = path
-            elif exists(path) and path.endswith('.mp4') and exists(path.replace('.mp4', '.h5')):
-                path_dict[key] = path.replace('.mp4', '.h5')
-            else:
-                del path_dict[key]
+            if '_flipped' not in key:
+                if exists(h5_path):
+                    path_dict[key] = h5_path
+                elif exists(path) and path.endswith('.h5'):
+                    path_dict[key] = path
+                elif exists(path) and path.endswith('.mp4') and exists(path.replace('.mp4', '.h5')):
+                    path_dict[key] = path.replace('.mp4', '.h5')
+                else:
+                    del path_dict[key]
 
         # Get references to h5 files
         data_dict = {}
@@ -632,19 +635,22 @@ class FlipRangeTool(FlipClassifierWidgets):
         joblib.dump(self.clf, self.output_file)
         print(f'Saved model in {self.output_file}')
 
-    def apply_flip_classifier(self, chunk_size=4000, chunk_overlap=0, smoothing=51, verbose=True):
+    def apply_flip_classifier(self, chunk_size=4000, chunk_overlap=0,
+                              smoothing=51, frame_path='frames', fps=30,
+                              write_movie=False, verbose=True):
         '''
+        Applies a trained flip classifier on previously extracted data to flip the mice to the correct
+         orientation.
 
         Parameters
         ----------
-        chunk_size
-        chunk_overlap
-        smoothing
-        verbose
+        chunk_size (int): size of frame chunks to process in batches.
+        chunk_overlap (int): number of frames to overlap between chunks to improve classification precision between chunks.
+        smoothing (int): kernel size of the applied median filter on the flip classifier results
+        verbose (bool): displays the tqdm progress bars for each session.
 
         Returns
         -------
-
         '''
 
         if self.clf is None:
@@ -654,22 +660,43 @@ class FlipRangeTool(FlipClassifierWidgets):
                 print('Could not load provided classifier.')
                 return
 
+        video_pipe = None
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', UserWarning)
             for key, path in tqdm(self.path_dict.items(), desc='Flipping extracted sessions...'):
-                dset = h5py.File(path, mode='r+')
+                dset = h5py.File(path, mode='a')
+                output_movie = path.replace('.h5', '_flipped.mp4')
 
-                frames = dset['frames']
+                frames = dset[frame_path]
                 frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
 
-                for batch in tqdm(frame_batches, desc=f'Applying flip classifier on {key} session\'s frame batches...', disable=not verbose):
+                for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
                     frame_batch = frames[batch]
 
                     # apply flip classifier on each batch to find which frames to flip
-                    flips = get_flips(frame_batch.copy(), flip_file=self.clf, smoothing=smoothing)
+                    flips = get_flips(frame_batch.copy(), flip_file=self.output_file, smoothing=smoothing)
                     flip_indices = np.where(flips)
 
                     # rewrite the frames with the newly classified orientation
-                    dset['frames'][batch][flip_indices] = np.rot90(frame_batch[flip_indices], k=2, axes=(1, 2))
+                    frame_batch[flip_indices] = np.rot90(dset[frame_path][batch][flip_indices], k=2, axes=(1, 2))
+                    dset[frame_path][batch] = frame_batch
 
+                    if write_movie:
+                        try:
+                            # Writing frame batch to mp4 file
+                            video_pipe = write_frames_preview(output_movie,
+                                                              frame_batch,
+                                                              pipe=video_pipe,
+                                                              close_pipe=False,
+                                                              depth_min=0,
+                                                              depth_max=100,
+                                                              fps=fps,
+                                                              progress_bar=verbose)
+                        except AttributeError:
+                            pass
                 dset.close()
+                # Check if video is done writing. If not, wait.
+                if video_pipe is not None:
+                    video_pipe.stdin.close()
+                    video_pipe.wait()
+                    video_pipe = None

@@ -320,13 +320,9 @@ class TestTransitionGraphController(TestCase):
 
         layout = 'spring'
         scalar_color = 'speeds_2d'
-        edge_threshold = (1, 4)
-        usage_threshold = (0, 4)
-        speed_threshold = (0, 4)
 
         self.gui.interactive_transition_graph_helper(layout,
                                                      scalar_color,
-                                                     edge_threshold,
-                                                     usage_threshold,
-                                                     speed_threshold)
-
+                                                     self.gui.edge_thresholder.value,
+                                                     self.gui.usage_thresholder.value,
+                                                     self.gui.speed_thresholder.value)

@@ -51,7 +51,7 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
     roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
 
 
-def interactive_extraction_preview_wrapper(input_dir):
+def interactive_extraction_preview_wrapper(input_dir, flipped=False):
     '''
 
     Interactive extraction previewing tool. Upon extracted session selection, function automatically displays
@@ -60,12 +60,13 @@ def interactive_extraction_preview_wrapper(input_dir):
     Parameters
     ----------
     input_dir (str): path to base directory containing extraction directories
+    flipped (bool): indicates whether to show corrected flip videos
 
     Returns
     -------
     '''
 
-    viewer = InteractiveExtractionViewer(data_path=input_dir)
+    viewer = InteractiveExtractionViewer(data_path=input_dir, flipped=flipped)
 
     # Run interactive application
     selout = widgets.interactive_output(viewer.get_extraction,

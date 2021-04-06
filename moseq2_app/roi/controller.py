@@ -923,15 +923,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
 class InteractiveExtractionViewer:
 
-    def __init__(self, data_path):
+    def __init__(self, data_path, flipped=False):
         '''
 
         Parameters
         ----------
         data_path (str): Path to base directory containing all sessions to test
+        flipped (bool): indicates whether to show corrected flip videos
         '''
 
-        self.sess_select = widgets.Dropdown(options=get_session_paths(data_path, extracted=True),
+        self.sess_select = widgets.Dropdown(options=get_session_paths(data_path, extracted=True, flipped=flipped),
                                             description='Session:', disabled=False, continuous_update=True)
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
