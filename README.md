@@ -2,9 +2,9 @@
 
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/dattalab/community)
 
-<center><img src="https://drive.google.com/uc?export=view&id=1kHdmkBx_XlueTJocREDx4YeHGrjfYKJv"></center>
+<center><img src="https://drive.google.com/uc?export=view&id=1PxTnCMsrk3hRHPnEjqGDzq1oPkTYfzj0"></center>
 
-Last Updated: 02/23/2021
+Last Updated: 04/07/2021
 
 ## Table of Contents
 - [MoSeq2-Notebook: A suite of interactive Jupyter notebooks for animal behavior sequencing and analysis](#moseq2-notebook-a-suite-of-interactive-jupyter-notebooks-for-animal-behavior-sequencing-and-analysis)
@@ -152,6 +152,17 @@ If you prefer to install the full Anaconda package, we refer you to the
 Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
 
 ### Git
+
+#### 2 Factor Authentication Note
+If you have 2FA enabled for your GitHub account, follow these instructions in order to be able to clone and install
+ the GitHub repositories succesfully.
+1. Create a [personal access token](https://github.com/settings/tokens).
+    1. Make sure to check the `repo` scope to allow read access.
+2. Copy and save your token in a note; you will use this token as your GitHub username from now on.
+3. Finally, once prompted for your username in the following steps, use your token as your username and enter with blank password.
+
+__Note: If you have 2FA enabled, your username will no longer work,
+ therefore you must use your generated token in order to access git repos.__
 
 To check if you have it installed, run `which git`. If it prints a path to git,
 you have it installed. Otherwise, refer to the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git/).
