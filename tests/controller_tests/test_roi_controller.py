@@ -92,6 +92,7 @@ class TestROIController(TestCase):
 
         self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
         self.gui.session_parameters['azure_test']['frame_range'] = [0, 60]
+        self.gui.frame_range.value = [0, 60]
 
         self.gui.extract_button_clicked()
 
