@@ -37,6 +37,9 @@ to extract, preprocess, model, and perform basic analysis on experimental data. 
 hope to expand our selection of notebooks based on user feedback and the
 project's trajectory.
 
+### Notebook Order
+<img src="https://drive.google.com/uc?export=view&id=1QXuvIfkK5Qi-mqlX9D7TbdXXLsk5mSrA">
+
 ### The main MoSeq notebook ([link](./Main-MoSeq2-Notebook.ipynb))
 
 A detailed and complete walk-through of the MoSeq pipeline — from data extraction to modeling.
