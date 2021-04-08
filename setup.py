@@ -38,7 +38,7 @@ setup(
                       'moseq2-extract @ git+https://github.com/dattalab/moseq2-extract.git@autosetting-params',
                       'moseq2-pca @ git+https://github.com/dattalab/moseq2-pca.git@release',
                       'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@release',
-                      'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@release'
+                      'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@release-update'
                       ],
     python_requires='<3.8'
 )
