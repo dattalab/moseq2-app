@@ -95,7 +95,7 @@ def view_extraction(extractions, default=0):
     return extractions
 
 @filter_warnings
-def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=False):
+def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=False, overwrite=False):
     '''
     Function to launch ROI detector interactive GUI in jupyter notebook
 
@@ -103,6 +103,7 @@ def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_de
     ----------
     progress_paths (dict): dictionary of notebook progress paths.
     compute_all_bgs (bool): if True, computes all the sessions' background images to speed up the UI.
+    overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
 
     Returns
     -------
@@ -115,7 +116,8 @@ def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_de
                             config_file,
                             session_config,
                             compute_bgs=compute_all_bgs,
-                            autodetect_depths=autodetect_depths)
+                            autodetect_depths=autodetect_depths,
+                            overwrite=overwrite)
 
 @filter_warnings
 def preview_extractions(input_dir, flipped=False):

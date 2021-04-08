@@ -316,11 +316,12 @@ class TestTransitionGraphController(TestCase):
         assert len(self.gui.outgoing_transition_entropy) == 1
         assert len(self.gui.trans_mats) == 1
 
-    def test_interactive_transition_graph_helper(self):
+    def _interactive_transition_graph_helper(self):
 
         layout = 'spring'
         scalar_color = 'speeds_2d'
 
+        self.gui.initialize_transition_data()
         self.gui.interactive_transition_graph_helper(layout,
                                                      scalar_color,
                                                      self.gui.edge_thresholder.value,

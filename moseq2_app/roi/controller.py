@@ -36,7 +36,7 @@ from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, re
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 
-    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=False):
+    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=False, overwrite=False):
         '''
 
         Parameters
@@ -45,6 +45,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         config_file (str): Path to main configuration file.
         session_config (str): Path to session-configuration file.
         compute_bgs (bool): Indicates whether to compute all the session backgrounds prior to app launch.
+        overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
         '''
 
         super().__init__()
@@ -63,6 +64,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Update DropDown menu items
         self.sessions = get_session_paths(data_path)
 
+        assert len(self.sessions) > 0, "No sessions were found in the provided base_dir"
+
         # Session selection dict key names
         self.keys = list(self.sessions.keys())
 
@@ -70,7 +73,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Read individual session config if it exists
         if session_config is not None:
-            if os.path.exists(session_config):
+            if os.path.exists(session_config) and not overwrite:
                 if os.stat(session_config).st_size > 0:
                     self.session_parameters = read_yaml(session_config)
                 else:
@@ -83,6 +86,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
         elif self.session_parameters == {}:
             self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
+
+        # add missing keys for newly found sessions
+        if len(list(self.session_parameters.keys())) < len(self.keys):
+            for key in self.keys:
+                if key not in self.session_parameters:
+                    self.session_parameters[key] = deepcopy(self.config_data)
 
         self.all_results = {}
 
@@ -154,11 +163,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.config_data['bg_roi_erode'] = (1, 1)
         if 'bg_roi_dilate' not in self.config_data:
             self.config_data['bg_roi_dilate'] = (1, 1)
-
-        # update manually set config parameters
-        for k in self.session_parameters:
-            for k1 in self.config_data:
-                self.session_parameters[k][k1] = self.config_data[k1]
 
         if compute_bgs:
             self.compute_all_bgs()
@@ -543,6 +547,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
         self.minmax_heights.value = [self.session_parameters[curr_session_key]['min_height'],
                                      self.session_parameters[curr_session_key]['max_height']]
+        self.dilate_iters.value = self.session_parameters[curr_session_key]['dilate_iterations']
 
         # Get background and display UI plots
         self.session_parameters[curr_session_key].pop('output_dir', None)
@@ -804,8 +809,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         view_path = join(output_dir, outpath + '.mp4')
 
         # Get frames to extract
-        frame_batches = [range(self.session_parameters[curr_session_key]['frame_range'][0],
-                               self.session_parameters[curr_session_key]['frame_range'][1])]
+        frame_batches = [range(self.frame_range.value[0], self.frame_range.value[1])]
 
         # Remove previous preview
         if os.path.exists(view_path):

@@ -24,7 +24,7 @@ from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTran
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
 
-def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True, autodetect_depths=False):
+def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True, autodetect_depths=False, overwrite=False):
     '''
 
     Interactive ROI detection wrapper function. Users can use run this wrapper
@@ -36,6 +36,7 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
     data_path (str): Path to base directory containing session folders.
     config_data (dict): ROI and Extraction configuration parameters
     session_parameters (str): Path to file containing individual session parameter sets.
+    overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
 
     Returns
     -------
@@ -45,7 +46,8 @@ def interactive_roi_wrapper(data_path, config_file, session_config=None, compute
                                  config_file,
                                  session_config,
                                  compute_bgs=compute_bgs,
-                                 autodetect_depths=autodetect_depths)
+                                 autodetect_depths=autodetect_depths,
+                                 overwrite=overwrite)
 
     # Run interactive application
     roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
