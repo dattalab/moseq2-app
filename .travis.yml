@@ -1,7 +1,7 @@
 #specs for travis ci
 language: python
 python: '3.6'
-dist: trusty
+dist: xenial
 
 stages:
   - pip-install
@@ -22,9 +22,7 @@ jobs:
         - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
@@ -67,9 +65,7 @@ jobs:
       stage: conda-script
       before_install:
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
@@ -99,9 +95,7 @@ jobs:
         - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 3B4FE6ACC0B21F32
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
