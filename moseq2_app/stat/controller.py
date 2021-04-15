@@ -74,6 +74,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Load all the data
         self.interactive_stat_helper()
         self.df = self.df[self.df['syllable'] < self.max_sylls]
+
         self.session_names = sorted(list(self.df.SessionName.unique()))
         self.subject_names = sorted(list(self.df.SubjectName.unique()))
 

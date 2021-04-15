@@ -112,8 +112,11 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Populate syllable info dict with relevant syllable information
         self.get_crowd_movie_paths(index_file, model_path, self.config_data, crowd_movie_dir)
 
+        # Get dropdown options with labels
+        self.option_dict = {f'{i} - {x["label"]}': self.syll_info[i] for i, x in enumerate(self.syll_info.values())}
+
         # Set the syllable dropdown options
-        self.syll_select.options = self.syll_info
+        self.syll_select.options = self.option_dict
 
     def clear_on_click(self, b=None):
         '''
@@ -130,7 +133,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         clear_output()
         del self
 
-    def write_syll_info(self):
+    def write_syll_info(self, curr_syll=None):
         '''
         Writes current syllable info data to a YAML file.
 
@@ -145,6 +148,15 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Write to file
         with open(self.save_path, 'w+') as f:
             yml.dump(tmp, f)
+
+        if curr_syll is not None:
+            # Update the syllable dropdown options
+            self.option_dict = {f'{i} - {x["label"]}': self.syll_info[i] for i, x in enumerate(self.syll_info.values())}
+
+            self.syll_select._initializing_traits_ = True
+            self.syll_select.options = self.option_dict
+            self.syll_select.index = curr_syll
+            self.syll_select._initializing_traits_ = False
 
     def on_next(self, event=None):
         '''
@@ -168,12 +180,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
             self.syll_select.index += 1
         else:
             self.syll_select.index = 0
+        curr_index = self.syll_select.index
 
         # Updating input values with current dict entries
         self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
         self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
 
-        self.write_syll_info()
+        self.write_syll_info(curr_syll=curr_index)
 
     def on_prev(self, event=None):
         '''
@@ -202,7 +215,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
         self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
 
-        self.write_syll_info()
+        self.write_syll_info(curr_syll=self.syll_select.index)
 
     def on_set(self, event=None):
         '''
@@ -523,9 +536,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.output_dir = output_dir
         self.max_sylls = len(syll_info)
 
-        # Set Syllable select widget options
-        self.cm_syll_select.options = list(range(self.max_sylls))
-
         if load_parquet:
             if df_path is not None and not os.path.exists(df_path):
                 self.df_path = None
@@ -559,6 +569,11 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.set_default_cm_parameters()
 
         self.clear_button.on_click(self.clear_on_click)
+
+        # Set Syllable select widget options
+        # Get dropdown options with labels
+        self.cm_syll_options = [f'{i} - {x["label"]}' for i, x in enumerate(self.syll_info.values())]
+        self.cm_syll_select.options = self.cm_syll_options
 
     def clear_on_click(self, b=None):
         '''
@@ -678,14 +693,18 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Update syllable info dict
         for gd in group_dicts:
             group_name = list(gd.keys())[0]
-            for syll in range(len(gd.keys())):
-                self.group_syll_info[syll]['group_info'][group_name] = {
-                    'usage': gd[group_name]['usage'][syll],
-                    '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
-                    '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
-                    'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                    'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
-                }
+            for syll in list(gd[group_name]['syllable'].keys()):
+                try:
+                    self.group_syll_info[syll]['group_info'][group_name] = {
+                        'usage': gd[group_name]['usage'][syll],
+                        '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
+                        '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
+                        'height (mm)': gd[group_name]['height_ave_mm'][syll],
+                        'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
+                    }
+                except KeyError:
+                    # syllable not in group
+                    pass
 
     def get_session_mean_syllable_info_df(self):
         '''
@@ -759,15 +778,19 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Update syllable data with session info
         for sd in session_dicts:
             session_name = list(sd.keys())[0]
-            for syll in range(self.max_sylls):
-                self.session_dict[syll]['session_info'][session_name] = {
-                    'usage': sd[session_name]['usage'][syll],
-                    '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
-                    '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
-                    'height (mm)': sd[session_name]['height_ave_mm'][syll],
-                    'duration': sd[session_name]['duration'][syll],
-                    'dist_to_center_px': sd[session_name]['dist_to_center_px'][syll],
-                }
+            for syll in list(sd[session_name]['syllable'].keys()):
+                try:
+                    self.session_dict[syll]['session_info'][session_name] = {
+                        'usage': sd[session_name]['usage'][syll],
+                        '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
+                        '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
+                        'height (mm)': sd[session_name]['height_ave_mm'][syll],
+                        'duration': sd[session_name]['duration'][syll],
+                        'dist_to_center_px': sd[session_name]['dist_to_center_px'][syll],
+                    }
+                except KeyError:
+                    # syllable not in session
+                    pass
 
     def get_pdf_plot(self, group_syllable_pdf, group_name):
         '''
@@ -794,7 +817,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         return pdf_fig
 
-    def generate_crowd_movie_divs(self):
+    def generate_crowd_movie_divs(self, grouped_syll_dict):
         '''
         Generates HTML divs containing crowd movies and syllable metadata tables
          from the given syllable dict file.
@@ -807,6 +830,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         cm_source = self.cm_sources_dropdown.value
 
+        syll_number = int(self.cm_syll_select.value.split(' - ')[0])
+
         # Compute paths to crowd movies
         path_dict = make_crowd_movies_wrapper(self.index_path, self.model_path, self.output_dir, self.config_data)
 
@@ -818,41 +843,46 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         if self.get_pdfs:
             # Get corresponding syllable position PDF
             group_syll_pdfs = get_syllable_pdfs(self.df,
-                                                syllables=[self.cm_syll_select.value],
+                                                syllables=[syll_number],
                                                 groupby=cm_source,
                                                 syllable_key='syllable')[0].drop('syllable', axis=1).reset_index()
             for group in g_iter:
-                self.grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs[cm_source] == group]['pdf']
+                grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs[cm_source] == group]['pdf']
 
         # Remove previously displayed data
         clear_output()
 
         # Get each group's syllable info to display; formatting keys.
         curr_grouped_syll_dict = {}
-        for group in self.grouped_syll_dict.keys():
+        for group in grouped_syll_dict.keys():
             curr_grouped_syll_dict[group] = {}
-            for key in self.grouped_syll_dict[group].keys():
+            for key in grouped_syll_dict[group].keys():
                 if key == 'velocity_2d_mm':
                     new_key = '2D velocity (mm/s)'
-                    curr_grouped_syll_dict[group][new_key] = self.grouped_syll_dict[group][key]
+                    curr_grouped_syll_dict[group][new_key] = grouped_syll_dict[group][key]
                 else:
-                    curr_grouped_syll_dict[group][key] = self.grouped_syll_dict[group][key]
+                    curr_grouped_syll_dict[group][key] = grouped_syll_dict[group][key]
 
         # Create syllable info DataFrame
         syll_info_df = pd.DataFrame(curr_grouped_syll_dict)
 
         # Get currently selected syllable name info
-        self.curr_label = self.syll_info[self.cm_syll_select.value]['label']
-        self.curr_desc = self.syll_info[self.cm_syll_select.value]['desc']
+        self.curr_label = self.syll_info[syll_number]['label']
+        self.curr_desc = self.syll_info[syll_number]['desc']
 
         # Create video divs including syllable metadata
         divs = []
         bk_plots = []
+
         for group_name, cm_path in path_dict.items():
             # Convert crowd movie metadata to HTML table
             if self.get_pdfs:
                 group_info = pd.DataFrame(syll_info_df.drop('pdf', axis=0)[group_name]).to_html()
-                group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
+                try:
+                    group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
+                except:
+                    display(syll_info_df)
+                    group_syllable_pdf = syll_info_df[group_name]['pdf'][self.cm_syll_select.index]
                 pdf_fig = self.get_pdf_plot(group_syllable_pdf, group_name)
 
                 bk_plots.append(pdf_fig)
@@ -898,13 +928,15 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         -------
         '''
 
-        # Compute current selected syllable's session dict.
-        self.grouped_syll_dict = self.session_dict[self.cm_syll_select.value]['session_info']
+        syll_number = int(self.cm_syll_select.value.split(' - ')[0])
 
-        self.config_data['session_names'] = list(self.grouped_syll_dict.keys())
+        # Compute current selected syllable's session dict.
+        grouped_syll_dict = self.session_dict[syll_number]['session_info']
+
+        self.config_data['session_names'] = list(grouped_syll_dict.keys())
 
         # Get Crowd Movie Divs
-        divs, self.bk_plots = self.generate_crowd_movie_divs()
+        divs, self.bk_plots = self.generate_crowd_movie_divs(grouped_syll_dict)
 
         # Display generated movies
         display_crowd_movies(self.widget_box, self.curr_label, self.curr_desc, divs, self.bk_plots)
@@ -923,19 +955,20 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         Returns
         -------
         '''
+        syll_number = int(syllable.split(' - ')[0])
 
         # Update current config data with widget values
-        self.config_data['specific_syllable'] = int(syllable)
+        self.config_data['specific_syllable'] = syll_number
         self.config_data['max_examples'] = nexamples
 
         # Get group info based on selected DropDownMenu item
         if groupby == 'group':
-            self.grouped_syll_dict = self.group_syll_info[syllable]['group_info']
-            for k in self.grouped_syll_dict:
-                self.grouped_syll_dict[k]['pdf'] = None
+            grouped_syll_dict = self.group_syll_info[syll_number]['group_info']
+            for k in grouped_syll_dict:
+                grouped_syll_dict[k]['pdf'] = None
 
             # Get Crowd Movie Divs
-            divs, self.bk_plots = self.generate_crowd_movie_divs()
+            divs, self.bk_plots = self.generate_crowd_movie_divs(grouped_syll_dict)
 
             # Display generated movies
             display_crowd_movies(self.widget_box, self.curr_label, self.curr_desc, divs, self.bk_plots)

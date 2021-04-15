@@ -1083,11 +1083,11 @@ def get_trans_graph_group_stats(node_indices, usages, scalars):
     group_dist = [scalars['dists'][j] for j in node_indices if j in scalars['dists']]
 
     group_stats = {
-        'usage': group_usage,
-        'speed_2d': group_speed_2d,
-        'speed_3d': group_speed_3d,
-        'height': group_height,
-        'dist': group_dist
+        'usage': np.nan_to_num(group_usage),
+        'speed_2d': np.nan_to_num(group_speed_2d),
+        'speed_3d': np.nan_to_num(group_speed_3d),
+        'height': np.nan_to_num(group_height),
+        'dist': np.nan_to_num(group_dist)
     }
 
     return group_stats
@@ -1209,8 +1209,8 @@ def setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color):
         '3D velocity': {'key': 'speed_3d', 'values': group_stats['speed_3d']},
         'Height': {'key': 'height', 'values': group_stats['height']},
         'Distance to Center': {'key': 'dist_to_center_px', 'values': group_stats['dist']},
-        'Entropy-In': {'key': 'ent_in', 'values': group_stats['incoming_transition_entropy']},
-        'Entropy-Out': {'key': 'ent_out', 'values': group_stats['outgoing_transition_entropy']},
+        'Entropy-In': {'key': 'ent_in', 'values': np.nan_to_num(group_stats['incoming_transition_entropy'])},
+        'Entropy-Out': {'key': 'ent_out', 'values': np.nan_to_num(group_stats['outgoing_transition_entropy'])},
     }
 
     fill_color, empty = set_fill_color(scalar_color, data_dict)

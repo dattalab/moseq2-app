@@ -18,6 +18,7 @@ import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 import ipywidgets as widgets
 from bokeh.models import Div, CustomJS, Slider
+from moseq2_extract.io.image import write_image
 from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
@@ -291,6 +292,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
         self.update_checked_list(self.curr_results)
+
+        # write ROI to correct path
+        write_image(join(dirname(self.curr_session), 'proc', f'roi_00.tiff'), self.curr_results['roi'])
 
     def check_all_sessions(self, b=None):
         '''
