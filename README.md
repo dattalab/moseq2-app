@@ -14,6 +14,8 @@ Last Updated: 04/07/2021
   * [Installation](#installation)
   * [Downloading a test dataset](#downloading-a-test-dataset)
   * [Getting started](#getting-started)
+    + [Organizing a MoSeq Dataset](#organizing-a-moseq-dataset)
+    + [Starting the Jupyter Notebooks](#starting-the-jupyter-notebooks)
   * [Bug Reporting](#bug-reporting)
 
 ## Overview
@@ -35,31 +37,31 @@ and/or fill out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 Currently, we offer 5 notebooks that provide tutorials for using MoSeq's pipeline
 to extract, preprocess, model, and perform basic analysis on experimental data. We
 hope to expand our selection of notebooks based on user feedback and the
-project's trajectory.
+project's trajectory. You can find the base copies of notebooks within the `notebooks/` directory.
 
 ### Notebook Order
 <img src="https://drive.google.com/uc?export=view&id=1QXuvIfkK5Qi-mqlX9D7TbdXXLsk5mSrA">
 
-### The main MoSeq notebook ([link](./Main-MoSeq2-Notebook.ipynb))
+### The main MoSeq notebook ([link](./notebooks/Main-MoSeq2-Notebook.ipynb))
 
 A detailed and complete walk-through of the MoSeq pipeline — from data extraction to modeling.
 It includes examples of what to expect at each step, and what to do if things don't go as expected.
 There are also a few visualizations to help with extraction and modeling. 
 
-### A notebook to explore modeling and experimental results interactively ([link](./Interactive-Model-Results-Exploration.ipynb))
+### A notebook to explore modeling and experimental results interactively ([link](./notebooks/Interactive-Model-Results-Exploration.ipynb))
 
 A stand-alone notebook containing all the interactive data exploration tools for
 modeled data. Simply enter the paths to your selected model(s) and index file
 to use to syllable exploration tools.
 
-### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./Model-Results-Extension.ipynb))
+### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./notebooks/Model-Results-Extension.ipynb))
 
 A stand-alone notebook demonstrating the `moseq2_viz` functionality. With examples for how to obtain
 syllable usages and other scalar statistics, and plot the syllables reordered by different statistics or by
 group difference. Additional examples include computing behavioral similarity distances, transition matrices,
 and hypothesis testing.
 
-### Flip Classifier Training Notebook ([link](./Flip%20Classifier%20Training%20Notebook.ipynb))
+### Flip Classifier Training Notebook ([link](./notebooks/Flip%20Classifier%20Training%20Notebook.ipynb))
 
 This notebook is a stand-alone tool that can be used to train a new 
 flip classifier used to correct the orientation of the extracted animal. If's
@@ -67,7 +69,7 @@ utilized if the current flip classifier is not working as expected.
 For example, the current flip classifier does not work well with datasets
 acquired with the Azure or RealSense depth cameras.
 
-## Hands-Free MoSeq2 Notebook ([link](./Handsfree-MoSeq2-Notebook.ipynb))
+## Hands-Free MoSeq2 Notebook ([link](./notebooks/Handsfree-MoSeq2-Notebook.ipynb))
 
 A streamlined version of the main notebook that can be used to run the 
 entire moseq2 pipeline with no user input. This would be useful for users 
@@ -275,6 +277,45 @@ MoSeq's pipeline in detail. To use the notebooks, make sure that you've
 activated the conda environment you installed MoSeq in (likely `moseq2-app`)
 and you have navigated to the folder that contains the jupyter notebook(s).
 
+### Organizing a MoSeq Dataset
+
+The currently accepted depth data extensions are:
+- `.dat` (raw depth files from our kinect2 data acquisition software)
+- `.tar.gz` (compressed depth files from our kinect2 data acquisition software)
+- `.avi` (compressed depth files from the `moseq2-extract` command line interface)
+- `.mkv` (generated from Microsoft's recording software for the Azure Kinect)
+
+To run this notebook, create a master folder with a copy of this notebook, and a separate subfolders for each recording file (see example directory structure below). 
+
+```
+.
+└── Data_Directory/
+    ├── Main-MoSeq2-Notebook.ipynb (1)
+    ├── Interactive-Model-Results-Exploration.ipynb (2)
+    ├── Model-Results-Extension.ipynb (3)
+    ├── session_1/ ** - the folder containing all of a single session's data
+    ├   ├── depth.dat        # depth data - the recording itself
+    ├   ├── depth_ts.txt     # timestamps - csv/txt file of the frame timestamps
+    ├   └── metadata.json    # metadata - json file that contains the rodent's info (group, subjectName, etc.)
+    ...
+    ├── session_N/ **
+    ├   ├── depth.dat
+    ├   ├── depth_ts.txt
+    └── └── metadata.json
+
+```
+
+__Note: if your data was acquired using an Azure Kinect or Intel RealSense depth camera, 
+you will not have `depth_ts.txt` or `metadata.json` in your session directories. 
+Before extraction you need to manually create a `metadata.json` file if you wish to identify sessions 
+based on the session name or mouse ID.__ The metadata.json file should minimally contain the following content structure:
+
+```json
+{"SessionName": "example session", "SubjectName": "example subject", "StartTime": "optional"}
+```
+
+### Starting the Jupyter Notebooks
+
 __:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
 your dataset so that the videos you generate will load into the notebooks properly.__ Moreover, we
 recommend each modeling project have its own dedicated set of notebooks, especially for analysis to 
@@ -282,11 +323,13 @@ improve reproducibility.
 
 You can easily copy all your notebooks to your modeling project(s) by running the following command:
 ```
-cp *.ipynb /path/to/data/dir/
+# note: must be in the moseq2-app directory for this command to work
+cp notebooks/* /path/to/data/dir/ 
 ```
 
 Run the following command to launch the jupyter notebook:
 ```bash
+# note: must be in the data directory where the notebooks were copied previously to.
 jupyter notebook
 ```
 
