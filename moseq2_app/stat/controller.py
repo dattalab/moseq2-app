@@ -270,7 +270,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         # get significant syllables for 2 group difference
         sig_sylls = []
-        intersect_sig_syllables = run_kruskal(df, statistic=stat, max_syllable=self.max_sylls, verbose=False)[2]
+        if len(df.group.unique()) > 1:
+            intersect_sig_syllables = run_kruskal(df, statistic=stat, max_syllable=self.max_sylls, verbose=False)[2]
 
         # Get selected syllable sorting
         if sort.lower() == 'difference':

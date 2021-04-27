@@ -1,5 +1,6 @@
 import os
 import bokeh.io
+import numpy as np
 from copy import deepcopy
 from os.path import exists
 from unittest import TestCase
@@ -98,8 +99,11 @@ class TestROIController(TestCase):
 
     def test_mark_passing_button_clicked(self):
 
+        self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
+
         num_areas = len(self.gui.config_data['pixel_areas'])
         self.gui.curr_results = {
+                                 'roi': np.zeros((50,50)),
                                  'flagged': True,
                                  'ret_code': 'test',
                                  'counted_pixels': 54000

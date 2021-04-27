@@ -114,7 +114,7 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
-        assert list(self.gui.syll_select.options.keys()) == list(range(self.gui.max_sylls))
+        assert len(list(self.gui.syll_select.options.keys())) == len(list(range(self.gui.max_sylls)))
 
     def test_clear_on_click(self):
 
@@ -293,7 +293,6 @@ class TestCrowdMovieComparison(TestCase):
     ## Crowd Movie Comparison tests
     def test_compare_init(self):
 
-        assert list(self.gui.cm_syll_select.options) == list(range(self.gui.max_sylls))
         assert self.gui.sessions == ['66e77b85-f5fa-4e31-a61c-8952394ff441',
                                      'ae8a9d45-7ad9-4048-963f-ca4931125fcd']
 
@@ -376,7 +375,7 @@ class TestCrowdMovieComparison(TestCase):
     def test_generate_crowd_movie_divs(self):
 
         self.gui.grouped_syll_dict = self.gui.group_syll_info[0]['group_info']
-        divs, bk_plots = self.gui.generate_crowd_movie_divs()
+        divs, bk_plots = self.gui.generate_crowd_movie_divs(self.gui.grouped_syll_dict)
         assert self.gui.curr_label == ''
         assert self.gui.curr_desc == ''
         assert len(divs) == 1
@@ -393,10 +392,10 @@ class TestCrowdMovieComparison(TestCase):
 
     def test_crowd_movie_preview(self):
 
-        self.gui.crowd_movie_preview(0, 'group', 2)
+        self.gui.crowd_movie_preview('0 - ', 'group', 2)
 
         assert self.gui.widget_box is not None
 
-        self.gui.crowd_movie_preview(0, 'sessions', 2)
+        self.gui.crowd_movie_preview('0 - ', 'sessions', 2)
 
         assert self.gui.widget_box is not None

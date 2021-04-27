@@ -7,8 +7,8 @@ main.py.
 
 import os
 import shutil
-import ipywidgets as widgets
 from bokeh.io import show
+import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
 from IPython.display import display, clear_output
