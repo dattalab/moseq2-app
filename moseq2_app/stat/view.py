@@ -19,7 +19,7 @@ from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Category10_10 as palette
 from bokeh.plotting import figure, show, from_networkx
-from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS,
+from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
 
 def graph_dendrogram(obj, syll_info):
@@ -155,6 +155,120 @@ def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, p
 
     percentile = np.percentile(boots, [pct, 100 - pct])
     return percentile
+
+def setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, line):
+    '''
+    Initializes the CustomJS script callback function used to update the plot upon changing the
+     value of the TextInput, a.k.a, Syllable Spotlight/Search widget.
+     Will update the interactive bokeh plot to only show syllables with labels that are substrings of the inputted
+     search string.
+    Parameters
+    ----------
+    src_dict (dict): dict object containing all the stats information contained in the main ColumnDataSource.
+    err_dict (dict): dict object containing all the error margins for the src_dict statistics.
+    err_source (bokeh.models.ColumnDataSource): data source to update based on slider values.
+     (Will hide error bars for excluded syllables).
+    searchbox (bokeh.models.TextInput): text input widget for users to input syllable labels to find.
+    circle (bokeh.glyph circle): drawn bokeh glyph representing syllables, that will be updated in the callback function
+    line (bokeh.glyph line): drawn line connecting all the circle nodes in the bokeh figure.
+     (To be hidden in the callback function if the syllable list is discontinuous)
+
+    Returns
+    -------
+    callback (bokeh.models.CustomJS): javascript callback function to embed to search bar and hover tool objects.
+    '''
+
+    callback = CustomJS(
+        args=dict(source=circle.data_source, err_source=err_source, searchbox=searchbox,
+                  data=src_dict, err_data=err_dict, line=line),
+        code="""
+                            var index = [], number = [], sem = [];
+                            var x = [], y = [], usage = [], speed_2d = []; 
+                            var speed_3d = [], height = [], dist = []; 
+                            var label = [], desc = [], movies = [];
+
+                            var err_x = [], err_y = [];
+                            var err_number = [], err_usage = []; 
+                            var err_speed_2d = [], err_speed_3d = [], err_sem = [];
+                            var err_height = [], err_dist = [], err_label = [];
+                            var err_desc = [], err_movies = [];
+
+                            for (var i = 0; i < data['x'].length; i++) {
+                                if(data['label'][i].toLowerCase().includes(searchbox.value.toLowerCase())) {
+                                    index.push(i);
+                                    x.push(data['x'][i]);
+                                    y.push(data['y'][i]);
+                                    sem.push(data['sem'][i]);
+                                    number.push(data['number'][i]);
+                                    usage.push(data['usage'][i]);
+                                    speed_2d.push(data['speed_2d'][i]);
+                                    speed_3d.push(data['speed_3d'][i]);
+                                    height.push(data['height'][i]);
+                                    dist.push(data['dist_to_center'][i]);
+                                    label.push(data['label'][i]);
+                                    desc.push(data['desc'][i]);
+                                    movies.push(data['movies'][i]);
+
+                                    err_x.push(err_data['x'][i]);
+                                    err_y.push(err_data['y'][i]);
+                                    err_number.push(err_data['number'][i]);
+
+                                    err_sem.push(err_data['sem'][i]);
+                                    err_usage.push(err_data['usage'][i]);
+                                    err_speed_2d.push(err_data['speed_2d'][i]);
+                                    err_speed_3d.push(err_data['speed_3d'][i]);
+                                    err_height.push(err_data['height'][i]);
+                                    err_dist.push(err_data['dist_to_center'][i]);
+                                    err_label.push(err_data['label'][i]);
+                                    err_desc.push(err_data['desc'][i]);
+                                    err_movies.push(err_data['movies'][i]);
+
+                                } else {
+                                    line.visible = false;
+                                }
+                            }
+
+                            if (x.length == data.x.length) {
+                                line.visible = true;
+                            }
+
+                            source.data.index = index;
+                            source.data.number = number;
+                            source.data.x = x;
+                            source.data.y = y;
+                            source.data.sem = sem;
+                            source.data.usage = usage;
+                            source.data.speed_2d = speed_2d;
+                            source.data.speed_3d = speed_3d;
+                            source.data.height = height;
+                            source.data.dist_to_center = dist;
+                            source.data.label = label;
+                            source.data.desc = desc;
+                            source.data.movies = movies;
+
+                            source.change.emit();
+
+                            err_source.data.index = index;
+                            err_source.data.x = err_x;
+                            err_source.data.y = err_y;
+
+                            err_source.data.number = err_number;
+                            err_source.data.usage = err_usage;
+                            err_source.data.sem = err_sem;
+                            err_source.data.speed_2d = err_speed_2d;
+                            err_source.data.speed_3d = err_speed_3d;
+                            err_source.data.height = err_height;
+                            err_source.data.dist_to_center = err_dist;
+                            err_source.data.label = err_label;
+                            err_source.data.desc = err_desc;
+                            err_source.data.movies = err_movies;
+
+                            err_source.change.emit();
+
+                         """
+    )
+
+    return callback
 
 def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat='usage'):
     '''
@@ -513,6 +627,8 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     slider = RangeSlider(start=0, end=0.001, value=(0, 0.001), step=0.001,
                          format="0[.]000", title=f"Display Syllables Within {thresh_stat} Range")
 
+    searchbox = TextInput(value='', title='Syllable to Display:')
+
     for group, color in zip(groups, colors):
 
         aux_df, sem, aux_sem, errs_x, errs_y = get_aux_stat_dfs(df, group, sorting, groupby, errorbar, stat)
@@ -546,12 +662,16 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8,
                                     muted_alpha=0.1, legend_label=group, color=color)
 
+        # setup searchbox hovertool
+        search_callback = setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, line)
+        searchbox.js_on_change('value', search_callback)
+
         # setup slider callback function to update the plot
-        callback = setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat)
-        slider.js_on_change('value', callback)
+        slider_callback = setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat)
+        slider.js_on_change('value', slider_callback)
 
         # update hover tools to match the thresholded plot points
-        hover = setup_hovertool(circle, callback)
+        hover = setup_hovertool(circle, search_callback)
         fig.add_tools(hover)
 
         # set up color pickers and link the selection to all the drawn glyphs
@@ -564,7 +684,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
             pickers.append(picker)
 
-    return pickers, slider
+    return pickers, slider, searchbox
 
 def set_grouping_colors(df, groupby):
     '''
@@ -609,7 +729,7 @@ def set_grouping_colors(df, groupby):
 
     return groups, group_colors, colors
 
-def format_stat_plot(p, df, slider, pickers, sorting):
+def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
     '''
     Edits the bokeh figures x-axis such that the syllable labels are also displayed, and are slanted 45 degrees.
      Sets the legend to be interactive where users can hide line plots by clicking on their legend item.
@@ -646,7 +766,7 @@ def format_stat_plot(p, df, slider, pickers, sorting):
     p.legend.location = "top_right"
 
     # Create gridplot of color pickers
-    output_grid = [slider]
+    output_grid = [searchbox, slider]
     if len(pickers) > 0:
         color_pickers = gridplot(pickers, ncols=2)
         output_grid.append(color_pickers)
@@ -701,14 +821,14 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
 
     # draw line plots, setup hovertool, thresholding slider and group color pickers
     if list(sorting) == syllable_families['leaves']:
-        pickers, slider = draw_stats(p, df, list(df.group.unique()), group_colors,
+        pickers, slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
                                      sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
     else:
-        pickers, slider = draw_stats(p, df, groups, colors, sorting,
+        pickers, slider, searchbox = draw_stats(p, df, groups, colors, sorting,
                                      groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # Format Bokeh plot with widgets
-    graph_n_pickers = format_stat_plot(p, df, slider, pickers, sorting)
+    graph_n_pickers = format_stat_plot(p, df, searchbox, slider, pickers, sorting)
 
     # Display figure and widgets
     show(graph_n_pickers)
