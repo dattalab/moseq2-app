@@ -485,7 +485,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
 
     return source, src_dict, err_source, err_dict
 
-def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid', thresh_stat='usage'):
+def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid', thresh_stat='usage', sig_sylls=[]):
     '''
     Helper function to bokeh_plotting that iterates through the given DataFrame and plots the
     data grouped by some user defined column ('group', 'SessionName', 'SubjectName'), with the errorbars of their
@@ -536,8 +536,15 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         circle = fig.circle('x', 'y', source=source, alpha=0.8, muted_alpha=0.1,
                             legend_label=group, color=color, size=6)
 
-        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8, muted_alpha=0.1, legend_label=group,
-                                    color=color)
+        if len(sig_sylls) > 0:
+            y = aux_df[stat].to_numpy()[sig_sylls]
+
+            # Draw stars instead of circles
+            diamond = fig.diamond_cross(sig_sylls, y, alpha=0.8, muted_alpha=0.1, legend_label='Significant Syllable',
+                                        fill_color=color, line_width=3, line_color='red', size=6)
+
+        error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8,
+                                    muted_alpha=0.1, legend_label=group, color=color)
 
         # setup slider callback function to update the plot
         callback = setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat)
@@ -650,7 +657,8 @@ def format_stat_plot(p, df, slider, pickers, sorting):
 
     return graph_n_pickers
 
-def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='SEM', syllable_families=None, sort_name='usage', thresh='usage'):
+def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='SEM',
+                   syllable_families=None, sort_name='usage', thresh='usage', sig_sylls=[]):
     '''
     Generates a Bokeh plot with interactive tools such as the HoverTool, which displays
     additional syllable information and the associated crowd movie.
@@ -688,13 +696,16 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
 
     if groupby != 'group':
         # draw session based statistics, without returning individual bokeh widgets to display
-        draw_stats(p, mean_df, list(df.group.unique()), group_colors, sorting, 'group', stat, errorbar, line_dash='dashed', thresh_stat=thresh)
+        draw_stats(p, mean_df, list(df.group.unique()), group_colors, sorting, 'group',
+                   stat, errorbar, line_dash='dashed', thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # draw line plots, setup hovertool, thresholding slider and group color pickers
     if list(sorting) == syllable_families['leaves']:
-        pickers, slider = draw_stats(p, df, list(df.group.unique()), group_colors, sorting, groupby, stat, errorbar, thresh_stat=thresh)
+        pickers, slider = draw_stats(p, df, list(df.group.unique()), group_colors,
+                                     sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
     else:
-        pickers, slider = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar, thresh_stat=thresh)
+        pickers, slider = draw_stats(p, df, groups, colors, sorting,
+                                     groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # Format Bokeh plot with widgets
     graph_n_pickers = format_stat_plot(p, df, slider, pickers, sorting)

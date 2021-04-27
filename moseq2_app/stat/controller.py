@@ -13,6 +13,7 @@ import pandas as pd
 from collections import defaultdict
 from IPython.display import clear_output
 from ipywidgets import interactive_output
+from moseq2_viz.model.stat import run_kruskal
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.util import get_sorted_index, read_yaml
@@ -267,10 +268,19 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sortby = self.dropdown_mapping[sort.lower()]
         thresh = self.dropdown_mapping[thresh.lower()]
 
+        # get significant syllables for 2 group difference
+        sig_sylls = []
+        intersect_sig_syllables = run_kruskal(df, statistic=stat, max_syllable=self.max_sylls, verbose=False)[2]
+
         # Get selected syllable sorting
         if sort.lower() == 'difference':
             # display Text for groups to input experimental groups
             ordering = sort_syllables_by_stat_difference(df, ctrl_group, exp_group, stat=stat)
+            if ctrl_group != exp_group:
+                try:
+                    sig_sylls = intersect_sig_syllables[(ctrl_group, exp_group)]
+                except KeyError:
+                    sig_sylls = intersect_sig_syllables[(exp_group, ctrl_group)]
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
         elif sort.lower() != 'usage':
@@ -298,7 +308,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             self.results['cladogram'] = self.cladogram
 
         self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby, errorbar=errorbar,
-                                       syllable_families=self.results, sort_name=sort, thresh=thresh)
+                                       syllable_families=self.results, sort_name=sort, thresh=thresh, sig_sylls=sig_sylls)
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
