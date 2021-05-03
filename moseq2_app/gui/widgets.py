@@ -43,7 +43,7 @@ class GroupSettingWidgets:
         self.group_set = widgets.HBox([self.group_input, self.save_button, self.update_index_button])
 
         self.index_dict, self.df = index_to_dataframe(self.index_filepath)
-        self.qgrid_widget = qgrid.show_grid(self.df[['SessionName', 'SubjectName', 'group', 'uuid']],
+        self.qgrid_widget = qgrid.show_grid(self.df[['SessionName', 'SubjectName', 'group', 'uuid', 'filename']],
                                             column_options=self.col_opts,
                                             column_definitions=self.col_defs,
                                             show_toolbar=False)
@@ -91,6 +91,7 @@ class GroupSettingWidgets:
         meta_cols = pd.DataFrame(meta).columns
 
         latest_df = self.qgrid_widget.get_changed_df()
+        self.df.drop('filename', axis=1)
         self.df.update(latest_df)
 
         updated_index = {'files': list(self.df.drop(meta_cols, axis=1).to_dict(orient='index').values()),
