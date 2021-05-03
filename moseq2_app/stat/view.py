@@ -654,10 +654,9 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         if len(sig_sylls) > 0:
             y = aux_df[stat].to_numpy()[sig_sylls]
-
             # Draw stars instead of circles
             diamond = fig.diamond_cross(sig_sylls, y, alpha=0.8, muted_alpha=0.1, legend_label='Significant Syllable',
-                                        fill_color=color, line_width=3, line_color='red', size=6)
+                                        fill_color=color, line_width=3, line_color='red', size=10)
 
         error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8,
                                     muted_alpha=0.1, legend_label=group, color=color)
