@@ -881,13 +881,15 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 try:
                     group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
                 except:
-                    display(syll_info_df)
-                    group_syllable_pdf = syll_info_df[group_name]['pdf'][self.cm_syll_select.index]
+                    group_syllable_pdf = np.zeros((50, 50))
+                    if len(cm_path) == 0:
+                        continue
+
                 pdf_fig = self.get_pdf_plot(group_syllable_pdf, group_name)
 
                 bk_plots.append(pdf_fig)
             else:
-                group_info = pd.DataFrame(syll_info_df[group_name]).to_html()
+                group_info = pd.DataFrame(syll_info_df[group_name]).drop('pdf').to_html()
 
             # Copy generated movie to temporary directory
             cm_dir = os.path.dirname(cm_path[0])
@@ -898,7 +900,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
             os.makedirs(tmp_dirname, exist_ok=True)
             shutil.copy2(cm_path[0], tmp_path)
-
             video_dims = get_video_info(tmp_path)['dims']
 
             # Insert paths and table into HTML div
