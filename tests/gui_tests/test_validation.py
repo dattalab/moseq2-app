@@ -204,5 +204,5 @@ class TestExtractionValidation(TestCase):
 
         index_data, df = index_to_dataframe(index_path)
 
-        assert df.shape == (2, 14)
+        assert df.shape == (2, 15)
         assert isinstance(index_data, dict)
