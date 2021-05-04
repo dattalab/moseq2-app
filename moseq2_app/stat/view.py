@@ -6,6 +6,7 @@ View module to facilitate graphing of interactive statistics tools: the Dendrogr
 '''
 
 import random
+import warnings
 import itertools
 import numpy as np
 import pandas as pd
@@ -621,6 +622,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     pickers (list of ColorPickers): List of interactive color picker widgets to update the graph colors.
     slider (bokeh.models.RangeSlider): RangeSlider object used to threshold/filter the displayed syllables.
     '''
+    warnings.filterwarnings('ignore',)
 
     pickers = []
 
