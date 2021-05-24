@@ -19,15 +19,14 @@ from collections import OrderedDict
 from bokeh.plotting import figure, show
 from os.path import dirname, join, exists
 from IPython.display import display, clear_output
-from moseq2_extract.extract.proc import get_flips
 from moseq2_app.roi.view import bokeh_plot_helper
 from moseq2_extract.util import gen_batch_sequence
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.io.video import write_frames_preview
 from moseq2_app.flip.widgets import FlipClassifierWidgets
+from moseq2_extract.extract.proc import clean_frames, get_flips
 
 class FlipRangeTool(FlipClassifierWidgets):
 
