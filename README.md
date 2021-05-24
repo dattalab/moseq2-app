@@ -285,7 +285,8 @@ The currently accepted depth data extensions are:
 - `.avi` (compressed depth files from the `moseq2-extract` command line interface)
 - `.mkv` (generated from Microsoft's recording software for the Azure Kinect)
 
-To run this notebook, create a master folder with a copy of this notebook, and a separate subfolders for each recording file (see example directory structure below). 
+To the notebooks, create a master folder with a copy of the provided notebooks,
+ and separate subfolders for each recording file (+relevant metadata). Shown in example directory structure below: 
 
 ```
 .
