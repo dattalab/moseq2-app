@@ -11,6 +11,9 @@ from IPython.display import display
 from bokeh.plotting import figure, show
 from os.path import dirname, join, relpath, exists
 from moseq2_extract.io.video import get_video_info
+from kora.drive import upload_public
+from IPython.display import HTML
+from base64 import b64encode
 
 
 def show_extraction(input_file, video_file):
@@ -35,6 +38,8 @@ def show_extraction(input_file, video_file):
     tmp_path = join(vid_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(video_file)}')
     tmp_dirname = dirname(tmp_path)
 
+    url = upload_public(video_file)
+
     if not exists(tmp_dirname):
         os.makedirs(tmp_dirname)
 
@@ -45,8 +50,9 @@ def show_extraction(input_file, video_file):
 
     video_div = f'''
                     <h2>{input_file}</h2>
+                    <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                     <video
-                        src="{relpath(tmp_path)}"; alt="{tmp_path}"; 
+                        src="{url}"; alt="{url}"; id="preview";                     
                         height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                         style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                         border="2"; autoplay controls loop>
@@ -63,6 +69,7 @@ def show_extraction(input_file, video_file):
     display(output)
 
     return output
+
 
 def bokeh_plot_helper(bk_fig, image):
     '''

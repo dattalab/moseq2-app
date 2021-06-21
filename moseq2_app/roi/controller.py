@@ -33,7 +33,7 @@ from moseq2_extract.io.video import (load_movie_data, get_video_info,
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, detect_and_set_camera_parameters,
                                  check_filter_sizes, graduate_dilated_wall_area)
-
+from kora.drive import upload_public
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 
@@ -266,8 +266,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
         clear_output(wait=True)
-        display(self.clear_button, self.ui_tools)
-        display(self.main_out)
+        # display(self.clear_button, self.ui_tools)
+        # display(self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
     def mark_passing_button_clicked(self, b=None):
@@ -566,9 +566,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                                                   }
                                                    )
 
+        # clear_output()
         display(self.clear_button, self.ui_tools)
-        display(self.main_out)
+        #display(self.main_out)
         gc.collect()
+
 
     def update_checked_list(self, results):
         '''
@@ -828,6 +830,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.output is not None:
             self.output = None
         self.output = show_extraction(basename(dirname(input_file)), view_path)
+        print('view path', view_path)
         gc.collect()
 
     def prepare_data_to_plot(self, roi, minmax_heights, fn):
@@ -861,7 +864,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters[curr_session_key]['true_depth'] = int(self.true_depth)
 
         # get segmented frame
-        raw_frames = load_movie_data(self.curr_session, 
+        raw_frames = load_movie_data(self.curr_session,
                                     range(fn, fn + 30),
                                     **self.session_parameters[curr_session_key],
                                     frame_size=self.curr_bground_im.shape[::-1])
@@ -875,7 +878,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # filter out regions outside of ROI
         try:
             filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
-            
+
         except:
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
@@ -908,7 +911,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
-        
+
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
@@ -974,11 +977,14 @@ class InteractiveExtractionViewer:
         '''
 
         video_dims = get_video_info(input_file)['dims']
+        url = upload_public(input_file)
+        display('input file is',input_file)
 
         video_div = f'''
                         <h2>{input_file}</h2>
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="{relpath(input_file)}"; alt="{abspath(input_file)}"; id="preview";
+                            src="{url}"; alt="{url}"; id="preview";
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                             style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>

@@ -8,7 +8,7 @@ from ipywidgets import HBox, VBox
 class InteractiveROIWidgets:
     '''
     Class that contains Ipywidget widgets and layouts to facilitate interactive ROI finding functionality.
-    This class is extended by the controller class InteractiveFindRoi. 
+    This class is extended by the controller class InteractiveFindRoi.
     '''
 
     def __init__(self):
@@ -99,8 +99,8 @@ class InteractiveROIWidgets:
 
         self.extract_tools = VBox([self.ext_label,
                                    VBox([self.minmax_label, self.minmax_heights]),
-                                   VBox([self.fr_label, self.frame_range]),
-                                   self.extract_button],
+                                   VBox([self.fr_label, self.frame_range])],
+                                   # self.extract_button
                                   layout=self.column_layout)
 
         self.button_box = VBox([HBox([self.check_all, self.save_parameters]),
