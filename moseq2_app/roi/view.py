@@ -13,7 +13,6 @@ from os.path import dirname, join, relpath, exists
 from moseq2_extract.io.video import get_video_info
 from kora.drive import upload_public
 from IPython.display import HTML
-from base64 import b64encode
 
 
 def show_extraction(input_file, video_file):

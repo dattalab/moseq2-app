@@ -830,7 +830,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.output is not None:
             self.output = None
         self.output = show_extraction(basename(dirname(input_file)), view_path)
-        print('view path', view_path)
         gc.collect()
 
     def prepare_data_to_plot(self, roi, minmax_heights, fn):
