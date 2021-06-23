@@ -902,6 +902,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             tmp_path = os.path.join(cm_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(cm_path[0])}')
             tmp_dirname = os.path.dirname(tmp_path)
 
+            url = upload_public(os.path.join(cm_dir, os.path.basename(cm_path[0])))
+            # print("url is", url)
+
             self.base_tmpdir = os.path.join(cm_dir, 'tmp')
 
             os.makedirs(tmp_dirname, exist_ok=True)
@@ -916,7 +919,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                     border="2"; autoplay controls loop>
                 </video>
-            '''.format(group_info=group_info, src=relpath(tmp_path), alt=tmp_path, height=int(video_dims[1] * 0.8),
+            '''.format(group_info=group_info, src=url, alt=url, height=int(video_dims[1] * 0.8),
                        width=int(video_dims[0] * 0.8))
 
             divs.append(group_txt)
