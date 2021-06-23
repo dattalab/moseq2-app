@@ -235,7 +235,7 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
     istat = InteractiveSyllableStats(index_path=index_path, model_path=model_path, df_path=df_path,
                                      info_path=info_path, max_sylls=max_syllables, load_parquet=load_parquet)
 
-    display(istat.clear_button, istat.stat_widget_box, istat.out)
+    display(istat.clear_button, istat.stat_widget_box)
     show(istat.cladogram)
     return istat
 
