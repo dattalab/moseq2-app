@@ -192,6 +192,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Launch and display interactive API
     output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
     display(labeler.clear_button, labeler.syll_select, output)
+    return labeler
 
     def on_syll_change(change):
         '''
@@ -236,6 +237,7 @@ def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path
 
     display(istat.clear_button, istat.stat_widget_box, istat.out)
     show(istat.cladogram)
+    return istat
 
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
                                                df_path=None, get_pdfs=True, load_parquet=False):

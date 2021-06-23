@@ -30,6 +30,9 @@ from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidg
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
 from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_position_heatmaps, get_syllable_pdfs)
 
+from kora.drive import upload_public
+from IPython.display import HTML
+
 yml = yaml.YAML()
 yml.indent(mapping=3, offset=2)
 
@@ -366,14 +369,17 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Get current movie path
         cm_path = syllables['crowd_movie_path']
+        url = upload_public(cm_path)
 
         video_dims = get_video_info(cm_path)['dims']
 
         # Create syllable crowd movie HTML div to embed
         video_div = f'''
                         <h2>{self.syll_select.index}: {syllables['label']}</h2>
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="{relpath(cm_path)}"; alt="{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
+                            src="{url}"; alt="{url}"; id="preview";  
+                            height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
                             style="float: left; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
@@ -407,7 +413,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
                                  pane_widths=[3, 0, 3])
 
         # Display all widgets
-        display(grid, self.button_box)
+        display(grid)
 
     def set_default_cm_parameters(self, config_data):
         '''

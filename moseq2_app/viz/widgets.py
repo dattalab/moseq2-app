@@ -66,12 +66,12 @@ class SyllableLabelerWidgets:
         self.lbl_box = VBox([self.syll_lbl, self.desc_lbl], layout=self.label_layout)
 
         # input box
-        self.input_box = VBox([self.lbl_name_input, self.desc_input], layout=self.label_layout)
+        self.input_box = VBox([self.lbl_name_input, self.desc_input, self.set_button], layout=self.label_layout)
 
         # syllable info box
         self.info_boxes = VBox([self.syll_info_lbl], layout=self.center_layout)
 
-        self.data_box = VBox([HBox([self.lbl_box, self.input_box], layout=self.data_layout), self.info_boxes],
+        self.data_box = VBox([HBox([self.lbl_box, self.input_box, self.set_button], layout=self.data_layout), self.info_boxes],
                              layout=self.data_col_layout)
 
         # button box

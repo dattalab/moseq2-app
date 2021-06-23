@@ -265,7 +265,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-        clear_output(wait=True)
+        # clear_output(wait=True)
         # display(self.clear_button, self.ui_tools)
         # display(self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
