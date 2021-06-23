@@ -22,6 +22,8 @@ from bokeh.palettes import Category10_10 as palette
 from bokeh.plotting import figure, show, from_networkx
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
+from kora.drive import upload_public
+from IPython.display import HTML
 
 def graph_dendrogram(obj, syll_info):
     '''
@@ -44,7 +46,7 @@ def graph_dendrogram(obj, syll_info):
                        output_backend="svg")
 
     # Show syllable info on hover
-    cladogram.add_tools(HoverTool(tooltips=[('label', '@labels')]), TapTool(), BoxSelectTool())
+    # cladogram.add_tools(HoverTool(tooltips=[('label', '@labels')]), TapTool(), BoxSelectTool())
 
     # Get distance sorted label ordering
     labels = list(map(int, obj.results['ivl']))
@@ -427,8 +429,9 @@ def setup_hovertool(circle, callback=None):
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div>
+                    <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            src="@movies"; height="260"; alt="@movies"; id="preview"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
                             border="2"; autoplay loop
                         ></video>
@@ -529,7 +532,8 @@ def get_syllable_info(df, sorting):
     cm_paths = []
     for cm in desc_data['crowd_movie_path'].to_numpy():
         try:
-            cm_paths.append(relpath(cm))
+            url = upload_public(relpath(cm))
+            cm_paths.append(url)
         except ValueError:
             # cm path does not exist
             cm_paths.append('')
@@ -1133,8 +1137,9 @@ def setup_trans_graph_tooltips(plot):
                     <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
                     <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
                     <div>
+                    <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            src="@movies"; height="260"; alt="@movies"; id="preview"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
                             border="2"; autoplay loop
                         ></video>
