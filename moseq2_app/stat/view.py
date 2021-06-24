@@ -428,7 +428,7 @@ def setup_hovertool(circle, callback=None):
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div>
-                    <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
                             src="@movies"; height="260"; alt="@movies"; id="preview"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
@@ -1135,7 +1135,7 @@ def setup_trans_graph_tooltips(plot):
                     <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
                     <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
                     <div>
-                    <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
                             src="@movies"; height="260"; alt="@movies"; id="preview"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
@@ -1146,7 +1146,8 @@ def setup_trans_graph_tooltips(plot):
                 """
 
     # adding interactive tools
-    plot.add_tools(HoverTool(tooltips=tooltips, line_policy='interp'),
+    hover = HoverTool(tooltips=tooltips, line_policy='interp')
+    plot.add_tools(hover,
                    TapTool(),
                    BoxSelectTool())
 
@@ -1280,11 +1281,10 @@ def get_group_node_syllable_info(syll_info, node_indices):
         labels.append(syll_info[n]['label'])
         descs.append(syll_info[n]['desc'])
         try:
-            cm_paths.append(relpath(syll_info[n]['crowd_movie_path']))
+            cm_paths.append(syll_info[n]['crowd_movie_path'])
         except ValueError:
             # crowd movie path not found
             cm_paths.append('')
-
     return labels, descs, cm_paths
 
 def setup_graph_hover_renderers(graph_renderer, group_stats, node_indices):
@@ -1578,7 +1578,6 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         # get syllable info for each node
         group_stats['labels'], group_stats['descs'], group_stats['cm_paths'] = \
             get_group_node_syllable_info(syll_info, node_indices)
-
         # setup hover tool information
         graph_renderer = setup_graph_hover_renderers(graph_renderer, group_stats, node_indices)
 

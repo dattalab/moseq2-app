@@ -524,6 +524,9 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             # Load Syllable Info
             self.syll_info = read_yaml(self.info_path)
+            pbar=tqdm(self.syll_info.items())
+            for _, value in pbar:
+                value['crowd_movie_path'] = upload_public(value['crowd_movie_path'])
 
             # Get labels and optionally relabel them by usage sorting
             labels = self.model_fit['labels']
