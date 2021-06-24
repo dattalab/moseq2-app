@@ -914,6 +914,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Insert paths and table into HTML div
             group_txt = '''
                 {group_info}
+                <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                 <video
                     src="{src}"; alt="{alt}"; height="{height}"; width="{width}"; preload="auto";
                     style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;

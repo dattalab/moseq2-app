@@ -26,6 +26,8 @@ from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interact
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats,
                                          convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
+from kora.drive import upload_public
+from tqdm import tqdm
 
 class InteractiveSyllableStats(SyllableStatWidgets):
     '''
@@ -239,6 +241,16 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
+
+        # Upload all videos to public paths for displaying in colab
+        print('Process crowd movie paths for display\n')
+        url = []
+        print('\n')
+        pbar = tqdm(self.df['crowd_movie_path'])
+        for cm in pbar:
+            tmp_url = upload_public(cm)
+            url.append(tmp_url)
+        self.df['crowd_movie_path'] = url
 
     def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, thresh='usage'):
         '''

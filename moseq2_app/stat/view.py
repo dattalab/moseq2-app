@@ -22,7 +22,6 @@ from bokeh.palettes import Category10_10 as palette
 from bokeh.plotting import figure, show, from_networkx
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
-from kora.drive import upload_public
 from IPython.display import HTML
 
 def graph_dendrogram(obj, syll_info):
@@ -415,7 +414,7 @@ def setup_hovertool(circle, callback=None):
     -------
     hover (bokeh.models.HoverTool): hover tool to embed into the created figure.
     '''
-    
+
     # html divs to display within the HoverTool
     tooltips = """
                 <div>
@@ -532,8 +531,7 @@ def get_syllable_info(df, sorting):
     cm_paths = []
     for cm in desc_data['crowd_movie_path'].to_numpy():
         try:
-            url = upload_public(relpath(cm))
-            cm_paths.append(url)
+            cm_paths.append(cm)
         except ValueError:
             # cm path does not exist
             cm_paths.append('')
