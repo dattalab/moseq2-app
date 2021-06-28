@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Add Kora for Google colab functionalities
-pip install -U kora
+# Add Google and Kora for Google colab functionalities
+pip install -U google kora
 pip install -e .
 
 # Install and Enable widget extensions configurator
