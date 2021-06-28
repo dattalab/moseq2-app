@@ -69,6 +69,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         # Load Syllable Info
         self.syll_info = read_yaml(self.info_path)
+        pbar = tqdm(self.syll_info.items())
+        for _, value in pbar:
+            value['crowd_movie_path'] = upload_public(value['crowd_movie_path'])
+
 
         self.results = None
         self.icoord, self.dcoord = None, None
@@ -241,16 +245,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
-
-        # Upload all videos to public paths for displaying in colab
-        print('Process crowd movie paths for display\n')
-        url = []
-        print('\n')
-        pbar = tqdm(self.df['crowd_movie_path'])
-        for cm in pbar:
-            tmp_url = upload_public(cm)
-            url.append(tmp_url)
-        self.df['crowd_movie_path'] = url
 
     def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, thresh='usage'):
         '''
