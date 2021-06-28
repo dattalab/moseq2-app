@@ -2,9 +2,21 @@
 
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/dattalab/community)
 
-<center><img src="https://drive.google.com/uc?export=view&id=1kHdmkBx_XlueTJocREDx4YeHGrjfYKJv"></center>
+<center><img src="https://drive.google.com/uc?export=view&id=1PxTnCMsrk3hRHPnEjqGDzq1oPkTYfzj0"></center>
 
-Last Updated: 11/30/2020
+Last Updated: 04/07/2021
+
+## Table of Contents
+- [MoSeq2-Notebook: A suite of interactive Jupyter notebooks for animal behavior sequencing and analysis](#moseq2-notebook-a-suite-of-interactive-jupyter-notebooks-for-animal-behavior-sequencing-and-analysis)
+  * [Overview](#overview)
+  * [Installation Instructions and Getting Started](#installation-and-getting-started)
+    + [Software Requirements](#software-requirements)
+  * [Installation](#installation)
+  * [Downloading a test dataset](#downloading-a-test-dataset)
+  * [Getting started](#getting-started)
+    + [Organizing a MoSeq Dataset](#organizing-a-moseq-dataset)
+    + [Starting the Jupyter Notebooks](#starting-the-jupyter-notebooks)
+  * [Bug Reporting](#bug-reporting)
 
 ## Overview
 
@@ -25,28 +37,31 @@ and/or fill out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 Currently, we offer 5 notebooks that provide tutorials for using MoSeq's pipeline
 to extract, preprocess, model, and perform basic analysis on experimental data. We
 hope to expand our selection of notebooks based on user feedback and the
-project's trajectory.
+project's trajectory. You can find the base copies of notebooks within the `notebooks/` directory.
 
-### The main MoSeq notebook ([link](./Main-MoSeq2-Notebook.ipynb))
+### Notebook Order
+<img src="https://drive.google.com/uc?export=view&id=1QXuvIfkK5Qi-mqlX9D7TbdXXLsk5mSrA">
+
+### The main MoSeq notebook ([link](./notebooks/Main-MoSeq2-Notebook.ipynb))
 
 A detailed and complete walk-through of the MoSeq pipeline — from data extraction to modeling.
 It includes examples of what to expect at each step, and what to do if things don't go as expected.
 There are also a few visualizations to help with extraction and modeling. 
 
-### A notebook to explore modeling and experimental results interactively ([link](./Interactive-Model-Results-Exploration.ipynb))
+### A notebook to explore modeling and experimental results interactively ([link](./notebooks/Interactive-Model-Results-Exploration.ipynb))
 
 A stand-alone notebook containing all the interactive data exploration tools for
 modeled data. Simply enter the paths to your selected model(s) and index file
 to use to syllable exploration tools.
 
-### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./Model-Results-Extension.ipynb))
+### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./notebooks/Model-Results-Extension.ipynb))
 
 A stand-alone notebook demonstrating the `moseq2_viz` functionality. With examples for how to obtain
 syllable usages and other scalar statistics, and plot the syllables reordered by different statistics or by
 group difference. Additional examples include computing behavioral similarity distances, transition matrices,
 and hypothesis testing.
 
-### Flip Classifier Training Notebook ([link](./Flip%20Classifier%20Training%20Notebook.ipynb))
+### Flip Classifier Training Notebook ([link](./notebooks/Flip%20Classifier%20Training%20Notebook.ipynb))
 
 This notebook is a stand-alone tool that can be used to train a new 
 flip classifier used to correct the orientation of the extracted animal. If's
@@ -54,7 +69,7 @@ utilized if the current flip classifier is not working as expected.
 For example, the current flip classifier does not work well with datasets
 acquired with the Azure or RealSense depth cameras.
 
-## Hands-Free MoSeq2 Notebook ([link](./Handsfree-MoSeq2-Notebook.ipynb))
+## Hands-Free MoSeq2 Notebook ([link](./notebooks/Handsfree-MoSeq2-Notebook.ipynb))
 
 A streamlined version of the main notebook that can be used to run the 
 entire moseq2 pipeline with no user input. This would be useful for users 
@@ -93,11 +108,10 @@ Don't worry, we'll walk through installation steps for each of these packages in
      - anaconda3/miniconda3
      - git
      - curl (it should be installed by default on all systems)
-     - gcc and g++: accepted and tested versions: 6, 7, 9, 10
-     - [`moseq2-extract==0.7.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
-     - [`moseq2-pca==0.4.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
-     - [`moseq2-model==0.5.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
-     - [`moseq2-viz==0.5.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
+     - [`moseq2-extract==0.8.0`](https://github.com/dattalab/moseq2-extract/blob/release/Documentation.pdf)
+     - [`moseq2-pca==0.5.0`](https://github.com/dattalab/moseq2-pca/blob/release/Documentation.pdf)
+     - [`moseq2-model==0.6.0`](https://github.com/dattalab/moseq2-model/blob/release/Documentation.pdf)
+     - [`moseq2-viz==0.6.0`](https://github.com/dattalab/moseq2-viz/blob/release/Documentation.pdf)
  - macOS:
      - XCode command line tools
 
@@ -142,77 +156,18 @@ If you prefer to install the full Anaconda package, we refer you to the
 
 Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
 
-### gcc
-
-We're going to walk through the process of installing `gcc-7` but you can install any of the
-supported versions listed above. Just replace `7` with the version you want to install.
-
-To check if you have `gcc-7`/`g++-7` is installed, run this command:
-```bash
-which gcc-7 # if you're on macOS
-which gcc   # if you're on linux
-```
-You should expect to see a path to your gcc-7 installation, like this:
-```bash
-/usr/local/bin/gcc-7  # or /usr/bin/gcc
-```
-
-Another way to confirm if your default gcc version is compatible is by running the following commands:
-```.bash
-gcc --version
-g++ --version
-```
-
-If gcc (or appropriate version of gcc) cannot be found, then follow these steps to install them for your respective OS:
-
-#### For macOS:
-
-1. Install [brew](https://brew.sh/), the macOS package manager, via their website.
-2. Install the xcode command line tools. Command: `xcode-select --install`
-**IMPORTANT: YOU CANNOT SKIP THIS STEP**. If you skip this step, you will see installation
-errors for `cytoolz`, `autoregressive`, and `psutil`
-3. Install gcc: `brew install gcc@7`
-
-Confirm you have `gcc-7` installed by running:
-```bash
-which gcc-7
-```
-
-The following step is important installing the `moseq2-model` dependency.
-Once you have confirmed gcc-7 is installed, run the next 2 commands to set
-them as default gcc versions. You need to run these two commands for
-the installation process only. Not every time you open a new terminal.
-
-```bash
-export CC="$(which gcc-7)"
-export CXX="$(which g++-7)"
-```
-
-If you could not install MoSeq using `gcc-7`, try `gcc-10`: `brew install gcc@10`.
-We've had success installing MoSeq with this `gcc` version too.
-#### For WSL/Linux:
-
-How to install on Ubuntu or Debian:
-```bash
-sudo apt update
-sudo apt install build-essential
-sudo apt install g++-7 gcc-7 -y
-```
-If you're using a different linux distribution, refer to their package manager to
-install gcc.
-
-The gcc version that's installed through `build-essential` should be able to compile
-`moseq2-model`'s dependencies, and there are no extra steps you need to take to make
-MoSeq recognize gcc (like you do for [macOS](#for-macos)).
-
-Alternatively, if the Ubuntu install isn't working, you can also install `gcc-7.3` with `conda`:
-```bash
-# automatically sets CC/CXX after installing, too
-conda install -c anaconda gcc_linux-64
-conda install -c anaconda gxx_linux-64
-```
-
 ### Git
+
+#### 2 Factor Authentication Note
+If you have 2FA enabled for your GitHub account, follow these instructions in order to be able to clone and install
+ the GitHub repositories succesfully.
+1. Create a [personal access token](https://github.com/settings/tokens).
+    1. Make sure to check the `repo` scope to allow read access.
+2. Copy and save your token in a note; you will use this token as your GitHub username from now on.
+3. Finally, once prompted for your username in the following steps, use your token as your username and enter with blank password.
+
+__Note: If you have 2FA enabled, your username will no longer work,
+ therefore you must use your generated token in order to access git repos.__
 
 To check if you have it installed, run `which git`. If it prints a path to git,
 you have it installed. Otherwise, refer to the [official installation guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git/).
@@ -234,7 +189,7 @@ run into trouble, you can run each of the commands from the script separately
 to figure out where the problem lies. If you run into installation issues that you
 can't figure out on your own or aren't documented here, please [sumbit an issue](https://github.com/dattalab/moseq2-docs/issues)
 
-#### Pre-installation instructions
+#### Installing MoSeq
 
 - download the `moseq2-app` GitHub repository, and navigate to it:
 ```bash
@@ -243,46 +198,33 @@ cd moseq2-app
 ```
 You'll be asked for your github username and password since this is a private repository.
 
-- We recommend that you create a new [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html) named `moseq2-app`:
-```bash
-# assuming you're in the moseq2-app directory:
-conda env create -n moseq2-app --file scripts/moseq2-env.yaml
-```
-If you're already a conda master, feel free to install MoSeq in any environment you want.
-Just make sure the dependencies described in `scripts/moseq2-env.yaml` are installed in
-that environment.
-
-- activate the new conda environment
-```bash
-conda activate moseq2-app
-```
-
-- If on a mac, link to the gcc compilers via 2 environment variables, like [we said
-above](#for-macos) (remember to replace `7` with the gcc version you have)
-```bash
-export CC="$(which gcc-7)"
-export CXX="$(which g++-7)"
-```
-
-You can check if the paths do exist by running the following command:
-```.bash
-echo $CC
-echo $CXX
-``` 
-
-#### Installing MoSeq
-
-Make sure you're in the `moseq2-app` folder with your new conda environment activated
-([see pre-installation instructions](#pre-installation-instructions))
-
-Run:
-```bash
-./scripts/install_moseq2_app.sh
-```
+- We recommend that you create a new [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html) 
+named `moseq2-app` using the following commands:
 
 If you get any errors running that script, open the script in a text file and run each line
 of the script independently. This will help you (and us) figure out where the
 error is occurring.
+
+For Linux and WSL:
+```bash
+# assuming you're in the moseq2-app directory:
+conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+
+conda activate moseq2-app
+
+./scripts/install_moseq2_app.sh
+```
+
+For MacOS:
+```bash
+# assuming you're in the moseq2-app directory:
+conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
+
+conda activate moseq2-app
+
+# Ensure you're in the moseq2-app/ folder with your new conda environment activated
+./scripts/install_moseq2_app.sh
+```
 
 You can check that you have the correct dependency versions using the commands below:
 ```bash
@@ -326,6 +268,46 @@ MoSeq's pipeline in detail. To use the notebooks, make sure that you've
 activated the conda environment you installed MoSeq in (likely `moseq2-app`)
 and you have navigated to the folder that contains the jupyter notebook(s).
 
+### Organizing a MoSeq Dataset
+
+The currently accepted depth data extensions are:
+- `.dat` (raw depth files from our kinect2 data acquisition software)
+- `.tar.gz` (compressed depth files from our kinect2 data acquisition software)
+- `.avi` (compressed depth files from the `moseq2-extract` command line interface)
+- `.mkv` (generated from Microsoft's recording software for the Azure Kinect)
+
+To the notebooks, create a master folder with a copy of the provided notebooks,
+ and separate subfolders for each recording file (+relevant metadata). Shown in example directory structure below: 
+
+```
+.
+└── Data_Directory/
+    ├── Main-MoSeq2-Notebook.ipynb (1)
+    ├── Interactive-Model-Results-Exploration.ipynb (2)
+    ├── Model-Results-Extension.ipynb (3)
+    ├── session_1/ ** - the folder containing all of a single session's data
+    ├   ├── depth.dat        # depth data - the recording itself
+    ├   ├── depth_ts.txt     # timestamps - csv/txt file of the frame timestamps
+    ├   └── metadata.json    # metadata - json file that contains the rodent's info (group, subjectName, etc.)
+    ...
+    ├── session_N/ **
+    ├   ├── depth.dat
+    ├   ├── depth_ts.txt
+    └── └── metadata.json
+
+```
+
+__Note: if your data was acquired using an Azure Kinect or Intel RealSense depth camera, 
+you will not have `depth_ts.txt` or `metadata.json` in your session directories. 
+Before extraction you need to manually create a `metadata.json` file if you wish to identify sessions 
+based on the session name or mouse ID.__ The metadata.json file should minimally contain the following content structure:
+
+```json
+{"SessionName": "example session", "SubjectName": "example subject", "StartTime": "optional"}
+```
+
+### Starting the Jupyter Notebooks
+
 __:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
 your dataset so that the videos you generate will load into the notebooks properly.__ Moreover, we
 recommend each modeling project have its own dedicated set of notebooks, especially for analysis to 
@@ -333,11 +315,13 @@ improve reproducibility.
 
 You can easily copy all your notebooks to your modeling project(s) by running the following command:
 ```
-cp *.ipynb /path/to/data/dir/
+# note: must be in the moseq2-app directory for this command to work
+cp notebooks/* /path/to/data/dir/ 
 ```
 
 Run the following command to launch the jupyter notebook:
 ```bash
+# note: must be in the data directory where the notebooks were copied previously to.
 jupyter notebook
 ```
 
@@ -370,8 +354,8 @@ For information on getting started, check out the [MoSeq Wiki](https://github.co
 
 ## Bug Reporting
 
-If you experience any errors during installation, consult the [troubleshooting](./TROUBLESHOOT.md) guide.
-If the your issue is not resolved there, submit a GitHub issue.
+If you experience any errors during installation, consult the [troubleshooting](./TROUBLESHOOT.md) guide or [wiki](https://github.com/dattalab/moseq2-app/wiki/Troubleshooting).
+If the your issue is not resolved there, consider submitting a GitHub issue.
 
 To report any issues or bugs using the notebook(s), please refer to the GitHub issues page in this repository:
 [Report Issue](https://github.com/dattalab/moseq2-app/issues/new).
