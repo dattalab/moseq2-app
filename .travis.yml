@@ -27,6 +27,7 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
+        - pip install -U kora
         - pip install -e .
       before_script:
         - make
