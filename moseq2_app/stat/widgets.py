@@ -11,6 +11,7 @@ from ipywidgets import HBox, VBox
 class SyllableStatWidgets:
 
     def __init__(self):
+        style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
 
@@ -19,8 +20,11 @@ class SyllableStatWidgets:
 
         self.stat_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
-        # add dist to center
         self.sorting_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.thresholding_dropdown = widgets.Dropdown(
+            options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
+            description='Threshold By:', disabled=False, style=style)
+
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)
         self.exp_dropdown = widgets.Dropdown(options=[], description='Group 2:', disabled=False)
 
@@ -31,13 +35,15 @@ class SyllableStatWidgets:
         self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
         ## boxes
+        self.data_layout = widgets.Layout(flex_flow='row', padding='top', justify_content='space-around', width='100%')
+
         self.stat_box = VBox([self.stat_dropdown, self.errorbar_dropdown])
         self.mutation_box = VBox([self.ctrl_dropdown, self.exp_dropdown])
 
-        self.sorting_box = VBox([self.sorting_dropdown, self.mutation_box])
+        self.sorting_box = VBox([self.sorting_dropdown, self.mutation_box, self.thresholding_dropdown])
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
-        self.stat_widget_box = HBox([self.stat_box, self.sorting_box, self.session_box])
+        self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
 
 class TransitionGraphWidgets:
 
