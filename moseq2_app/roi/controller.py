@@ -33,7 +33,10 @@ from moseq2_extract.io.video import (load_movie_data, get_video_info,
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, detect_and_set_camera_parameters,
                                  check_filter_sizes, graduate_dilated_wall_area)
-from kora.drive import upload_public
+try:
+    from kora.drive import upload_public
+except (ImportError, ModuleNotFoundError) as error:
+    print(error)
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 

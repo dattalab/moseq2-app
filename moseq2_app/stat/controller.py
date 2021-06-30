@@ -26,8 +26,11 @@ from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interact
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats,
                                          convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
-from kora.drive import upload_public
 from tqdm import tqdm
+try:
+    from kora.drive import upload_public
+except (ImportError, ModuleNotFoundError) as error:
+    print(error)
 
 class InteractiveSyllableStats(SyllableStatWidgets):
     '''

@@ -11,8 +11,11 @@ from IPython.display import display
 from bokeh.plotting import figure, show
 from os.path import dirname, join, relpath, exists
 from moseq2_extract.io.video import get_video_info
-from kora.drive import upload_public
 from IPython.display import HTML
+try:
+    from kora.drive import upload_public
+except (ImportError, ModuleNotFoundError) as error:
+    print(error)
 
 
 def show_extraction(input_file, video_file):

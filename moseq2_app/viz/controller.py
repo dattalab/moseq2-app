@@ -29,9 +29,11 @@ from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
 from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_position_heatmaps, get_syllable_pdfs)
-
-from kora.drive import upload_public
 from IPython.display import HTML
+try:
+    from kora.drive import upload_public
+except (ImportError, ModuleNotFoundError) as error:
+    print(error)
 
 yml = yaml.YAML()
 yml.indent(mapping=3, offset=2)
