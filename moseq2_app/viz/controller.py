@@ -56,7 +56,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         super().__init__()
         self.save_path = save_path
         self.max_sylls = max_sylls
-        self.crowd_movie_dir = crowd_movie_dir
 
         self.config_data = read_yaml(config_file)
 
