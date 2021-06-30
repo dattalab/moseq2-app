@@ -215,7 +215,7 @@ class TestSyllableLabeler(TestCase):
         self.gui.get_crowd_movie_paths(self.progress_paths['index_file'],
                                        self.progress_paths['model_path'],
                                        self.gui.config_data,
-                                       self.gui.crowd_movie_dir)
+                                       self.progress_paths['crowd_dir'])
 
         assert exists(self.gui.crowd_movie_dir)
         assert len([f for f in os.listdir(self.gui.crowd_movie_dir) if f.endswith('.mp4')]) == 6
