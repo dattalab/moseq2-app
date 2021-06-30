@@ -414,7 +414,6 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
-        print(self.selected_frame_ranges_dict)
 
         corrected_dataset = []
         # Get corrected frame ranges
