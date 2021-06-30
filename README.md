@@ -159,6 +159,9 @@ Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/
 ### Git
 
 #### 2 Factor Authentication Note
+Note: this is only temporarily necessary until moseq2 is publicly available on github. 
+Then, you will only have to install the GitHub CLI tool in order to `pip install .` everything.   
+
 If you have 2FA enabled for your GitHub account, follow these instructions in order to be able to clone and install
  the GitHub repositories succesfully.
 1. Create a [personal access token](https://github.com/settings/tokens).
