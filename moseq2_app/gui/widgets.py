@@ -15,6 +15,14 @@ from moseq2_app.util import index_to_dataframe
 class GroupSettingWidgets:
 
     def __init__(self, index_filepath):
+        '''
+        Initializes all the Group Setting widgets, parses the index yaml file into a pandas DataFrame that is
+         compatible to be displayed using QGrid.
+
+        Parameters
+        ----------
+        index_filepath (str): Path to index file (moseq2-index.yaml) containing session metadata and grouping info.
+        '''
 
         self.index_filepath = index_filepath
         style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
@@ -104,5 +112,14 @@ class GroupSettingWidgets:
         self.update_index_button.icon = 'check'
 
     def clear_clicked(self, b=None):
-        # Clear the display
+        '''
+        Clear the display.
+
+        Parameters
+        ----------
+        b (ipywidgets.Button click): callback from button when user clicks the button.
+
+        Returns
+        -------
+        '''
         clear_output()
