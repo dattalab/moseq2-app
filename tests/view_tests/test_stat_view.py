@@ -11,7 +11,13 @@ class TestStatView(TestCase):
     def test_clamp(self):
 
         val1 = clamp(-10)
+        val2 = clamp(300)
+        val3 = clamp(151.12345)
+
         assert val1 == 0
+        assert val1 != val2
+        assert val2 == 255
+        assert val3 == 151.12345
 
     def test_colorscale(self):
         ret = colorscale('#111111', -1)
