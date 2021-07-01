@@ -9,8 +9,9 @@ from os.path import exists
 from bokeh.io import output_notebook
 from moseq2_extract.util import filter_warnings
 from moseq2_extract.gui import get_selected_sessions
+from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
-     validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_scalar_summary_wrapper, \
+     validate_extractions_wrapper, interactive_group_setting_wrapper, \
      interactive_syllable_labeler_wrapper, interactive_syllable_stat_wrapper, \
      interactive_crowd_movie_comparison_preview_wrapper, interactive_plot_transition_graph_wrapper,\
      get_frame_flips_wrapper
@@ -185,7 +186,8 @@ def interactive_scalar_summary(index_file):
         print('Index file does not exist. Input path to an existing file and run the function again.')
         return
 
-    interactive_scalar_summary_wrapper(index_file)
+    viewer = InteractiveScalarViewer(index_file)
+    return viewer
 
 @filter_warnings
 def label_syllables(progress_paths, max_syllables=None, n_explained=99):
