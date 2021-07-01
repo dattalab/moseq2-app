@@ -61,6 +61,11 @@ class GroupSettingWidgets:
         qgrid.set_grid_option('highlightSelectedRow', True)
         qgrid.set_grid_option('highlightSelectedCell', False)
 
+        # Add callback functions
+        self.clear_button.on_click(self.clear_clicked)
+        self.update_index_button.on_click(self.update_clicked)
+        self.save_button.on_click(self.update_table)
+
     def update_table(self, b=None):
         '''
         Updates table upon "Set Button" click

@@ -118,11 +118,6 @@ def interactive_group_setting_wrapper(index_filepath):
 
     index_grid = GroupSettingWidgets(index_filepath)
 
-    # Add callback functions
-    index_grid.clear_button.on_click(index_grid.clear_clicked)
-    index_grid.update_index_button.on_click(index_grid.update_clicked)
-    index_grid.save_button.on_click(index_grid.update_table)
-
     # Display output
     display(index_grid.clear_button, index_grid.group_set)
     display(index_grid.qgrid_widget)
