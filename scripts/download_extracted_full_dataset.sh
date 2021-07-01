@@ -1,6 +1,6 @@
 #!/bin/bash
 mkdir full_extracted_test_ds
-cp notebooks/* full_extracted_test_ds
+cp notebooks/*.ipynb full_extracted_test_ds
 cd full_extracted_test_ds
 
 # amphetamine dataset
