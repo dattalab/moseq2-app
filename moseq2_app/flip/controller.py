@@ -687,8 +687,11 @@ class FlipRangeTool(FlipClassifierWidgets):
                                                                   depth_max=100,
                                                                   fps=fps,
                                                                   progress_bar=verbose)
-                            except AttributeError:
-                                pass
+                            except AttributeError as e:
+                                warnings.warn(f'Could not generate flipped movie for {key}:{path}. Skipping...')
+                                print(e)
+                                print(e.__traceback__)
+                                break
                     # Check if video is done writing. If not, wait.
                     if video_pipe is not None:
                         video_pipe.stdin.close()
