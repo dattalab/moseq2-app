@@ -1,4 +1,5 @@
 import os
+import h5py
 import shutil
 import bokeh.io
 import numpy as np
@@ -129,9 +130,10 @@ class TestFlipController(TestCase):
         assert self.gui.face_right_button.layout.visibility == 'hidden'
 
     def test_load_sessions(self):
-        data_dict, path_dict = self.gui.load_sessions()
+        path_dict = self.gui.load_sessions()
 
-        assert data_dict['azure_test'].shape == (60, 80, 80)
+        with h5py.File(path_dict['azure_test'], mode='r') as f:
+            assert f['frames'].shape == (60, 80, 80)
         assert path_dict['azure_test'] == 'data/azure_test/proc/results_00.h5'
 
     def test_interactive_launch_frame_selector(self):
