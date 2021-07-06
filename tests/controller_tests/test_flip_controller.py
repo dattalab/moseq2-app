@@ -68,6 +68,58 @@ class TestFlipController(TestCase):
         assert self.gui.start_button.description == 'Start Range'
         assert self.gui.start_button.button_style == 'info'
 
+    def test_on_selected_range_value(self):
+
+        initial_value = self.gui.delete_selection_button.layout.visibility
+
+        self.gui.on_selected_range_value()
+
+        new_value = self.gui.delete_selection_button.layout.visibility
+
+        assert initial_value != new_value
+        assert new_value == 'visible'
+
+    def test_on_delete_selection_clicked(self):
+
+        self.gui.selected_ranges.options = ['L - sessionName1 - range(100,200)',
+                                            'R - sessionName2 - range(200,500)',
+                                            'L - sessionName3 - range(600,700)']
+
+        self.gui.selected_frame_ranges_dict = {'sessionName1': [(True, range(100, 200))],
+                                               'sessionName2': [(True, range(200, 500))],
+                                               'sessionName3': [(True, range(600, 700))]}
+
+        self.gui.frame_ranges = [range(100, 200),
+                                 range(200, 500),
+                                 range(600, 700)]
+
+        self.gui.display_frame_ranges = list(self.gui.selected_ranges.options)
+
+        initial_value = self.gui.selected_ranges.value
+
+        self.gui.on_delete_selection_clicked()
+
+        new_value = 'R - 200-500 - sessionName2'
+
+        # updated current selected value
+        assert initial_value != new_value
+
+        # updated number of selected ranges, post-selection deletion
+        assert len(self.gui.selected_ranges.options) == 2
+
+        # number of total viewed sessions is unchanged
+        assert len(self.gui.selected_frame_ranges_dict.keys()) == 3
+
+        # selections within session keys have been updated
+        assert self.gui.selected_frame_ranges_dict == {'sessionName1': [],
+                                                       'sessionName2': [(True, range(200, 500))],
+                                                       'sessionName3': [(True, range(600, 700))]}
+
+
+        # updated number of frame ranges to display
+        assert len(self.gui.frame_ranges) == 2
+        assert len(list(self.gui.display_frame_ranges)) == 2
+
     def test_curr_frame_update(self):
         input_event = {'new': 1}
 

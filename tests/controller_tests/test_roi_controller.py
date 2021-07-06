@@ -60,6 +60,8 @@ class TestROIController(TestCase):
 
         selected_session = self.gui.checked_list.value
 
+        # Creating a dummy event object to behave like a ipywidget callback object
+        # with old and new object attributes
         class Event:
             old = selected_session
             new = selected_session
@@ -74,6 +76,7 @@ class TestROIController(TestCase):
         self.gui.get_selected_session(event)
         assert self.gui.config_data['detect'] == False
 
+        # testing whether the detect attribute is being updated if old!=new
         event = Event(new=list(self.gui.checked_list.options)[1])
         self.gui.get_selected_session(event)
 
