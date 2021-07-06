@@ -68,6 +68,17 @@ class TestFlipController(TestCase):
         assert self.gui.start_button.description == 'Start Range'
         assert self.gui.start_button.button_style == 'info'
 
+    def test_on_selected_range_value(self):
+
+        initial_value = self.gui.delete_selection_button.layout.visibility
+
+        self.gui.on_selected_range_value()
+
+        new_value = self.gui.delete_selection_button.layout.visibility
+
+        assert initial_value != new_value
+        assert new_value == 'visible'
+
     def test_curr_frame_update(self):
         input_event = {'new': 1}
 
