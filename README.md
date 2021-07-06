@@ -181,7 +181,7 @@ run into trouble, you can run each of the commands from the script separately
 to figure out where the problem lies. If you run into installation issues that you
 can't figure out on your own or aren't documented here, please [sumbit an issue](https://github.com/dattalab/moseq2-docs/issues)
 
-#### Pre-installation instructions
+#### Installing MoSeq
 
 - download the `moseq2-app` GitHub repository, and navigate to it:
 ```bash
@@ -190,46 +190,33 @@ cd moseq2-app
 ```
 You'll be asked for your github username and password since this is a private repository.
 
-- We recommend that you create a new [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html) named `moseq2-app`:
-```bash
-# assuming you're in the moseq2-app directory:
-conda env create -n moseq2-app --file scripts/moseq2-env.yaml
-```
-If you're already a conda master, feel free to install MoSeq in any environment you want.
-Just make sure the dependencies described in `scripts/moseq2-env.yaml` are installed in
-that environment.
-
-- activate the new conda environment
-```bash
-conda activate moseq2-app
-```
-
-- If on a mac, link to the gcc compilers via 2 environment variables, like [we said
-above](#for-macos) (remember to replace `7` with the gcc version you have)
-```bash
-export CC="$(which gcc-7)"
-export CXX="$(which g++-7)"
-```
-
-You can check if the paths do exist by running the following command:
-```.bash
-echo $CC
-echo $CXX
-``` 
-
-#### Installing MoSeq
-
-Make sure you're in the `moseq2-app` folder with your new conda environment activated
-([see pre-installation instructions](#pre-installation-instructions))
-
-Run:
-```bash
-./scripts/install_moseq2_app.sh
-```
+- We recommend that you create a new [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/environments.html) 
+named `moseq2-app` using the following commands:
 
 If you get any errors running that script, open the script in a text file and run each line
 of the script independently. This will help you (and us) figure out where the
 error is occurring.
+
+For Linux and WSL:
+```bash
+# assuming you're in the moseq2-app directory:
+conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+
+conda activate moseq2-app
+
+./scripts/install_moseq2_app.sh
+```
+
+For MacOS:
+```bash
+# assuming you're in the moseq2-app directory:
+conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
+
+conda activate moseq2-app
+
+# Ensure you're in the moseq2-app/ folder with your new conda environment activated
+./scripts/install_moseq2_app.sh
+```
 
 You can check that you have the correct dependency versions using the commands below:
 ```bash
