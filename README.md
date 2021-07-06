@@ -357,8 +357,8 @@ For information on getting started, check out the [MoSeq Wiki](https://github.co
 
 ## Bug Reporting
 
-If you experience any errors during installation, consult the [troubleshooting](./TROUBLESHOOT.md) guide.
-If the your issue is not resolved there, submit a GitHub issue.
+If you experience any errors during installation, consult the [troubleshooting](./TROUBLESHOOT.md) guide or [wiki](https://github.com/dattalab/moseq2-app/wiki/Troubleshooting).
+If the your issue is not resolved there, consider submitting a GitHub issue.
 
 To report any issues or bugs using the notebook(s), please refer to the GitHub issues page in this repository:
 [Report Issue](https://github.com/dattalab/moseq2-app/issues/new).
