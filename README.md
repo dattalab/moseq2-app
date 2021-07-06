@@ -4,6 +4,20 @@
 
 <center><img src="https://drive.google.com/uc?export=view&id=1PxTnCMsrk3hRHPnEjqGDzq1oPkTYfzj0"></center>
 
+Last Updated: 04/07/2021
+
+## Table of Contents
+- [MoSeq2-Notebook: A suite of interactive Jupyter notebooks for animal behavior sequencing and analysis](#moseq2-notebook-a-suite-of-interactive-jupyter-notebooks-for-animal-behavior-sequencing-and-analysis)
+  * [Overview](#overview)
+  * [Installation Instructions and Getting Started](#installation-and-getting-started)
+    + [Software Requirements](#software-requirements)
+  * [Installation](#installation)
+  * [Downloading a test dataset](#downloading-a-test-dataset)
+  * [Getting started](#getting-started)
+    + [Organizing a MoSeq Dataset](#organizing-a-moseq-dataset)
+    + [Starting the Jupyter Notebooks](#starting-the-jupyter-notebooks)
+  * [Bug Reporting](#bug-reporting)
+
 ## Overview
 
 The MoSeq2 toolkit enables users to model rodent behavior across different experimental groups, and
