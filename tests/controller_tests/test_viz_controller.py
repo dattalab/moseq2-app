@@ -86,11 +86,15 @@ class TestSyllableLabeler(TestCase):
     # Syllable Labeler Tests
     def test_labeler_init(self):
 
+        # asserting that the input arguments into the init function were properly set.
+        # the following files in the assertions are newly generated
         assert len(self.gui.syll_info) == 6
         assert exists('data/syll_info.yaml')
         assert exists('data/syll_df.parquet')
         assert exists('data/moseq_scalar_dataframe.parquet')
 
+        # asserting that upon reloading pre-existing files with max_syllables, the correct number of
+        # syllables are returned.
         self.gui = SyllableLabeler(self.model_fit,
                                    self.progress_paths['model_path'],
                                    self.progress_paths['index_file'],
@@ -106,6 +110,7 @@ class TestSyllableLabeler(TestCase):
 
         os.remove('data/syll_info.yaml')
 
+        # asserting that the syll_info.yaml file will be regenerated if it didn't exist
         self.gui = SyllableLabeler(self.model_fit,
                                    self.progress_paths['model_path'],
                                    self.progress_paths['index_file'],
@@ -114,6 +119,8 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
+        # assert that file is being regenerated
+        assert exists('data/syll_info.yaml')
         assert len(list(self.gui.syll_select.options.keys())) == len(list(range(self.gui.max_sylls)))
 
     def test_clear_on_click(self):
