@@ -260,6 +260,44 @@ MoSeq's pipeline in detail. To use the notebooks, make sure that you've
 activated the conda environment you installed MoSeq in (likely `moseq2-app`)
 and you have navigated to the folder that contains the jupyter notebook(s).
 
+### Organizing a MoSeq Dataset
+
+The currently accepted depth data extensions are:
+- `.dat` (raw depth files from our kinect2 data acquisition software)
+- `.tar.gz` (compressed depth files from our kinect2 data acquisition software)
+- `.avi` (compressed depth files from the `moseq2-extract` command line interface)
+- `.mkv` (generated from Microsoft's recording software for the Azure Kinect)
+
+To the notebooks, create a master folder with a copy of the provided notebooks,
+ and separate subfolders for each recording file (+relevant metadata). Shown in example directory structure below: 
+
+```
+.
+└── Data_Directory/
+    ├── Main-MoSeq2-Notebook.ipynb (1)
+    ├── Interactive-Model-Results-Exploration.ipynb (2)
+    ├── Model-Results-Extension.ipynb (3)
+    ├── session_1/ ** - the folder containing all of a single session's data
+    ├   ├── depth.dat        # depth data - the recording itself
+    ├   ├── depth_ts.txt     # timestamps - csv/txt file of the frame timestamps
+    ├   └── metadata.json    # metadata - json file that contains the rodent's info (group, subjectName, etc.)
+    ...
+    ├── session_N/ **
+    ├   ├── depth.dat
+    ├   ├── depth_ts.txt
+    └── └── metadata.json
+
+```
+
+__Note: if your data was acquired using an Azure Kinect or Intel RealSense depth camera, 
+you will not have `depth_ts.txt` or `metadata.json` in your session directories. 
+Before extraction you need to manually create a `metadata.json` file if you wish to identify sessions 
+based on the session name or mouse ID.__ The metadata.json file should minimally contain the following content structure:
+
+```json
+{"SessionName": "example session", "SubjectName": "example subject", "StartTime": "optional"}
+```
+
 __:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
 your dataset so that the videos you generate will load into the notebooks properly.__ Moreover, we
 recommend each modeling project have its own dedicated set of notebooks, especially for analysis to 
