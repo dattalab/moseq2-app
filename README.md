@@ -37,28 +37,31 @@ and/or fill out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 Currently, we offer 5 notebooks that provide tutorials for using MoSeq's pipeline
 to extract, preprocess, model, and perform basic analysis on experimental data. We
 hope to expand our selection of notebooks based on user feedback and the
-project's trajectory.
+project's trajectory. You can find the base copies of notebooks within the `notebooks/` directory.
 
-### The main MoSeq notebook ([link](./Main-MoSeq2-Notebook.ipynb))
+### Notebook Order
+<img src="https://drive.google.com/uc?export=view&id=1QXuvIfkK5Qi-mqlX9D7TbdXXLsk5mSrA">
+
+### The main MoSeq notebook ([link](./notebooks/Main-MoSeq2-Notebook.ipynb))
 
 A detailed and complete walk-through of the MoSeq pipeline — from data extraction to modeling.
 It includes examples of what to expect at each step, and what to do if things don't go as expected.
 There are also a few visualizations to help with extraction and modeling. 
 
-### A notebook to explore modeling and experimental results interactively ([link](./Interactive-Model-Results-Exploration.ipynb))
+### A notebook to explore modeling and experimental results interactively ([link](./notebooks/Interactive-Model-Results-Exploration.ipynb))
 
 A stand-alone notebook containing all the interactive data exploration tools for
 modeled data. Simply enter the paths to your selected model(s) and index file
 to use to syllable exploration tools.
 
-### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./Model-Results-Extension.ipynb))
+### A notebook to explore modeling and experimental results using the MoSeq2 APIs ([link](./notebooks/Model-Results-Extension.ipynb))
 
 A stand-alone notebook demonstrating the `moseq2_viz` functionality. With examples for how to obtain
 syllable usages and other scalar statistics, and plot the syllables reordered by different statistics or by
 group difference. Additional examples include computing behavioral similarity distances, transition matrices,
 and hypothesis testing.
 
-### Flip Classifier Training Notebook ([link](./Flip%20Classifier%20Training%20Notebook.ipynb))
+### Flip Classifier Training Notebook ([link](./notebooks/Flip%20Classifier%20Training%20Notebook.ipynb))
 
 This notebook is a stand-alone tool that can be used to train a new 
 flip classifier used to correct the orientation of the extracted animal. If's
@@ -66,7 +69,7 @@ utilized if the current flip classifier is not working as expected.
 For example, the current flip classifier does not work well with datasets
 acquired with the Azure or RealSense depth cameras.
 
-## Hands-Free MoSeq2 Notebook ([link](./Handsfree-MoSeq2-Notebook.ipynb))
+## Hands-Free MoSeq2 Notebook ([link](./notebooks/Handsfree-MoSeq2-Notebook.ipynb))
 
 A streamlined version of the main notebook that can be used to run the 
 entire moseq2 pipeline with no user input. This would be useful for users 
