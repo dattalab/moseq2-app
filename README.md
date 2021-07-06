@@ -156,75 +156,8 @@ If you prefer to install the full Anaconda package, we refer you to the
 
 Learn more about `conda` in general [here](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
 
-### gcc
 
-We're going to walk through the process of installing `gcc-7` but you can install any of the
-supported versions listed above. Just replace `7` with the version you want to install.
 
-To check if you have `gcc-7`/`g++-7` is installed, run this command:
-```bash
-which gcc-7 # if you're on macOS
-which gcc   # if you're on linux
-```
-You should expect to see a path to your gcc-7 installation, like this:
-```bash
-/usr/local/bin/gcc-7  # or /usr/bin/gcc
-```
-
-Another way to confirm if your default gcc version is compatible is by running the following commands:
-```.bash
-gcc --version
-g++ --version
-```
-
-If gcc (or appropriate version of gcc) cannot be found, then follow these steps to install them for your respective OS:
-
-#### For macOS:
-
-1. Install [brew](https://brew.sh/), the macOS package manager, via their website.
-2. Install the xcode command line tools. Command: `xcode-select --install`
-**IMPORTANT: YOU CANNOT SKIP THIS STEP**. If you skip this step, you will see installation
-errors for `cytoolz`, `autoregressive`, and `psutil`
-3. Install gcc: `brew install gcc@7`
-
-Confirm you have `gcc-7` installed by running:
-```bash
-which gcc-7
-```
-
-The following step is important installing the `moseq2-model` dependency.
-Once you have confirmed gcc-7 is installed, run the next 2 commands to set
-them as default gcc versions. You need to run these two commands for
-the installation process only. Not every time you open a new terminal.
-
-```bash
-export CC="$(which gcc-7)"
-export CXX="$(which g++-7)"
-```
-
-If you could not install MoSeq using `gcc-7`, try `gcc-10`: `brew install gcc@10`.
-We've had success installing MoSeq with this `gcc` version too.
-#### For WSL/Linux:
-
-How to install on Ubuntu or Debian:
-```bash
-sudo apt update
-sudo apt install build-essential
-sudo apt install g++-7 gcc-7 -y
-```
-If you're using a different linux distribution, refer to their package manager to
-install gcc.
-
-The gcc version that's installed through `build-essential` should be able to compile
-`moseq2-model`'s dependencies, and there are no extra steps you need to take to make
-MoSeq recognize gcc (like you do for [macOS](#for-macos)).
-
-Alternatively, if the Ubuntu install isn't working, you can also install `gcc-7.3` with `conda`:
-```bash
-# automatically sets CC/CXX after installing, too
-conda install -c anaconda gcc_linux-64
-conda install -c anaconda gxx_linux-64
-```
 
 ### Git
 
