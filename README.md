@@ -298,6 +298,8 @@ based on the session name or mouse ID.__ The metadata.json file should minimally
 {"SessionName": "example session", "SubjectName": "example subject", "StartTime": "optional"}
 ```
 
+### Starting the Jupyter Notebooks
+
 __:exclamation: IMPORTANT: :exclamation: Make sure that the notebook is run from the same directory as 
 your dataset so that the videos you generate will load into the notebooks properly.__ Moreover, we
 recommend each modeling project have its own dedicated set of notebooks, especially for analysis to 
@@ -305,11 +307,13 @@ improve reproducibility.
 
 You can easily copy all your notebooks to your modeling project(s) by running the following command:
 ```
-cp *.ipynb /path/to/data/dir/
+# note: must be in the moseq2-app directory for this command to work
+cp notebooks/* /path/to/data/dir/ 
 ```
 
 Run the following command to launch the jupyter notebook:
 ```bash
+# note: must be in the data directory where the notebooks were copied previously to.
 jupyter notebook
 ```
 
