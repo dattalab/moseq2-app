@@ -4,6 +4,7 @@ General utility functions.
 
 '''
 import pandas as pd
+from os.path import basename
 from moseq2_viz.util import read_yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.util import compute_behavioral_statistics
@@ -56,6 +57,11 @@ def index_to_dataframe(index_path):
     tmp_df = pd.DataFrame(files)
 
     df = pd.concat([meta_df, tmp_df], axis=1)
+
+    def apply_filename(n):
+        return basename(n[0])
+
+    df['filename'] = df['path'].apply(apply_filename)
 
     return index_data, df
 

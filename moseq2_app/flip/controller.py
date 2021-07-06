@@ -82,10 +82,10 @@ class FlipRangeTool(FlipClassifierWidgets):
                         print('Error: No extracted sessions were found.')
 
             # open h5 files and get reference dict
-            self.data_dict, self.path_dict = self.load_sessions()
+            self.path_dict = self.load_sessions()
 
             # initialize selected frame range dictionary
-            self.selected_frame_ranges_dict = {k: [] for k in self.data_dict}
+            self.selected_frame_ranges_dict = {k: [] for k in self.path_dict}
             self.curr_total_selected_frames = 0
 
             # observe dropdown value changes
@@ -187,7 +187,8 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.start, self.stop = 0, 0
 
         # if so reset the button and start stop values
-        self.frame_num_slider.max = self.data_dict[self.session_select_dropdown.label].shape[0] - 1
+        with h5py.File(self.path_dict[self.session_select_dropdown.label], mode='r') as f:
+            self.frame_num_slider.max = f['frames'].shape[0] - 1
         self.frame_num_slider.value = 0
         clear_output(wait=True)
 
@@ -337,7 +338,6 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         Returns
         -------
-        data_dict (dict): dict of
         path_dict (dict): dict of session names and paths filtered for sessions missing an h5 or mp4 files.
         '''
 
@@ -356,17 +356,7 @@ class FlipRangeTool(FlipClassifierWidgets):
                 else:
                     del path_dict[key]
 
-        # Get references to h5 files
-        data_dict = {}
-        for key, path in path_dict.items():
-            try:
-                dset = h5py.File(path, mode='r+')['frames']
-                data_dict[key] = dset
-            except OSError:
-                warnings.warn(f"session {key} h5 file is not available to be read, it may be in use by another process.")
-                pass
-
-        return data_dict, path_dict
+        return path_dict
 
     def interactive_launch_frame_selector(self):
         '''
@@ -387,7 +377,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                         tools=tools,
                         output_backend="webgl")
 
-        displayed_frame = clean_frames(np.array([self.data_dict[self.session_select_dropdown.label][num]]), **self.clean_parameters)[0]
+        with h5py.File(self.path_dict[self.session_select_dropdown.label], mode='r') as f:
+            displayed_frame = clean_frames(np.array([f['frames'][num]]), **self.clean_parameters)[0]
 
         data = dict(image=[displayed_frame],
                     x=[0],
@@ -414,7 +405,6 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
-        print(self.selected_frame_ranges_dict)
 
         corrected_dataset = []
         # Get corrected frame ranges
@@ -433,7 +423,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                     correct_idx = sorted(set(np.concatenate([list(flip) for flip in correct_flips])))
 
                     # get the session and load only the selected frame range and apply filtering
-                    correct_cleaned_data = clean_frames(self.data_dict[session][correct_idx], **self.clean_parameters)
+                    with h5py.File(self.path_dict[session], mode='r') as f:
+                        correct_cleaned_data = clean_frames(f['frames'][correct_idx], **self.clean_parameters)
                     
                     # add the data to the dataset
                     corrected_dataset.append(deepcopy(correct_cleaned_data))
@@ -441,7 +432,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                 # handle frames indicated incorrectly flipped
                 if len(incorrect_flips) > 0:
                     incorrect_idx = sorted(set(np.concatenate([list(flip) for flip in incorrect_flips])))
-                    incorrect_cleaned_data = clean_frames(self.data_dict[session][incorrect_idx], **self.clean_parameters)
+                    with h5py.File(self.path_dict[session], mode='r') as f:
+                        incorrect_cleaned_data = clean_frames(f['frames'][incorrect_idx], **self.clean_parameters)
                     
                     # flip the data that is facing left
                     flip_corrected_data = np.flip(incorrect_cleaned_data, axis=2)
@@ -623,7 +615,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         if percent_correct > 90:
             print('You have achieved acceptable model accuracy.')
-            print('Re-extract the data with the newly saved model, and continue to the PCA step.')
+            print('Correct the extracted data in the next cell using your new model, and continue to the PCA step.')
         else:
             print('Model performance is not high enough to extract a valid dataset. '
                   'Either try selecting more accurate frame indices,\n'
@@ -663,42 +655,45 @@ class FlipRangeTool(FlipClassifierWidgets):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', UserWarning)
             for key, path in tqdm(self.path_dict.items(), desc='Flipping extracted sessions...'):
-                dset = h5py.File(path, mode='a')
-                output_movie = path.replace('.h5', '_flipped.mp4')
+                # Open h5 file to stream and correct/update stored frames and scalar angles.
+                with h5py.File(path, mode='a') as f:
+                    output_movie = path.replace('.h5', '_flipped.mp4')
 
-                frames = dset[frame_path]
-                frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
+                    frames = f[frame_path]
+                    frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
 
-                for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
-                    frame_batch = frames[batch]
+                    for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
+                        frame_batch = frames[batch]
 
-                    # apply flip classifier on each batch to find which frames to flip
-                    flips = get_flips(frame_batch.copy(), flip_file=self.output_file, smoothing=smoothing)
-                    flip_indices = np.where(flips)
+                        # apply flip classifier on each batch to find which frames to flip
+                        flips = get_flips(frame_batch.copy(), flip_file=self.output_file, smoothing=smoothing)
+                        flip_indices = np.where(flips)
 
-                    # rewrite the frames with the newly classified orientation
-                    frame_batch[flip_indices] = np.rot90(dset[frame_path][batch][flip_indices], k=2, axes=(1, 2))
-                    dset[frame_path][batch] = frame_batch
+                        # rewrite the frames with the newly classified orientation
+                        frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
+                        f[frame_path][batch] = frame_batch
 
-                    # augment recorded scalar value to reflect orientation switches
-                    dset['scalars/angle'][flip_indices] += np.pi
+                        # augment recorded scalar value to reflect orientation switches
+                        f['scalars/angle'][flip_indices] += np.pi
 
-                    if write_movie:
-                        try:
-                            # Writing frame batch to mp4 file
-                            video_pipe = write_frames_preview(output_movie,
-                                                              frame_batch,
-                                                              pipe=video_pipe,
-                                                              close_pipe=False,
-                                                              depth_min=0,
-                                                              depth_max=100,
-                                                              fps=fps,
-                                                              progress_bar=verbose)
-                        except AttributeError:
-                            pass
-                dset.close()
-                # Check if video is done writing. If not, wait.
-                if video_pipe is not None:
-                    video_pipe.stdin.close()
-                    video_pipe.wait()
-                    video_pipe = None
+                        if write_movie:
+                            try:
+                                # Writing frame batch to mp4 file
+                                video_pipe = write_frames_preview(output_movie,
+                                                                  frame_batch,
+                                                                  pipe=video_pipe,
+                                                                  close_pipe=False,
+                                                                  depth_min=0,
+                                                                  depth_max=100,
+                                                                  fps=fps,
+                                                                  progress_bar=verbose)
+                            except AttributeError as e:
+                                warnings.warn(f'Could not generate flipped movie for {key}:{path}. Skipping...')
+                                print(e)
+                                print(e.__traceback__)
+                                break
+                    # Check if video is done writing. If not, wait.
+                    if video_pipe is not None:
+                        video_pipe.stdin.close()
+                        video_pipe.wait()
+                        video_pipe = None

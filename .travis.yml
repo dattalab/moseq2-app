@@ -1,17 +1,20 @@
 #specs for travis ci
 language: python
-dist: trusty
-os: linux
+python: '3.6'
+dist: xenial
 
 stages:
   - pip-install
-  - install-script
+  - conda-script
+  - name: conda-script-osx
+    if: branch = release
   - name: latest-pythons
-    if: branch = master
+    if: branch = release
 
 jobs:
   include:
     - env: ISOLATED=true
+      os: linux
       python: '3.6'
       stage: pip-install
       before_install:
@@ -19,7 +22,7 @@ jobs:
         - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
@@ -33,25 +36,55 @@ jobs:
         - codecov -t $CC_TEST_REPORTER_ID
 
     - env: ISOLATED=true
+      os: linux
       python: '3.6'
-      stage: install-script
+      stage: conda-script
       before_install:
-        - pip install -U pip
-        - pip install awscli
-        - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+        - bash miniconda.sh -b -p $HOME/miniconda
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
+        - hash -r
+        - conda config --set always_yes yes --set changeps1 no
+        - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
+        - conda activate moseq2-app
+        - pip install awscli
+        - pip install pytest codecov
+        - pip install pytest-cov
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
         - make
       script:
-        - pytest --cov-report xml --cov-report term
-      after_success:
-        - codecov -t $CC_TEST_REPORTER_ID
+        - pytest
+
+    - env: ISOLATED=true
+      os: osx
+      osx_image: xcode10.2
+      language: shell
+      stage: conda-script-osx
+      before_install:
+        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "miniconda3_latest.sh"
+        - chmod +x miniconda3_latest.sh  # turn script into excutable
+        - hash -r
+        - ./miniconda3_latest.sh -b -f -p $HOME/miniconda
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
+        - conda config --set always_yes yes --set changeps1 no
+        - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
+        - conda activate moseq2-app
+        - pip install awscli
+        - pip install pytest==5.4.1 codecov pytest-cov
+      install:
+        - ./scripts/install_moseq2_app.sh
+      before_script:
+        - make
+      script:
+        - pytest
 
     - env: ISOLATED=true
       dist: xenial
@@ -62,7 +95,7 @@ jobs:
         - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/trusty-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
@@ -74,3 +107,28 @@ jobs:
         - pytest --cov-report xml --cov-report term
       after_success:
         - codecov -t $CC_TEST_REPORTER_ID
+
+    - env: ISOLATED=true
+      os: osx
+      osx_image: xcode10.2
+      python: '3.7'
+      stage: latest-pythons
+      before_install:
+        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o miniconda3_latest.sh
+        - chmod +x miniconda3_latest.sh  # turn script into excutable
+        - hash -r
+        - ./miniconda3_latest.sh -b -p $HOME/miniconda
+        - source "$HOME/miniconda/etc/profile.d/conda.sh"
+        - conda config --set always_yes yes --set changeps1 no
+        - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
+        - conda activate moseq2-app
+        - pip install awscli
+        - pip install pytest codecov
+        - pip install pytest-cov
+      install:
+        - ./scripts/install_moseq2_app.sh
+      before_script:
+        - make
+      script:
+        - pytest

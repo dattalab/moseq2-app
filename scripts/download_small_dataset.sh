@@ -1,6 +1,6 @@
 #!/bin/bash
 mkdir small_test_ds
-cp Main-MoSeq2-Notebook.ipynb small_test_ds
+cp notebooks/*.ipynb small_test_ds
 cd small_test_ds
 
 # amphetamine data
