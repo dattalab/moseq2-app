@@ -2,9 +2,7 @@
 
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/dattalab/community)
 
-<center><img src="https://drive.google.com/uc?export=view&id=1kHdmkBx_XlueTJocREDx4YeHGrjfYKJv"></center>
-
-Last Updated: 11/30/2020
+<center><img src="https://drive.google.com/uc?export=view&id=1PxTnCMsrk3hRHPnEjqGDzq1oPkTYfzj0"></center>
 
 ## Overview
 
