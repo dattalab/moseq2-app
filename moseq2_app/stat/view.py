@@ -44,9 +44,6 @@ def graph_dendrogram(obj, syll_info):
                        height=500,
                        output_backend="svg")
 
-    # Show syllable info on hover
-    cladogram.add_tools(HoverTool(tooltips=[('label', '@labels')]), TapTool(), BoxSelectTool())
-
     # Get distance sorted label ordering
     labels = list(map(int, obj.results['ivl']))
     sources = []
@@ -457,7 +454,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     pickers (list of ColorPickers): List of interactive color picker widgets to update the graph colors.
     slider (bokeh.models.RangeSlider): RangeSlider object used to threshold/filter the displayed syllables.
     '''
-    warnings.filterwarnings('ignore',)
+    warnings.filterwarnings('ignore')
 
     pickers = []
 
@@ -498,11 +495,13 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8,
                                     muted_alpha=0.1, legend_label=group, color=color)
 
-        # setup searchbox hovertool
+        # setup searchbox callback function
+        # callback function will allow user interaction to dynamically edit the circle.ColumnDataSource
         search_callback = setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, line)
         searchbox.js_on_change('value', search_callback)
 
         # setup slider callback function to update the plot
+        # callback function will allow user interaction to dynamically edit the circle.ColumnDataSource
         slider_callback = setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat)
         slider.js_on_change('value', slider_callback)
 
@@ -783,9 +782,8 @@ def get_neighbors(graph, node_indices, group_name):
     for k, v in neighbor_edge_colors.items():
         k1 = k[::-1]
         if k1 in neighbor_edge_colors:
-            if v != neighbor_edge_colors[k1]:
-                neighbor_edge_colors[k] = 'green'
-                neighbor_edge_colors[k1] = 'green'
+            neighbor_edge_colors[k] = 'green'
+            neighbor_edge_colors[k1] = 'green'
 
     return prev_states, next_states, neighbor_edge_colors
 
@@ -1277,6 +1275,8 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
             x, y = zip(*new_layout.values())
             syllable = [a if a in node_indices else '' for a in new_layout]
     except:
+        # If the graph has been thresholded such that there are missing syllables, or is empty altogether
+        # (with or without thresholding) we remove all the node label coordinates.
         x, y = [], []
         syllable = []
 

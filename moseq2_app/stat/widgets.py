@@ -5,8 +5,10 @@ Widgets module containing classes with components for each of the interactive sy
 
 '''
 
+import numpy as np
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
+from IPython.display import clear_output
 
 class SyllableStatWidgets:
 
@@ -44,6 +46,47 @@ class SyllableStatWidgets:
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
         self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
+    
+    def clear_on_click(self, b=None):
+        '''
+        Clears the cell output
+
+        Parameters
+        ----------
+        b (button click)
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+        del self
+
+    def on_grouping_update(self, event):
+        '''
+        Updates the MultipleSelect widget upon selecting groupby == SubjectName or SessionName.
+        Hides it if groupby == group.
+
+        Parameters
+        ----------
+        event (user clicks new grouping)
+
+        Returns
+        -------
+        '''
+
+        if event.new == 'SessionName':
+            self.session_sel.layout.display = "flex"
+            self.session_sel.layout.align_items = 'stretch'
+            self.session_sel.options = self.session_names
+        elif event.new == 'SubjectName':
+            self.session_sel.layout.display = "flex"
+            self.session_sel.layout.align_items = 'stretch'
+            self.session_sel.options = self.subject_names
+        else:
+            self.session_sel.layout.display = "none"
+
+        self.session_sel.value = [self.session_sel.options[0]]
 
 class SyllableStatBokehCallbacks:
     def __init__(self, condition=''):
@@ -233,3 +276,80 @@ class TransitionGraphWidgets:
                                            layout=col1_layout),
                                       VBox([self.color_nodes_dropdown, self.speed_thresholder], layout=col2_layout)],
                                            layout=ui_layout)
+
+    def clear_on_click(self, b=None):
+        '''
+        Clears the cell output
+
+        Parameters
+        ----------
+        b (button click)
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+
+    def set_range_widget_values(self):
+        '''
+        After the dataset is initialized, the threshold range sliders' values will be set
+         according to the standard deviations of the dataset.
+
+        Returns
+        -------
+        '''
+
+        # Update threshold range values
+        edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
+        usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
+        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
+
+        self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
+                                         range(edge_threshold_stds)]
+        self.edge_thresholder.index = (1, edge_threshold_stds - 1)
+
+        self.usage_thresholder.options = [float('%.3f' % (self.df['usage'].std() * i)) for i in
+                                          range(usage_threshold_stds)]
+        self.usage_thresholder.index = (0, usage_threshold_stds - 1)
+
+        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
+                                          range(speed_threshold_stds)]
+        self.speed_thresholder.index = (0, speed_threshold_stds - 1)
+
+    def on_set_scalar(self, event):
+        '''
+        Updates the scalar threshold slider filter criteria according to the current node coloring.
+        Changes the name of the slider as well.
+
+        Parameters
+        ----------
+        event (dropdown event): User changes selected dropdown value
+
+        Returns
+        -------
+        '''
+
+        if event.new == 'Default' or event.new == '2D velocity':
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+        elif event.new == '2D velocity':
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+        elif event.new == '3D velocity':
+            key = 'velocity_3d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 3D Velocity'
+        elif event.new == 'Height':
+            key = 'height_ave_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by Height'
+        elif event.new == 'Distance to Center':
+            key = 'dist_to_center_px'
+            self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
+        else:
+            key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+
+        scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
+        self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
+                                          range(scalar_threshold_stds)]
+        self.speed_thresholder.index = (0, scalar_threshold_stds - 1)

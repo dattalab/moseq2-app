@@ -56,11 +56,15 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.index_path = index_path
         self.df_path = df_path
 
+        # If user inputs load_parquet=True in main.py function label_syllables()
+        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
+        # to load the data from.
         if load_parquet:
             if df_path is not None:
                 if not os.path.exists(df_path):
                     self.df_path = None
         else:
+            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
             self.df_path = None
 
         self.df = None
@@ -115,47 +119,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             'thresh': self.thresholding_dropdown
         })
 
-    def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
-
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-        del self
-
-    def on_grouping_update(self, event):
-        '''
-        Updates the MultipleSelect widget upon selecting groupby == SubjectName or SessionName.
-        Hides it if groupby == group.
-
-        Parameters
-        ----------
-        event (user clicks new grouping)
-
-        Returns
-        -------
-        '''
-
-        if event.new == 'SessionName':
-            self.session_sel.layout.display = "flex"
-            self.session_sel.layout.align_items = 'stretch'
-            self.session_sel.options = self.session_names
-        elif event.new == 'SubjectName':
-            self.session_sel.layout.display = "flex"
-            self.session_sel.layout.align_items = 'stretch'
-            self.session_sel.options = self.subject_names
-        else:
-            self.session_sel.layout.display = "none"
-
-        self.session_sel.value = [self.session_sel.options[0]]
-
     def compute_dendrogram(self):
         '''
         Computes the pairwise distances between the included model AR-states, and
@@ -170,6 +133,12 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                                     max_syllable=self.max_sylls,
                                     distances='ar[init]')['ar[init]']
 
+        # Finding the first syllable where the distance between 2 states is np.nan
+        # If/when that np.nan syllable-pair distance is found,
+        # the nan distances, including the following syllables, will be removed from the matrix X.
+        # The reason why the matrix X is cut off upon finding the first np.nan distance is because the
+        # syllables are already relabeled by usage, therefore if a syllable is reported to be not used, then
+        # the subsequent syllables will also not be used.
         is_missing = np.isnan(X)
         if is_missing.any():
             print('Existing model does not have equal amount of requested states.')
@@ -226,6 +195,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if self.max_sylls is None:
             self.max_sylls = max_sylls
 
+        # if load_parquet=True, and self.df_path points to an existing parquet file,
+        # then the syllable statistics DataFrame will be loaded from the parquet file.
+        # otherwise, the DataFrame is computed from scratch
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
@@ -341,10 +313,15 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.max_sylls = max_sylls
         self.plot_vertically = plot_vertically
 
+        # If user inputs load_parquet=True in main.py function label_syllables()
+        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
+        # to load the data from.
         if load_parquet:
-            if df_path is not None and not os.path.exists(df_path):
-                self.df_path = None
+            if df_path is not None:
+                if not os.path.exists(df_path):
+                    self.df_path = None
         else:
+            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
             self.df_path = None
 
         # Load Model
@@ -374,83 +351,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             'Height': 'heights',
             'Distance to Center': 'dists'
         }
-
-    def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
-
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-
-    def set_range_widget_values(self):
-        '''
-        After the dataset is initialized, the threshold range sliders' values will be set
-         according to the standard deviations of the dataset.
-
-        Returns
-        -------
-        '''
-
-        # Update threshold range values
-        edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
-        usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
-
-        self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
-                                         range(edge_threshold_stds)]
-        self.edge_thresholder.index = (1, edge_threshold_stds - 1)
-
-        self.usage_thresholder.options = [float('%.3f' % (self.df['usage'].std() * i)) for i in
-                                          range(usage_threshold_stds)]
-        self.usage_thresholder.index = (0, usage_threshold_stds - 1)
-
-        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
-                                          range(speed_threshold_stds)]
-        self.speed_thresholder.index = (0, speed_threshold_stds - 1)
-
-    def on_set_scalar(self, event):
-        '''
-        Updates the scalar threshold slider filter criteria according to the current node coloring.
-        Changes the name of the slider as well.
-
-        Parameters
-        ----------
-        event (dropdown event): User changes selected dropdown value
-
-        Returns
-        -------
-        '''
-
-        if event.new == 'Default' or event.new == '2D velocity':
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-        elif event.new == '2D velocity':
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-        elif event.new == '3D velocity':
-            key = 'velocity_3d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 3D Velocity'
-        elif event.new == 'Height':
-            key = 'height_ave_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by Height'
-        elif event.new == 'Distance to Center':
-            key = 'dist_to_center_px'
-            self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
-        else:
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-
-        scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
-        self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
-                                          range(scalar_threshold_stds)]
-        self.speed_thresholder.index = (0, scalar_threshold_stds - 1)
 
     def compute_entropies(self, labels, label_group):
         '''
