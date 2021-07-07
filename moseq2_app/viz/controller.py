@@ -103,10 +103,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.next_button.on_click(self.on_next)
         self.prev_button.on_click(self.on_prev)
         self.set_button.on_click(self.on_set)
+        self.clear_button.on_click(self.clear_on_click)
 
         self.get_mean_syllable_info()
-
-        self.clear_button.on_click(self.clear_on_click)
 
         # Populate syllable info dict with relevant syllable information
         self.get_crowd_movie_paths(index_file, model_path, self.config_data, crowd_movie_dir)
@@ -116,21 +115,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Set the syllable dropdown options
         self.syll_select.options = self.option_dict
-
-    def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
-
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-        del self
 
     def write_syll_info(self, curr_syll=None):
         '''
@@ -156,86 +140,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
             self.syll_select.options = self.option_dict
             self.syll_select.index = curr_syll
             self.syll_select._initializing_traits_ = False
-
-    def on_next(self, event=None):
-        '''
-        Callback function to trigger an view update when the user clicks the "Next" button.
-
-        Parameters
-        ----------
-        event (ipywidgets.ButtonClick): User clicks next button.
-
-        Returns
-        -------
-        '''
-
-        # Updating dict
-        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
-        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
-
-        # Handle cycling through syllable labels
-        if self.syll_select.index < len(self.syll_select.options) - 1:
-            # Updating selection to trigger update
-            self.syll_select.index += 1
-        else:
-            self.syll_select.index = 0
-        curr_index = self.syll_select.index
-
-        # Updating input values with current dict entries
-        self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
-        self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
-
-        self.write_syll_info(curr_syll=curr_index)
-
-    def on_prev(self, event=None):
-        '''
-        Callback function to trigger an view update when the user clicks the "Previous" button.
-
-        Parameters
-        ----------
-        event (ipywidgets.ButtonClick): User clicks 'previous' button.
-
-        Returns
-        -------
-        '''
-
-        # Update syllable information dict
-        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
-        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
-
-        # Handle cycling through syllable labels
-        if self.syll_select.index != 0:
-            # Updating selection to trigger update
-            self.syll_select.index -= 1
-        else:
-            self.syll_select.index = len(self.syll_select.options) - 1
-
-        # Reloading previously inputted text area string values
-        self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
-        self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
-
-        self.write_syll_info(curr_syll=self.syll_select.index)
-
-    def on_set(self, event=None):
-        '''
-        Callback function to save the dict to syllable information file.
-
-        Parameters
-        ----------
-        event (ipywidgets.ButtonClick): User clicks the 'Save' button.
-
-        Returns
-        -------
-        '''
-
-        # Update dict
-        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
-        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
-
-        self.write_syll_info()
-
-        # Update button style
-        self.set_button.button_style = 'success'
 
     def get_mean_group_dict(self, group_df):
         '''

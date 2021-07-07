@@ -8,6 +8,7 @@ Widgets module containing classes with components for each of the interactive sy
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 from bokeh.models.widgets import PreText
+from IPython.display import clear_output
 
 class SyllableLabelerWidgets:
 
@@ -76,6 +77,101 @@ class SyllableLabelerWidgets:
 
         # button box
         self.button_box = HBox([self.prev_button, self.set_button, self.next_button], layout=self.ui_layout)
+
+    def clear_on_click(self, b=None):
+        '''
+        Clears the cell output
+
+        Parameters
+        ----------
+        b (button click)
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+        del self
+
+    def on_next(self, event=None):
+        '''
+        Callback function to trigger an view update when the user clicks the "Next" button.
+
+        Parameters
+        ----------
+        event (ipywidgets.ButtonClick): User clicks next button.
+
+        Returns
+        -------
+        '''
+
+        # Updating dict
+        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
+        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
+
+        # Handle cycling through syllable labels
+        if self.syll_select.index < len(self.syll_select.options) - 1:
+            # Updating selection to trigger update
+            self.syll_select.index += 1
+        else:
+            self.syll_select.index = 0
+        curr_index = self.syll_select.index
+
+        # Updating input values with current dict entries
+        self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
+        self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
+
+        self.write_syll_info(curr_syll=curr_index)
+
+    def on_prev(self, event=None):
+        '''
+        Callback function to trigger an view update when the user clicks the "Previous" button.
+
+        Parameters
+        ----------
+        event (ipywidgets.ButtonClick): User clicks 'previous' button.
+
+        Returns
+        -------
+        '''
+
+        # Update syllable information dict
+        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
+        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
+
+        # Handle cycling through syllable labels
+        if self.syll_select.index != 0:
+            # Updating selection to trigger update
+            self.syll_select.index -= 1
+        else:
+            self.syll_select.index = len(self.syll_select.options) - 1
+
+        # Reloading previously inputted text area string values
+        self.lbl_name_input.value = self.syll_info[self.syll_select.index]['label']
+        self.desc_input.value = self.syll_info[self.syll_select.index]['desc']
+
+        self.write_syll_info(curr_syll=self.syll_select.index)
+
+    def on_set(self, event=None):
+        '''
+        Callback function to save the dict to syllable information file.
+
+        Parameters
+        ----------
+        event (ipywidgets.ButtonClick): User clicks the 'Save' button.
+
+        Returns
+        -------
+        '''
+
+        # Update dict
+        self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
+        self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
+
+        self.write_syll_info()
+
+        # Update button style
+        self.set_button.button_style = 'success'
 
 class CrowdMovieCompareWidgets:
 
