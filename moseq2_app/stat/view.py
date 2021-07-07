@@ -660,11 +660,13 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         error_bars = fig.multi_line('x', 'y', source=err_source, alpha=0.8,
                                     muted_alpha=0.1, legend_label=group, color=color)
 
-        # setup searchbox hovertool
+        # setup searchbox callback function
+        # callback function will allow user interaction to dynamically edit the circle.ColumnDataSource
         search_callback = setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, line)
         searchbox.js_on_change('value', search_callback)
 
         # setup slider callback function to update the plot
+        # callback function will allow user interaction to dynamically edit the circle.ColumnDataSource
         slider_callback = setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_stat)
         slider.js_on_change('value', slider_callback)
 
