@@ -7,6 +7,7 @@ Widgets module containing classes with components for each of the interactive sy
 
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
+from IPython.display import clear_output
 
 class SyllableStatWidgets:
 
@@ -44,6 +45,47 @@ class SyllableStatWidgets:
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
         self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
+
+    def clear_on_click(self, b=None):
+        '''
+        Clears the cell output
+
+        Parameters
+        ----------
+        b (button click)
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+        del self
+
+    def on_grouping_update(self, event):
+        '''
+        Updates the MultipleSelect widget upon selecting groupby == SubjectName or SessionName.
+        Hides it if groupby == group.
+
+        Parameters
+        ----------
+        event (user clicks new grouping)
+
+        Returns
+        -------
+        '''
+
+        if event.new == 'SessionName':
+            self.session_sel.layout.display = "flex"
+            self.session_sel.layout.align_items = 'stretch'
+            self.session_sel.options = self.session_names
+        elif event.new == 'SubjectName':
+            self.session_sel.layout.display = "flex"
+            self.session_sel.layout.align_items = 'stretch'
+            self.session_sel.options = self.subject_names
+        else:
+            self.session_sel.layout.display = "none"
+
+        self.session_sel.value = [self.session_sel.options[0]]
 
 class TransitionGraphWidgets:
 
