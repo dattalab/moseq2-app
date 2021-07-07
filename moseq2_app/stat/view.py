@@ -622,7 +622,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     pickers (list of ColorPickers): List of interactive color picker widgets to update the graph colors.
     slider (bokeh.models.RangeSlider): RangeSlider object used to threshold/filter the displayed syllables.
     '''
-    warnings.filterwarnings('ignore',)
+    warnings.filterwarnings('ignore')
 
     pickers = []
 
