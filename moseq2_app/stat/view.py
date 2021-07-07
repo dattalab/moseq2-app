@@ -234,14 +234,14 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
 
     return callback
 
-def setup_hovertool(circle, callback=None):
+def setup_hovertool(renderers, callback=None):
     '''
     Initialize hover tool with tooltips showing all the syllable information and the crowd movies upon
      hovering over a syllable circle glyph.
 
     Parameters
     ----------
-    circle (bokeh.glyph circle): drawn bokeh glyph representing syllables, that will be updated in the callback function
+    renderers (list bokeh.Renderer Instances): drawn bokeh glyph representing syllables, that will be updated in the callback function
     callback (bokeh.models.CustomJS): javascript callback function to embed to hover tool objects to preserve alignment.
 
     Returns
@@ -271,7 +271,7 @@ def setup_hovertool(circle, callback=None):
                 </div>
                 """
 
-    hover = HoverTool(renderers=[circle],
+    hover = HoverTool(renderers=renderers,
                       callback=callback,
                       tooltips=tooltips,
                       point_policy='snap_to_data',
@@ -507,9 +507,8 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         slider.js_on_change('value', slider_callback)
 
         # update hover tools to match the thresholded plot points
-        hover = setup_hovertool(circle, search_callback)
+        hover = setup_hovertool(fig.renderers)
         fig.add_tools(hover)
-
         # set up color pickers and link the selection to all the drawn glyphs
         if groupby == 'group':
             picker = ColorPicker(title=f"{group} Line Color")
