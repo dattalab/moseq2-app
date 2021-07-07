@@ -886,8 +886,10 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             if self.get_pdfs:
                 group_info = pd.DataFrame(syll_info_df.drop('pdf', axis=0)[group_name]).to_html()
                 try:
+                    # The 'pdf' key is pointing to the outputted syllable-position heatmap for each grouping.
                     group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
                 except:
+                    # If a group does not express this syllable, then a empty heatmap will be generated in it's place.
                     group_syllable_pdf = np.zeros((50, 50))
                     if len(cm_path) == 0:
                         continue
