@@ -144,6 +144,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
         -------
         '''
 
+        # Dropping sub-dictionaries from the syll_info dict that contain
+        # the syllable statistics information plotted in the info table in the Syllable Labeler GUI.
+        # The sub-dicts are dropped in order to keep the syll_info.yaml file clean, only containing the
+        # label, description, and crowd movie path for each syllable.
         tmp = deepcopy(self.syll_info)
         for syll in range(self.max_sylls):
             tmp[syll].pop('group_info', None)
