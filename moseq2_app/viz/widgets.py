@@ -9,6 +9,7 @@ import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 from bokeh.models.widgets import PreText
 from IPython.display import clear_output
+from moseq2_app.viz.view import display_crowd_movies
 
 class SyllableLabelerWidgets:
 
