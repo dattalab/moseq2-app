@@ -46,7 +46,7 @@ class SyllableStatWidgets:
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
         self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
-
+    
     def clear_on_click(self, b=None):
         '''
         Clears the cell output
@@ -87,6 +87,141 @@ class SyllableStatWidgets:
             self.session_sel.layout.display = "none"
 
         self.session_sel.value = [self.session_sel.options[0]]
+
+class SyllableStatBokehCallbacks:
+    def __init__(self, condition=''):
+        '''
+        Initializes JS string elements containing different code chunks. The code chunk list is as follows:
+         1. js_variables: The first step of the Bokeh-CustomJS callback function initializing all of the
+          Bokeh ColumnDataSource variables that will be dynamically updated during user interaction.
+         2. js_for_loop: The second step of the callback which is used to iterate through all of the
+          indices on the x-axis of the syllable statistics plot. The contents of the for-loop will decide what gets
+          plotted on the Bokeh.figure using a js_condition.
+         3. js_condition: An if-statement that resides directly after opening a for-loop; it is used to filter out
+          syllables that do not pass the given condition. E.g. Syllable "label" not in Syllable SearchBox.
+         4. js_condition_pass: The code block that runs upon passing the js_condition. Upon passing,
+          the syllable variables will be append to all of the list variables in js_variables.
+         5. js_condition_fail: The code block that runs if the js_condition fails. It is mainly used to hide the
+          line from the stat plot if the points are disjointed.
+          Note: the js_for_loop is also closed in this code block. Therefore, no other operations are being run.
+         6. js_update: The final step in the CustomJS Callback; there is an inputted variable "source" that has an
+          attribute named "data" (source.data), which contains attribute references
+          to all of the variables in js_variables. If source.data.xyz is updated in this section with a corresponding
+          variable "xyz", and the change is "emitted" using "source.change.emit();", only then will the Bokeh figure be
+          updated. The "source" variable is what controls the dynamic setting of variables in Bokeh.
+         7. code: The concatenation of all the previous variables to create a
+          complete asynchronous JS callback function. This is the code that is passed to the CustomJS object.
+
+        Parameters
+        ----------
+        condition (str): string code block that contains a condition to dynamically filter/edit a Bokeh figure using
+         bokeh widgets.
+        '''
+
+        self.js_condition = condition
+
+        self.js_variables = '''
+                        // All of these arrays will always end up to be the same length
+                    
+                        // initialize all the variables that appear in the HoverTool
+                        // these same variables represent all the attributes that are held by Bokeh Gylph objects.
+                        var index = [], number = [], sem = [];
+                        var x = [], y = [], usage = [], speed_2d = []; 
+                        var speed_3d = [], height = [], dist = []; 
+                        var label = [], desc = [], movies = [];
+                    
+                        // initialize the same variables for the plotted error bars.
+                        // this is important in order to filter out both the plotted points AND their error bars.
+                        var err_x = [], err_y = [];
+                        var err_number = [], err_usage = []; 
+                        var err_speed_2d = [], err_speed_3d = [], err_sem = [];
+                        var err_height = [], err_dist = [], err_label = [];
+                        var err_desc = [], err_movies = [];\n
+                       '''
+
+        # iterating through the total number of syllables in the set.
+        self.js_for_loop = '''for (var i = 0; i < data['x'].length; i++) {\n'''
+
+        self.js_condition_pass = '''
+                            // append accepted syllables to all the js_variables
+                            index.push(i);
+                            x.push(data['x'][i]);
+                            y.push(data['y'][i]);
+                            sem.push(data['sem'][i]);
+                            number.push(data['number'][i]);
+                            usage.push(data['usage'][i]);
+                            speed_2d.push(data['speed_2d'][i]);
+                            speed_3d.push(data['speed_3d'][i]);
+                            height.push(data['height'][i]);
+                            dist.push(data['dist_to_center'][i]);
+                            label.push(data['label'][i]);
+                            desc.push(data['desc'][i]);
+                            movies.push(data['movies'][i]);
+    
+                            err_x.push(err_data['x'][i]);
+                            err_y.push(err_data['y'][i]);
+                            err_number.push(err_data['number'][i]);
+    
+                            err_sem.push(err_data['sem'][i]);
+                            err_usage.push(err_data['usage'][i]);
+                            err_speed_2d.push(err_data['speed_2d'][i]);
+                            err_speed_3d.push(err_data['speed_3d'][i]);
+                            err_height.push(err_data['height'][i]);
+                            err_dist.push(err_data['dist_to_center'][i]);
+                            err_label.push(err_data['label'][i]);
+                            err_desc.push(err_data['desc'][i]);
+                            err_movies.push(err_data['movies'][i]);\n
+                            '''
+
+        self.js_condition_fail = '''
+                                } else {
+                                    // hide the joining line-plot in the syllable statistics if the included
+                                    // syllable set is not contiguous.
+                                    line.visible = false;
+                                }\n
+                            }
+                            '''
+
+        self.js_update = '''
+                    // update the data source controlling the interactive figure and emit the changes.
+                    source.data.index = index;
+                    source.data.number = number;
+                    source.data.x = x;
+                    source.data.y = y;
+                    source.data.sem = sem;
+                    source.data.usage = usage;
+                    source.data.speed_2d = speed_2d;
+                    source.data.speed_3d = speed_3d;
+                    source.data.height = height;
+                    source.data.dist_to_center = dist;
+                    source.data.label = label;
+                    source.data.desc = desc;
+                    source.data.movies = movies;
+                    
+                    // update the plotted points
+                    source.change.emit();
+    
+                    err_source.data.index = index;
+                    err_source.data.x = err_x;
+                    err_source.data.y = err_y;
+    
+                    err_source.data.number = err_number;
+                    err_source.data.usage = err_usage;
+                    err_source.data.sem = err_sem;
+                    err_source.data.speed_2d = err_speed_2d;
+                    err_source.data.speed_3d = err_speed_3d;
+                    err_source.data.height = err_height;
+                    err_source.data.dist_to_center = err_dist;
+                    err_source.data.label = err_label;
+                    err_source.data.desc = err_desc;
+                    err_source.data.movies = err_movies;
+                    
+                    // update the plotted error bars
+                    err_source.change.emit();\n
+                    '''
+
+        self.code = self.js_variables + self.js_for_loop + self.js_condition + \
+               self.js_condition_pass + self.js_condition_fail + self.js_update
 
 class TransitionGraphWidgets:
 
