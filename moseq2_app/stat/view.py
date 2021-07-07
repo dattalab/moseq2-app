@@ -948,9 +948,8 @@ def get_neighbors(graph, node_indices, group_name):
     for k, v in neighbor_edge_colors.items():
         k1 = k[::-1]
         if k1 in neighbor_edge_colors:
-            if v != neighbor_edge_colors[k1]:
-                neighbor_edge_colors[k] = 'green'
-                neighbor_edge_colors[k1] = 'green'
+            neighbor_edge_colors[k] = 'green'
+            neighbor_edge_colors[k1] = 'green'
 
     return prev_states, next_states, neighbor_edge_colors
 
