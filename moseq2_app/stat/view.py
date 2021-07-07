@@ -43,9 +43,6 @@ def graph_dendrogram(obj, syll_info):
                        height=500,
                        output_backend="svg")
 
-    # Show syllable info on hover
-    cladogram.add_tools(HoverTool(tooltips=[('label', '@labels')]), TapTool(), BoxSelectTool())
-
     # Get distance sorted label ordering
     labels = list(map(int, obj.results['ivl']))
     sources = []
