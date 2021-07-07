@@ -180,16 +180,12 @@ def setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, lin
     callback (bokeh.models.CustomJS): javascript callback function to embed to search bar and hover tool objects.
     '''
 
-    js_cbs = SyllableStatBokehCallbacks()
-
     js_condition = '''if(data['label'][i].toLowerCase().includes(searchbox.value.toLowerCase())) {\n'''
-
-    code = js_cbs.js_variables+js_cbs.js_for_loop+js_condition+\
-          js_cbs.js_condition_pass+js_cbs.js_condition_fail+'}\n'+js_cbs.js_update
+    js_cbs = SyllableStatBokehCallbacks(condition=js_condition)
 
     callback = CustomJS(
         args=dict(source=circle.data_source, err_source=err_source, searchbox=searchbox,
-                  data=src_dict, err_data=err_dict, line=line), code=code)
+                  data=src_dict, err_data=err_dict, line=line), code=js_cbs.code)
 
     return callback
 
@@ -229,16 +225,12 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
     }
 
     js_condition = '''if((data[thresh_stat][i] >= slider.value[0]) && (data[thresh_stat][i] <= slider.value[1])) {\n'''
-
-    js_cbs = SyllableStatBokehCallbacks()
-
-    code = js_cbs.js_variables+js_cbs.js_for_loop+js_condition+\
-           js_cbs.js_condition_pass+js_cbs.js_condition_fail+'}\n'+js_cbs.js_update
+    js_cbs = SyllableStatBokehCallbacks(condition=js_condition)
 
     callback = CustomJS(
         args=dict(source=circle.data_source, err_source=err_source,
                   data=src_dict, err_data=err_dict, thresh_stat=dict_mapping[thresh_stat],
-                  slider=slider, line=line), code=code)
+                  slider=slider, line=line), code=js_cbs.code)
 
     return callback
 

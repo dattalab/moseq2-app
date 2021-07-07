@@ -46,7 +46,10 @@ class SyllableStatWidgets:
         self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
 
 class SyllableStatBokehCallbacks:
-    def __init__(self):
+    def __init__(self, condition=''):
+
+        self.js_condition = condition
+
         self.js_variables = '''
                         var index = [], number = [], sem = [];
                         var x = [], y = [], usage = [], speed_2d = []; 
@@ -132,6 +135,9 @@ class SyllableStatBokehCallbacks:
     
                     err_source.change.emit();\n
                     '''
+
+        self.code = self.js_variables + self.js_for_loop + self.js_condition + \
+               self.js_condition_pass + self.js_condition_fail + '}\n' + self.js_update
 
 class TransitionGraphWidgets:
 
