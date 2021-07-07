@@ -55,6 +55,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         super().__init__()
         self.save_path = save_path
+
+        # max_sylls is either automatically set in the wrapper.py function interactive_syllable_labeler_wrapper()
+        # by passing max_syllables=None to the wrapper/main.py function::label_syllables. Otherwise, if a integer
+        # is inputted, then self.max_sylls is set to that same integer.
         self.max_sylls = max_sylls
 
         self.config_data = read_yaml(config_file)
