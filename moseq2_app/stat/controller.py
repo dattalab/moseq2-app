@@ -56,11 +56,15 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.index_path = index_path
         self.df_path = df_path
 
+        # If user inputs load_parquet=True in main.py function label_syllables()
+        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
+        # to load the data from.
         if load_parquet:
             if df_path is not None:
                 if not os.path.exists(df_path):
                     self.df_path = None
         else:
+            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
             self.df_path = None
 
         self.df = None
@@ -341,10 +345,15 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.max_sylls = max_sylls
         self.plot_vertically = plot_vertically
 
+        # If user inputs load_parquet=True in main.py function label_syllables()
+        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
+        # to load the data from.
         if load_parquet:
-            if df_path is not None and not os.path.exists(df_path):
-                self.df_path = None
+            if df_path is not None:
+                if not os.path.exists(df_path):
+                    self.df_path = None
         else:
+            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
             self.df_path = None
 
         # Load Model
