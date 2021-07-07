@@ -209,3 +209,97 @@ class CrowdMovieCompareWidgets:
                                                      border='solid',
                                                      width='100%',
                                                      justify_content='space-around'))
+
+    def clear_on_click(self, b=None):
+        '''
+        Clears the cell output
+
+        Parameters
+        ----------
+        b
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+
+    def select_session(self, event=None):
+        '''
+        Callback function to save the list of selected sessions to config_data,
+         and get session syllable info to pass to crowd_movie_wrapper and create the
+         accompanying syllable scalar metadata table.
+
+        Parameters
+        ----------
+        event (event): User clicks on multiple sessions in the SelectMultiple widget
+
+        Returns
+        -------
+        '''
+
+        # Set currently selected sessions
+        self.config_data['session_names'] = list(self.cm_session_sel.value)
+
+        # Update session_syllable info dict
+        self.get_selected_session_syllable_info(self.config_data['session_names'])
+
+    def show_session_select(self, change):
+        '''
+        Callback function to change current view to show session selector when user switches
+        DropDownMenu selection to 'SessionName', and hides it if the user
+        selects 'groups'.
+
+        Parameters
+        ----------
+        change (event): User switches their DropDownMenu selection
+
+        Returns
+        -------
+        '''
+
+        # Handle display syllable selection and update config_data crowd movie generation
+        # source selector.
+        options = [self.sorted_index['files'][s]['metadata'] for s in self.sessions]
+
+        if change.new == 'SessionName':
+            # Show session selector
+            self.cm_session_sel.options = sorted([o['SessionName'] for o in options])
+            self.cm_session_sel.layout = self.layout_visible
+            self.cm_trigger_button.layout.display = 'block'
+            self.config_data['separate_by'] = 'sessions'
+        elif change.new == 'SubjectName':
+            self.cm_session_sel.options = sorted([o['SubjectName'] for o in options])
+            self.cm_session_sel.layout = self.layout_visible
+            self.cm_trigger_button.layout.display = 'block'
+            self.config_data['separate_by'] = 'subjects'
+        elif change.new == 'group':
+            # Hide session selector
+            self.cm_session_sel.layout = self.layout_hidden
+            self.cm_trigger_button.layout.display = 'none'
+            self.config_data['separate_by'] = 'groups'
+
+    def on_click_trigger_button(self, b=None):
+        '''
+        Generates crowd movies and displays them when the user clicks the trigger button
+
+        Parameters
+        ----------
+        b (ipywidgets.Button click event): User clicks "Generate Movies" button
+
+        Returns
+        -------
+        '''
+
+        syll_number = int(self.cm_syll_select.value.split(' - ')[0])
+
+        # Compute current selected syllable's session dict.
+        grouped_syll_dict = self.session_dict[syll_number]['session_info']
+
+        self.config_data['session_names'] = list(grouped_syll_dict.keys())
+
+        # Get Crowd Movie Divs
+        divs, self.bk_plots = self.generate_crowd_movie_divs(grouped_syll_dict)
+
+        # Display generated movies
+        display_crowd_movies(self.widget_box, self.curr_label, self.curr_desc, divs, self.bk_plots)
