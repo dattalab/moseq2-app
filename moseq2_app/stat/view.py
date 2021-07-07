@@ -1440,6 +1440,8 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
             x, y = zip(*new_layout.values())
             syllable = [a if a in node_indices else '' for a in new_layout]
     except:
+        # If the graph has been thresholded such that there are missing syllables, or is empty altogether
+        # (with or without thresholding) we remove all the node label coordinates.
         x, y = [], []
         syllable = []
 
