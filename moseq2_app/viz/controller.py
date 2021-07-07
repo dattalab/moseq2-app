@@ -14,10 +14,10 @@ from glob import glob
 from copy import deepcopy
 from bokeh.io import show
 import ruamel.yaml as yaml
-from os.path import relpath
 import ipywidgets as widgets
 from bokeh.layouts import column
 from bokeh.plotting import figure
+from os.path import relpath, exists
 from moseq2_extract.util import read_yaml
 from moseq2_viz.util import get_sorted_index
 from bokeh.models import Div, CustomJS, Slider
@@ -531,7 +531,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.get_pdfs = get_pdfs
 
         if isinstance(syll_info, str):
-            self.syll_info = read_yaml(syll_info)
+            if exists(syll_info):
+                self.syll_info = read_yaml(syll_info)
         elif isinstance(syll_info, dict):
             self.syll_info = syll_info
 
