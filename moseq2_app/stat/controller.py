@@ -236,6 +236,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if self.max_sylls is None:
             self.max_sylls = max_sylls
 
+        # if load_parquet=True, and self.df_path points to an existing parquet file,
+        # then the syllable statistics DataFrame will be loaded from the parquet file.
+        # otherwise, the DataFrame is computed from scratch
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
