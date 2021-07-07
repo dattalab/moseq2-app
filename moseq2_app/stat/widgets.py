@@ -45,6 +45,94 @@ class SyllableStatWidgets:
 
         self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
 
+class SyllableStatBokehCallbacks:
+    def __init__(self):
+        self.js_variables = '''
+                        var index = [], number = [], sem = [];
+                        var x = [], y = [], usage = [], speed_2d = []; 
+                        var speed_3d = [], height = [], dist = []; 
+                        var label = [], desc = [], movies = [];
+    
+                        var err_x = [], err_y = [];
+                        var err_number = [], err_usage = []; 
+                        var err_speed_2d = [], err_speed_3d = [], err_sem = [];
+                        var err_height = [], err_dist = [], err_label = [];
+                        var err_desc = [], err_movies = [];\n
+                       '''
+
+        self.js_for_loop = '''for (var i = 0; i < data['x'].length; i++) {\n'''
+
+        self.js_condition_pass = '''
+                            index.push(i);
+                            x.push(data['x'][i]);
+                            y.push(data['y'][i]);
+                            sem.push(data['sem'][i]);
+                            number.push(data['number'][i]);
+                            usage.push(data['usage'][i]);
+                            speed_2d.push(data['speed_2d'][i]);
+                            speed_3d.push(data['speed_3d'][i]);
+                            height.push(data['height'][i]);
+                            dist.push(data['dist_to_center'][i]);
+                            label.push(data['label'][i]);
+                            desc.push(data['desc'][i]);
+                            movies.push(data['movies'][i]);
+    
+                            err_x.push(err_data['x'][i]);
+                            err_y.push(err_data['y'][i]);
+                            err_number.push(err_data['number'][i]);
+    
+                            err_sem.push(err_data['sem'][i]);
+                            err_usage.push(err_data['usage'][i]);
+                            err_speed_2d.push(err_data['speed_2d'][i]);
+                            err_speed_3d.push(err_data['speed_3d'][i]);
+                            err_height.push(err_data['height'][i]);
+                            err_dist.push(err_data['dist_to_center'][i]);
+                            err_label.push(err_data['label'][i]);
+                            err_desc.push(err_data['desc'][i]);
+                            err_movies.push(err_data['movies'][i]);\n
+                            '''
+
+        self.js_condition_fail = '''
+                            } else {
+                                line.visible = false;
+                            }\n
+                            '''
+
+        self.js_update = '''
+                    source.data.index = index;
+                    source.data.number = number;
+                    source.data.x = x;
+                    source.data.y = y;
+                    source.data.sem = sem;
+                    source.data.usage = usage;
+                    source.data.speed_2d = speed_2d;
+                    source.data.speed_3d = speed_3d;
+                    source.data.height = height;
+                    source.data.dist_to_center = dist;
+                    source.data.label = label;
+                    source.data.desc = desc;
+                    source.data.movies = movies;
+    
+                    source.change.emit();
+    
+                    err_source.data.index = index;
+                    err_source.data.x = err_x;
+                    err_source.data.y = err_y;
+    
+                    err_source.data.number = err_number;
+                    err_source.data.usage = err_usage;
+                    err_source.data.sem = err_sem;
+                    err_source.data.speed_2d = err_speed_2d;
+                    err_source.data.speed_3d = err_speed_3d;
+                    err_source.data.height = err_height;
+                    err_source.data.dist_to_center = err_dist;
+                    err_source.data.label = err_label;
+                    err_source.data.desc = err_desc;
+                    err_source.data.movies = err_movies;
+    
+                    err_source.change.emit();\n
+                    '''
+
 class TransitionGraphWidgets:
 
 

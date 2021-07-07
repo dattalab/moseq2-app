@@ -20,6 +20,7 @@ from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Category10_10 as palette
 from bokeh.plotting import figure, show, from_networkx
+from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
 
@@ -179,95 +180,16 @@ def setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, lin
     callback (bokeh.models.CustomJS): javascript callback function to embed to search bar and hover tool objects.
     '''
 
+    js_cbs = SyllableStatBokehCallbacks()
+
+    js_condition = '''if(data['label'][i].toLowerCase().includes(searchbox.value.toLowerCase())) {\n'''
+
+    code = js_cbs.js_variables+js_cbs.js_for_loop+js_condition+\
+          js_cbs.js_condition_pass+js_cbs.js_condition_fail+'}\n'+js_cbs.js_update
+
     callback = CustomJS(
         args=dict(source=circle.data_source, err_source=err_source, searchbox=searchbox,
-                  data=src_dict, err_data=err_dict, line=line),
-        code="""
-                            var index = [], number = [], sem = [];
-                            var x = [], y = [], usage = [], speed_2d = []; 
-                            var speed_3d = [], height = [], dist = []; 
-                            var label = [], desc = [], movies = [];
-
-                            var err_x = [], err_y = [];
-                            var err_number = [], err_usage = []; 
-                            var err_speed_2d = [], err_speed_3d = [], err_sem = [];
-                            var err_height = [], err_dist = [], err_label = [];
-                            var err_desc = [], err_movies = [];
-
-                            for (var i = 0; i < data['x'].length; i++) {
-                                if(data['label'][i].toLowerCase().includes(searchbox.value.toLowerCase())) {
-                                    index.push(i);
-                                    x.push(data['x'][i]);
-                                    y.push(data['y'][i]);
-                                    sem.push(data['sem'][i]);
-                                    number.push(data['number'][i]);
-                                    usage.push(data['usage'][i]);
-                                    speed_2d.push(data['speed_2d'][i]);
-                                    speed_3d.push(data['speed_3d'][i]);
-                                    height.push(data['height'][i]);
-                                    dist.push(data['dist_to_center'][i]);
-                                    label.push(data['label'][i]);
-                                    desc.push(data['desc'][i]);
-                                    movies.push(data['movies'][i]);
-
-                                    err_x.push(err_data['x'][i]);
-                                    err_y.push(err_data['y'][i]);
-                                    err_number.push(err_data['number'][i]);
-
-                                    err_sem.push(err_data['sem'][i]);
-                                    err_usage.push(err_data['usage'][i]);
-                                    err_speed_2d.push(err_data['speed_2d'][i]);
-                                    err_speed_3d.push(err_data['speed_3d'][i]);
-                                    err_height.push(err_data['height'][i]);
-                                    err_dist.push(err_data['dist_to_center'][i]);
-                                    err_label.push(err_data['label'][i]);
-                                    err_desc.push(err_data['desc'][i]);
-                                    err_movies.push(err_data['movies'][i]);
-
-                                } else {
-                                    line.visible = false;
-                                }
-                            }
-
-                            if (x.length == data.x.length) {
-                                line.visible = true;
-                            }
-
-                            source.data.index = index;
-                            source.data.number = number;
-                            source.data.x = x;
-                            source.data.y = y;
-                            source.data.sem = sem;
-                            source.data.usage = usage;
-                            source.data.speed_2d = speed_2d;
-                            source.data.speed_3d = speed_3d;
-                            source.data.height = height;
-                            source.data.dist_to_center = dist;
-                            source.data.label = label;
-                            source.data.desc = desc;
-                            source.data.movies = movies;
-
-                            source.change.emit();
-
-                            err_source.data.index = index;
-                            err_source.data.x = err_x;
-                            err_source.data.y = err_y;
-
-                            err_source.data.number = err_number;
-                            err_source.data.usage = err_usage;
-                            err_source.data.sem = err_sem;
-                            err_source.data.speed_2d = err_speed_2d;
-                            err_source.data.speed_3d = err_speed_3d;
-                            err_source.data.height = err_height;
-                            err_source.data.dist_to_center = err_dist;
-                            err_source.data.label = err_label;
-                            err_source.data.desc = err_desc;
-                            err_source.data.movies = err_movies;
-
-                            err_source.change.emit();
-
-                         """
-    )
+                  data=src_dict, err_data=err_dict, line=line), code=code)
 
     return callback
 
@@ -306,96 +228,17 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
         'dist_to_center_px': 'dist_to_center'
     }
 
+    js_condition = '''if((data[thresh_stat][i] >= slider.value[0]) && (data[thresh_stat][i] <= slider.value[1])) {\n'''
+
+    js_cbs = SyllableStatBokehCallbacks()
+
+    code = js_cbs.js_variables+js_cbs.js_for_loop+js_condition+\
+           js_cbs.js_condition_pass+js_cbs.js_condition_fail+'}\n'+js_cbs.js_update
+
     callback = CustomJS(
         args=dict(source=circle.data_source, err_source=err_source,
                   data=src_dict, err_data=err_dict, thresh_stat=dict_mapping[thresh_stat],
-                  slider=slider, line=line),
-        code="""
-                        var index = [], number = [], sem = [];
-                        var x = [], y = [], usage = [], speed_2d = []; 
-                        var speed_3d = [], height = [], dist = []; 
-                        var label = [], desc = [], movies = [];
-
-                        var err_x = [], err_y = [];
-                        var err_number = [], err_usage = []; 
-                        var err_speed_2d = [], err_speed_3d = [], err_sem = [];
-                        var err_height = [], err_dist = [], err_label = [];
-                        var err_desc = [], err_movies = [];
-
-                        for (var i = 0; i < data['x'].length; i++) {
-                            if((data[thresh_stat][i] >= slider.value[0]) && (data[thresh_stat][i] <= slider.value[1])) {
-                                index.push(i);
-                                x.push(data['x'][i]);
-                                y.push(data['y'][i]);
-                                sem.push(data['sem'][i]);
-                                number.push(data['number'][i]);
-                                usage.push(data['usage'][i]);
-                                speed_2d.push(data['speed_2d'][i]);
-                                speed_3d.push(data['speed_3d'][i]);
-                                height.push(data['height'][i]);
-                                dist.push(data['dist_to_center'][i]);
-                                label.push(data['label'][i]);
-                                desc.push(data['desc'][i]);
-                                movies.push(data['movies'][i]);
-
-                                err_x.push(err_data['x'][i]);
-                                err_y.push(err_data['y'][i]);
-                                err_number.push(err_data['number'][i]);
-
-                                err_sem.push(err_data['sem'][i]);
-                                err_usage.push(err_data['usage'][i]);
-                                err_speed_2d.push(err_data['speed_2d'][i]);
-                                err_speed_3d.push(err_data['speed_3d'][i]);
-                                err_height.push(err_data['height'][i]);
-                                err_dist.push(err_data['dist_to_center'][i]);
-                                err_label.push(err_data['label'][i]);
-                                err_desc.push(err_data['desc'][i]);
-                                err_movies.push(err_data['movies'][i]);
-
-                            } else {
-                                line.visible = false;
-                            }
-                        }
-
-                        if (x.length == data.x.length) {
-                            line.visible = true;
-                        }
-
-                        source.data.index = index;
-                        source.data.number = number;
-                        source.data.x = x;
-                        source.data.y = y;
-                        source.data.sem = sem;
-                        source.data.usage = usage;
-                        source.data.speed_2d = speed_2d;
-                        source.data.speed_3d = speed_3d;
-                        source.data.height = height;
-                        source.data.dist_to_center = dist;
-                        source.data.label = label;
-                        source.data.desc = desc;
-                        source.data.movies = movies;
-
-                        source.change.emit();
-
-                        err_source.data.index = index;
-                        err_source.data.x = err_x;
-                        err_source.data.y = err_y;
-
-                        err_source.data.number = err_number;
-                        err_source.data.usage = err_usage;
-                        err_source.data.sem = err_sem;
-                        err_source.data.speed_2d = err_speed_2d;
-                        err_source.data.speed_3d = err_speed_3d;
-                        err_source.data.height = err_height;
-                        err_source.data.dist_to_center = err_dist;
-                        err_source.data.label = err_label;
-                        err_source.data.desc = err_desc;
-                        err_source.data.movies = err_movies;
-
-                        err_source.change.emit();
-
-                     """
-    )
+                  slider=slider, line=line), code=code)
 
     return callback
 
