@@ -710,8 +710,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                         'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
                     }
                 except KeyError:
-                    # syllable not in group
-                    pass
+                    # if a syllable is not in the given group, a KeyError will arise.
+                    print(f'Warning: syllable #{syll} is not in group:{group_name}')
 
     def get_session_mean_syllable_info_df(self):
         '''
@@ -796,8 +796,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                         'dist_to_center_px': sd[session_name]['dist_to_center_px'][syll],
                     }
                 except KeyError:
-                    # syllable not in session
-                    pass
+                    # if a syllable is not in the given group, a KeyError will arise.
+                    print(f'Warning: syllable #{syll} is not in group:{session_name}')
 
     def get_pdf_plot(self, group_syllable_pdf, group_name):
         '''
