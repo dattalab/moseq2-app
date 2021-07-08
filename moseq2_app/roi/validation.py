@@ -7,8 +7,9 @@ The module contains extraction validation functions that test extractions' scala
 import scipy
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from copy import deepcopy
+from os.path import exists
+import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml
@@ -141,8 +142,7 @@ def get_scalar_df(path_dict):
         h5path = v.replace('mp4', 'h5')
         yamlpath = v.replace('mp4', 'yaml')
 
-
-        if not yamlpath.endswith('.yaml'):
+        if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')
             continue
         stat_dict = read_yaml(yamlpath)
@@ -251,7 +251,7 @@ def make_session_status_dicts(paths):
         yamlpath = v.replace('.mp4', '.yaml')
         h5path = v.replace('.mp4', '.h5')
 
-        if not yamlpath.endswith('.yaml'):
+        if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')
             continue
         stat_dict = read_yaml(yamlpath)
