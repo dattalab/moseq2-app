@@ -26,7 +26,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     ----------
     timestamps (1D np.array): Session's recorded timestamp array.
     fps (int): Frames per second
-    scaling_factor (float): factor to divide timestamps by to convert timestamp units into seconds
+    scaling_factor (float): factor to divide timestamps by to convert timestamp milliseconds into seconds.
 
     Returns
     -------
@@ -35,7 +35,10 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
 
     # Find the time difference between frames.
     diff = np.diff(timestamps)
+
+    # Check if the timestamps are in milliseconds based on the mean difference amount
     if np.mean(diff) > 10:
+        # rescale the timestamps to seconds
         diff /= scaling_factor
 
     # Find the average time difference between frames.
