@@ -32,7 +32,7 @@ from moseq2_extract.io.video import (load_movie_data, get_video_info,
                                      get_movie_info, load_timestamps_from_movie)
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, detect_and_set_camera_parameters,
-                                 check_filter_sizes, graduate_dilated_wall_area)
+                                 check_filter_sizes)
 
 
 class InteractiveFindRoi(InteractiveROIWidgets):
@@ -123,7 +123,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Update main configuration parameters
         self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
         self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
-        self.graduate_walls = self.config_data.get('graduate_walls', False)
 
         if self.config_data.get('threads', 8) < 1:
             self.config_data['threads'] = 8
@@ -465,16 +464,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         strel_dilate = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_dilate']))
         strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
 
-        if self.config_data['detect'] and self.graduate_walls and self.dilate_iters.value > 1:
-            print('Graduating Background')
-            self.session_parameters[curr_session_key].pop('output_dir', None)
-            bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
-            self.curr_bground_im = graduate_dilated_wall_area(bground_im,
-                                                              self.session_parameters[curr_session_key],
-                                                              strel_dilate, join(dirname(session), 'proc'))
-        else:
-            self.session_parameters[curr_session_key].pop('output_dir', None)
-            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
+        # get the current background image
+        self.session_parameters[curr_session_key].pop('output_dir', None)
+        self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
         try:
             # Get ROI
@@ -625,12 +617,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                     range(fn, fn + 30),
                                     **self.session_parameters[curr_session_key],
                                     frame_size=self.curr_bground_im.shape[::-1])
-        if not self.config_data.get('graduate_walls', False):
-            curr_frame = (self.curr_bground_im - raw_frames)
-        else:
-            mouse_on_edge = (self.curr_bground_im < self.true_depth) & (raw_frames < self.curr_bground_im)
-            curr_frame = (self.curr_bground_im - raw_frames) * np.logical_not(mouse_on_edge) + \
-                         (self.true_depth - raw_frames) * mouse_on_edge
+
+        # subtract background
+        curr_frame = (self.curr_bground_im - raw_frames)
 
         # filter out regions outside of ROI
         try:
