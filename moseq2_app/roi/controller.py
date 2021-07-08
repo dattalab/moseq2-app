@@ -73,16 +73,18 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
 
         # Read individual session config if it exists
-        if session_config is not None:
+        if session_config is None:
+            self.generate_session_config(session_config)
+        elif not os.path.exists(session_config):
+            self.generate_session_config(session_config)
+        else:
             if os.path.exists(session_config) and not overwrite:
-                if os.stat(session_config).st_size > 0:
-                    self.session_parameters = read_yaml(session_config)
-                else:
+                if os.stat(session_config).st_size <= 0:
                     self.generate_session_config(session_config)
-            else:
-                self.generate_session_config(session_config)
 
-        # Handle broken session config files
+        self.session_parameters = read_yaml(session_config)
+
+        # Extra check: Handle broken session config files and generate default session params from config_data
         if self.session_parameters is None:
             self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
         elif self.session_parameters == {}:
