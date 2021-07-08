@@ -25,7 +25,7 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
         - pip install -e .
       before_script:
@@ -44,7 +44,7 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
         - bash miniconda.sh -b -p $HOME/miniconda
         - source "$HOME/miniconda/etc/profile.d/conda.sh"
@@ -61,6 +61,7 @@ jobs:
         - make
       script:
         - pytest
+
 
     - env: ISOLATED=true
       os: osx
@@ -98,7 +99,7 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
         - pip install -e .
       before_script:
@@ -114,7 +115,7 @@ jobs:
       python: '3.7'
       stage: latest-pythons
       before_install:
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
         - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o miniconda3_latest.sh
         - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
