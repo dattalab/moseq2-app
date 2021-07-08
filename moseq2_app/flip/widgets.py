@@ -14,7 +14,14 @@ class FlipClassifierWidgets:
 
     def __init__(self, path_dict, max_frames, continuous_update=True, launch_gui=True):
         '''
-        Initializes all flip classifier widgets
+        Initializes all flip classifier widgets, their callback functionality, their event listeners,
+         and the associated variables being edited by the callbacks.
+        Parameters
+        ----------
+        path_dict (dict): dict of sessionName-keys pointing to each session's results_00.h5 file (extraction output).
+        max_frames (int): max number of frames to include in a dataset.
+        continuous_update (bool): indicates whether to asynchronously reload the display as the user scrolls the slider.
+        launch_gui (bool): indicates to callbacks to display the GUI using a FlipRangeTool function in flip.controller.py
         '''
 
         style = {'description_width': 'initial'}
