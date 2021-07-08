@@ -12,67 +12,13 @@ import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
 from IPython.display import display, clear_output
-from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.progress import get_session_paths
-from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
                                    compute_syllable_explained_variance)
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
-from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
-
-def interactive_roi_wrapper(data_path, config_file, session_config=None, compute_bgs=True, autodetect_depths=False, overwrite=False):
-    '''
-
-    Interactive ROI detection wrapper function. Users can use run this wrapper
-    to find the required extraction parameters, as well as preview examples of the extraction
-    with the found parameters.
-
-    Parameters
-    ----------
-    data_path (str): Path to base directory containing session folders.
-    config_data (dict): ROI and Extraction configuration parameters
-    session_parameters (str): Path to file containing individual session parameter sets.
-    overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
-
-    Returns
-    -------
-    '''
-
-    roi_app = InteractiveFindRoi(data_path,
-                                 config_file,
-                                 session_config,
-                                 compute_bgs=compute_bgs,
-                                 autodetect_depths=autodetect_depths,
-                                 overwrite=overwrite)
-
-    # Run interactive application
-    roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
-
-
-def interactive_extraction_preview_wrapper(input_dir, flipped=False):
-    '''
-
-    Interactive extraction previewing tool. Upon extracted session selection, function automatically displays
-    the extraction mp4 video file.
-
-    Parameters
-    ----------
-    input_dir (str): path to base directory containing extraction directories
-    flipped (bool): indicates whether to show corrected flip videos
-
-    Returns
-    -------
-    '''
-
-    viewer = InteractiveExtractionViewer(data_path=input_dir, flipped=flipped)
-
-    # Run interactive application
-    selout = widgets.interactive_output(viewer.get_extraction,
-                                        {'input_file': viewer.sess_select})
-    display(viewer.clear_button, viewer.sess_select, selout)
 
 def validate_extractions_wrapper(input_dir):
     '''
@@ -101,27 +47,6 @@ def validate_extractions_wrapper(input_dir):
 
     # Print Results
     print_validation_results(scalar_df, status_dicts)
-
-def interactive_group_setting_wrapper(index_filepath):
-    '''
-
-    Wrapper function that handles the interactive group display and value updating.
-
-    Parameters
-    ----------
-    index_filepath (str): Path to index file.
-
-    Returns
-    -------
-    '''
-
-    index_grid = GroupSettingWidgets(index_filepath)
-
-    # Display output
-    display(index_grid.clear_button, index_grid.group_set)
-    display(index_grid.qgrid_widget)
-
-    return index_grid
 
 def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file,
                                          max_syllables=None, n_explained=99):
@@ -283,40 +208,3 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 
     # Display widgets and bokeh network plots
     display(i_trans_graph.clear_button, i_trans_graph.thresholding_box, out)
-
-def get_frame_flips_wrapper(input_dir,
-                            output_file,
-                            max_frames=1e6,
-                            tail_filter_iters=1,
-                            space_filter_size=3,
-                            continuous_slider_update=True,
-                            launch_gui=True):
-    '''
-
-    Wrapper function that facilitates the interactive
-
-    Parameters
-    ----------
-    input_dir (str): Input directory containing extracted session folders.
-    output_file (str): Path to save flip classifier in.
-    max_frames (int): Maximum number of frames to load from the extracted data.
-    tail_filter_iters (int): Number of tail filtering iterations
-    prefilter_kernel_size (int): Size of the median spatial filter.
-    continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
-    launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
-
-    Returns
-    -------
-    flip_finder (FlipRangeTool): Flip Classifier Training object that will be used throughout the notebook to
-     hold the labeled accepted frame ranges and selected paths/info.
-    '''
-
-    flip_finder = FlipRangeTool(input_dir=input_dir,
-                                max_frames=max_frames,
-                                output_file=output_file,
-                                tail_filter_iters=tail_filter_iters,
-                                prefilter_kernel_size=space_filter_size,
-                                launch_gui=launch_gui,
-                                continuous_slider_update=continuous_slider_update)
-
-    return flip_finder
