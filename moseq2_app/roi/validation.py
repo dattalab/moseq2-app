@@ -138,6 +138,8 @@ def get_scalar_df(path_dict):
 
     # Get scalar dicts for all the sessions
     for k, v in path_dict.items():
+        if not v.endswith('.mp4'):
+            continue
         # Get relevant extraction paths
         h5path = v.replace('mp4', 'h5')
         yamlpath = v.replace('mp4', 'yaml')
@@ -247,6 +249,9 @@ def make_session_status_dicts(paths):
 
     # Get flags
     for k, v in paths.items():
+        if not v.endswith('.mp4'):
+            continue
+
         # get yaml metadata
         yamlpath = v.replace('.mp4', '.yaml')
         h5path = v.replace('.mp4', '.h5')
@@ -254,6 +259,7 @@ def make_session_status_dicts(paths):
         if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')
             continue
+
         stat_dict = read_yaml(yamlpath)
         status_dicts[stat_dict['uuid']] = deepcopy(flags)
         status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
