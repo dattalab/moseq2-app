@@ -280,6 +280,7 @@ class FlipClassifierWidgets:
     def changed_selected_session(self, event=None):
         '''
         Callback function to load newly selected session.
+        Note: self.interactive_launch_frame_selector() is function that lives in the flip.controller.FlipRangeTool class
 
         Parameters
         ----------
@@ -308,6 +309,7 @@ class FlipClassifierWidgets:
     def curr_frame_update(self, event):
         '''
         Updates the currently displayed frame when the slider is moved.
+        Note: self.interactive_launch_frame_selector() is function that lives in the flip.controller.FlipRangeTool class
 
         Parameters
         ----------
