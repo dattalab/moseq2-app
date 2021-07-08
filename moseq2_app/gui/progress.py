@@ -43,7 +43,7 @@ def generate_missing_metadata(sess_dir, sess_name):
     with open(join(sess_dir, 'metadata.json'), 'w') as fp:
         json.dump(sample_meta, fp)
 
-def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
+def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mkv', 'avi']):
     '''
     Find all depth recording sessions and their paths (with given extensions)
     to work on given base directory.
@@ -55,6 +55,8 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
     ----------
     data_dir (str): path to directory containing all session folders.
     exts (list): list of depth file extensions to search for.
+    flipped (bool): indicates whether to show corrected flip videos
+    extracted (bool): indicates to return paths to extracted sessions only.
 
     Returns
     -------
@@ -63,6 +65,8 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
 
     if extracted:
         path = '*/proc/*.'
+        if flipped:
+            path = '*/proc/*_flipped.'
         exts = ['mp4']
     else:
         path = '*/*.'
@@ -73,22 +77,28 @@ def get_session_paths(data_dir, extracted=False, exts=['dat', 'mkv', 'avi']):
     for ext in exts:
         if len(data_dir) == 0:
             data_dir = os.getcwd()
-            files = sorted(glob(path + ext))
+            if flipped:
+                files = sorted(glob(path + ext))
+            else:
+                files = [f for f in sorted(glob(path + ext)) if 'flipped' not in f]
             sessions += files
         else:
             data_dir = data_dir.strip()
             if os.path.isdir(data_dir):
-                files = sorted(glob(os.path.join(data_dir, path + ext)))
+                if flipped:
+                    files = sorted(glob(os.path.join(data_dir, path + ext)))
+                else:
+                    files = [f for f in sorted(glob(os.path.join(data_dir, path + ext))) if 'flipped' not in f]
                 sessions += files
             else:
                 print('directory not found, try again.')
 
     if len(sessions) == 0:
         if extracted:
-            sessions = glob(join(data_dir, '*.mp4'))
+            sessions = sorted(glob(join(data_dir, '*.mp4')))
         else:
             for ext in exts:
-                sessions += glob(join(data_dir, f'*.{ext}'))
+                sessions += sorted(glob(join(data_dir, f'*.{ext}')))
 
     if extracted:
         names = [dirname(sess).split('/')[-2] for sess in sessions]
@@ -219,7 +229,7 @@ def find_progress(base_progress):
         if exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
             base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
 
-    models = glob(join(base_dir, '**/model.p'), recursive=True)
+    models = glob(join(base_dir, '**/*.p'), recursive=True)
     if len(models) == 1:
         base_progress['model_path'] = models[0]
         base_progress['model_session_path'] = dirname(models[0])
@@ -303,6 +313,9 @@ def generate_intital_progressfile(filename='progress.yaml'):
             else:
                 # fallback
                 base_progress_vars = find_progress(base_progress_vars)
+
+    # Find progress in given base directory
+    base_progress_vars = find_progress(base_progress_vars)
 
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)

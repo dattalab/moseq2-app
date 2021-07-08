@@ -1,14 +1,36 @@
 import os
-import sys
+import shutil
+from copy import deepcopy
 import ruamel.yaml as yaml
 from unittest import TestCase
 from os.path import exists, join
+from moseq2_extract.helpers.wrappers import extract_wrapper
 from moseq2_app.gui.progress import generate_missing_metadata, get_session_paths, update_progress, \
-    restore_progress_vars, show_progress_bar, count_total_found_items, get_pca_progress, \
-    get_extraction_progress, print_progress, check_progress
+    restore_progress_vars, show_progress_bar, count_total_found_items, get_pca_progress, load_progress, \
+    get_extraction_progress, print_progress, check_progress, find_progress, generate_intital_progressfile
 
 
 class TestNotebookProgress(TestCase):
+
+    def setUp(self):
+
+        if exists('data/session_config.yaml'):
+            os.remove('data/session_config.yaml')
+
+        self.base_dir = 'data/'
+        self.base_progress_vars = {'base_dir': self.base_dir,
+                              'config_file': '',
+                              'index_file': '',
+                              'train_data_dir': '',
+                              'pca_dirname': '',
+                              'scores_filename': '',
+                              'scores_path': '',
+                              'changepoints_path': '',
+                              'model_path': '',
+                              'crowd_dir': '',
+                              'syll_info': '',
+                              'plot_path': join(self.base_dir, 'plots/'),
+                              'snapshot': 'test'}
 
     def test_generate_missing_metadata(self):
 
@@ -37,22 +59,8 @@ class TestNotebookProgress(TestCase):
         base_dir = 'data/'
         progress_file = join(base_dir, 'progress.yaml')
 
-        base_progress_vars = {'base_dir': base_dir,
-                              'config_file': '',
-                              'index_file': '',
-                              'train_data_dir': '',
-                              'pca_dirname': '',
-                              'scores_filename': '',
-                              'scores_path': '',
-                              'changepoints_path': '',
-                              'model_path': '',
-                              'crowd_dir': '',
-                              'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/'),
-                              'snapshot': 'test'}
-
         with open(progress_file, 'w') as f:
-            yaml.safe_dump(base_progress_vars, f)
+            yaml.safe_dump(self.base_progress_vars, f)
 
         new_prog = update_progress(progress_file, 'config_file', 'test_path')
         assert new_prog['config_file'] == 'test_path'
@@ -60,37 +68,63 @@ class TestNotebookProgress(TestCase):
         with open(progress_file, 'r') as f:
             read_progs = yaml.safe_load(f)
 
-        assert read_progs != base_progress_vars
+        assert read_progs != self.base_progress_vars
 
         os.remove(progress_file)
+
+    def test_find_progress(self):
+        base_dir = 'data/'
+        progress_file = join(base_dir, 'progress.yaml')
+
+        with open(progress_file, 'w') as f:
+            yaml.safe_dump(self.base_progress_vars, f)
+
+        new_prog = find_progress(deepcopy(self.base_progress_vars))
+
+        assert new_prog != self.base_progress_vars
+
+        with open('data/config.yaml', 'r') as f:
+            config_data = yaml.safe_load(f)
+
+        with open('data/session_config.yaml', 'w') as f:
+            yaml.safe_dump(config_data, f)
+
+        new_prog2 = find_progress(deepcopy(self.base_progress_vars))
+        assert new_prog != new_prog2
+
+        os.remove('data/session_config.yaml')
+
+    def test_generate_initial_progressfile(self):
+
+        loaded_prog = generate_intital_progressfile('data/progress.yaml')
+
+        assert loaded_prog != self.base_progress_vars
+
+        find_progress(deepcopy(loaded_prog))
+
+        generate_intital_progressfile('data/progress.yaml')
+        assert exists('data/progress.yaml')
+
+    def test_load_progress(self):
+        ret = load_progress('data/fake_progress.yaml')
+        assert ret == None
 
     def test_restore_progress_vars(self):
 
         base_dir = 'data/'
         progress_file = join(base_dir, 'progress.yaml')
 
-        base_progress_vars = {'base_dir': base_dir,
-                              'config_file': '',
-                              'index_file': '',
-                              'train_data_dir': '',
-                              'pca_dirname': '',
-                              'scores_filename': '',
-                              'scores_path': '',
-                              'changepoints_path': '',
-                              'model_path': '',
-                              'crowd_dir': '',
-                              'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/'),
-                              'snapshot': 'test'}
-
         with open(progress_file, 'w') as f:
-            yaml.safe_dump(base_progress_vars, f)
+            yaml.safe_dump(self.base_progress_vars, f)
 
-        new_prog = update_progress(progress_file, 'config_file', 'test_path')
+        new_prog = update_progress(deepcopy(progress_file), 'config_file', 'test_path')
         assert new_prog['config_file'] == 'test_path'
 
-        test_restore = restore_progress_vars(progress_file)
-        assert test_restore == new_prog
+        test_restore1 = restore_progress_vars(progress_file, overwrite=True)
+        assert test_restore1 != new_prog
+
+        test_restore2 = restore_progress_vars(progress_file, init=True, overwrite=True)
+        assert test_restore2 != self.base_progress_vars
 
         os.remove(progress_file)
 
@@ -122,62 +156,34 @@ class TestNotebookProgress(TestCase):
     def test_get_extraction_progress(self):
         base_dir = 'data/'
 
-        base_progress_vars = {'base_dir': base_dir,
-                              'config_file': '',
-                              'index_file': '',
-                              'train_data_dir': '',
-                              'pca_dirname': '',
-                              'scores_filename': '',
-                              'scores_path': '',
-                              'changepoints_path': '',
-                              'model_path': '',
-                              'crowd_dir': '',
-                              'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/')}
+        with open('data/config.yaml', 'r') as f:
+            config_data = yaml.safe_load(f)
+
+        extract_wrapper('data/azure_test/nfov_test.mkv',
+                        None,
+                        config_data,
+                        num_frames=60,
+                        skip=True)
+        assert exists('data/azure_test/proc/results_00.mp4')
 
         path_dict, num_extracted = get_extraction_progress(base_dir)
 
-        assert num_extracted == 0
+        assert num_extracted == 1
         assert len(list(path_dict.keys())) == 2
 
+        shutil.rmtree('data/azure_test/proc/')
+
     def test_print_progress(self):
-        base_dir = 'data/'
 
-        base_progress_vars = {'base_dir': base_dir,
-                              'config_file': '',
-                              'index_file': '',
-                              'train_data_dir': '',
-                              'pca_dirname': '',
-                              'scores_filename': '',
-                              'scores_path': '',
-                              'changepoints_path': '',
-                              'model_path': '',
-                              'crowd_dir': '',
-                              'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/')}
-
-        print_progress(base_dir, base_progress_vars)
+        print_progress(self.base_dir, self.base_progress_vars)
 
     def test_check_progress(self):
         stdin = 'data/stdin.txt'
         base_dir = 'data/'
         progress_file = join(base_dir, 'progress.yaml')
 
-        base_progress_vars = {'base_dir': base_dir,
-                              'config_file': '',
-                              'index_file': '',
-                              'train_data_dir': '',
-                              'pca_dirname': '',
-                              'scores_filename': '',
-                              'scores_path': '',
-                              'changepoints_path': '',
-                              'model_path': '',
-                              'crowd_dir': '',
-                              'syll_info': '',
-                              'plot_path': os.path.join(base_dir, 'plots/')}
-
         with open(progress_file, 'w') as f:
-            yaml.safe_dump(base_progress_vars, f)
+            yaml.safe_dump(self.base_progress_vars, f)
 
         with open(stdin, 'w') as f:
             f.write('N')

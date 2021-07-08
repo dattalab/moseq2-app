@@ -7,8 +7,9 @@ The module contains extraction validation functions that test extractions' scala
 import scipy
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from copy import deepcopy
+from os.path import exists
+import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml
@@ -25,7 +26,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     ----------
     timestamps (1D np.array): Session's recorded timestamp array.
     fps (int): Frames per second
-    scaling_factor (float): factor to divide timestamps by to convert timestamp units into seconds
+    scaling_factor (float): factor to divide timestamps by to convert timestamp milliseconds into seconds.
 
     Returns
     -------
@@ -33,7 +34,12 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     '''
 
     # Find the time difference between frames.
-    diff = np.diff(timestamps) / scaling_factor
+    diff = np.diff(timestamps)
+
+    # Check if the timestamps are in milliseconds based on the mean difference amount
+    if np.mean(diff) > 10:
+        # rescale the timestamps to seconds
+        diff /= scaling_factor
 
     # Find the average time difference between frames.
     avgTime = np.mean(diff)
@@ -134,11 +140,16 @@ def get_scalar_df(path_dict):
     scalar_dfs = []
 
     # Get scalar dicts for all the sessions
-    for v in path_dict.values():
+    for k, v in path_dict.items():
+        if not v.endswith('.mp4'):
+            continue
         # Get relevant extraction paths
         h5path = v.replace('mp4', 'h5')
         yamlpath = v.replace('mp4', 'yaml')
 
+        if not exists(yamlpath):
+            print(f'No valid yaml path for session: {k}')
+            continue
         stat_dict = read_yaml(yamlpath)
 
         metadata = stat_dict['metadata']
@@ -240,10 +251,17 @@ def make_session_status_dicts(paths):
     }
 
     # Get flags
-    for v in paths.values():
+    for k, v in paths.items():
+        if not v.endswith('.mp4'):
+            continue
+
         # get yaml metadata
-        yamlpath = v.replace('mp4', 'yaml')
-        h5path = v.replace('mp4', 'h5')
+        yamlpath = v.replace('.mp4', '.yaml')
+        h5path = v.replace('.mp4', '.h5')
+
+        if not exists(yamlpath):
+            print(f'No valid yaml path for session: {k}')
+            continue
 
         stat_dict = read_yaml(yamlpath)
         status_dicts[stat_dict['uuid']] = deepcopy(flags)
@@ -417,8 +435,9 @@ def print_validation_results(scalar_df, status_dicts):
     for k in anomaly_dict:
         error, warning = False, False
         for k1, v1 in anomaly_dict[k].items():
+            # v1 is polymorphic; it can be a bool, a dict, an array, or a float.
             if k1 != 'metadata':
-                if k1 in errors and v1 == True:
+                if k1 in errors and v1 != False:
                     error = True
                 elif isinstance(v1, dict):
                     # scalar anomalies

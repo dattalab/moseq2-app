@@ -4,15 +4,19 @@ Main functions that facilitate all jupyter notebook functionality. All functions
  to handle any non front-end settings.
 
 '''
-
 from os.path import exists
+import ipywidgets as widgets
+from IPython.display import display
 from bokeh.io import output_notebook
 from moseq2_extract.util import filter_warnings
+from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_extract.gui import get_selected_sessions
-from moseq2_app.gui.wrappers import interactive_roi_wrapper, interactive_extraction_preview_wrapper, \
-     validate_extractions_wrapper, interactive_group_setting_wrapper, interactive_syllable_labeler_wrapper, \
-     interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
-     interactive_plot_transition_graph_wrapper, get_frame_flips_wrapper
+from moseq2_app.gui.widgets import GroupSettingWidgets
+from moseq2_app.scalars.controller import InteractiveScalarViewer
+from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
+from moseq2_app.gui.wrappers import validate_extractions_wrapper, interactive_syllable_labeler_wrapper, \
+    interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
+    interactive_plot_transition_graph_wrapper
 
 output_notebook()
 
@@ -32,7 +36,8 @@ def flip_classifier_tool(input_dir,
                          max_frames=1e6,
                          tail_filter_iters=1,
                          space_filter_size=3,
-                         continuous_slider_update=True):
+                         continuous_slider_update=True,
+                         launch_gui=True):
     '''
 
     Flip Classifier Notebook main functionality access point.
@@ -44,20 +49,24 @@ def flip_classifier_tool(input_dir,
     output_file (str): Path to save the outputted flip classifier.
     tail_filter_iters (int): Number of tail filtering iterations
     prefilter_kernel_size (int): Size of the median spatial filter.
+    continuous_slider_update (bool): Indicates whether to continuously update the view upon slider widget interactions.
+    launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
 
     Returns
     -------
-    flip_obj (FlipRangeTool): Object that holds all saved interactive functionality and data to be used throughout the
-     notebook.
+    flip_obj (FlipRangeTool): Flip Classifier Training object that will be used throughout the notebook to
+     hold the labeled accepted frame ranges and selected paths/info.
     '''
 
-    flip_obj = get_frame_flips_wrapper(input_dir,
-                                       output_file,
-                                       max_frames,
-                                       tail_filter_iters,
-                                       space_filter_size,
-                                       continuous_slider_update)
-    return flip_obj
+    flip_finder = FlipRangeTool(input_dir=input_dir,
+                                max_frames=max_frames,
+                                output_file=output_file,
+                                tail_filter_iters=tail_filter_iters,
+                                prefilter_kernel_size=space_filter_size,
+                                launch_gui=launch_gui,
+                                continuous_slider_update=continuous_slider_update)
+
+    return flip_finder
 
 @filter_warnings
 def view_extraction(extractions, default=0):
@@ -89,7 +98,7 @@ def view_extraction(extractions, default=0):
     return extractions
 
 @filter_warnings
-def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=False):
+def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=False, overwrite=False):
     '''
     Function to launch ROI detector interactive GUI in jupyter notebook
 
@@ -97,6 +106,7 @@ def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_de
     ----------
     progress_paths (dict): dictionary of notebook progress paths.
     compute_all_bgs (bool): if True, computes all the sessions' background images to speed up the UI.
+    overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
 
     Returns
     -------
@@ -105,26 +115,37 @@ def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_de
     config_file = progress_paths['config_file']
     session_config = progress_paths['session_config']
 
-    interactive_roi_wrapper(progress_paths.get('base_dir', './'),
-                            config_file,
-                            session_config,
-                            compute_bgs=compute_all_bgs,
-                            autodetect_depths=autodetect_depths)
+    roi_app = InteractiveFindRoi(progress_paths.get('base_dir', './'),
+                                 config_file,
+                                 session_config,
+                                 compute_bgs=compute_all_bgs,
+                                 autodetect_depths=autodetect_depths,
+                                 overwrite=overwrite)
+
+    # Run interactive application
+    roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
 
 @filter_warnings
-def preview_extractions(input_dir):
+def preview_extractions(input_dir, flipped=False):
     '''
     Function to launch a dynamic video loader that displays extraction session mp4s.
+    Upon extracted session selection, function automatically displays the extraction mp4 video file.
 
     Parameters
     ----------
     input_dir (str): Path to parent directory containing extracted sessions folders
+    flipped (bool): indicates whether to show corrected flip videos
 
     Returns
     -------
     '''
     output_notebook()
-    interactive_extraction_preview_wrapper(input_dir)
+    viewer = InteractiveExtractionViewer(data_path=input_dir, flipped=flipped)
+
+    # Run interactive application
+    selout = widgets.interactive_output(viewer.get_extraction,
+                                        {'input_file': viewer.sess_select})
+    display(viewer.clear_button, viewer.sess_select, selout)
 
 @filter_warnings
 def validate_extractions(input_dir):
@@ -157,7 +178,33 @@ def interactive_group_setting(index_file):
     -------
     '''
 
-    interactive_group_setting_wrapper(index_file)
+    index_grid = GroupSettingWidgets(index_file)
+
+    # Display output
+    display(index_grid.clear_button, index_grid.group_set)
+    display(index_grid.qgrid_widget)
+
+    return index_grid
+
+@filter_warnings
+def interactive_scalar_summary(index_file):
+    '''
+    Interactive Scalar summary visualization tool accessible from jupyter notebook.
+
+    Parameters
+    ----------
+    index_file (str): Path to index file containing session paths to plot scalars for.
+
+    Returns
+    -------
+    '''
+
+    if not exists(index_file):
+        print('Index file does not exist. Input path to an existing file and run the function again.')
+        return
+
+    viewer = InteractiveScalarViewer(index_file)
+    return viewer
 
 @filter_warnings
 def label_syllables(progress_paths, max_syllables=None, n_explained=99):

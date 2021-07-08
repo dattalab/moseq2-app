@@ -5,7 +5,6 @@ the widgets.py file to facilitate the real-time interaction.
 
 '''
 
-import re
 import cv2
 import h5py
 import joblib
@@ -15,20 +14,24 @@ from copy import deepcopy
 from tqdm.auto import tqdm
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
+from collections import OrderedDict
+from IPython.display import display
 from bokeh.plotting import figure, show
 from os.path import dirname, join, exists
-from IPython.display import display, clear_output
 from moseq2_app.roi.view import bokeh_plot_helper
+from moseq2_extract.util import gen_batch_sequence
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from moseq2_extract.extract.proc import clean_frames
 from moseq2_app.gui.progress import get_session_paths
+from moseq2_extract.io.video import write_frames_preview
 from moseq2_app.flip.widgets import FlipClassifierWidgets
-from moseq2_extract.util import recursive_find_h5s, h5_to_dict
+from moseq2_extract.extract.proc import clean_frames, get_flips
 
 class FlipRangeTool(FlipClassifierWidgets):
 
-    def __init__(self, input_dir, max_frames, output_file, tail_filter_iters, prefilter_kernel_size, continuous_slider_update):
+    def __init__(self, input_dir, max_frames, output_file,
+                 tail_filter_iters, prefilter_kernel_size,
+                 launch_gui=True, continuous_slider_update=True):
         '''
 
         Initialization for the Flip Classifier Training tool.
@@ -42,17 +45,39 @@ class FlipRangeTool(FlipClassifierWidgets):
         output_file (str): Path to save the outputted flip classifier.
         tail_filter_iters (int): Number of tail filtering iterations
         prefilter_kernel_size (int): Size of the median spatial filter.
+        launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
         '''
 
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            super().__init__(continuous_update=continuous_slider_update)
-
+            warnings.simplefilter('ignore', FutureWarning)
             # User input parameters
             self.input_dir = input_dir
-            self.max_frames = max_frames
             self.output_file = output_file
+            self.clf = None
+
+            # get input session paths
+            self.sessions = get_session_paths(input_dir, extracted=True, flipped=False)
+            if len(self.sessions) == 0:
+                if 'aggregate_results/' not in input_dir:
+                    found_agg = exists(join(input_dir, 'aggregate_results/'))
+                    if found_agg:
+                        self.input_dir = join(input_dir, 'aggregate_results/')
+                        print(f'Loading data from: {self.input_dir}')
+                        self.sessions = get_session_paths(self.input_dir, extracted=True, flipped=False)
+
+                    if not found_agg or len(self.sessions) == 0:
+                        print('Error: No extracted sessions were found.')
+
+            # open h5 files and get reference dict
+            self.path_dict = self.load_sessions()
+
+            # initialize widgets and their callbacks.
+            # passing additional state variables to consolidate
+            super().__init__(path_dict=self.path_dict,
+                             max_frames=max_frames,
+                             continuous_update=continuous_slider_update,
+                             launch_gui=launch_gui)
 
             # initialize frame cleaning parameter dict
             self.clean_parameters = {
@@ -60,205 +85,6 @@ class FlipRangeTool(FlipClassifierWidgets):
                 'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
                 'prefilter_space': (prefilter_kernel_size,)
             }
-
-            # get input session paths
-            self.sessions = get_session_paths(input_dir, extracted=True)
-            if len(self.sessions) == 0:
-                if 'aggregate_results/' not in input_dir:
-                    found_agg = exists(join(input_dir, 'aggregate_results/'))
-                    if found_agg:
-                        self.input_dir = join(input_dir, 'aggregate_results/')
-                        print(f'Loading data from: {self.input_dir}')
-                        self.sessions = get_session_paths(self.input_dir, extracted=True)
-
-                    if not found_agg or len(self.sessions) == 0:
-                        print('Error: No extracted sessions were found.')
-
-            # open h5 files and get reference dict
-            self.data_dict, self.path_dict = self.load_sessions()
-
-            # initialize selected frame range dictionary
-            self.selected_frame_ranges_dict = {k: [] for k in self.data_dict}
-            self.curr_total_selected_frames = 0
-
-            # observe dropdown value changes
-            self.session_select_dropdown.observe(self.changed_selected_session, names='value')
-            self.session_select_dropdown.options = self.path_dict
-
-            # Widget values
-            self.frame_ranges = []
-            self.display_frame_ranges = []
-
-            self.start = self.frame_num_slider.value
-            self.stop = 0
-
-            self.selected_ranges.options = self.frame_ranges
-
-            # Callbacks
-            self.clear_button.on_click(self.clear_on_click)
-            self.start_button.on_click(self.start_stop_frame_range)
-            self.face_left_button.on_click(self.facing_range_callback)
-            self.face_right_button.on_click(self.facing_range_callback)
-            self.frame_num_slider.observe(self.curr_frame_update, names='value')
-
-    def changed_selected_session(self, event):
-        '''
-        Callback function to load newly selected session.
-
-        Parameters
-        ----------
-        event (ipywidgets Event): self.session_select_dropdown.value is changed
-
-        Returns
-        -------
-        '''
-
-        # check if button is in middle range selection
-        if self.start_button.description == 'End Range':
-            self.start_button.description = 'Start Range'
-            self.start_button.button_style = 'info'
-
-            self.start, self.stop = 0, 0
-
-        # if so reset the button and start stop values
-        self.frame_num_slider.max = self.data_dict[self.session_select_dropdown.label].shape[0] - 1
-        self.frame_num_slider.value = 0
-        clear_output(wait=True)
-        self.interactive_launch_frame_selector()
-
-    def curr_frame_update(self, event):
-        '''
-        Updates the currently displayed frame when the slider is moved.
-
-        Parameters
-        ----------
-        event (ipywidgets Event): self.frame_num_slider.value is changed.
-
-        Returns
-        -------
-        '''
-
-        self.frame_num_slider.value = event['new']
-        clear_output(wait=True)
-        self.interactive_launch_frame_selector()
-
-    def facing_range_callback(self, event):
-        '''
-        Callback function to handle when a user clicks either of the left or right facing buttons
-         after selecting a frame range. It will call a helper function: update_state_on_selected_range() if 
-         the stop frame num. > start.
-        It will also hide the buttons after a successful selection, and redisplay the start range selection button.
-
-        Returns
-        -------
-        '''
-
-        self.stop = self.frame_num_slider.value
-
-        left = False
-        if 'left' in event.description.lower():
-            left = True
-
-        if self.stop > self.start:
-            self.update_state_on_selected_range(left)
-            
-            # Update left and right button visibility
-            self.face_left_button.layout.visibility = 'hidden'
-            self.face_right_button.layout.visibility = 'hidden'
-
-            # Update range selection button
-            self.start_button.description = 'Start Range'
-            self.start_button.button_style = 'info'
-
-    
-    def update_state_on_selected_range(self, left):
-        '''
-        Helper function that updates the view upon a correct frame range addition (stop > start).
-         Callback function to update the table of selected frame ranges upon
-         button click. Function will will add the selected ranges to the table
-          and session dict to train the model downstream.
-
-        Parameters
-        ----------
-        left (bool): Indicates which direction the mouse is facing the selected range. if True, facing left, else right.
-
-        Returns
-        -------
-        '''
-
-        # Updating list of displayed session + selected frame ranges
-        selected_range = range(self.start, self.stop)
-        display_selected_range = f'{self.session_select_dropdown.label} - {selected_range}'
-        
-        # Set the directional indicators in the displayed range list
-        if left:
-            display_selected_range = f'L - {display_selected_range}'
-        else:
-            display_selected_range = f'R - {display_selected_range}'
-
-        self.curr_total_selected_frames += len(selected_range)
-
-        # Update the current frame selector indicator
-        old_lbl = self.curr_total_label.value
-        old_val = re.findall(r': \d+', old_lbl)[0]
-        new_val = old_lbl.replace(old_val, f': {str(self.curr_total_selected_frames)}')
-
-        # Change indicator color to green if number of total selected
-        # frames exceeds selected max number of frames
-        if self.curr_total_selected_frames >= self.max_frames:
-            new_val = f'<center><h4><font color="green";>{new_val}</h4></center>'
-        self.curr_total_label.value = new_val
-
-        # appending session list to get frames from for the flip classifier later on
-        if selected_range not in self.selected_frame_ranges_dict[self.session_select_dropdown.label]:
-            self.selected_frame_ranges_dict[self.session_select_dropdown.label] += [(left, selected_range)]
-
-        # appending to frame ranges to display in table
-        self.frame_ranges.append(selected_range)
-        self.display_frame_ranges.append(display_selected_range)
-        self.selected_ranges.options = self.display_frame_ranges
-
-    def start_stop_frame_range(self, b):
-        '''
-        Callback function that triggers the "Add Range" functionality.
-         If user clicks the button == 'Start Range', then the function will start including frames
-         in the correct flip set. After it is clicked, the button will function as a "Cancel Selection"
-         button, hiding the direction selection buttons.
-
-        Parameters
-        ----------
-        b (button click): User clicks on "Start or Stop" Range button.
-
-        Returns
-        -------
-        '''
-
-        if self.start_button.description == 'Start Range':
-            self.start = self.frame_num_slider.value
-            self.start_button.description = 'Cancel Select'
-            self.start_button.button_style = 'danger'
-            self.face_left_button.layout.visibility = 'visible'
-            self.face_right_button.layout.visibility = 'visible'
-        else:
-            self.start_button.description = 'Start Range'
-            self.start_button.button_style = 'info'
-            self.face_left_button.layout.visibility = 'hidden'
-            self.face_right_button.layout.visibility = 'hidden'
-            
-
-    def clear_on_click(self, b):
-        '''
-        Clears the output.
-
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
 
     def load_sessions(self):
         '''
@@ -270,31 +96,25 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         Returns
         -------
-        data_dict (dict): dict of
         path_dict (dict): dict of session names and paths filtered for sessions missing an h5 or mp4 files.
         '''
 
-        path_dict = {}
+        path_dict = OrderedDict()
 
         # Get h5 paths
         for key, path in self.sessions.items():
             h5_path = join(dirname(path), 'proc/', 'results_00.h5')
-            if exists(h5_path):
-                path_dict[key] = h5_path
-            elif exists(path) and path.endswith('.h5'):
-                path_dict[key] = path
-            elif exists(path) and path.endswith('.mp4') and exists(path.replace('.mp4', '.h5')):
-                path_dict[key] = path.replace('.mp4', '.h5')
-            else:
-                del path_dict[key]
+            if '_flipped' not in key:
+                if exists(h5_path):
+                    path_dict[key] = h5_path
+                elif exists(path) and path.endswith('.h5'):
+                    path_dict[key] = path
+                elif exists(path) and path.endswith('.mp4') and exists(path.replace('.mp4', '.h5')):
+                    path_dict[key] = path.replace('.mp4', '.h5')
+                else:
+                    del path_dict[key]
 
-        # Get references to h5 files
-        data_dict = {}
-        for key, path in path_dict.items():
-            dset = h5py.File(path, mode='r')['frames']
-            data_dict[key] = dset
-
-        return data_dict, path_dict
+        return path_dict
 
     def interactive_launch_frame_selector(self):
         '''
@@ -315,7 +135,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                         tools=tools,
                         output_backend="webgl")
 
-        displayed_frame = clean_frames(np.array([self.data_dict[self.session_select_dropdown.label][num]]), **self.clean_parameters)[0]
+        with h5py.File(self.path_dict[self.session_select_dropdown.label], mode='r') as f:
+            displayed_frame = clean_frames(np.array([f['frames'][num]]), **self.clean_parameters)[0]
 
         data = dict(image=[displayed_frame],
                     x=[0],
@@ -342,7 +163,6 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         '''
-        print(self.selected_frame_ranges_dict)
 
         corrected_dataset = []
         # Get corrected frame ranges
@@ -361,7 +181,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                     correct_idx = sorted(set(np.concatenate([list(flip) for flip in correct_flips])))
 
                     # get the session and load only the selected frame range and apply filtering
-                    correct_cleaned_data = clean_frames(self.data_dict[session][correct_idx], **self.clean_parameters)
+                    with h5py.File(self.path_dict[session], mode='r') as f:
+                        correct_cleaned_data = clean_frames(f['frames'][correct_idx], **self.clean_parameters)
                     
                     # add the data to the dataset
                     corrected_dataset.append(deepcopy(correct_cleaned_data))
@@ -369,8 +190,9 @@ class FlipRangeTool(FlipClassifierWidgets):
                 # handle frames indicated incorrectly flipped
                 if len(incorrect_flips) > 0:
                     incorrect_idx = sorted(set(np.concatenate([list(flip) for flip in incorrect_flips])))
-                    incorrect_cleaned_data = clean_frames(self.data_dict[session][incorrect_idx], **self.clean_parameters)
-                
+                    with h5py.File(self.path_dict[session], mode='r') as f:
+                        incorrect_cleaned_data = clean_frames(f['frames'][incorrect_idx], **self.clean_parameters)
+                    
                     # flip the data that is facing left
                     flip_corrected_data = np.flip(incorrect_cleaned_data, axis=2)
 
@@ -485,7 +307,8 @@ class FlipRangeTool(FlipClassifierWidgets):
                                  min_samples_leaf=1,
                                  oob_score=False,
                                  random_state=0,
-                                 verbose=0):
+                                 verbose=0,
+                                 train=True):
         '''
 
         Trains the flip classifier the pre-augmented dataset given some optionally adjustable
@@ -503,37 +326,132 @@ class FlipRangeTool(FlipClassifierWidgets):
         oob_score (bool): whether to use out-of-bag samples to estimate the R^2 on unseen data.
         random_state (int): The seed used by the random number generator.
         verbose (int): Controls the verbosity when fitting and predicting.
+        train (bool): If True, trains or retrains a model, if False only tests the model on the test set.
 
         Returns
         -------
         '''
 
-        # Flip Classifier Model to train
-        self.clf = RandomForestClassifier(n_estimators=n_estimators,
-                                          criterion=criterion,
-                                          min_samples_split=min_samples_split,
-                                          min_samples_leaf=min_samples_leaf,
-                                          oob_score=oob_score,
-                                          max_depth=max_depth,
-                                          random_state=random_state,
-                                          n_jobs=n_jobs,
-                                          verbose=verbose)
+        if not exists(self.output_file):
+            # Flip Classifier Model to train
+            self.clf = RandomForestClassifier(n_estimators=n_estimators,
+                                              criterion=criterion,
+                                              min_samples_split=min_samples_split,
+                                              min_samples_leaf=min_samples_leaf,
+                                              oob_score=oob_score,
+                                              max_depth=max_depth,
+                                              random_state=random_state,
+                                              n_jobs=n_jobs,
+                                              verbose=verbose)
+        else:
+            print('Loading pre-existing flip classifier')
+            try:
+                self.clf = joblib.load(self.output_file)
+            except Exception as e:
+                print(f'Error could not load existing flip classifier: {e}')
+                print('Creating and training a new flip classifier.')
+                train = True
+                self.clf = RandomForestClassifier(n_estimators=n_estimators,
+                                                  criterion=criterion,
+                                                  min_samples_split=min_samples_split,
+                                                  flip_indicesmin_samples_leaf=min_samples_leaf,
+                                                  oob_score=oob_score,
+                                                  max_depth=max_depth,
+                                                  random_state=random_state,
+                                                  n_jobs=n_jobs,
+                                                  verbose=verbose)
 
-        self.clf.fit(self.x_train, self.y_train)
+        if train:
+            self.clf.fit(self.x_train, self.y_train)
 
+        # get model test set predictions
         y_predict = self.clf.predict(self.x_test)
 
+        # compute performace
         percent_correct = np.mean(self.y_test == y_predict) * 1e2
         print('Performance: {0:3f}% correct'.format(percent_correct))
 
         if percent_correct > 90:
             print('You have achieved acceptable model accuracy.')
-            print('Re-extract the data with the newly saved model, and continue to the PCA step.')
+            print('Correct the extracted data in the next cell using your new model, and continue to the PCA step.')
         else:
             print('Model performance is not high enough to extract a valid dataset. '
                   'Either try selecting more accurate frame indices,\n'
                   'or re-extract the data with your latest flip classifier (with highest accuracy) '
                   'and retry selecting frame ranges with less random flips.')
 
+        # save model
         joblib.dump(self.clf, self.output_file)
         print(f'Saved model in {self.output_file}')
+
+    def apply_flip_classifier(self, chunk_size=4000, chunk_overlap=0,
+                              smoothing=51, frame_path='frames', fps=30,
+                              write_movie=False, verbose=True):
+        '''
+        Applies a trained flip classifier on previously extracted data to flip the mice to the correct
+         orientation.
+
+        Parameters
+        ----------
+        chunk_size (int): size of frame chunks to process in batches.
+        chunk_overlap (int): number of frames to overlap between chunks to improve classification precision between chunks.
+        smoothing (int): kernel size of the applied median filter on the flip classifier results
+        verbose (bool): displays the tqdm progress bars for each session.
+
+        Returns
+        -------
+        '''
+
+        if self.clf is None:
+            try:
+                joblib.load(self.output_file)
+            except:
+                print('Could not load provided classifier.')
+                return
+
+        video_pipe = None
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            for key, path in tqdm(self.path_dict.items(), desc='Flipping extracted sessions...'):
+                # Open h5 file to stream and correct/update stored frames and scalar angles.
+                with h5py.File(path, mode='a') as f:
+                    output_movie = path.replace('.h5', '_flipped.mp4')
+
+                    frames = f[frame_path]
+                    frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
+
+                    for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
+                        frame_batch = frames[batch]
+
+                        # apply flip classifier on each batch to find which frames to flip
+                        flips = get_flips(frame_batch.copy(), flip_file=self.output_file, smoothing=smoothing)
+                        flip_indices = np.where(flips)
+
+                        # rewrite the frames with the newly classified orientation
+                        frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
+                        f[frame_path][batch] = frame_batch
+
+                        # augment recorded scalar value to reflect orientation switches
+                        f['scalars/angle'][flip_indices] += np.pi
+
+                        if write_movie:
+                            try:
+                                # Writing frame batch to mp4 file
+                                video_pipe = write_frames_preview(output_movie,
+                                                                  frame_batch,
+                                                                  pipe=video_pipe,
+                                                                  close_pipe=False,
+                                                                  depth_min=0,
+                                                                  depth_max=100,
+                                                                  fps=fps,
+                                                                  progress_bar=verbose)
+                            except AttributeError as e:
+                                warnings.warn(f'Could not generate flipped movie for {key}:{path}. Skipping...')
+                                print(e)
+                                print(e.__traceback__)
+                                break
+                    # Check if video is done writing. If not, wait.
+                    if video_pipe is not None:
+                        video_pipe.stdin.close()
+                        video_pipe.wait()
+                        video_pipe = None

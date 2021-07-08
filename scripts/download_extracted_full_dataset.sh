@@ -1,7 +1,6 @@
 #!/bin/bash
 mkdir full_extracted_test_ds
-cp Main-MoSeq2-Notebook.ipynb full_extracted_test_ds
-cp Interactive-Model-Results-Exploration.ipynb full_extracted_test_ds
+cp notebooks/*.ipynb full_extracted_test_ds
 cd full_extracted_test_ds
 
 # amphetamine dataset
