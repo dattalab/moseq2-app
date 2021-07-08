@@ -101,15 +101,6 @@ class FlipRangeTool(FlipClassifierWidgets):
 
             self.selected_ranges.options = self.frame_ranges
 
-            # Callbacks
-            self.clear_button.on_click(self.clear_on_click)
-            self.start_button.on_click(self.start_stop_frame_range)
-            self.face_left_button.on_click(self.facing_range_callback)
-            self.face_right_button.on_click(self.facing_range_callback)
-            self.delete_selection_button.on_click(self.on_delete_selection_clicked)
-            self.selected_ranges.observe(self.on_selected_range_value, names='value')
-            self.frame_num_slider.observe(self.curr_frame_update, names='value')
-
     def load_sessions(self):
         '''
         Recursively searches for completed h5 extraction files, and loads total_frames=max_frames to
