@@ -486,12 +486,18 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    )
         except ValueError:
             # bg depth range did not capture any area
+            # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
+            # roi detection.
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
+
+            # setting the roi variable to 1's array to match the background image. This way,
+            # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
             self.update_checked_list(results=curr_results)
             return curr_results
         except Exception as e:
+            # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             print(e)
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
