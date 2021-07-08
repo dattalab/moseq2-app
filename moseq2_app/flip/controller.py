@@ -110,16 +110,6 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.selected_ranges.observe(self.on_selected_range_value, names='value')
             self.frame_num_slider.observe(self.curr_frame_update, names='value')
 
-    def on_selected_range_value(self, event=None):
-        '''
-        Callback function to make the delete button visible once the user selects one of the frame ranges.
-
-        Returns
-        -------
-        '''
-
-        self.delete_selection_button.layout.visibility = 'visible'
-
     def on_delete_selection_clicked(self, b=None):
         '''
         Button callback function that deletes the currently selected frame range from the list upon
@@ -313,20 +303,6 @@ class FlipRangeTool(FlipClassifierWidgets):
             self.start_button.button_style = 'info'
             self.face_left_button.layout.visibility = 'hidden'
             self.face_right_button.layout.visibility = 'hidden'
-
-    def clear_on_click(self, b=None):
-        '''
-        Clears the output.
-
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
 
     def load_sessions(self):
         '''

@@ -4,8 +4,9 @@ Widgets module containing all the interactive components of the frame selection 
 
 '''
 
-from ipywidgets import VBox, HBox
 import ipywidgets as widgets
+from ipywidgets import VBox, HBox
+from IPython.display import clear_output
 
 class FlipClassifierWidgets:
 
@@ -58,3 +59,27 @@ class FlipClassifierWidgets:
                                self.selected_ranges, self.delete_selection_button])
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
+
+    def clear_on_click(self, b=None):
+        '''
+        Clears the output.
+
+        Parameters
+        ----------
+        b (button click)
+
+        Returns
+        -------
+        '''
+
+        clear_output()
+
+    def on_selected_range_value(self, event=None):
+        '''
+        Callback function to make the delete button visible once the user selects one of the frame ranges.
+
+        Returns
+        -------
+        '''
+
+        self.delete_selection_button.layout.visibility = 'visible'
