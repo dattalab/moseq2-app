@@ -6,10 +6,9 @@ from os.path import exists, join
 from moseq2_viz.util import parse_index
 from moseq2_extract.helpers.wrappers import extract_wrapper
 from moseq2_app.gui.progress import generate_missing_metadata
-from moseq2_app.gui.wrappers import interactive_group_setting_wrapper
 from moseq2_app.main import (interactive_roi_detector, preview_extractions, validate_extractions,
-                            interactive_group_setting, label_syllables, interactive_syllable_stats,
-                            interactive_crowd_movie_comparison, interactive_transition_graph,
+                             interactive_group_setting, label_syllables, interactive_syllable_stats,
+                             interactive_crowd_movie_comparison, interactive_transition_graph,
                              view_extraction, flip_classifier_tool)
 
 class TestMain(TestCase):
@@ -111,10 +110,7 @@ class TestMain(TestCase):
 
     def test_interactive_group_setting(self):
 
-        interactive_group_setting(self.progress_paths['index_file'])
-
-    def test_interactive_group_setting_wrapper(self):
-        index_grid = interactive_group_setting_wrapper(self.progress_paths['index_file'])
+        index_grid = interactive_group_setting(self.progress_paths['index_file'])
 
         index_grid.update_table()
 
