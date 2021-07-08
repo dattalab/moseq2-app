@@ -120,6 +120,33 @@ class InteractiveROIWidgets:
                               self.message],
                              layout=self.box_layout)
 
+        ### Event Listeners ###
+
+        self.clear_button.on_click(self.clear_on_click)
+
+        # Set save parameters button callback
+        self.save_parameters.on_click(self.save_clicked)
+
+        # Set check all sessions button callback
+        self.check_all.on_click(self.check_all_sessions)
+
+        # Set min-max range slider callback
+        self.minmax_heights.observe(self.update_minmax_config, names='value')
+
+        # Set extract button callback
+        self.extract_button.on_click(self.extract_button_clicked)
+
+        # Set passing button callback
+        self.mark_passing.on_click(self.mark_passing_button_clicked)
+
+        # Set extract frame range slider
+        self.frame_range.observe(self.update_config_fr, names='value')
+        self.frame_num.observe(self.update_config_fn, names='value')
+
+        self.bg_roi_depth_range.observe(self.update_config_dr, names='value')
+
+        self.dilate_iters.observe(self.update_config_di, names='value')
+
     def clear_on_click(self, b=None):
         '''
         Clears the cell output

@@ -117,33 +117,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                width='100%')
         self.indicator = widgets.HTML(value="")
 
-        # Set save parameters button callback
-        self.save_parameters.on_click(self.save_clicked)
-
-        # Set check all sessions button callback
-        self.check_all.on_click(self.check_all_sessions)
-
-        # Set min-max range slider callback
-        self.minmax_heights.observe(self.update_minmax_config, names='value')
-
-        # Set extract button callback
-        self.extract_button.on_click(self.extract_button_clicked)
-
-        # Set passing button callback
-        self.mark_passing.on_click(self.mark_passing_button_clicked)
-
-        # Set extract frame range slider
-        self.frame_range.observe(self.update_config_fr, names='value')
-        self.frame_num.observe(self.update_config_fn, names='value')
-
-        self.bg_roi_depth_range.observe(self.update_config_dr, names='value')
-
-        self.dilate_iters.observe(self.update_config_di, names='value')
-
         # Set session select callback
         self.checked_list.observe(self.get_selected_session, names='value')
-
-        self.clear_button.on_click(self.clear_on_click)
 
         # Update main configuration parameters
         self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
