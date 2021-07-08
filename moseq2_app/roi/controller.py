@@ -166,6 +166,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
             try:
+                # finfo is a key that points to a dict that contains the following keys:
+                # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
                 if 'finfo' not in self.session_parameters[s]:
                     self.session_parameters[s]['finfo'] = get_movie_info(p)
                     if p.endswith('.mkv'):
@@ -204,6 +206,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # test saved config data parameters on all sessions
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
             if sessionName != self.curr_session:
+                # finfo is a key that points to a dict that contains the following keys:
+                # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
                 if 'finfo' not in self.session_parameters[sessionName]:
                     self.session_parameters[sessionName]['finfo'] = get_movie_info(sessionPath)
 
@@ -279,6 +283,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.formatted_key in self.keys:
             self.curr_session = self.sessions[self.formatted_key]
 
+        # finfo is a key that points to a dict that contains the following keys:
+        # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
         if 'finfo' not in self.session_parameters[curr_session_key]:
             self.session_parameters[curr_session_key]['finfo'] = get_movie_info(self.curr_session)
 
