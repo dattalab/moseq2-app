@@ -8,7 +8,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from moseq2_viz.util import parse_index
 from plotly.subplots import make_subplots
-from IPython.display import display, clear_output
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_app.scalars.widgets import InteractiveScalarWidgets
 
@@ -43,43 +42,8 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
 
         self.checked_list.options = [c for c in self.columns if c not in to_drop]
 
-        # init callback function
-        self.checked_list.observe(self.on_column_select, names='value')
-        self.clear_button.on_click(self.on_clear)
-
         # set default values
         self.checked_list.value = ['velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'width_mm', 'length_mm']
-
-    def on_clear(self, b=None):
-        '''
-        Clears the display and memory.
-
-        Parameters
-        ----------
-        b (button Event): Ipywidgets.Button click event.
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-        del self
-
-    def on_column_select(self, event=None):
-        '''
-        Updates the view once the user selects a new set of scalars to plot.
-
-        Parameters
-        ----------
-        event
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-        display(self.ui_tools)
-        self.interactive_view()
 
     def make_graphs(self):
         '''
