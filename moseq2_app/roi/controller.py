@@ -521,7 +521,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for area in self.config_data.get('pixel_areas', []):
             # if the current session's ROI is smaller than all the previously checked sessions
             # by at least 500 square pixels. Then this session's ROI will be flagged
-            if isclose(area, r, abs_tol=50e2) or r > area:
+            if isclose(area, r, abs_tol=50e2):
                 res = True
                 break
 
