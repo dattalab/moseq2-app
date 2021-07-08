@@ -426,6 +426,7 @@ def print_validation_results(scalar_df, status_dicts):
     for k in anomaly_dict:
         error, warning = False, False
         for k1, v1 in anomaly_dict[k].items():
+            # v1 is polymorphic; it can be a bool, a dict, an array, or a float.
             if k1 != 'metadata':
                 if k1 in errors and v1 != False:
                     error = True
