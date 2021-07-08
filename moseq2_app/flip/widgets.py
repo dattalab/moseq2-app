@@ -12,7 +12,7 @@ from IPython.display import clear_output
 
 class FlipClassifierWidgets:
 
-    def __init__(self, continuous_update):
+    def __init__(self, path_dict, max_frames, continuous_update=True, launch_gui=True):
         '''
         Initializes all flip classifier widgets
         '''
@@ -62,6 +62,27 @@ class FlipClassifierWidgets:
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
 
+        # Widget values edited via callback functions
+        # variables used in self.start_stop_frame_range()
+        self.start = self.frame_num_slider.value
+        self.stop = 0
+
+        # variables used in self.on_delete_selection_clicked()
+        self.max_frames = max_frames
+        self.frame_ranges = []
+        self.display_frame_ranges = []
+        self.selected_ranges.options = self.frame_ranges
+
+        # variable used in update_state_on_selected_range()
+        self.path_dict = path_dict
+        self.curr_total_selected_frames = 0
+
+        # initialize selected frame range dictionary
+        self.selected_frame_ranges_dict = {k: [] for k in self.path_dict}
+
+        # variable for launching GUI view
+        self.launch_gui = launch_gui
+
         # Callbacks
         self.clear_button.on_click(self.clear_on_click)
         self.start_button.on_click(self.start_stop_frame_range)
@@ -70,6 +91,10 @@ class FlipClassifierWidgets:
         self.delete_selection_button.on_click(self.on_delete_selection_clicked)
         self.selected_ranges.observe(self.on_selected_range_value, names='value')
         self.frame_num_slider.observe(self.curr_frame_update, names='value')
+
+        # observe dropdown value changes
+        self.session_select_dropdown.options = self.path_dict
+        self.session_select_dropdown.observe(self.changed_selected_session, names='value')
 
     def clear_on_click(self, b=None):
         '''

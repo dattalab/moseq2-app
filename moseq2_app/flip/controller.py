@@ -5,7 +5,6 @@ the widgets.py file to facilitate the real-time interaction.
 
 '''
 
-import re
 import cv2
 import h5py
 import joblib
@@ -16,9 +15,9 @@ from tqdm.auto import tqdm
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+from IPython.display import display
 from bokeh.plotting import figure, show
 from os.path import dirname, join, exists
-from IPython.display import display, clear_output
 from moseq2_app.roi.view import bokeh_plot_helper
 from moseq2_extract.util import gen_batch_sequence
 from sklearn.ensemble import RandomForestClassifier
@@ -52,21 +51,10 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', FutureWarning)
-            super().__init__(continuous_update=continuous_slider_update)
-
             # User input parameters
             self.input_dir = input_dir
-            self.max_frames = max_frames
             self.output_file = output_file
-            self.launch_gui = launch_gui
             self.clf = None
-
-            # initialize frame cleaning parameter dict
-            self.clean_parameters = {
-                'iters_tail': tail_filter_iters,
-                'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
-                'prefilter_space': (prefilter_kernel_size,)
-            }
 
             # get input session paths
             self.sessions = get_session_paths(input_dir, extracted=True, flipped=False)
@@ -84,22 +72,19 @@ class FlipRangeTool(FlipClassifierWidgets):
             # open h5 files and get reference dict
             self.path_dict = self.load_sessions()
 
-            # initialize selected frame range dictionary
-            self.selected_frame_ranges_dict = {k: [] for k in self.path_dict}
-            self.curr_total_selected_frames = 0
+            # initialize widgets and their callbacks.
+            # passing additional state variables to consolidate
+            super().__init__(path_dict=self.path_dict,
+                             max_frames=max_frames,
+                             continuous_update=continuous_slider_update,
+                             launch_gui=launch_gui)
 
-            # observe dropdown value changes
-            self.session_select_dropdown.observe(self.changed_selected_session, names='value')
-            self.session_select_dropdown.options = self.path_dict
-
-            # Widget values
-            self.frame_ranges = []
-            self.display_frame_ranges = []
-
-            self.start = self.frame_num_slider.value
-            self.stop = 0
-
-            self.selected_ranges.options = self.frame_ranges
+            # initialize frame cleaning parameter dict
+            self.clean_parameters = {
+                'iters_tail': tail_filter_iters,
+                'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
+                'prefilter_space': (prefilter_kernel_size,)
+            }
 
     def load_sessions(self):
         '''
