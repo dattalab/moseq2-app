@@ -519,9 +519,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             r = float(cv2.countNonZero(rois[0].astype('uint8')))
             self.session_parameters[curr_session_key]['pixel_area'] = r
 
+        # initialize flag to check whether this session's ROI has a comparable number of pixels
+        # to the previously viewed sessions.
         res = False
+
         # check if the current measured area is within is the current list of ROI areas
         for area in self.config_data.get('pixel_areas', []):
+            # if the current session's ROI is smaller than all the previously checked sessions
+            # by at least 500 square pixels. Then this session's ROI will be flagged
             if isclose(area, r, abs_tol=50e2) or r > area:
                 res = True
                 break
