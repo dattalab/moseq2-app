@@ -168,7 +168,7 @@ class SyllableLabelerWidgets:
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
         self.syll_info[self.syll_select.index]['desc'] = self.desc_input.value
 
-        self.write_syll_info()
+        self.write_syll_info(curr_syll=self.syll_select.index)
 
         # Update button style
         self.set_button.button_style = 'success'
