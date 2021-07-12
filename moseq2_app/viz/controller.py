@@ -534,6 +534,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         for gd in group_dicts:
             group_name = list(gd.keys())[0]
             for syll in list(gd[group_name]['syllable'].keys()):
+                # ensure syll is less than max number of syllables
                 if syll < self.max_sylls:
                     try:
                         self.group_syll_info[syll]['group_info'][group_name] = {
