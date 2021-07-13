@@ -7,15 +7,16 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 from os.path import exists
 import ipywidgets as widgets
 from IPython.display import display
-from bokeh.io import output_notebook
+from bokeh.io import output_notebook, show
 from moseq2_extract.util import filter_warnings
 from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
+from moseq2_app.stat.controller import InteractiveSyllableStats
 from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
-from moseq2_app.gui.wrappers import validate_extractions_wrapper, interactive_syllable_labeler_wrapper, \
-    interactive_syllable_stat_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
+from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
+    interactive_syllable_labeler_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
     interactive_plot_transition_graph_wrapper
 
 output_notebook()
@@ -256,10 +257,10 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
     '''
 
     # Get proper input parameters
-    index_file = progress_paths['index_file']
-    model_path = progress_paths['model_path']
-    syll_info_path = progress_paths['syll_info']
-    syll_info_df_path = progress_paths['df_info_path']
+    index_file = progress_paths['index_file'] # Path to index file.
+    model_path = progress_paths['model_path'] # Path to trained model file.
+    syll_info_path = progress_paths['syll_info'] # Path to syllable information file.
+    syll_info_df_path = progress_paths['df_info_path'] # relavant data frame for plotting and stats
 
     inputs = ['model_path', 'index_file', 'syll_info']
 
@@ -269,8 +270,12 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
-    interactive_syllable_stat_wrapper(index_file, model_path, syll_info_path,
-                                      syll_info_df_path, max_syllables=max_syllable, load_parquet=load_parquet)
+    # Initialize the statistical grapher context
+    istat = InteractiveSyllableStats(index_path=index_file, model_path=model_path, df_path=syll_info_df_path,
+                                     info_path=syll_info_path, max_sylls=max_syllable, load_parquet=load_parquet)
+
+    display(istat.clear_button, istat.stat_widget_box, istat.out)
+    show(istat.cladogram)
 
 @filter_warnings
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):

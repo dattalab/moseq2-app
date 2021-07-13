@@ -114,31 +114,6 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Update view when user selects new syllable from DropDownMenu
     output.observe(on_syll_change, names='value')
 
-def interactive_syllable_stat_wrapper(index_path, model_path, info_path, df_path=None, max_syllables=None, load_parquet=False):
-    '''
-    Wrapper function to launch the interactive syllable statistics API. Users will be able to view different
-    syllable statistics, sort them according to their metric of choice, and dynamically group the data to
-    view individual sessions or group averages.
-
-    Parameters
-    ----------
-    index_path (str): Path to index file.
-    model_path (str): Path to trained model file.
-    info_path (str): Path to syllable information file.
-    max_syllables (int): Maximum number of syllables to plot.
-    load_parquet (bool): Indicates to load previously loaded data
-
-    Returns
-    -------
-    '''
-
-    # Initialize the statistical grapher context
-    istat = InteractiveSyllableStats(index_path=index_path, model_path=model_path, df_path=df_path,
-                                     info_path=info_path, max_sylls=max_syllables, load_parquet=load_parquet)
-
-    display(istat.clear_button, istat.stat_widget_box, istat.out)
-    show(istat.cladogram)
-
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
                                                df_path=None, get_pdfs=True, load_parquet=False):
     '''
