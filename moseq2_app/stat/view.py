@@ -551,16 +551,20 @@ def set_grouping_colors(df, groupby):
         for s in groups:
             sess_groups.append(list(tmp_groups[tmp_groups[groupby] == s].group)[0])
 
-        color_map = {}
-        for i, g in enumerate(sess_groups):
-            if g not in color_map.keys():
-                color_map[g] = i
-
-        group_color_map = {g: palette[color_map[g]] for g in sess_groups}
-        group_colors = list(group_color_map.values())
-
-        colors = [colorscale(group_color_map[sg], 0.5 + random.random()) for sg in sess_groups]
-
+        # generate a list of unique groups
+        unique_group = np.unique(sess_groups)
+        # generate a dictionary for group index in the colo palette
+        color_map = dict(zip(unique_group, range(len(unique_group))))
+        for group, index in color_map.items():
+            try:
+                color_map[group] = palette[index]
+            # handle index error when the number of groups is greater than the nubmer of colors in the palette
+            except IndexError:
+                print('Not enough color groups in the pallette')
+                # set color index to the last item in pallette
+                color_map[group] = palette[-1]
+        group_colors = list(color_map.values())
+        colors = [colorscale(color_map[sg], 0.5 + random.random()) for sg in sess_groups]
     return groups, group_colors, colors
 
 def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
