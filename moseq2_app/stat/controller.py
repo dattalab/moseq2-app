@@ -116,6 +116,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             'sessions': self.session_sel,
             'ctrl_group': self.ctrl_dropdown,
             'exp_group': self.exp_dropdown,
+            'hyp_test': self.hyp_test_dropdown,
             'thresh': self.thresholding_dropdown
         })
 
@@ -212,7 +213,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
 
-    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, thresh='usage'):
+    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, hyp_test, thresh='usage'):
         '''
         Helper function that is responsible for handling ipywidgets interactions and updating the currently
          displayed Bokeh plot.
@@ -227,7 +228,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
-
+        hyp_test (str or ipywidgets.DropDown): Name of hypothesis testing method to use to compute significant syllables.
+        thresh (str or ipywidgets.DropDown): Name of statistic to threshold the graph by using the Bokeh Slider
         Returns
         -------
         '''
