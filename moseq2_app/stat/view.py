@@ -557,13 +557,18 @@ def set_grouping_colors(df, groupby):
         unique_group = np.unique(sess_groups)
         # generate a dictionary for group index in the colo palette
         color_map = dict(zip(unique_group, range(len(unique_group))))
+
+        # When the user is trying to plot over 40 experiment groups at the same time
+        if len(unique_group) > len(palette):
+            print('Too many groups to plot. Some colors may be resued')
+
         for group, index in color_map.items():
             try:
                 color_map[group] = palette[index]
             # handle index error when the number of groups is greater than the nubmer of colors in the palette
             except IndexError:
                 print('Not enough color groups in the pallette')
-                # set color index to the last item in pallette
+                # set color index to the last item in pallette to resue color
                 color_map[group] = palette[-1]
         group_colors = list(color_map.values())
         colors = [colorscale(color_map[sg], 0.5 + random.random()) for sg in sess_groups]
