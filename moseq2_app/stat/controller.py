@@ -216,6 +216,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
+        # When syllable usage is 0, the scalars will have nan affecting the interactive stat plot
+        # Since syllable usage is 0, the nan in scalars will be filled with 0
+        self.df.fillna(0, inplace=True)
 
     def run_selected_hypothesis_test(self, hyp_test_name, stat, ctrl_group, exp_group):
         '''

@@ -534,17 +534,19 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         for gd in group_dicts:
             group_name = list(gd.keys())[0]
             for syll in list(gd[group_name]['syllable'].keys()):
-                try:
-                    self.group_syll_info[syll]['group_info'][group_name] = {
-                        'usage': gd[group_name]['usage'][syll],
-                        '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
-                        '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
-                        'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                        'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
-                    }
-                except KeyError:
-                    # if a syllable is not in the given group, a KeyError will arise.
-                    print(f'Warning: syllable #{syll} is not in group:{group_name}')
+                # ensure syll is less than max number of syllables
+                if syll < self.max_sylls:
+                    try:
+                        self.group_syll_info[syll]['group_info'][group_name] = {
+                            'usage': gd[group_name]['usage'][syll],
+                            '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
+                            '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
+                            'height (mm)': gd[group_name]['height_ave_mm'][syll],
+                            'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
+                        }
+                    except KeyError:
+                        # if a syllable is not in the given group, a KeyError will arise.
+                        print(f'Warning: syllable #{syll} is not in group:{group_name}')
 
     def get_session_mean_syllable_info_df(self):
         '''
