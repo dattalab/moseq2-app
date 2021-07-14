@@ -268,7 +268,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         return sig_sylls
 
 
-    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, hyp_test, thresh='usage'):
+    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, hyp_test='KW & Dunn\'s', thresh='usage'):
         '''
         Helper function that is responsible for handling ipywidgets interactions and updating the currently
          displayed Bokeh plot.
