@@ -99,6 +99,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             'height': 'height_ave_mm',
             'similarity': 'similarity',
             'difference': 'difference',
+            'KW & Dunn\s': 'kw',
+            'Z-Test': 'z_test',
+            'T-Test': 't_test',
+            'Mann-Whitney': 'mw'
         }
 
         self.clear_button.on_click(self.clear_on_click)
