@@ -487,9 +487,9 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
                             legend_label=group, color=color, size=6)
 
         if len(sig_sylls) > 0:
-            y = aux_df[stat].to_numpy()[sig_sylls]
+            y = [-1e-2 for _ in aux_df[stat].to_numpy()[sig_sylls]]
             # Draw stars instead of circles
-            fig.diamond_cross(sig_sylls, np.floor(y)-1e-2, alpha=0.8, muted_alpha=0.1, legend_label='Significant Syllable',
+            fig.diamond_cross(sig_sylls, y, alpha=0.8, muted_alpha=0.1, legend_label='Significant Syllable',
                               fill_color=color, line_width=3, line_color='red', size=10)
         else:
             # handle glyph being rendered upon dynamic reload; prevents "float value out of range" bokeh error.
