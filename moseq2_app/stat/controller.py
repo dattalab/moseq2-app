@@ -306,7 +306,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             ordering = sort_syllables_by_stat_difference(df, ctrl_group, exp_group, stat=stat)
 
             # run selected hypothesis test
-            sig_sylls = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+            if ctrl_group != exp_group:
+                sig_sylls = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
 
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
