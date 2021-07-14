@@ -13,12 +13,12 @@ import pandas as pd
 from collections import defaultdict
 from IPython.display import clear_output
 from ipywidgets import interactive_output
-from moseq2_viz.model.stat import run_kruskal
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.model.dist import get_behavioral_distance
+from moseq2_viz.model.stat import run_kruskal, run_pairwise_stats
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
@@ -216,6 +216,56 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
+
+    def run_selected_hypothesis_test(self, hyp_test_name, stat, ctrl_group, exp_group):
+        '''
+        Helper function that computes the significant syllables for a given pair of groups given
+         a name for the type of hypothesis test to run, and the statistic to run the test on.
+
+        Parameters
+        ----------
+        hyp_test_name (str): Name of hypothesis test to run. options=['KW & Dunn\s', 'Z-Test', 'T-Test', 'Mann-Whitney']
+        stat (str): Syllable statistic to compute hypothesis test on. options=['usage', 'distance to center', 'similarity', 'difference']
+        ctrl_group (str): Name of control group to compute group difference sorting with.
+        exp_group (str): Name of comparative group to compute group difference sorting with.
+
+        Returns
+        -------
+        sig_sylls (list): list of significant syllables to mark on plotted statistics figure
+        '''
+
+        if self.dropdown_mapping[hyp_test_name] == 'kw':
+            # run KW and Dunn's Test
+            sig_syll_dict = run_kruskal(self.df, statistic=stat, max_syllable=self.max_sylls)[2]
+
+            # get corresponding computed significant syllables from pair dict
+            if (ctrl_group, exp_group) in sig_syll_dict:
+                sig_sylls = sig_syll_dict[(ctrl_group, exp_group)]
+            elif (exp_group, ctrl_group) in sig_syll_dict:
+                sig_sylls = sig_syll_dict[(exp_group, ctrl_group)]
+            else:
+                raise KeyError('Selected groups are not compatible with KW hypothesis test.')
+
+        elif self.dropdown_mapping[hyp_test_name] == 'z_test':
+            # run z-test
+            intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
+                                                     test_type='z_test', statistic=stat, max_syllable=self.max_sylls)
+        elif self.dropdown_mapping[hyp_test_name] == 't_test':
+            # run t-test
+            intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
+                                                     test_type='t_test', statistic=stat, max_syllable=self.max_sylls)
+        elif self.dropdown_mapping[hyp_test_name] == 'mw':
+            # run Mann-Whitney test
+            intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
+                                                     test_type='mw', statistic=stat, max_syllable=self.max_sylls)
+
+            print('sig sylls:', intersect_sig_sylls)
+
+        if self.dropdown_mapping[hyp_test_name] != 'kw':
+            sig_sylls = list(intersect_sig_sylls[intersect_sig_sylls["is_sig"] == True].index)
+
+        return sig_sylls
+
 
     def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, hyp_test, thresh='usage'):
         '''
