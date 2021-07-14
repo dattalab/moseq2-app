@@ -259,8 +259,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
                                                      test_type='mw', statistic=stat, max_syllable=self.max_sylls)
 
-            print('sig sylls:', intersect_sig_sylls)
-
         if self.dropdown_mapping[hyp_test_name] != 'kw':
             sig_sylls = list(intersect_sig_sylls[intersect_sig_sylls["is_sig"] == True].index)
 
@@ -288,28 +286,25 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         -------
         '''
 
+        # initialize sig_sylls list variable to prevent UnboundLocalError
+        sig_sylls = []
+
         # Get current dataFrame to plot
-        df = self.df
+        df = self.df.fillna(0)
 
         # Handle names to query DataFrame with
         stat = self.dropdown_mapping[stat.lower()]
         sortby = self.dropdown_mapping[sort.lower()]
         thresh = self.dropdown_mapping[thresh.lower()]
 
-        # get significant syllables for 2 group difference
-        sig_sylls = []
-        if len(df.group.unique()) > 1:
-            intersect_sig_syllables = run_kruskal(df, statistic=stat, max_syllable=self.max_sylls, verbose=False)[2]
-
         # Get selected syllable sorting
         if sort.lower() == 'difference':
             # display Text for groups to input experimental groups
             ordering = sort_syllables_by_stat_difference(df, ctrl_group, exp_group, stat=stat)
-            if ctrl_group != exp_group:
-                try:
-                    sig_sylls = intersect_sig_syllables[(ctrl_group, exp_group)]
-                except KeyError:
-                    sig_sylls = intersect_sig_syllables[(exp_group, ctrl_group)]
+
+            # run selected hypothesis test
+            sig_sylls = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
         elif sort.lower() != 'usage':
