@@ -36,7 +36,7 @@ class SyllableStatWidgets:
 
         self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
-        self.hyp_test_dropdown = widgets.Dropdown(options=['KW & Dunn\s', 'Z-Test', 'T-Test', 'Mann-Whitney'], description='Hypothesis Test:',
+        self.hyp_test_dropdown = widgets.Dropdown(options=['KW & Dunn\'s', 'Z-Test', 'T-Test', 'Mann-Whitney'], description='Hypothesis Test:',
                                                   disabled=False)
 
         ## boxes
