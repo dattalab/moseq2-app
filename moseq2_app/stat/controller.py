@@ -99,7 +99,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             'height': 'height_ave_mm',
             'similarity': 'similarity',
             'difference': 'difference',
-            'KW & Dunn\s': 'kw',
+            'KW & Dunn\'s': 'kw',
             'Z-Test': 'z_test',
             'T-Test': 't_test',
             'Mann-Whitney': 'mw'
