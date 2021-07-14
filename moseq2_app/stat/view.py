@@ -18,7 +18,7 @@ from bokeh.layouts import gridplot
 from bokeh.palettes import Spectral4
 from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
-from bokeh.palettes import Category10_10 as palette
+from bokeh.palettes import Category20_20, Category20b_20
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
@@ -537,6 +537,8 @@ def set_grouping_colors(df, groupby):
     colors (list): list of all the colors used to plot the glyphs
     '''
 
+    # Concatenate two category 20 palettes to make a bigger palette
+    palette = Category20_20 + Category20b_20
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
