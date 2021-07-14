@@ -18,7 +18,7 @@ from bokeh.layouts import gridplot
 from bokeh.palettes import Spectral4
 from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
-from bokeh.palettes import Category10_10 as palette
+from bokeh.palettes import Category20_20, Category20b_20
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
@@ -537,6 +537,8 @@ def set_grouping_colors(df, groupby):
     colors (list): list of all the colors used to plot the glyphs
     '''
 
+    # Concatenate two category 20 palettes to make a bigger palette
+    palette = Category20_20 + Category20b_20
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
@@ -551,16 +553,25 @@ def set_grouping_colors(df, groupby):
         for s in groups:
             sess_groups.append(list(tmp_groups[tmp_groups[groupby] == s].group)[0])
 
-        color_map = {}
-        for i, g in enumerate(sess_groups):
-            if g not in color_map.keys():
-                color_map[g] = i
+        # generate a list of unique groups
+        unique_group = np.unique(sess_groups)
+        # generate a dictionary for group index in the colo palette
+        color_map = dict(zip(unique_group, range(len(unique_group))))
 
-        group_color_map = {g: palette[color_map[g]] for g in sess_groups}
-        group_colors = list(group_color_map.values())
+        # When the user is trying to plot over 40 experiment groups at the same time
+        if len(unique_group) > len(palette):
+            print('Too many groups to plot. Some colors may be resued')
 
-        colors = [colorscale(group_color_map[sg], 0.5 + random.random()) for sg in sess_groups]
-
+        for group, index in color_map.items():
+            try:
+                color_map[group] = palette[index]
+            # handle index error when the number of groups is greater than the nubmer of colors in the palette
+            except IndexError:
+                print('Not enough color groups in the pallette')
+                # set color index to the last item in pallette to resue color
+                color_map[group] = palette[-1]
+        group_colors = list(color_map.values())
+        colors = [colorscale(color_map[sg], 0.5 + random.random()) for sg in sess_groups]
     return groups, group_colors, colors
 
 def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
