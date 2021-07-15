@@ -931,14 +931,12 @@ def set_fill_color(scalar_color, data_dict):
 
     fill_color = 'white'
 
-    try:
-        if not empty and scalar_color in data_dict:
-            fill_color = linear_cmap(data_dict[scalar_color]['key'],
-                                     "Spectral4",
-                                     0,
-                                     max(data_dict[scalar_color]['values']))
-    except ValueError:
-        pass
+    if not empty and scalar_color in data_dict:
+        fill_color = linear_cmap(data_dict[scalar_color]['key'],
+                                 "Spectral4",
+                                 0,
+                                 np.nanmax(data_dict[scalar_color]['values']))
+
 
     return fill_color, empty
 
