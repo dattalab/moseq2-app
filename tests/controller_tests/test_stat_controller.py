@@ -147,11 +147,11 @@ class TestSyllableStatController(TestCase):
 
         sort = 'similarity'
         errorbar = 'SEM'
-        self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group)
+        self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, 'Z-Test')
 
         sort = 'difference'
         errorbar = 'STD'
-        self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group)
+        self.gui.interactive_syll_stats_grapher(stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, 'T-Test')
 
 class TestTransitionGraphController(TestCase):
 
