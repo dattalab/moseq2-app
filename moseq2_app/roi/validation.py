@@ -359,11 +359,7 @@ def run_validation_tests(scalar_df, status_dicts):
     '''
 
     sessionNames = list(scalar_df.uuid.unique())
-
-    try:
-        status_dicts = run_heatmap_kl_divergence_test(scalar_df, status_dicts)
-    except:
-        pass
+    status_dicts = run_heatmap_kl_divergence_test(scalar_df, status_dicts)
 
     for s in sessionNames:
         df = scalar_df[scalar_df['uuid'] == s]
