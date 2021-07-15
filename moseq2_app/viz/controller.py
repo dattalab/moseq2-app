@@ -277,14 +277,17 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Get current movie path
         cm_path = syllables['crowd_movie_path']
+        url = upload_public(cm_path)
 
         video_dims = get_video_info(cm_path)['dims']
 
         # Create syllable crowd movie HTML div to embed
         video_div = f'''
                         <h2>{self.syll_select.index}: {syllables['label']}</h2>
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="{relpath(cm_path)}"; alt="{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
+                            src="{url}"; alt="{url}"; id="preview";  
+                            height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
                             style="float: left; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
@@ -318,7 +321,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
                                  pane_widths=[3, 0, 3])
 
         # Display all widgets
-        display(grid, self.button_box)
+        display(grid)
 
     def set_default_cm_parameters(self, config_data):
         '''
@@ -740,6 +743,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             tmp_path = os.path.join(cm_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(cm_path[0])}')
             tmp_dirname = os.path.dirname(tmp_path)
 
+            url = upload_public(os.path.join(cm_dir, os.path.basename(cm_path[0])))
+            # print("url is", url)
+
             self.base_tmpdir = os.path.join(cm_dir, 'tmp')
 
             os.makedirs(tmp_dirname, exist_ok=True)
@@ -749,12 +755,13 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Insert paths and table into HTML div
             group_txt = '''
                 {group_info}
+                <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                 <video
                     src="{src}"; alt="{alt}"; height="{height}"; width="{width}"; preload="auto";
                     style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                     border="2"; autoplay controls loop>
                 </video>
-            '''.format(group_info=group_info, src=relpath(tmp_path), alt=tmp_path, height=int(video_dims[1] * 0.8),
+            '''.format(group_info=group_info, src=url, alt=url, height=int(video_dims[1] * 0.8),
                        width=int(video_dims[0] * 0.8))
 
             divs.append(group_txt)

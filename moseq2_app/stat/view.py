@@ -23,6 +23,7 @@ from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
+from IPython.display import HTML
 
 def graph_dendrogram(obj, syll_info):
     '''
@@ -245,7 +246,7 @@ def setup_hovertool(renderers, callback=None):
     -------
     hover (bokeh.models.HoverTool): hover tool to embed into the created figure.
     '''
-    
+
     # html divs to display within the HoverTool
     tooltips = """
                 <div>
@@ -794,13 +795,6 @@ def get_neighbors(graph, node_indices, group_name):
             print('missing', group_name, n)
             pass
 
-    # correct colors for edges where the transition is both incoming and outgoing
-    for k, v in neighbor_edge_colors.items():
-        k1 = k[::-1]
-        if k1 in neighbor_edge_colors:
-            neighbor_edge_colors[k] = 'green'
-            neighbor_edge_colors[k1] = 'green'
-
     return prev_states, next_states, neighbor_edge_colors
 
 def format_plot(plot):
@@ -983,6 +977,30 @@ def setup_trans_graph_tooltips(plot):
                     <div>
                         <video
                             src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
+                            border="2"; autoplay loop
+                        ></video>
+                    </div>
+                </div>
+                """
+    tooltips = """
+                <div>
+                    <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
+                    <div><span style="font-size: 12px;">label: @label</span></div>
+                    <div><span style="font-size: 12px;">description: @desc</span></div>
+                    <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
+                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
+                    <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
+                    <div>
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
+                        <video
+                            src="@movies"; height="260"; alt="@movies"; id="preview"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
                             border="2"; autoplay loop
                         ></video>

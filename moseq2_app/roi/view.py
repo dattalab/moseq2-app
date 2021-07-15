@@ -11,6 +11,11 @@ from IPython.display import display
 from bokeh.plotting import figure, show
 from os.path import dirname, join, relpath, exists
 from moseq2_extract.io.video import get_video_info
+from IPython.display import HTML
+try:
+    from kora.drive import upload_public
+except (ImportError, ModuleNotFoundError) as error:
+    print(error)
 
 
 def show_extraction(input_file, video_file):
@@ -27,7 +32,6 @@ def show_extraction(input_file, video_file):
 
     Returns
     -------
-    output (ipywidgets.Output widget): HTML canvas where the video is being displayed.
     '''
 
     # Copy generated movie to temporary directory
@@ -45,8 +49,9 @@ def show_extraction(input_file, video_file):
 
     video_div = f'''
                     <h2>{input_file}</h2>
+                    <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                     <video
-                        src="{relpath(tmp_path)}"; alt="{tmp_path}"; 
+                        src="{url}"; alt="{url}"; id="preview";                     
                         height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                         style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                         border="2"; autoplay controls loop>
@@ -63,6 +68,7 @@ def show_extraction(input_file, video_file):
     display(output)
 
     return output
+
 
 def bokeh_plot_helper(bk_fig, image):
     '''

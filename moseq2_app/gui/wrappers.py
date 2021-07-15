@@ -48,6 +48,49 @@ def validate_extractions_wrapper(input_dir):
     # Print Results
     print_validation_results(scalar_df, status_dicts)
 
+def interactive_group_setting_wrapper(index_filepath):
+    '''
+
+    Wrapper function that handles the interactive group display and value updating.
+
+    Parameters
+    ----------
+    index_filepath (str): Path to index file.
+
+    Returns
+    -------
+    '''
+
+    index_grid = GroupSettingWidgets(index_filepath)
+
+    # Add callback functions
+    index_grid.clear_button.on_click(index_grid.clear_clicked)
+    index_grid.update_index_button.on_click(index_grid.update_clicked)
+    index_grid.save_button.on_click(index_grid.update_table)
+
+    # Display output
+    display(index_grid.clear_button, index_grid.group_set)
+    display(index_grid.qgrid_widget)
+
+    return index_grid
+
+def interactive_scalar_summary_wrapper(index_filepath):
+    '''
+    Wrapper function to launch the session scalar summary plot.
+
+    Parameters
+    ----------
+    index_filepath (str): Path to index file to plot scalars from.
+
+    Returns
+    -------
+    viewer (InteractiveScalarViewer obj): Scalar summary viewer object.
+    '''
+
+    viewer = InteractiveScalarViewer(index_filepath)
+
+    return viewer
+
 def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file,
                                          max_syllables=None, n_explained=99):
     '''
@@ -94,6 +137,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Launch and display interactive API
     output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
     display(labeler.clear_button, labeler.syll_select, output)
+    return labeler
 
     def on_syll_change(change):
         '''

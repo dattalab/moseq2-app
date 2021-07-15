@@ -32,8 +32,11 @@ from moseq2_extract.io.video import (load_movie_data, get_video_info,
                                      get_movie_info, load_timestamps_from_movie)
 from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
                                  set_bground_to_plane_fit, detect_and_set_camera_parameters,
-                                 check_filter_sizes)
-
+                                 check_filter_sizes, graduate_dilated_wall_area)
+try:
+    from kora.drive import upload_public
+except (ImportError, ModuleNotFoundError) as error:
+    print(error)
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 
@@ -457,7 +460,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             bg_roi_range_min = int(self.true_depth - range_diff)
             bg_roi_range_max = int(self.true_depth + range_diff)
 
-            self.session_parameters[curr_session_key]['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
+            self.config_data['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
 
             if bg_roi_range_max > self.bg_roi_depth_range.max:
                 self.bg_roi_depth_range.max = bg_roi_range_max + range_diff
@@ -490,8 +493,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
             self.update_checked_list(results=curr_results)
             return curr_results
+        except ValueError:
+            # bg depth range did not capture any area
+            curr_results['flagged'] = True
+            curr_results['ret_code'] = "0x1f534"
+            curr_results['roi'] = np.ones_like(self.curr_bground_im)
+            self.update_checked_list(results=curr_results)
+            return curr_results
         except Exception as e:
-            # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             print(e)
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
@@ -513,6 +522,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             r = float(cv2.countNonZero(rois[0].astype('uint8')))
             self.session_parameters[curr_session_key]['pixel_area'] = r
 
+        res = False
+        # check if the current measured area is within is the current list of ROI areas
+        for area in self.config_data.get('pixel_areas', []):
+            if isclose(area, r, abs_tol=50e2) or r > area:
+                res = True
+                break
         # initialize flag to check whether this session's ROI has a comparable number of pixels
         # to the previously viewed sessions.
         res = False
@@ -525,6 +540,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 res = True
                 break
 
+        if not res and (len(self.config_data.get('pixel_areas', [])) > 0):
+            curr_results['flagged'] = True
+            curr_results['ret_code'] = "0x1f534"
+        else:
+            # add accepted area size to
+            self.config_data['pixel_areas'].append(r)
         if not res and (len(self.config_data.get('pixel_areas', [])) > 0):
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
@@ -555,8 +576,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         Returns
         -------
         '''
-
-        curr_session_key = self.keys[self.checked_list.index]
 
         # Get structuring elements
         str_els = get_strels(self.config_data)
@@ -622,11 +641,21 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # subtract background
         curr_frame = (self.curr_bground_im - raw_frames)
+        raw_frames = load_movie_data(self.curr_session,
+                                    range(fn, fn + 30),
+                                    **self.session_parameters[curr_session_key],
+                                    frame_size=self.curr_bground_im.shape[::-1])
+        if not self.config_data.get('graduate_walls', False):
+            curr_frame = (self.curr_bground_im - raw_frames)
+        else:
+            mouse_on_edge = (self.curr_bground_im < self.true_depth) & (raw_frames < self.curr_bground_im)
+            curr_frame = (self.curr_bground_im - raw_frames) * np.logical_not(mouse_on_edge) + \
+                         (self.true_depth - raw_frames) * mouse_on_edge
 
         # filter out regions outside of ROI
         try:
             filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
-            
+
         except:
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
@@ -659,7 +688,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
-        
+
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
@@ -725,11 +754,14 @@ class InteractiveExtractionViewer:
         '''
 
         video_dims = get_video_info(input_file)['dims']
+        url = upload_public(input_file)
+        display('input file is',input_file)
 
         video_div = f'''
                         <h2>{input_file}</h2>
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="{relpath(input_file)}"; alt="{abspath(input_file)}"; id="preview";
+                            src="{url}"; alt="{url}"; id="preview";
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                             style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
