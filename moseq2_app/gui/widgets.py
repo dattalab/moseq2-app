@@ -9,6 +9,8 @@ import qgrid
 import pandas as pd
 import ruamel.yaml as yaml
 import ipywidgets as widgets
+from IPython.display import clear_output
+from moseq2_app.util import index_to_dataframe
 
 class GroupSettingWidgets:
 
