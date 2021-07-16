@@ -960,30 +960,6 @@ def setup_trans_graph_tooltips(plot):
     Returns
     -------
     '''
-
-    tooltips = """
-                <div>
-                    <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
-                    <div><span style="font-size: 12px;">label: @label</span></div>
-                    <div><span style="font-size: 12px;">description: @desc</span></div>
-                    <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
-                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
-                    <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
-                    <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
-                    <div>
-                        <video
-                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
-                            style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
-                            border="2"; autoplay loop
-                        ></video>
-                    </div>
-                </div>
-                """
     tooltips = """
                 <div>
                     <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
