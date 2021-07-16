@@ -320,7 +320,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    )
 
         display(self.clear_button, self.ui_tools)
-        display(self.main_out)
+        # display(self.main_out)
         gc.collect()
 
     def update_checked_list(self, results):
