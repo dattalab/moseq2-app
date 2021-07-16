@@ -260,8 +260,9 @@ def setup_hovertool(renderers, callback=None):
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div>
+                        <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
-                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            src="@movies"; height="260"; alt="@movies"; id="preview"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
                             border="2"; autoplay loop
                         ></video>
