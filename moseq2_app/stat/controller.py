@@ -89,6 +89,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.interactive_stat_helper()
         self.df = self.df[self.df['syllable'] < self.max_sylls]
 
+        # bokeh_plotting() reads crowd movie paths from self.df rather than self.syll_info
+        for syllable in self.syll_info.keys():
+            self.df.loc[self.df.syllable == syllable, 'crowd_movie_path'] = self.syll_info[syllable]['crowd_movie_path']
+
         self.session_names = sorted(list(self.df.SessionName.unique()))
         self.subject_names = sorted(list(self.df.SubjectName.unique()))
 
