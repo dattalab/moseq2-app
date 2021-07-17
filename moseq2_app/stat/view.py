@@ -367,7 +367,6 @@ def get_syllable_info(df, sorting):
         except ValueError:
             # cm path does not exist
             cm_paths.append('')
-    print('cm path is', cm_paths)
 
     return labels, desc, cm_paths
 
@@ -1125,7 +1124,6 @@ def get_group_node_syllable_info(syll_info, node_indices):
         except ValueError:
             # crowd movie path not found
             cm_paths.append('')
-    print('cm path is', cm_paths)
 
     return labels, descs, cm_paths
 
