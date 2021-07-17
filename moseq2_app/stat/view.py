@@ -1120,7 +1120,7 @@ def get_group_node_syllable_info(syll_info, node_indices):
         labels.append(syll_info[n]['label'])
         descs.append(syll_info[n]['desc'])
         try:
-            cm_paths.append(relpath(syll_info[n]['crowd_movie_path']))
+            cm_paths.append(syll_info[n]['crowd_movie_path'])
         except ValueError:
             # crowd movie path not found
             cm_paths.append('')
