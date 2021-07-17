@@ -796,6 +796,13 @@ def get_neighbors(graph, node_indices, group_name):
             print('missing', group_name, n)
             pass
 
+    # correct colors for edges where the transition is both incoming and outgoing
+    for k, v in neighbor_edge_colors.items():
+        k1 = k[::-1]
+        if k1 in neighbor_edge_colors:
+            neighbor_edge_colors[k] = 'green'
+            neighbor_edge_colors[k1] = 'green'
+
     return prev_states, next_states, neighbor_edge_colors
 
 def format_plot(plot):
