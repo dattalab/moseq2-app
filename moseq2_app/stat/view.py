@@ -363,7 +363,7 @@ def get_syllable_info(df, sorting):
     cm_paths = []
     for cm in desc_data['crowd_movie_path'].to_numpy():
         try:
-            cm_paths.append(relpath(cm))
+            cm_paths.append(cm)
         except ValueError:
             # cm path does not exist
             cm_paths.append('')
