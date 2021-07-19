@@ -6,7 +6,9 @@ Main functions that facilitate all jupyter notebook functionality. All functions
 '''
 
 from os.path import exists
-from bokeh.io import output_notebook
+import ipywidgets as widgets
+from IPython.display import display
+from bokeh.io import output_notebook, show
 from moseq2_extract.util import filter_warnings
 from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_extract.gui import get_selected_sessions
