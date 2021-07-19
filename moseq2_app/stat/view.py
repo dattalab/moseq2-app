@@ -514,7 +514,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
 
         # update hover tools to match the thresholded plot points
         print('rendering')
-        hover = setup_hovertool(fig.renderers)
+        hover = setup_hovertool([circle])
         fig.add_tools(hover)
         # set up color pickers and link the selection to all the drawn glyphs
         if groupby == 'group':
