@@ -755,8 +755,7 @@ class InteractiveExtractionViewer:
 
         video_dims = get_video_info(input_file)['dims']
         url = upload_public(input_file)
-        display('input file is',input_file)
-
+        input_file = '/'.join(input_file.split('/')[-4:]) # truncate the base dir part of the file path
         video_div = f'''
                         <h2>{input_file}</h2>
                         <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
