@@ -26,7 +26,7 @@ from moseq2_app.stat.view import graph_dendrogram, bokeh_plotting, plot_interact
 from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_trans_mats,
                                          convert_transition_matrix_to_ebunch,
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
-from tqdm import tqdm
+from tqdm.auto import tqdm
 try:
     from kora.drive import upload_public
 except (ImportError, ModuleNotFoundError) as error:
@@ -79,6 +79,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         pbar = tqdm(self.syll_info.items())
         for _, value in pbar:
             value['crowd_movie_path'] = upload_public(value['crowd_movie_path'])
+            pbar.set_description('Preparing crowd movies')
 
 
         self.results = None
@@ -483,6 +484,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             pbar=tqdm(self.syll_info.items())
             for _, value in pbar:
                 value['crowd_movie_path'] = upload_public(value['crowd_movie_path'])
+                pbar.set_description('Preparing crowd movies')
 
             # Get labels and optionally relabel them by usage sorting
             labels = self.model_fit['labels']
