@@ -251,6 +251,7 @@ def setup_hovertool(renderers, callback=None):
                 <div>
                     <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
                     <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -310,7 +311,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     if errorbar == 'CI 95%':
         stat_err = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
         aux_err = {}
-        for s in ['usage', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
+        for s in ['usage', 'duration', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
             aux_err[s] = df_group.groupby('syllable')[s].apply(get_ci_vect_vectorized).reindex(sorting)
     elif errorbar == 'SEM':
         stat_err = grouped.sem().reindex(sorting)
@@ -401,6 +402,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         x=list(range(len(aux_df.index))),
         y=aux_df[stat].to_numpy(),
         usage=aux_df['usage'].to_numpy(),
+        duration=aux_df['duration'].to_numpy(),
         speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
         speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
         height=aux_df['height_ave_mm'].to_numpy(),
@@ -418,6 +420,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         x=errs_x,
         y=errs_y,
         usage=aux_sem['usage'].to_numpy(),
+        duration=aux_sem['duration'].to_numpy(),
         speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
         speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
         height=aux_sem['height_ave_mm'].to_numpy(),
