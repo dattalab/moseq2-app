@@ -93,6 +93,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.dropdown_mapping = {
             'usage': 'usage',
+            'duration': 'duration',
             'distance to center': 'dist_to_center_px',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',

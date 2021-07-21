@@ -20,11 +20,11 @@ class SyllableStatWidgets:
         self.layout_hidden = widgets.Layout(display='none')
         self.layout_visible = widgets.Layout(display='block')
 
-        self.stat_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
+        self.stat_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
-        self.sorting_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.sorting_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
         self.thresholding_dropdown = widgets.Dropdown(
-            options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
+            options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
             description='Threshold By:', disabled=False, style=style)
 
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)

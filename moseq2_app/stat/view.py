@@ -215,6 +215,7 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
     # map the dropdown values back to datasource names to retrieve in the javascript callback function
     dict_mapping = {
         'usage': 'usage',
+        'duration': 'duration',
         'velocity_2d_mm': 'speed_2d',
         'velocity_3d_mm': 'speed_3d',
         'height_ave_mm': 'height',
