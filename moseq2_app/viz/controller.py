@@ -175,7 +175,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             for syll in range(self.max_sylls):
                 self.group_syll_info[syll]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
-                    'duration': gd[group_name]['duration'][syll],
+                    'duration (s)': gd[group_name]['duration'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
@@ -540,6 +540,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     try:
                         self.group_syll_info[syll]['group_info'][group_name] = {
                             'usage': gd[group_name]['usage'][syll],
+                            'duration (s)': gd[group_name]['duration'][syll],
                             '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                             '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                             'height (mm)': gd[group_name]['height_ave_mm'][syll],
@@ -625,6 +626,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 try:
                     self.session_dict[syll]['session_info'][session_name] = {
                         'usage': sd[session_name]['usage'][syll],
+                        'duration': sd[session_name]['duration'][syll],
                         '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
                         '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
                         'height (mm)': sd[session_name]['height_ave_mm'][syll],
