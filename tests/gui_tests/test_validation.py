@@ -20,7 +20,9 @@ class TestExtractionValidation(TestCase):
         }
 
         h5path = paths['session_1'].replace('mp4', 'h5')
-        timestamps = h5py.File(h5path, 'r')['timestamps'][()]
+
+        with h5py.File(h5path, 'r') as f:
+            timestamps = f['timestamps'][()]
 
         percent_error = check_timestamp_error_percentage(timestamps)
 
