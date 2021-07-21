@@ -129,14 +129,14 @@ class SyllableStatBokehCallbacks:
                         // initialize all the variables that appear in the HoverTool
                         // these same variables represent all the attributes that are held by Bokeh Gylph objects.
                         var index = [], number = [], sem = [];
-                        var x = [], y = [], usage = [], speed_2d = []; 
+                        var x = [], y = [], usage = [], duration = [], speed_2d = []; 
                         var speed_3d = [], height = [], dist = []; 
                         var label = [], desc = [], movies = [];
                     
                         // initialize the same variables for the plotted error bars.
                         // this is important in order to filter out both the plotted points AND their error bars.
                         var err_x = [], err_y = [];
-                        var err_number = [], err_usage = []; 
+                        var err_number = [], err_usage = [], err_duration = []; 
                         var err_speed_2d = [], err_speed_3d = [], err_sem = [];
                         var err_height = [], err_dist = [], err_label = [];
                         var err_desc = [], err_movies = [];\n
@@ -153,6 +153,7 @@ class SyllableStatBokehCallbacks:
                             sem.push(data['sem'][i]);
                             number.push(data['number'][i]);
                             usage.push(data['usage'][i]);
+                            duration.push(data['duration'][i]);
                             speed_2d.push(data['speed_2d'][i]);
                             speed_3d.push(data['speed_3d'][i]);
                             height.push(data['height'][i]);
@@ -167,6 +168,7 @@ class SyllableStatBokehCallbacks:
     
                             err_sem.push(err_data['sem'][i]);
                             err_usage.push(err_data['usage'][i]);
+                            err_duration.push(err_data['duration'][i]);
                             err_speed_2d.push(err_data['speed_2d'][i]);
                             err_speed_3d.push(err_data['speed_3d'][i]);
                             err_height.push(err_data['height'][i]);
@@ -193,6 +195,7 @@ class SyllableStatBokehCallbacks:
                     source.data.y = y;
                     source.data.sem = sem;
                     source.data.usage = usage;
+                    source.data.duration = duration;
                     source.data.speed_2d = speed_2d;
                     source.data.speed_3d = speed_3d;
                     source.data.height = height;
@@ -210,6 +213,7 @@ class SyllableStatBokehCallbacks:
     
                     err_source.data.number = err_number;
                     err_source.data.usage = err_usage;
+                    err_source.data.duration = err_duration;
                     err_source.data.sem = err_sem;
                     err_source.data.speed_2d = err_speed_2d;
                     err_source.data.speed_3d = err_speed_3d;
