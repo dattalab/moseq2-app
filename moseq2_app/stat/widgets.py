@@ -263,7 +263,7 @@ class TransitionGraphWidgets:
                                                       style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', '2D velocity',
+        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', 'Duration', '2D velocity',
                                                               '3D velocity', 'Height', 'Distance to Center',
                                                               'Entropy-In', 'Entropy-Out'],
                                                      description='Node Coloring',
@@ -344,6 +344,9 @@ class TransitionGraphWidgets:
 
         if event.new == 'Default' or event.new == '2D velocity':
             key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+        elif event.new == 'Duration':
+            key = 'duration'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'

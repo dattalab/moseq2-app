@@ -402,6 +402,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Manage dropdown menu values
         self.scalar_dict = {
             'Default': 'speeds_2d',
+            'Duration': 'duration',
             '2D velocity': 'speeds_2d',
             '3D velocity': 'speeds_3d',
             'Height': 'heights',
@@ -528,6 +529,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             # Get anchored group scalars
             scalars = defaultdict(list)
             _scalar_map = {
+                'duration': 'duration',
                 'speeds_2d': 'velocity_2d_mm',
                 'speeds_3d': 'velocity_3d_mm',
                 'heights': 'height_ave_mm',

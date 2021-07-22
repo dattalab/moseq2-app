@@ -974,6 +974,7 @@ def setup_trans_graph_tooltips(plot):
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
                     <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -1053,6 +1054,7 @@ def get_trans_graph_group_stats(node_indices, usages, scalars):
 
     # get usages
     group_usage = [usages[j] for j in node_indices if j in usages]
+    group_duration = [scalars['duration'][j] for j in node_indices if j in scalars['duration']]
 
     # get speeds
     group_speed_2d = [scalars['speeds_2d'][j] for j in node_indices if j in scalars['speeds_2d']]
@@ -1066,6 +1068,7 @@ def get_trans_graph_group_stats(node_indices, usages, scalars):
 
     group_stats = {
         'usage': np.nan_to_num(group_usage),
+        'duration': np.nan_to_num(group_duration),
         'speed_2d': np.nan_to_num(group_speed_2d),
         'speed_3d': np.nan_to_num(group_speed_3d),
         'height': np.nan_to_num(group_height),
@@ -1159,6 +1162,7 @@ def setup_graph_hover_renderers(graph_renderer, group_stats, node_indices):
     graph_renderer.node_renderer.data_source.add(group_stats['prev_states'], 'prev')
     graph_renderer.node_renderer.data_source.add(group_stats['next_states'], 'next')
     graph_renderer.node_renderer.data_source.add(group_stats['usage'], 'usage')
+    graph_renderer.node_renderer.data_source.add(group_stats['duration'], 'duration')
     graph_renderer.node_renderer.data_source.add(group_stats['speed_2d'], 'speed_2d')
     graph_renderer.node_renderer.data_source.add(group_stats['speed_3d'], 'speed_3d')
     graph_renderer.node_renderer.data_source.add(group_stats['height'], 'height')
@@ -1189,6 +1193,7 @@ def setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color):
     data_dict = {
         '2D velocity': {'key': 'speed_2d', 'values': group_stats['speed_2d']},
         '3D velocity': {'key': 'speed_3d', 'values': group_stats['speed_3d']},
+        'Duration': {'key': 'duration', 'values': group_stats['duration']},
         'Height': {'key': 'height', 'values': group_stats['height']},
         'Distance to Center': {'key': 'dist_to_center_px', 'values': group_stats['dist']},
         'Entropy-In': {'key': 'ent_in', 'values': np.nan_to_num(group_stats['incoming_transition_entropy'])},
