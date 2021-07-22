@@ -261,18 +261,18 @@ class TransitionGraphWidgets:
                                                      style=style, value='Default', continuous_update=False,
                                                      layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.edge_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style,
-                                                             description='Threshold Edge Weights',
-                                                             layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                             continuous_update=False)
-        self.usage_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style, readout_format='.4f',
-                                                              description='Threshold Nodes by Usage',
-                                                              layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                              continuous_update=False)
-        self.speed_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style, readout_format='.1f',
-                                                              description='Threshold Nodes by Speed',
-                                                              layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                              continuous_update=False)
+        self.edge_thresholder = widgets.FloatRangeSlider(style=style, step=0.001, min=0, readout_format='.4f',
+                                                         description='Threshold Edge Weights',
+                                                         layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                         continuous_update=False)
+        self.usage_thresholder = widgets.FloatRangeSlider(style=style, step=0.001, min=0, readout_format='.3f',
+                                                          description='Threshold Nodes by Usage',
+                                                          layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                          continuous_update=False)
+        self.speed_thresholder = widgets.FloatRangeSlider(style=style, step=0.01, min=0, readout_format='.2f',
+                                                          description='Threshold Nodes by Speed',
+                                                          layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                          continuous_update=False)
 
         self.thresholding_box = HBox([
                                       VBox([self.graph_layout_dropdown, self.edge_thresholder, self.usage_thresholder],
@@ -304,21 +304,14 @@ class TransitionGraphWidgets:
         '''
 
         # Update threshold range values
-        edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
-        usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
+        self.edge_thresholder.max = np.max(self.trans_mats)
+        self.edge_thresholder.value = (0, np.max(self.trans_mats))
 
-        self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
-                                         range(edge_threshold_stds)]
-        self.edge_thresholder.index = (1, edge_threshold_stds - 1)
+        self.usage_thresholder.max = self.df['usage'].max()
+        self.usage_thresholder.value = (0, self.df['usage'].max())
 
-        self.usage_thresholder.options = [float('%.3f' % (self.df['usage'].std() * i)) for i in
-                                          range(usage_threshold_stds)]
-        self.usage_thresholder.index = (0, usage_threshold_stds - 1)
-
-        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
-                                          range(speed_threshold_stds)]
-        self.speed_thresholder.index = (0, speed_threshold_stds - 1)
+        self.speed_thresholder.max = self.df['velocity_2d_mm'].max()
+        self.speed_thresholder.value = (0, self.df['velocity_2d_mm'].max())
 
     def on_set_scalar(self, event):
         '''
@@ -352,7 +345,5 @@ class TransitionGraphWidgets:
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
 
-        scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
-        self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
-                                          range(scalar_threshold_stds)]
-        self.speed_thresholder.index = (0, scalar_threshold_stds - 1)
+        self.speed_thresholder.max = self.df[key].max()
+        self.speed_thresholder.value = (0, self.df[key].max())
