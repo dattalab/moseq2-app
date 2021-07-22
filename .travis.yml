@@ -27,7 +27,7 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
-        - pip install -e .
+        - pip install .
       before_script:
         - make
       script:
@@ -101,7 +101,7 @@ jobs:
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
         - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
       install:
-        - pip install -e .
+        - pip install .
       before_script:
         - make
       script:

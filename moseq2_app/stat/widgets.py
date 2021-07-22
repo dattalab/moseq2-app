@@ -186,6 +186,11 @@ class SyllableStatBokehCallbacks:
                             '''
 
         self.js_update = '''
+                    // reload the line if all the data points are present
+                    if (x.length == data['x'].length) {
+                        line.visible = true;
+                    }
+                    
                     // update the data source controlling the interactive figure and emit the changes.
                     source.data.index = index;
                     source.data.number = number;
