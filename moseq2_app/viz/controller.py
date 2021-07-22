@@ -234,7 +234,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         else:
             # plot 4 groups per row to avoid table being cut off by movie
             n_rows = int(len(columns) / 4)
-            row_cols = np.split(columns, n_rows)
+            row_cols = np.array_split(columns, n_rows)
 
             for i in range(len(row_cols)):
                 row_df = full_df[row_cols[i]]
