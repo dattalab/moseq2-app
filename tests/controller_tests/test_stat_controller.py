@@ -229,6 +229,7 @@ class TestTransitionGraphController(TestCase):
 
         scalar_dict = {
             'Default': 'speeds_2d',
+            'Duration': 'duration',
             '2D velocity': 'speeds_2d',
             '3D velocity': 'speeds_3d',
             'Height': 'heights',
