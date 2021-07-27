@@ -20,11 +20,11 @@ class SyllableStatWidgets:
         self.layout_hidden = widgets.Layout(display='none')
         self.layout_visible = widgets.Layout(display='block')
 
-        self.stat_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
+        self.stat_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
-        self.sorting_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.sorting_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
         self.thresholding_dropdown = widgets.Dropdown(
-            options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
+            options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
             description='Threshold By:', disabled=False, style=style)
 
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)
@@ -129,14 +129,14 @@ class SyllableStatBokehCallbacks:
                         // initialize all the variables that appear in the HoverTool
                         // these same variables represent all the attributes that are held by Bokeh Gylph objects.
                         var index = [], number = [], sem = [];
-                        var x = [], y = [], usage = [], speed_2d = []; 
+                        var x = [], y = [], usage = [], duration = [], speed_2d = []; 
                         var speed_3d = [], height = [], dist = []; 
                         var label = [], desc = [], movies = [];
                     
                         // initialize the same variables for the plotted error bars.
                         // this is important in order to filter out both the plotted points AND their error bars.
                         var err_x = [], err_y = [];
-                        var err_number = [], err_usage = []; 
+                        var err_number = [], err_usage = [], err_duration = []; 
                         var err_speed_2d = [], err_speed_3d = [], err_sem = [];
                         var err_height = [], err_dist = [], err_label = [];
                         var err_desc = [], err_movies = [];\n
@@ -153,6 +153,7 @@ class SyllableStatBokehCallbacks:
                             sem.push(data['sem'][i]);
                             number.push(data['number'][i]);
                             usage.push(data['usage'][i]);
+                            duration.push(data['duration'][i]);
                             speed_2d.push(data['speed_2d'][i]);
                             speed_3d.push(data['speed_3d'][i]);
                             height.push(data['height'][i]);
@@ -167,6 +168,7 @@ class SyllableStatBokehCallbacks:
     
                             err_sem.push(err_data['sem'][i]);
                             err_usage.push(err_data['usage'][i]);
+                            err_duration.push(err_data['duration'][i]);
                             err_speed_2d.push(err_data['speed_2d'][i]);
                             err_speed_3d.push(err_data['speed_3d'][i]);
                             err_height.push(err_data['height'][i]);
@@ -198,6 +200,7 @@ class SyllableStatBokehCallbacks:
                     source.data.y = y;
                     source.data.sem = sem;
                     source.data.usage = usage;
+                    source.data.duration = duration;
                     source.data.speed_2d = speed_2d;
                     source.data.speed_3d = speed_3d;
                     source.data.height = height;
@@ -215,6 +218,7 @@ class SyllableStatBokehCallbacks:
     
                     err_source.data.number = err_number;
                     err_source.data.usage = err_usage;
+                    err_source.data.duration = err_duration;
                     err_source.data.sem = err_sem;
                     err_source.data.speed_2d = err_speed_2d;
                     err_source.data.speed_3d = err_speed_3d;
@@ -259,7 +263,7 @@ class TransitionGraphWidgets:
                                                       style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', '2D velocity',
+        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', 'Duration', '2D velocity',
                                                               '3D velocity', 'Height', 'Distance to Center',
                                                               'Entropy-In', 'Entropy-Out'],
                                                      description='Node Coloring',
@@ -340,6 +344,9 @@ class TransitionGraphWidgets:
 
         if event.new == 'Default' or event.new == '2D velocity':
             key = 'velocity_2d_mm'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+        elif event.new == 'Duration':
+            key = 'duration'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
