@@ -253,13 +253,9 @@ class TestTransitionGraphController(TestCase):
 
         self.gui.set_range_widget_values()
 
-        assert self.gui.edge_thresholder.options == (0.0, 0.023, 0.047, 0.07, 0.094)
-        assert self.gui.usage_thresholder.options == (0.0, 0.203, 0.406, 0.61, 0.813)
-        assert self.gui.speed_thresholder.options == (0.0, 1.503, 3.005, 4.508, 6.011)
-
-        assert self.gui.edge_thresholder.index == (1, 4)
-        assert self.gui.usage_thresholder.index == (0, 4)
-        assert self.gui.speed_thresholder.index == (0, 4)
+        assert self.gui.edge_thresholder.value == (0, 0.125)
+        assert self.gui.usage_thresholder.value == (0, 0.6744186046511628)
+        assert self.gui.speed_thresholder.value == (0, 5.0545125007629395)
 
     def test_on_set_scalar(self):
 
@@ -317,7 +313,7 @@ class TestTransitionGraphController(TestCase):
         assert len(self.gui.outgoing_transition_entropy) == 1
         assert len(self.gui.trans_mats) == 1
 
-    def _interactive_transition_graph_helper(self):
+    def test_interactive_transition_graph_helper(self):
 
         layout = 'spring'
         scalar_color = 'speeds_2d'
