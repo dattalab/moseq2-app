@@ -18,7 +18,7 @@ from bokeh.layouts import gridplot
 from bokeh.palettes import Spectral4
 from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
-from bokeh.palettes import Category10_10 as palette
+from bokeh.palettes import Category20_20, Category20b_20
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
@@ -215,6 +215,7 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
     # map the dropdown values back to datasource names to retrieve in the javascript callback function
     dict_mapping = {
         'usage': 'usage',
+        'duration': 'duration',
         'velocity_2d_mm': 'speed_2d',
         'velocity_3d_mm': 'speed_3d',
         'height_ave_mm': 'height',
@@ -251,6 +252,7 @@ def setup_hovertool(renderers, callback=None):
                 <div>
                     <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
                     <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -310,7 +312,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     if errorbar == 'CI 95%':
         stat_err = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
         aux_err = {}
-        for s in ['usage', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
+        for s in ['usage', 'duration', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
             aux_err[s] = df_group.groupby('syllable')[s].apply(get_ci_vect_vectorized).reindex(sorting)
     elif errorbar == 'SEM':
         stat_err = grouped.sem().reindex(sorting)
@@ -401,6 +403,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         x=list(range(len(aux_df.index))),
         y=aux_df[stat].to_numpy(),
         usage=aux_df['usage'].to_numpy(),
+        duration=aux_df['duration'].to_numpy(),
         speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
         speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
         height=aux_df['height_ave_mm'].to_numpy(),
@@ -418,6 +421,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         x=errs_x,
         y=errs_y,
         usage=aux_sem['usage'].to_numpy(),
+        duration=aux_sem['duration'].to_numpy(),
         speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
         speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
         height=aux_sem['height_ave_mm'].to_numpy(),
@@ -511,7 +515,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         slider.js_on_change('value', slider_callback)
 
         # update hover tools to match the thresholded plot points
-        hover = setup_hovertool(fig.renderers)
+        hover = setup_hovertool([circle])
         fig.add_tools(hover)
         # set up color pickers and link the selection to all the drawn glyphs
         if groupby == 'group':
@@ -542,6 +546,8 @@ def set_grouping_colors(df, groupby):
     colors (list): list of all the colors used to plot the glyphs
     '''
 
+    # Concatenate two category 20 palettes to make a bigger palette
+    palette = Category20_20 + Category20b_20
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
@@ -556,16 +562,25 @@ def set_grouping_colors(df, groupby):
         for s in groups:
             sess_groups.append(list(tmp_groups[tmp_groups[groupby] == s].group)[0])
 
-        color_map = {}
-        for i, g in enumerate(sess_groups):
-            if g not in color_map.keys():
-                color_map[g] = i
+        # generate a list of unique groups
+        unique_group = np.unique(sess_groups)
+        # generate a dictionary for group index in the colo palette
+        color_map = dict(zip(unique_group, range(len(unique_group))))
 
-        group_color_map = {g: palette[color_map[g]] for g in sess_groups}
-        group_colors = list(group_color_map.values())
+        # When the user is trying to plot over 40 experiment groups at the same time
+        if len(unique_group) > len(palette):
+            print('Too many groups to plot. Some colors may be resued')
 
-        colors = [colorscale(group_color_map[sg], 0.5 + random.random()) for sg in sess_groups]
-
+        for group, index in color_map.items():
+            try:
+                color_map[group] = palette[index]
+            # handle index error when the number of groups is greater than the nubmer of colors in the palette
+            except IndexError:
+                print('Not enough color groups in the pallette')
+                # set color index to the last item in pallette to resue color
+                color_map[group] = palette[-1]
+        group_colors = list(color_map.values())
+        colors = [colorscale(color_map[sg], 0.5 + random.random()) for sg in sess_groups]
     return groups, group_colors, colors
 
 def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
@@ -931,14 +946,12 @@ def set_fill_color(scalar_color, data_dict):
 
     fill_color = 'white'
 
-    try:
-        if not empty and scalar_color in data_dict:
-            fill_color = linear_cmap(data_dict[scalar_color]['key'],
-                                     "Spectral4",
-                                     0,
-                                     max(data_dict[scalar_color]['values']))
-    except ValueError:
-        pass
+    if not empty and scalar_color in data_dict:
+        fill_color = linear_cmap(data_dict[scalar_color]['key'],
+                                 "Spectral4",
+                                 0,
+                                 np.nanmax(data_dict[scalar_color]['values']))
+
 
     return fill_color, empty
 
@@ -961,6 +974,7 @@ def setup_trans_graph_tooltips(plot):
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
+                    <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
                     <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
@@ -1040,6 +1054,7 @@ def get_trans_graph_group_stats(node_indices, usages, scalars):
 
     # get usages
     group_usage = [usages[j] for j in node_indices if j in usages]
+    group_duration = [scalars['duration'][j] for j in node_indices if j in scalars['duration']]
 
     # get speeds
     group_speed_2d = [scalars['speeds_2d'][j] for j in node_indices if j in scalars['speeds_2d']]
@@ -1053,6 +1068,7 @@ def get_trans_graph_group_stats(node_indices, usages, scalars):
 
     group_stats = {
         'usage': np.nan_to_num(group_usage),
+        'duration': np.nan_to_num(group_duration),
         'speed_2d': np.nan_to_num(group_speed_2d),
         'speed_3d': np.nan_to_num(group_speed_3d),
         'height': np.nan_to_num(group_height),
@@ -1146,6 +1162,7 @@ def setup_graph_hover_renderers(graph_renderer, group_stats, node_indices):
     graph_renderer.node_renderer.data_source.add(group_stats['prev_states'], 'prev')
     graph_renderer.node_renderer.data_source.add(group_stats['next_states'], 'next')
     graph_renderer.node_renderer.data_source.add(group_stats['usage'], 'usage')
+    graph_renderer.node_renderer.data_source.add(group_stats['duration'], 'duration')
     graph_renderer.node_renderer.data_source.add(group_stats['speed_2d'], 'speed_2d')
     graph_renderer.node_renderer.data_source.add(group_stats['speed_3d'], 'speed_3d')
     graph_renderer.node_renderer.data_source.add(group_stats['height'], 'height')
@@ -1176,6 +1193,7 @@ def setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color):
     data_dict = {
         '2D velocity': {'key': 'speed_2d', 'values': group_stats['speed_2d']},
         '3D velocity': {'key': 'speed_3d', 'values': group_stats['speed_3d']},
+        'Duration': {'key': 'duration', 'values': group_stats['duration']},
         'Height': {'key': 'height', 'values': group_stats['height']},
         'Distance to Center': {'key': 'dist_to_center_px', 'values': group_stats['dist']},
         'Entropy-In': {'key': 'ent_in', 'values': np.nan_to_num(group_stats['incoming_transition_entropy'])},
