@@ -19,7 +19,6 @@ jobs:
       stage: pip-install
       before_install:
         - pip install -U pip
-        - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
@@ -29,7 +28,7 @@ jobs:
       install:
         - pip install .
       before_script:
-        - make
+        - ./scripts/download_test_dataset.sh
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
@@ -52,13 +51,12 @@ jobs:
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
         - conda activate moseq2-app
-        - pip install awscli
         - pip install pytest codecov
         - pip install pytest-cov
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
-        - make
+        - ./scripts/download_test_dataset.sh
       script:
         - pytest
 
@@ -78,12 +76,11 @@ jobs:
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
         - conda activate moseq2-app
-        - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
-        - make
+        - ./scripts/download_test_dataset.sh
       script:
         - pytest
 
@@ -93,7 +90,6 @@ jobs:
       stage: latest-pythons
       before_install:
         - pip install -U pip
-        - pip install awscli
         - pip install pytest==5.4.1 codecov pytest-cov
         - export PYTHONPATH=$PYTHONPATH:$(pwd)
         - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
@@ -103,7 +99,7 @@ jobs:
       install:
         - pip install .
       before_script:
-        - make
+        - ./scripts/download_test_dataset.sh
       script:
         - pytest --cov-report xml --cov-report term
       after_success:
@@ -124,12 +120,11 @@ jobs:
         - conda config --set always_yes yes --set changeps1 no
         - conda env create -n moseq2-app --file scripts/moseq2-env-osx.yaml
         - conda activate moseq2-app
-        - pip install awscli
         - pip install pytest codecov
         - pip install pytest-cov
       install:
         - ./scripts/install_moseq2_app.sh
       before_script:
-        - make
+        - ./scripts/download_test_dataset.sh
       script:
         - pytest
