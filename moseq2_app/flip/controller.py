@@ -452,6 +452,5 @@ class FlipRangeTool(FlipClassifierWidgets):
                                 break
                     # Check if video is done writing. If not, wait.
                     if video_pipe is not None:
-                        video_pipe.stdin.close()
-                        video_pipe.wait()
+                        video_pipe.communicate()
                         video_pipe = None
