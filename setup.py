@@ -36,9 +36,9 @@ setup(
                       'qgrid==1.3.1', 'ipython==7.14.0', 'ipywidgets==7.5.1', 'numpy==1.18.3', 'scikit-image==0.16.2',
                       'scikit-learn==0.20.3', 'opencv-python==4.1.2.30', 'h5py==2.10.0', 'matplotlib==3.1.2', 'plotly==4.14.3',
                       'moseq2-extract @ git+https://github.com/dattalab/moseq2-extract.git@dev',
-                      'moseq2-pca @ git+https://github.com/dattalab/moseq2-pca.git@release',
-                      'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@release',
-                      'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@release-update'
+                      'moseq2-pca @ git+https://github.com/dattalab/moseq2-pca.git@dev',
+                      'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@dev',
+                      'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@dev'
                       ],
     python_requires='>=3.6,<3.8'
 )
