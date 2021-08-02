@@ -180,6 +180,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             for syll in range(self.max_sylls):
                 self.group_syll_info[syll]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
+                    'duration (s)': gd[group_name]['duration'][syll],
                     '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                     '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
@@ -239,7 +240,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         else:
             # plot 4 groups per row to avoid table being cut off by movie
             n_rows = int(len(columns) / 4)
-            row_cols = np.split(columns, n_rows)
+            row_cols = np.array_split(columns, n_rows)
 
             for i in range(len(row_cols)):
                 row_df = full_df[row_cols[i]]
@@ -547,6 +548,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     try:
                         self.group_syll_info[syll]['group_info'][group_name] = {
                             'usage': gd[group_name]['usage'][syll],
+                            'duration (s)': gd[group_name]['duration'][syll],
                             '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
                             '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
                             'height (mm)': gd[group_name]['height_ave_mm'][syll],
@@ -632,6 +634,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 try:
                     self.session_dict[syll]['session_info'][session_name] = {
                         'usage': sd[session_name]['usage'][syll],
+                        'duration': sd[session_name]['duration'][syll],
                         '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
                         '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
                         'height (mm)': sd[session_name]['height_ave_mm'][syll],

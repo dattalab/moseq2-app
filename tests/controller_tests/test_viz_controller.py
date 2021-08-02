@@ -352,7 +352,8 @@ class TestCrowdMovieComparison(TestCase):
 
         self.gui.get_mean_group_dict(group_df)
 
-        assert len(self.gui.group_syll_info[0]['group_info']['default']) == 5
+        # expecting a 6 key dictionary for data to pass to displayed table
+        assert len(self.gui.group_syll_info[0]['group_info']['default']) == 6
 
     def test_get_session_mean_syllable_info_df(self):
 

@@ -20,11 +20,11 @@ class SyllableStatWidgets:
         self.layout_hidden = widgets.Layout(display='none')
         self.layout_visible = widgets.Layout(display='block')
 
-        self.stat_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
+        self.stat_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
-        self.sorting_dropdown = widgets.Dropdown(options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.sorting_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
         self.thresholding_dropdown = widgets.Dropdown(
-            options=['usage', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
+            options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
             description='Threshold By:', disabled=False, style=style)
 
         self.ctrl_dropdown = widgets.Dropdown(options=[], description='Group 1:', disabled=False)
@@ -129,14 +129,14 @@ class SyllableStatBokehCallbacks:
                         // initialize all the variables that appear in the HoverTool
                         // these same variables represent all the attributes that are held by Bokeh Gylph objects.
                         var index = [], number = [], sem = [];
-                        var x = [], y = [], usage = [], speed_2d = []; 
+                        var x = [], y = [], usage = [], duration = [], speed_2d = []; 
                         var speed_3d = [], height = [], dist = []; 
                         var label = [], desc = [], movies = [];
                     
                         // initialize the same variables for the plotted error bars.
                         // this is important in order to filter out both the plotted points AND their error bars.
                         var err_x = [], err_y = [];
-                        var err_number = [], err_usage = []; 
+                        var err_number = [], err_usage = [], err_duration = []; 
                         var err_speed_2d = [], err_speed_3d = [], err_sem = [];
                         var err_height = [], err_dist = [], err_label = [];
                         var err_desc = [], err_movies = [];\n
@@ -153,6 +153,7 @@ class SyllableStatBokehCallbacks:
                             sem.push(data['sem'][i]);
                             number.push(data['number'][i]);
                             usage.push(data['usage'][i]);
+                            duration.push(data['duration'][i]);
                             speed_2d.push(data['speed_2d'][i]);
                             speed_3d.push(data['speed_3d'][i]);
                             height.push(data['height'][i]);
@@ -167,6 +168,7 @@ class SyllableStatBokehCallbacks:
     
                             err_sem.push(err_data['sem'][i]);
                             err_usage.push(err_data['usage'][i]);
+                            err_duration.push(err_data['duration'][i]);
                             err_speed_2d.push(err_data['speed_2d'][i]);
                             err_speed_3d.push(err_data['speed_3d'][i]);
                             err_height.push(err_data['height'][i]);
@@ -198,6 +200,7 @@ class SyllableStatBokehCallbacks:
                     source.data.y = y;
                     source.data.sem = sem;
                     source.data.usage = usage;
+                    source.data.duration = duration;
                     source.data.speed_2d = speed_2d;
                     source.data.speed_3d = speed_3d;
                     source.data.height = height;
@@ -215,6 +218,7 @@ class SyllableStatBokehCallbacks:
     
                     err_source.data.number = err_number;
                     err_source.data.usage = err_usage;
+                    err_source.data.duration = err_duration;
                     err_source.data.sem = err_sem;
                     err_source.data.speed_2d = err_speed_2d;
                     err_source.data.speed_3d = err_speed_3d;
@@ -259,25 +263,25 @@ class TransitionGraphWidgets:
                                                       style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', '2D velocity',
+        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', 'Duration', '2D velocity',
                                                               '3D velocity', 'Height', 'Distance to Center',
                                                               'Entropy-In', 'Entropy-Out'],
                                                      description='Node Coloring',
                                                      style=style, value='Default', continuous_update=False,
                                                      layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.edge_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style,
-                                                             description='Threshold Edge Weights',
-                                                             layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                             continuous_update=False)
-        self.usage_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style, readout_format='.4f',
-                                                              description='Threshold Nodes by Usage',
-                                                              layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                              continuous_update=False)
-        self.speed_thresholder = widgets.SelectionRangeSlider(options=['tmp'], style=style, readout_format='.1f',
-                                                              description='Threshold Nodes by Speed',
-                                                              layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                              continuous_update=False)
+        self.edge_thresholder = widgets.FloatRangeSlider(style=style, step=0.001, min=0, readout_format='.4f',
+                                                         description='Threshold Edge Weights',
+                                                         layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                         continuous_update=False)
+        self.usage_thresholder = widgets.FloatRangeSlider(style=style, step=0.001, min=0, readout_format='.3f',
+                                                          description='Threshold Nodes by Usage',
+                                                          layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                          continuous_update=False)
+        self.speed_thresholder = widgets.FloatRangeSlider(style=style, step=0.01, min=0, readout_format='.2f',
+                                                          description='Threshold Nodes by Speed',
+                                                          layout=widgets.Layout(align_items='stretch', width='90%'),
+                                                          continuous_update=False)
 
         self.thresholding_box = HBox([
                                       VBox([self.graph_layout_dropdown, self.edge_thresholder, self.usage_thresholder],
@@ -309,21 +313,14 @@ class TransitionGraphWidgets:
         '''
 
         # Update threshold range values
-        edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
-        usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
+        self.edge_thresholder.max = np.max(self.trans_mats)
+        self.edge_thresholder.value = (0, np.max(self.trans_mats))
 
-        self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
-                                         range(edge_threshold_stds)]
-        self.edge_thresholder.index = (1, edge_threshold_stds - 1)
+        self.usage_thresholder.max = self.df['usage'].max()
+        self.usage_thresholder.value = (0, self.df['usage'].max())
 
-        self.usage_thresholder.options = [float('%.3f' % (self.df['usage'].std() * i)) for i in
-                                          range(usage_threshold_stds)]
-        self.usage_thresholder.index = (0, usage_threshold_stds - 1)
-
-        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
-                                          range(speed_threshold_stds)]
-        self.speed_thresholder.index = (0, speed_threshold_stds - 1)
+        self.speed_thresholder.max = self.df['velocity_2d_mm'].max()
+        self.speed_thresholder.value = (0, self.df['velocity_2d_mm'].max())
 
     def on_set_scalar(self, event):
         '''
@@ -341,6 +338,9 @@ class TransitionGraphWidgets:
         if event.new == 'Default' or event.new == '2D velocity':
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+        elif event.new == 'Duration':
+            key = 'duration'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
@@ -357,7 +357,5 @@ class TransitionGraphWidgets:
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
 
-        scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
-        self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
-                                          range(scalar_threshold_stds)]
-        self.speed_thresholder.index = (0, scalar_threshold_stds - 1)
+        self.speed_thresholder.max = self.df[key].max()
+        self.speed_thresholder.value = (0, self.df[key].max())
