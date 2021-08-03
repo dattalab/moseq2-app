@@ -12,5 +12,5 @@ curl -L -o config.yaml https://www.dropbox.com/s/i51yfglirupi32h/progress_colab.
 curl -L -o moseq2-index.yaml https://www.dropbox.com/s/iirgxqec2rp65nl/moseq2-index_colab.yaml?dl=0
 
 # Aggregate Sessions
-curl -L -o -o aggregage_results.zip https://www.dropbox.com/sh/fdi8mq4a2s4xp9q/AABlU230uGutBI6oA7QhrMkOa?dl=0 && unzip aggregage_results.zip -d aggregate_results
+curl -L -o aggregage_results.zip https://www.dropbox.com/sh/fdi8mq4a2s4xp9q/AABlU230uGutBI6oA7QhrMkOa?dl=1 && unzip aggregage_results.zip -d aggregage_results
 rm aggregage_results.zip
