@@ -2,10 +2,10 @@
 mkdir test_data
 cd test_data
 
-# Progress File
+# Config File
 curl -L -o config.yaml https://www.dropbox.com/s/2zayp2gbz5e4ssf/config_colab.yaml?dl=0
 
-# Config File
+# Progress File
 curl -L -o progress.yaml https://www.dropbox.com/s/i51yfglirupi32h/progress_colab.yaml?dl=0
 
 # Index File

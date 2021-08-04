@@ -2,8 +2,11 @@
 mkdir test_data
 cd test_data
 
+# Config file
+curl -L -o config.yaml https://www.dropbox.com/s/iy7l5kolzhz2wyv/config_colab_withresults.yaml?dl=0
+
 # Progress File
-curl -L -o config.yaml https://www.dropbox.com/s/lkkrc2xmj1u17zh/progress_colab_withresults.yaml?dl=0
+curl -L -o progress.yaml https://www.dropbox.com/s/lkkrc2xmj1u17zh/progress_colab_withresults.yaml?dl=0
 
 # Index File
 curl -L -o moseq2-index.yaml  https://www.dropbox.com/s/8hzw8nhpmwabn16/moseq2-index_colab_withresults.yaml?dl=0
