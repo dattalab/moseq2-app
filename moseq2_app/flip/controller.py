@@ -219,7 +219,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         '''
 
         cols = ['0 - Correctly Flipped (Facing East)', '1 - Incorrectly Flipped (Facing West)']
-        rows = ['', 'y-flipped']
+        rows = ['', 'x-flipped']
 
         fig, axes = plt.subplots(2, 2, figsize=(8, 8), sharex=True, sharey=True)
 
