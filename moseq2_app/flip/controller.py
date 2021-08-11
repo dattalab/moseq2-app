@@ -242,7 +242,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         fig.tight_layout()
 
-    def augment_dataset(self):
+    def augment_dataset(self, plot_examples=False):
         '''
         Augments the selected correct dataset with 3 rotated versions of the truth values:
          1. xflip -> incorrect case; 2. yflip -> correct case; 3. xyflip -> incorrect case;
@@ -250,6 +250,9 @@ class FlipRangeTool(FlipClassifierWidgets):
           The first half of X contains the incorrect cases (1), and the second half contains the correct cases (0).
           Equivalently, the first half of the y variable is composed of 1s, and the latter half is composed of 0s.
 
+        Parameters
+        ----------
+        plot_examples (bool): Indicates whether to display the 2x2 preview grid of dataset examples.
         Returns
         -------
         '''
@@ -266,13 +269,14 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.x = np.vstack((data_xflip.reshape((-1, npixels)), data_xyflip.reshape((-1, npixels)),
                        data_yflip.reshape((-1, npixels)), self.corrected_dataset.reshape((-1, npixels))))
 
-        # Plot examples of class 0: correctly flipped, and class 1: incorrectly flipped
-        self.plot_xy_examples(data_xflip, data_yflip, data_xyflip, selected_frame=0)
+        if plot_examples:
+            # Plot examples of class 0: correctly flipped, and class 1: incorrectly flipped
+            self.plot_xy_examples(data_xflip, data_yflip, data_xyflip, selected_frame=0)
 
         # class 1 is x facing west
         self.y = np.concatenate((np.ones((ntrials * 2,)), np.zeros((ntrials * 2,))))
 
-    def prepare_datasets(self, test_size, random_state=0):
+    def prepare_datasets(self, test_size, random_state=0, plot_examples=False):
         '''
         Correct data after the appropriate flip ranges have been selected, augment and create X,y training sets,
          and split the data to training and testing splits.
@@ -281,7 +285,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         ----------
         test_size (int): Test dataset percent split size
         random_state (int): Seed value to randomly sort the split data
-
+        plot_examples (bool): Indicates whether to display the 2x2 preview grid of dataset examples
         Returns
         -------
         '''
@@ -290,7 +294,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.get_corrected_data()
 
         # Augment the data
-        self.augment_dataset()
+        self.augment_dataset(plot_examples=plot_examples)
 
         # Split the datasets into Train and Test Sets
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x,
