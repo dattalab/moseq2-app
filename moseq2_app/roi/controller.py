@@ -156,7 +156,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.session_parameters[curr_session_key]['finfo'] = get_movie_info(self.curr_session)
 
         if self.curr_session.endswith('.mkv'):
-            self.handle_mkv_files(self, curr_session_key, self.curr_session)
+            self.handle_mkv_files(curr_session_key, self.curr_session)
 
         # Update sliders with corresponding session's previously set values
         if not isinstance(self.session_parameters[curr_session_key]['bg_roi_depth_range'], str):
