@@ -86,8 +86,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.checked_list.options = colored_options
         self.checked_list.value = colored_options[0]
 
-        # Set session select callback
-        self.checked_list.observe(self.get_selected_session, names='value')
 
         # Update main configuration parameters
         self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))

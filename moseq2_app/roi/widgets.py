@@ -132,6 +132,9 @@ class InteractiveROIWidgets:
 
         self.clear_button.on_click(self.clear_on_click)
 
+        # Session Select widget callback
+        self.checked_list.observe(self.get_selected_session, names='value')
+
         # Set save parameters button callback
         self.save_parameters.on_click(self.save_clicked)
 
