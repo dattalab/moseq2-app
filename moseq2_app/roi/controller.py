@@ -272,47 +272,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.get_all_session_roi_results(session_dict)
 
-
-        # Get relevant structuring elements
-        strel_dilate = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_dilate']))
-        strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
-
-        # get the current background image
-        self.session_parameters[curr_session_key].pop('output_dir', None)
-        self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
-
-        try:
-            # Get ROI
-            rois, plane, bboxes, _, _, _ = get_roi(bground_im,
-                                                   **self.session_parameters[curr_session_key],
-                                                   strel_dilate=strel_dilate,
-                                                   strel_erode=strel_erode,
-                                                   get_all_data=True
-                                                   )
-        except ValueError:
-            # bg depth range did not capture any area
-            # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
-            # roi detection.
-            return curr_results
-        except Exception as e:
-            # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
-            print(e)
-            return curr_results
-
-        if self.config_data['use_plane_bground']:
-            print('Using plane fit for background...')
-            self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
-
-        if self.config_data['autodetect']:
-            # Corresponds to a rough pixel area estimate
-            r = float(cv2.countNonZero(rois[0].astype('uint8')))
-            self.config_data['pixel_areas'].append(r)
-            self.session_parameters[curr_session_key]['pixel_area'] = r
-        else:
-            # Corresponds to a rough pixel area estimate
-            r = float(cv2.countNonZero(rois[0].astype('uint8')))
-            self.session_parameters[curr_session_key]['pixel_area'] = r
-
         if self.npassing == len(self.checked_list.options):
             self.save_clicked()
             self.message.value = 'All sessions passed and the config files have been saved.\n' \

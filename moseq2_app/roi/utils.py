@@ -181,6 +181,93 @@ class InteractiveFindRoiUtilites:
                 # Print error if an issue arises
                 display(f'Error, could not compute background for session: {s}.')
                 pass
+
+    def get_roi_and_depths(self):
+        '''
+        Performs bucket centroid estimation to find the coordinates to use as the true depth value.
+        The true depth will be used to estimate the background depth_range, then it will update the
+        widget values in real time.
+
+        Parameters
+        ----------
+        bground_im (2D np.array): Computed session background
+        session (str): path to currently processed session
+        config_data (dict): Extraction configuration parameters
+
+        Returns
+        -------
+        results (dict): dict that contains computed information. E.g. its ROI, and if it was flagged.
+        '''
+
+        curr_session_key = self.keys[self.checked_list.index]
+
+        # Compute suitable depth range based on depth value at bucket centroid
+        self.autodetect_depth_range(curr_session_key)
+
+        # Get relevant structuring elements
+        strel_dilate = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_dilate']))
+        strel_erode = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_erode']))
+
+        # get the current background image
+        self.session_parameters[curr_session_key].pop('output_dir', None)
+        self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
+
+        try:
+            # Get ROI
+            rois, plane, bboxes, _, _, _ = get_roi(self.curr_bground_im,
+                                                   **self.session_parameters[curr_session_key],
+                                                   strel_dilate=strel_dilate,
+                                                   strel_erode=strel_erode,
+                                                   get_all_data=True
+                                                   )
+        except ValueError:
+            # bg depth range did not capture any area
+            # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
+            # roi detection.
+            self.curr_results['flagged'] = True
+            self.curr_results['err_code'] = 1
+            self.curr_results['ret_code'] = "0x1f534"
+
+            # setting the roi variable to 1's array to match the background image. This way,
+            # bokeh will still have an image to display.
+            self.curr_results['roi'] = np.ones_like(self.curr_bground_im)
+            self.update_checked_list()
+            return
+        except Exception as e:
+            # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
+            self.curr_results['flagged'] = True
+            self.curr_results['err_code'] = 1
+            self.curr_results['ret_code'] = "0x1f534"
+            self.curr_results['roi'] = np.ones_like(self.curr_bground_im)
+            self.update_checked_list()
+            return
+
+        if self.config_data['use_plane_bground']:
+            print('Using plane fit for background...')
+            self.curr_bground_im = set_bground_to_plane_fit(self.curr_bground_im, plane, join(dirname(self.curr_session), 'proc'))
+
+        if self.config_data['autodetect']:
+            # Corresponds to a rough pixel area estimate
+            r = float(cv2.countNonZero(rois[0].astype('uint16')))
+            self.config_data['pixel_areas'].append(r)
+            self.session_parameters[curr_session_key]['pixel_area'] = r
+        else:
+            # Corresponds to a rough pixel area estimate
+            r = float(cv2.countNonZero(rois[0].astype('uint16')))
+            self.session_parameters[curr_session_key]['pixel_area'] = r
+
+        self.check_roi_validity(n_pixels=r)
+
+        # Save ROI
+        self.curr_results['roi'] = rois[0]
+        self.curr_results['counted_pixels'] = r
+
+        # Update results
+        self.update_checked_list()
+        gc.collect()
+
+        return
+
     def get_all_session_roi_results(self, session_dict):
         '''
 
