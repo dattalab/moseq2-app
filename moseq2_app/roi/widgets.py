@@ -193,6 +193,31 @@ class InteractiveROIWidgets:
                 self.config_data['autodetect'] = True
             self.interactive_find_roi_session_selector(self.checked_list.value)
 
+    def update_checked_list(self):
+        '''
+        Helper function to update the session selector passing indicators when a parameter test is run.
+
+        Parameters
+        ----------
+        results (dict): ROI detection results dict containing the flag and return code to display.
+
+        Returns
+        -------
+        '''
+        curr_index = self.checked_list.index
+        cur_val = list(self.checked_list.options)[curr_index].split(' ')
+        checked_options = list(self.checked_list.options)
+
+        # Update Checked List
+        checked_options[curr_index] = f'{chr(int(self.curr_results["ret_code"], base=16))} {cur_val[1]}'
+
+        # Changing the value of _initalizing_traits_ in order to prevent superfluous reloads
+        self.checked_list._initializing_traits_ = True
+        self.checked_list.options = checked_options
+
+        self.checked_list._initializing_traits_ = False
+        self.checked_list.value = checked_options[curr_index]
+
     def extract_button_clicked(self, b=None):
         '''
         Updates the true depth autodetection parameter

@@ -311,30 +311,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.interactive_depth_finder()
 
-    def update_checked_list(self, results):
-        '''
-        Helper function to update the session selector passing indicators when a parameter test is run.
-
-        Parameters
-        ----------
-        results (dict): ROI detection results dict containing the flag and return code to display.
-
-        Returns
-        -------
-        '''
-
-        curr_index = self.checked_list.index
-        cur_val = list(self.checked_list.options)[curr_index].split(' ')
-        checked_options = list(self.checked_list.options)
-
-        # Update Checked List
-        checked_options[curr_index] = f'{chr(int(results["ret_code"], base=16))} {cur_val[1]}'
-        self.checked_list._initializing_traits_ = True
-        self.checked_list.options = checked_options
-
-        self.checked_list._initializing_traits_ = False
-        self.checked_list.value = checked_options[curr_index]
-
     def interactive_depth_finder(self):
         '''
         Interactive helper function that updates that views whenever the depth range or
