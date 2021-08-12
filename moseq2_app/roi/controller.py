@@ -7,32 +7,23 @@ the widgets.py file to facilitate the real-time interaction.
 
 import gc
 import os
-import cv2
-import bokeh
-import warnings
 import numpy as np
-from math import isclose
 from bokeh.io import show
 from copy import deepcopy
-import ruamel.yaml as yaml
-from tqdm.auto import tqdm
 import ipywidgets as widgets
 from bokeh.models import Div, CustomJS, Slider
-from moseq2_extract.io.image import write_image
 from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
+from moseq2_extract.extract.proc import get_bground_im_file
+from moseq2_app.roi.utils import InteractiveFindRoiUtilites
 from os.path import dirname, basename, join, relpath, abspath
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
-from moseq2_extract.extract.proc import get_roi, get_bground_im_file
-from moseq2_extract.io.video import (load_movie_data, get_video_info,
-                                     get_movie_info, load_timestamps_from_movie)
-from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, read_yaml,
-                                 set_bground_to_plane_fit, detect_and_set_camera_parameters,
-                                 check_filter_sizes)
+from moseq2_extract.io.video import load_movie_data, get_video_info, get_movie_info
+from moseq2_extract.util import (detect_and_set_camera_parameters, check_filter_sizes, get_strels, read_yaml)
 
 
 class InteractiveFindRoi(InteractiveROIWidgets):
