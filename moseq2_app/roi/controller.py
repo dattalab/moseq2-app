@@ -55,16 +55,23 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.main_out = None
         self.output = None
 
+        # setting input variables
         self.autodetect_depths = autodetect_depths
+
+        # initial number of sessions that are considering Passing
+        self.npassing = 0
 
         # initialize reusable results dicts
         self.curr_results = {'flagged': False,
                              'ret_code': "0x1f7e2",
                              'err_code': -1}
+        self.all_results = {}
+
+        # initialize reusable background image variable
+        self.curr_bground_im = None
+
         # Read default config parameters
         self.config_data = read_yaml(config_file)
-
-        self.session_config = session_config
 
         # Update DropDown menu items
         self.sessions = get_session_paths(data_path)
@@ -75,32 +82,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.keys = list(self.sessions.keys())
 
 
-        self.all_results = {}
-
-        self.config_data['session_config_path'] = session_config
-        self.config_data['config_file'] = config_file
-
-        states = [0] * len(self.sessions.keys())
-
-        c_base = int("1F534", base=16)
-        options = list(self.sessions.keys())
-        colored_options = ['{} {}'.format(chr(c_base + s), o) for s, o in zip(states, options)]
-
-        # Set Initial List options
-        self.checked_list.options = colored_options
-        self.checked_list.value = colored_options[0]
-
 
         # Update main configuration parameters
         self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
         self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
 
+        # Ensure config file is reading frames with >1 thread for fast reloading
         if self.config_data.get('threads', 8) < 1:
             self.config_data['threads'] = 8
 
-        for k in self.keys:
-            self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
-
+        # Ensure config file contains all required parameters prior to creating session_config
         self.config_data = check_filter_sizes(self.config_data)
         self.config_data['pixel_areas'] = []
         self.config_data['autodetect'] = True
@@ -110,8 +101,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if 'bg_roi_dilate' not in self.config_data:
             self.config_data['bg_roi_dilate'] = (1, 1)
 
-        if compute_bgs:
-            self.compute_all_bgs()
 
 
 
@@ -125,6 +114,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         ----------
         session_dict (dict): dict of session directory names paired with their absolute paths.
         config_data (dict): ROI/Extraction configuration parameters.
+        # Create initial shared session_parameters dict
+        self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
 
         Returns
         -------
@@ -150,19 +141,25 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                 except:
                     sess_res = {'flagged': True, 'ret_code': '0x1f534'}
+        # Update global session config: self.session_paramters
+        self.get_session_config(session_config=session_config, overwrite=overwrite)
+        self.config_data['session_config_path'] = session_config
+        self.config_data['config_file'] = config_file
 
                 # Save session parameters if it is not flagged
                 if not sess_res['flagged']:
                     self.npassing += 1
+        for k in self.keys:
+            self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
 
                 # Update label
                 self.checked_lbl.value = f'Sessions with Passing ROI Sizes: {self.npassing}/{len(self.checked_list.options)}'
+        # Create colored dots for each session item in the checked_list widget
+        states = [0] * len(self.sessions.keys())
+        c_base = int("1F534", base=16)
+        options = list(self.sessions.keys())
+        colored_options = ['{} {}'.format(chr(c_base + s), o) for s, o in zip(states, options)]
 
-                # Set index passing value
-                checked_options[i] = f'{chr(int(sess_res["ret_code"], base=16))} {sessionName}'
-                # Safely updating displayed list
-                self.checked_list._initializing_traits_ = True
-                self.checked_list.options = checked_options
 
                 self.checked_list._initializing_traits_ = False
 
@@ -170,7 +167,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.all_results[sessionName] = sess_res['flagged']
                 gc.collect()
 
-        self.checked_list.value = checked_options[self.checked_list.index]
+        if compute_bgs:
+            self.compute_all_bgs()
 
         if self.npassing == len(self.checked_list.options):
             self.save_clicked()
