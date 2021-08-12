@@ -466,11 +466,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # filter out regions outside of ROI
         try:
             filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
-            
         except:
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
+                self.curr_results['err_code'] = 4
                 self.curr_results['flagged'] = True
 
         # filter for included mouse height range
@@ -480,6 +480,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display min-max heights error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
+                self.curr_results['err_code'] = 5
                 self.curr_results['flagged'] = True
 
         # Get overlayed ROI
@@ -497,7 +498,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
-            self.curr_results['flagged'] = False
+            self.curr_results['flagged'] = True
+            self.curr_results['err_code'] = 6
+            self.curr_results['ret_code'] = "0x1f534"
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
@@ -507,8 +510,19 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         else:
             display_bg = self.curr_bground_im
 
+        # Update indicator value with final error
+        error_code = self.curr_results['err_code']
+        err_formatting_s, formatting_e = '<center><h2><font color="red";>', '</h2></center>'
+        if error_code < 0:
+            final_indicator_value = f'<center><h2><font color="green";>{self.error_codes[error_code]}</h2></center>'
+        else:
+            final_indicator_value = err_formatting_s+self.error_codes[error_code]+formatting_e
+
         # Make and display plots
         self.main_output = plot_roi_results(self.formatted_key, display_bg, roi, overlay, filtered_frames, result['depth_frames'][0], fn, main_out=self.main_output)
+
+        # update text indicator value
+        self.indicator.value = final_indicator_value
         gc.collect()
 
 class InteractiveExtractionViewer:

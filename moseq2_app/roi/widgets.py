@@ -104,6 +104,20 @@ class InteractiveROIWidgets:
                                                width='100%')
         self.indicator = widgets.HTML(value="")
 
+        # Error codes numbered in order of all the steps executed from __init__() ->  prepare_data_to_plot()
+        self.error_codes = {
+            -1: 'Passing',
+            0: 'Could not compute background.',
+            1: 'Could not compute ROI.',
+            2: 'Current detected ROI may be too large. If ROI is acceptable, '
+               'Mark it as passing by clicking "Save ROI". Otherwise, change the depth range values.',
+            3: 'Current detected ROI is too small. If ROI is acceptable, '
+               'Mark it as passing. Otherwise, change the depth range values, or increase Dilate Iters.',
+            4: 'Could not apply ROI to loaded frames.',
+            5: 'Mouse height threshold range is incorrect.',
+            6: 'Could not extract mouse from raw data.'
+        }
+
         # groupings
         # ui widgets
         self.roi_tools = VBox([self.roi_label,
@@ -194,11 +208,11 @@ class InteractiveROIWidgets:
 
         if old_value != event.new.split(' ')[1]:
             self.checked_list.value = event.new
-            self.main_out = None
-
             self.config_data['detect'] = True
             if self.autodetect_depths:
                 self.config_data['autodetect'] = True
+
+            self.curr_results['err_code'] = -1
             self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def update_checked_list(self):
