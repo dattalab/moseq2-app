@@ -7,13 +7,13 @@ import numpy as np
 import ipywidgets as widgets
 from bokeh.models import Div
 from bokeh.layouts import gridplot
-from IPython.display import display
 from bokeh.plotting import figure, show
+from IPython.display import display, clear_output
 from os.path import dirname, join, relpath, exists
 from moseq2_extract.io.video import get_video_info
 
 
-def show_extraction(input_file, video_file):
+def show_extraction(input_file, video_file, main_output=None):
     '''
 
     Visualization helper function to display manually triggered extraction.
@@ -55,14 +55,14 @@ def show_extraction(input_file, video_file):
 
     div = Div(text=video_div, style={'width': '100%', 'align-items': 'center', 'display': 'contents'})
 
-    output = widgets.Output(layout=widgets.Layout(align_items='center', display='inline-block',
+    if main_output is None:
+        main_output = widgets.Output(layout=widgets.Layout(align_items='center', display='inline-block',
                                                   height='100%', width='100%'))
-    with output:
+    with main_output:
+        clear_output(wait=True)
         show(div)
 
-    display(output)
-
-    return output
+    return main_output
 
 def bokeh_plot_helper(bk_fig, image):
     '''
@@ -97,7 +97,7 @@ def bokeh_plot_helper(bk_fig, image):
                      palette="Viridis256")
 
 
-def plot_roi_results(sessionName, bground_im, roi, overlay, filtered_frames, depth_frames, fn):
+def plot_roi_results(sessionName, bground_im, roi, overlay, filtered_frames, depth_frames, fn, main_out=None):
     '''
     Main ROI plotting function that uses Bokeh to facilitate 3 interactive plots.
     Plots the background image, and an axis-connected plot of the ROI,
@@ -166,10 +166,12 @@ def plot_roi_results(sessionName, bground_im, roi, overlay, filtered_frames, dep
                    [segmented_fig, cropped_fig]],
                   plot_width=350, plot_height=350)
 
-    # Create Output widget object to center grid plot in view
-    output = widgets.Output(layout=widgets.Layout(align_items='center'))
-    with output:
+    if main_out is None:
+        # Create Output widget object to center grid plot in view
+        main_out = widgets.Output(layout=widgets.Layout(align_items='center'))
+
+    with main_out:
+        clear_output(wait=True)
         show(gp)
 
-    # Display centered grid plot
-    display(output)
+    return main_out

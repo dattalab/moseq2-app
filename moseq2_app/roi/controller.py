@@ -51,10 +51,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         super().__init__()
 
-        # main output gui to be reused
-        self.main_out = None
-        self.output = None
-
         # setting input variables
         self.autodetect_depths = autodetect_depths
 
@@ -69,6 +65,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # initialize reusable background image variable
         self.curr_bground_im = None
+
+        # initialize reusable grid and extraction output widgets
+        self.main_output = widgets.Output(layout=widgets.Layout(align_items='center'))
+        self.extraction_output = widgets.Output(layout=widgets.Layout(align_items='center', display='inline-block', height='100%', width='100%'))
 
         # Read default config parameters
         self.config_data = read_yaml(config_file)
@@ -174,6 +174,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.message.value = tmp_message
         # start tool execution
         self.interactive_find_roi_session_selector(self.checked_list.value)
+        display(self.clear_button, self.ui_tools, self.indicator, self.main_output, self.extraction_output)
 
     def interactive_find_roi_session_selector(self, session):
         '''
@@ -283,12 +284,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 # Update the session flag result
                 self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
                 self.all_results[curr_session_key] = self.curr_results['flagged']
-
-        # Clear output to update view
-        clear_output()
-
-        # Display extraction validation indicator
-        display(self.indicator)
 
         # display graphs
         self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
@@ -415,9 +410,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                 str_els, view_path)
 
         # display extracted video as HTML Div using Bokeh
-        if self.output is not None:
-            self.output = None
-        self.output = show_extraction(basename(dirname(input_file)), view_path)
+        self.extraction_output = show_extraction(basename(dirname(input_file)), view_path, main_output=self.extraction_output)
         gc.collect()
 
     def prepare_data_to_plot(self, roi, minmax_heights, fn):
@@ -504,7 +497,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             display_bg = self.curr_bground_im
 
         # Make and display plots
-        plot_roi_results(self.formatted_key, display_bg, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
+        self.main_output = plot_roi_results(self.formatted_key, display_bg, roi, overlay, filtered_frames, result['depth_frames'][0], fn, main_out=self.main_output)
         gc.collect()
 
 class InteractiveExtractionViewer:
