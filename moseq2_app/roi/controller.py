@@ -327,34 +327,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         results (dict): dict that contains computed information. E.g. its ROI, and if it was flagged.
         '''
 
-        curr_session_key = self.keys[self.checked_list.index]
 
-        if self.config_data['autodetect']:
-            # Get max depth as a thresholding limit (this would be the DTD if it already was computed)
-            limit = np.max(bground_im)
-
-            # Compute bucket distance thresholding value
-            threshold_value = np.median(bground_im)
-            self.session_parameters[curr_session_key]['bg_threshold'] = int(threshold_value)
-
-            # Threshold image to find depth at bucket center: the true depth
-            cX, cY = get_bucket_center(bground_im, limit, threshold=threshold_value)
-
-            # True depth is at the center of the bucket
-            self.true_depth = bground_im[cY][cX]
-            self.session_parameters[curr_session_key]['true_depth'] = int(self.true_depth)
-
-            # Get true depth range difference
-            range_diff = 10 ** (len(str(int(self.true_depth))) - 1)
-
-            # Center the depth ranges around the true depth
-            bg_roi_range_min = int(self.true_depth - range_diff)
-            bg_roi_range_max = int(self.true_depth + range_diff)
-
-            self.session_parameters[curr_session_key]['bg_roi_depth_range'] = (bg_roi_range_min, bg_roi_range_max)
-
-            if bg_roi_range_max > self.bg_roi_depth_range.max:
-                self.bg_roi_depth_range.max = bg_roi_range_max + range_diff
 
         # Get relevant structuring elements
         strel_dilate = select_strel(self.config_data['bg_roi_shape'], tuple(self.config_data['bg_roi_dilate']))
