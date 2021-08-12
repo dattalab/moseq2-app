@@ -57,6 +57,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         self.autodetect_depths = autodetect_depths
 
+        # initialize reusable results dicts
+        self.curr_results = {'flagged': False,
+                             'ret_code': "0x1f7e2",
+                             'err_code': -1}
         # Read default config parameters
         self.config_data = read_yaml(config_file)
 
@@ -323,10 +327,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         results (dict): dict that contains computed information. E.g. its ROI, and if it was flagged.
         '''
 
-        # initialize results dict
-        curr_results = {'flagged': False,
-                        'ret_code': "0x1f7e2"}
-
         curr_session_key = self.keys[self.checked_list.index]
 
         if self.config_data['autodetect']:
@@ -376,21 +376,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # bg depth range did not capture any area
             # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
             # roi detection.
-            curr_results['flagged'] = True
-            curr_results['ret_code'] = "0x1f534"
-
-            # setting the roi variable to 1's array to match the background image. This way,
-            # bokeh will still have an image to display.
-            curr_results['roi'] = np.ones_like(self.curr_bground_im)
-            self.update_checked_list(results=curr_results)
             return curr_results
         except Exception as e:
             # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             print(e)
-            curr_results['flagged'] = True
-            curr_results['ret_code'] = "0x1f534"
-            curr_results['roi'] = np.ones_like(self.curr_bground_im)
-            self.update_checked_list(results=curr_results)
             return curr_results
 
         if self.config_data['use_plane_bground']:
@@ -426,11 +415,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # add accepted area size to
             self.config_data['pixel_areas'].append(r)
 
-        # Save ROI
-        curr_results['roi'] = rois[0]
-        curr_results['counted_pixels'] = r
-        self.update_checked_list(results=curr_results)
-        gc.collect()
 
         return curr_results
 

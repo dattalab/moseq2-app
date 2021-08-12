@@ -261,7 +261,7 @@ class InteractiveROIWidgets:
         self.config_data['pixel_areas'].append(self.curr_results['counted_pixels'])
         self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
-        self.update_checked_list(self.curr_results)
+        self.update_checked_list()
 
         # write ROI to correct path
         write_image(join(dirname(self.curr_session), 'proc', f'roi_00.tiff'), self.curr_results['roi'])
