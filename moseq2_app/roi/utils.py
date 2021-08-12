@@ -181,3 +181,53 @@ class InteractiveFindRoiUtilites:
                 # Print error if an issue arises
                 display(f'Error, could not compute background for session: {s}.')
                 pass
+    def get_all_session_roi_results(self, session_dict):
+        '''
+
+        Parameters
+        ----------
+        session_dict
+
+        Returns
+        -------
+
+        '''
+
+        checked_options = list(self.checked_list.options)
+
+        # test saved config data parameters on all sessions
+        for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
+            self.curr_session = sessionPath
+            # finfo is a key that points to a dict that contains the following keys:
+            # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
+            if 'finfo' not in self.session_parameters[sessionName]:
+                self.session_parameters[sessionName]['finfo'] = get_movie_info(self.curr_session)
+
+            if self.curr_session.endswith('.mkv'):
+                self.handle_mkv_files(sessionName, self.curr_session)
+
+            # Get background image for each session and test the current parameters on it
+            self.session_parameters[sessionName].pop('output_dir', None)
+            self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[sessionName])
+            self.get_roi_and_depths()
+
+            # Save session parameters if it is not flagged
+            if not self.curr_results['flagged']:
+                self.npassing += 1
+
+            # Update nPassing Sessions label in display
+            self.checked_lbl.value = f'Sessions with Passing ROI Sizes: {self.npassing}/{len(self.checked_list.options)}'
+
+            # Set index passing value
+            checked_options[i] = f'{chr(int(self.curr_results["ret_code"], base=16))} {sessionName}'
+
+            # Safely updating displayed list
+            self.checked_list._initializing_traits_ = True
+            self.checked_list.options = checked_options
+            self.checked_list._initializing_traits_ = False
+
+            # Updating progress
+            self.all_results[sessionName] = self.curr_results['flagged']
+            gc.collect()
+
+        self.checked_list.value = checked_options[self.checked_list.index]

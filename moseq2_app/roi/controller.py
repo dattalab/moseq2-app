@@ -95,54 +95,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if 'bg_roi_dilate' not in self.config_data:
             self.config_data['bg_roi_dilate'] = (1, 1)
 
-
-
-
-
-    def test_all_sessions(self, session_dict):
-        '''
-        Helper function to test the current configurable UI values on all the
-        sessions that were found.
-
-        Parameters
-        ----------
-        session_dict (dict): dict of session directory names paired with their absolute paths.
-        config_data (dict): ROI/Extraction configuration parameters.
         # Create initial shared session_parameters dict
         self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
 
-        Returns
-        -------
-        all_results (dict): dict of session names and values used to indicate if a session was flagged,
-        with their computed ROI for convenience.
-        '''
-        checked_options = list(self.checked_list.options)
-
-        self.npassing = 0
-
-        # test saved config data parameters on all sessions
-        for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
-            if sessionName != self.curr_session:
-                # finfo is a key that points to a dict that contains the following keys:
-                # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
-                if 'finfo' not in self.session_parameters[sessionName]:
-                    self.session_parameters[sessionName]['finfo'] = get_movie_info(sessionPath)
-
-                # Get background image for each session and test the current parameters on it
-                self.session_parameters[sessionName].pop('output_dir', None)
-                bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
-                try:
-                    sess_res = self.get_roi_and_depths(bground_im, sessionPath)
-                except:
-                    sess_res = {'flagged': True, 'ret_code': '0x1f534'}
         # Update global session config: self.session_paramters
         self.get_session_config(session_config=session_config, overwrite=overwrite)
         self.config_data['session_config_path'] = session_config
         self.config_data['config_file'] = config_file
 
-                # Save session parameters if it is not flagged
-                if not sess_res['flagged']:
-                    self.npassing += 1
         for k in self.keys:
             self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
 
@@ -163,9 +123,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                       func=self.update_minmax_config,
                                       new_val=(self.config_data.get('min_height', 10), self.config_data.get('max_height', 100)))
 
-                # Updating progress
-                self.all_results[sessionName] = sess_res['flagged']
-                gc.collect()
         self.safe_widget_value_update(wid_obj=self.dilate_iters,
                                       func=self.update_config_di,
                                       new_val=self.config_data.get('dilate_iterations', 0))
@@ -173,16 +130,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if compute_bgs:
             self.compute_all_bgs()
 
-        if self.npassing == len(self.checked_list.options):
-            self.save_clicked()
-            self.message.value = 'All sessions passed and the config files have been saved.\n' \
-                                 'You can now safely clear the output, and move to the "Extract All" cell.\n'
-        else:
-            tmp_message = 'Some sessions were flagged. Save the parameter set for the current passing sessions, \
-             then find and save the correct set for the remaining sessions.\n'
-            if self.autodetect_depths == False:
-                tmp_message += ' Try Clearing the output, and rerunning the cell with autodetect_depths = True'
-            self.message.value = tmp_message
         # start tool execution
         self.interactive_find_roi_session_selector(self.checked_list.value)
         display(self.clear_button, self.ui_tools, self.indicator, self.main_output, self.extraction_output)
@@ -298,25 +245,32 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # display graphs
         self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
-
         gc.collect()
 
+    def test_all_sessions(self, session_dict):
         '''
-        Performs bucket centroid estimation to find the coordinates to use as the true depth value.
-        The true depth will be used to estimate the background depth_range, then it will update the
-        widget values in real time.
+        Helper to a callback function to test the current configurable UI values on all the
+        sessions that were found. Triggered when user clicks "Check All Sessions".
+
+        The function will call a helper utility get_all_session_roi_results() in order to iteratively check each session,
+         and update the displayed "circle indicator" color to green if the test passes, and red if it fails.
+
+        If all the sessions pass, the session_config.yaml file will be saved to file and a message is emited indicating that
+         the user can close the gui and move to the "Extract All Sessions" cell. If some sessions, fail the emitted message
+         will indicate to check these sessions and update their parameters prior to continuing to the extract step.
 
         Parameters
         ----------
         bground_im (2D np.array): Computed session background
         session (str): path to currently processed session
         config_data (dict): Extraction configuration parameters
+        session_dict (dict): dict of session directory names paired with their absolute paths.
 
         Returns
         -------
-        results (dict): dict that contains computed information. E.g. its ROI, and if it was flagged.
         '''
 
+        self.get_all_session_roi_results(session_dict)
 
 
         # Get relevant structuring elements
@@ -359,10 +313,16 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             r = float(cv2.countNonZero(rois[0].astype('uint8')))
             self.session_parameters[curr_session_key]['pixel_area'] = r
 
+        if self.npassing == len(self.checked_list.options):
+            self.save_clicked()
+            self.message.value = 'All sessions passed and the config files have been saved.\n' \
+                                 'You can now safely clear the output, and move to the "Extract All" cell.\n'
         else:
-
-
-        return curr_results
+            tmp_message = 'Some sessions were flagged. Save the parameter set for the current passing sessions, \
+             then find and save the correct set for the remaining sessions.\n'
+            if self.autodetect_depths == False:
+                tmp_message += ' Try Clearing the output, and rerunning the cell with autodetect_depths = True'
+            self.message.value = tmp_message
 
     def get_extraction(self, input_file, bground_im, roi):
         '''
