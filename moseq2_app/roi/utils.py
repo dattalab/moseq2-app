@@ -59,6 +59,50 @@ class InteractiveFindRoiUtilites:
         # Generate session config file if it does not exist
         with open(path, 'w+') as f:
             yaml.safe_dump(self.session_parameters, f)
+
+    def check_roi_validity(self, n_pixels):
+        '''
+
+        Parameters
+        ----------
+        n_pixels
+
+        Returns
+        -------
+        '''
+
+        res = False
+        pixel_areas = self.config_data.get('pixel_areas', [])
+
+        # check if the current measured area is within is the current list of ROI areas
+        if len(pixel_areas) < 3:
+            abs_tol = 50e2
+        else:
+            abs_tol = np.std(pixel_areas)
+
+        for area in pixel_areas:
+            # if the current session's ROI is smaller than all the previously checked sessions
+            # by at least 500 square pixels. Then this session's ROI will be flagged
+            if isclose(area, n_pixels, abs_tol=abs_tol):
+                res = True
+                break
+
+        # set flag to check whether this session's ROI has a comparable number of pixels
+        # to the previously viewed sessions.
+        if not res and (len(pixel_areas) > 0):
+            self.curr_results['flagged'] = True
+            if n_pixels < np.mean(pixel_areas):
+                self.curr_results['err_code'] = 3
+            else:
+                self.curr_results['err_code'] = 2
+            self.curr_results['ret_code'] = "0x1f534"
+        else:
+            # add accepted area size to
+            self.curr_results['flagged'] = False
+            self.curr_results['err_code'] = -1
+            self.curr_results['ret_code'] = "0x1f7e2"
+            self.config_data['pixel_areas'].append(n_pixels)
+
     def autodetect_depth_range(self, curr_session_key):
         '''
 
