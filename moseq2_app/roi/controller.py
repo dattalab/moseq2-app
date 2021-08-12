@@ -309,18 +309,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters[curr_session_key].pop('output_dir', None)
         self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
-        if self.main_out is None:
-            self.main_out = widgets.interactive_output(self.interactive_depth_finder, {
-                                                                                   'minmax_heights': self.minmax_heights,
-                                                                                   'fn': self.frame_num,
-                                                                                   'dr': self.bg_roi_depth_range,
-                                                                                   'di': self.dilate_iters
-                                                                                  }
-                                                   )
-
-        display(self.clear_button, self.ui_tools)
-        display(self.main_out)
-        gc.collect()
+        self.interactive_depth_finder()
 
     def update_checked_list(self, results):
         '''
@@ -346,7 +335,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.checked_list._initializing_traits_ = False
         self.checked_list.value = checked_options[curr_index]
 
-    def interactive_depth_finder(self, minmax_heights, fn, dr, di):
+    def interactive_depth_finder(self):
         '''
         Interactive helper function that updates that views whenever the depth range or
         dilation iterations sliders are changed.
@@ -355,15 +344,15 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         Parameters
         ----------
-        session (str or ipywidget DropDownMenu): path to input file
-        bground_im (2D np.array): Computed session background
-        config_data (dict): Extraction configuration parameters
-        dr (tuple or ipywidget IntRangeSlider): Depth range to capture
-        di (int or ipywidget IntSlider): Dilation iterations
-
         Returns
         -------
         '''
+
+        # Get widget values
+        minmax_heights = self.minmax_heights.value
+        fn = self.frame_num.value
+        dr = self.bg_roi_depth_range.value
+        di = self.dilate_iters.value
 
         curr_session_key = self.keys[self.checked_list.index]
 
