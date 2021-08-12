@@ -86,14 +86,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.checked_list.options = colored_options
         self.checked_list.value = colored_options[0]
 
-        # Display validation indicator
-        self.indicator_layout = widgets.Layout(display='flex',
-                                               flex_flow='column',
-                                               font_size='150%',
-                                               align_items='center',
-                                               width='100%')
-        self.indicator = widgets.HTML(value="")
-
         # Set session select callback
         self.checked_list.observe(self.get_selected_session, names='value')
 

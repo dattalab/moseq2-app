@@ -96,6 +96,14 @@ class InteractiveROIWidgets:
                                          border='solid',
                                          height='100%', width='100%')
 
+        # Display validation indicator
+        self.indicator_layout = widgets.Layout(display='flex',
+                                               flex_flow='column',
+                                               font_size='150%',
+                                               align_items='center',
+                                               width='100%')
+        self.indicator = widgets.HTML(value="")
+
         # groupings
         # ui widgets
         self.roi_tools = VBox([self.roi_label,
