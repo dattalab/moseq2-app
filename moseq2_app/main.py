@@ -123,8 +123,7 @@ def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_de
                                  autodetect_depths=autodetect_depths,
                                  overwrite=overwrite)
 
-    # Run interactive application
-    roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
+    return roi_app
 
 @filter_warnings
 def preview_extractions(input_dir, flipped=False):

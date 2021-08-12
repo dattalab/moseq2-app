@@ -258,6 +258,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if self.autodetect_depths == False:
                 tmp_message += ' Try Clearing the output, and rerunning the cell with autodetect_depths = True'
             self.message.value = tmp_message
+        # start tool execution
+        self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def interactive_find_roi_session_selector(self, session):
         '''
