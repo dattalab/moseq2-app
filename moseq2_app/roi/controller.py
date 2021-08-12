@@ -152,12 +152,23 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         options = list(self.sessions.keys())
         colored_options = ['{} {}'.format(chr(c_base + s), o) for s, o in zip(states, options)]
 
+        # Set Initial List options
+        self.safe_widget_value_update(wid_obj=self.checked_list,
+                                      func=self.get_selected_session,
+                                      new_val=colored_options[0],
+                                      new_options=colored_options)
 
-                self.checked_list._initializing_traits_ = False
+        # Update main configuration parameters
+        self.safe_widget_value_update(wid_obj=self.minmax_heights,
+                                      func=self.update_minmax_config,
+                                      new_val=(self.config_data.get('min_height', 10), self.config_data.get('max_height', 100)))
 
                 # Updating progress
                 self.all_results[sessionName] = sess_res['flagged']
                 gc.collect()
+        self.safe_widget_value_update(wid_obj=self.dilate_iters,
+                                      func=self.update_config_di,
+                                      new_val=self.config_data.get('dilate_iterations', 0))
 
         if compute_bgs:
             self.compute_all_bgs()
