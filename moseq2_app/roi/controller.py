@@ -119,33 +119,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if compute_bgs:
             self.compute_all_bgs()
 
-    def compute_all_bgs(self):
-        '''
-        Computes all the background images before displaying the app to speed up user interaction.
 
-        Returns
-        -------
-        '''
 
-        for s, p in tqdm(self.sessions.items(), total=len(self.sessions.keys()), desc='Computing backgrounds'):
-            try:
-                # finfo is a key that points to a dict that contains the following keys:
-                # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
-                if 'finfo' not in self.session_parameters[s]:
-                    self.session_parameters[s]['finfo'] = get_movie_info(p)
-                    if p.endswith('.mkv'):
-                        self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
-                                                                                              threads=self.config_data['threads'],
-                                                                                              mapping=self.config_data.get('mapping', 'DEPTH'))
-                        self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
-
-                # Compute background image; saving the image to a file
-                self.session_parameters[s].pop('output_dir', None)
-                get_bground_im_file(p, **self.session_parameters[s], output_dir=None)
-            except:
-                # Print error if an issue arises
-                display(f'Error, could not compute background for session: {s}.')
-                pass
 
     def test_all_sessions(self, session_dict):
         '''
