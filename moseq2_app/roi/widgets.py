@@ -417,3 +417,30 @@ class InteractiveROIWidgets:
 
         self.interactive_depth_finder()
 
+    def safe_widget_value_update(self, wid_obj, func, new_val, new_options=None, names='value'):
+        '''
+
+        Parameters
+        ----------
+        wid_obj
+        func
+        new_val
+        new_options
+        names
+
+        Returns
+        -------
+        '''
+
+        # stop listening for callbacks
+        wid_obj.unobserve(func, names)
+
+        # if options are given, update the widget option
+        if new_options is not None:
+            wid_obj.options = new_options
+
+        # update value
+        wid_obj.value = new_val
+
+        # re-observe callbacks
+        wid_obj.observe(func, names=names)

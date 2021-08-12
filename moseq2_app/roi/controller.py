@@ -81,12 +81,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Session selection dict key names
         self.keys = list(self.sessions.keys())
 
-
-
-        # Update main configuration parameters
-        self.minmax_heights.value = (self.config_data.get('min_height', 10), self.config_data.get('max_height', 100))
-        self.dilate_iters.value = self.config_data.get('dilate_iterations', 0)
-
         # Ensure config file is reading frames with >1 thread for fast reloading
         if self.config_data.get('threads', 8) < 1:
             self.config_data['threads'] = 8
@@ -152,8 +146,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         for k in self.keys:
             self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
 
-                # Update label
-                self.checked_lbl.value = f'Sessions with Passing ROI Sizes: {self.npassing}/{len(self.checked_list.options)}'
         # Create colored dots for each session item in the checked_list widget
         states = [0] * len(self.sessions.keys())
         c_base = int("1F534", base=16)
@@ -218,10 +210,18 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Update sliders with corresponding session's previously set values
         if not isinstance(self.session_parameters[curr_session_key]['bg_roi_depth_range'], str):
-            self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
-        self.minmax_heights.value = [self.session_parameters[curr_session_key]['min_height'],
-                                     self.session_parameters[curr_session_key]['max_height']]
-        self.dilate_iters.value = self.session_parameters[curr_session_key]['dilate_iterations']
+            self.safe_widget_value_update(wid_obj=self.bg_roi_depth_range,
+                                          func=self.update_config_dr,
+                                          new_val=self.session_parameters[curr_session_key]['bg_roi_depth_range'])
+
+        self.safe_widget_value_update(wid_obj=self.minmax_heights,
+                                      func=self.update_minmax_config,
+                                      new_val=[self.session_parameters[curr_session_key]['min_height'],
+                                               self.session_parameters[curr_session_key]['max_height']])
+
+        self.safe_widget_value_update(wid_obj=self.dilate_iters,
+                                      func=self.update_config_di,
+                                      new_val=self.session_parameters[curr_session_key]['dilate_iterations'])
 
         # Get background and display UI plots
         self.session_parameters[curr_session_key].pop('output_dir', None)
@@ -266,9 +266,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.session_parameters[curr_session_key]['frame_range'] = self.frame_range.value
 
             # Update sliders with corresponding session's autodetected values
-            self.bg_roi_depth_range.value = self.session_parameters[curr_session_key]['bg_roi_depth_range']
-            self.minmax_heights.value = [self.session_parameters[curr_session_key]['min_height'],
-                                         self.session_parameters[curr_session_key]['max_height']]
+            self.safe_widget_value_update(wid_obj=self.minmax_heights,
+                                          func=self.update_minmax_config,
+                                          new_val=[self.session_parameters[curr_session_key]['min_height'],
+                                                   self.session_parameters[curr_session_key]['max_height']])
+
+            self.safe_widget_value_update(wid_obj=self.bg_roi_depth_range,
+                                          func=self.update_config_dr,
+                                          new_val=self.session_parameters[curr_session_key]['bg_roi_depth_range'])
         else:
             # Test updated parameters
             self.session_parameters[curr_session_key]['bg_roi_depth_range'] = (int(dr[0]), int(dr[1]))
@@ -278,13 +283,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 # Update the session flag result
                 self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
                 self.all_results[curr_session_key] = self.curr_results['flagged']
-
-        # set indicator
-        if self.curr_results['flagged']:
-            self.indicator.value = '<center><h2><font color="red";>Flagged: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
-                                   ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
-        else:
-            self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
         # Clear output to update view
         clear_output()
@@ -469,7 +467,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
                 self.curr_results['flagged'] = True
 
         # filter for included mouse height range
@@ -479,7 +476,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display min-max heights error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
 
         # Get overlayed ROI
@@ -497,13 +493,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
-        
-        if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
-            if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
-                self.curr_results['flagged'] = True
-        else:
-            self.indicator.value = "<center><h2><font color='green';>Passing</h2></center>"
             self.curr_results['flagged'] = False
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
