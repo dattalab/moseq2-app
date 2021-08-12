@@ -267,7 +267,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Autodetect reference depth range and min-max height values at launch
         if self.config_data['autodetect']:
-            self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
+            self.get_roi_and_depths()
             if not self.curr_results['flagged']:
                 self.config_data['autodetect'] = False
 
@@ -293,7 +293,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
             if self.config_data['detect']:
                 # Update the session flag result
-                self.curr_results = self.get_roi_and_depths(self.curr_bground_im, self.curr_session)
+                self.get_roi_and_depths()
                 self.all_results[curr_session_key] = self.curr_results['flagged']
 
         # display graphs
@@ -301,7 +301,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         gc.collect()
 
-    def get_roi_and_depths(self, bground_im, session):
         '''
         Performs bucket centroid estimation to find the coordinates to use as the true depth value.
         The true depth will be used to estimate the background depth_range, then it will update the
