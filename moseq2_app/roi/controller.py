@@ -143,13 +143,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 if 'finfo' not in self.session_parameters[sessionName]:
                     self.session_parameters[sessionName]['finfo'] = get_movie_info(sessionPath)
 
-                if sessionPath.endswith('.mkv'):
-                    self.session_parameters[sessionName]['timestamps'] = \
-                        load_timestamps_from_movie(sessionPath, self.config_data['threads'],
-                                                   self.config_data.get('mapping', 'DEPTH'))
-                    self.session_parameters[sessionName]['finfo']['nframes'] = \
-                        len(self.session_parameters[sessionName]['timestamps'])
-
                 # Get background image for each session and test the current parameters on it
                 self.session_parameters[sessionName].pop('output_dir', None)
                 bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
@@ -223,11 +216,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             self.session_parameters[curr_session_key]['finfo'] = get_movie_info(self.curr_session)
 
         if self.curr_session.endswith('.mkv'):
-            self.session_parameters[curr_session_key]['timestamps'] = \
-                load_timestamps_from_movie(self.curr_session, threads=self.config_data['threads'],
-                                           mapping=self.config_data.get('mapping', 'DEPTH'))
-            self.session_parameters[curr_session_key]['finfo']['nframes'] = \
-                len(self.session_parameters[curr_session_key]['timestamps'])
+            self.handle_mkv_files(self, curr_session_key, self.curr_session)
 
         # Update sliders with corresponding session's previously set values
         if not isinstance(self.session_parameters[curr_session_key]['bg_roi_depth_range'], str):

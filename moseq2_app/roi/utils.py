@@ -96,6 +96,23 @@ class InteractiveFindRoiUtilites:
 
             if bg_roi_range_max > self.bg_roi_depth_range.max:
                 self.bg_roi_depth_range.max = bg_roi_range_max + range_diff
+
+    def handle_mkv_files(self, session_key, session_path):
+        '''
+
+        Parameters
+        ----------
+        session_key
+        session_path
+        Returns
+        -------
+        '''
+
+        self.session_parameters[session_key]['timestamps'] = load_timestamps_from_movie(session_path,
+                                                                                        threads=self.config_data['threads'],
+                                                                                        mapping=self.config_data.get('mapping', 'DEPTH'))
+        self.session_parameters[session_key]['finfo']['nframes'] = len(self.session_parameters[session_key]['timestamps'])
+
     def compute_all_bgs(self):
         '''
         Computes all the background images before displaying the app to speed up user interaction.
