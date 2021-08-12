@@ -187,16 +187,13 @@ class InteractiveROIWidgets:
         Returns
         -------
         '''
+        if event.old is None:
+            old_value = ''
+        else:
+            old_value = event.old.split(' ')[1]
 
-        if event.old.split(' ')[1] != event.new.split(' ')[1]:
+        if old_value != event.new.split(' ')[1]:
             self.checked_list.value = event.new
-
-            gc.collect()
-            bokeh.io.curdoc().clear()
-            bokeh.io.state.State().reset()
-            bokeh.io.reset_output()
-            bokeh.io.output_notebook(hide_banner=True)
-            clear_output(wait=True)
             self.main_out = None
 
             self.config_data['detect'] = True
@@ -241,9 +238,6 @@ class InteractiveROIWidgets:
         Returns
         -------
         '''
-        clear_output(wait=True)
-        display(self.clear_button, self.ui_tools)
-        display(self.main_out)
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
     def mark_passing_button_clicked(self, b=None):
@@ -349,6 +343,8 @@ class InteractiveROIWidgets:
         self.config_data['max_height'] = self.minmax_heights.value[1]
         self.config_data['detect'] = False
 
+        self.interactive_depth_finder()
+
     def update_config_dr(self, event=None):
         '''
         Callback function to update config dict with current UI depth range values
@@ -367,6 +363,8 @@ class InteractiveROIWidgets:
 
         self.session_parameters[self.keys[self.checked_list.index]]['bg_roi_depth_range'] = deepcopy(self.config_data['bg_roi_depth_range'])
 
+        self.interactive_depth_finder()
+
     def update_config_di(self, event=None):
         '''
         Callback function to update config dict with current UI dilation iterations
@@ -382,6 +380,8 @@ class InteractiveROIWidgets:
         self.config_data['dilate_iterations'] = int(self.dilate_iters.value)
         self.session_parameters[self.keys[self.checked_list.index]]['dilate_iterations'] = int(self.dilate_iters.value)
         self.config_data['detect'] = True
+
+        self.interactive_depth_finder()
 
     def update_config_fr(self, event=None):
         '''
@@ -414,3 +414,6 @@ class InteractiveROIWidgets:
         self.config_data['frame_num'] = self.frame_num.value
         self.session_parameters[self.keys[self.checked_list.index]]['frame_num'] = self.frame_num.value
         self.config_data['detect'] = False
+
+        self.interactive_depth_finder()
+
