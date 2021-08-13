@@ -362,7 +362,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.curr_results['err_code'] = 4
+                self.curr_results['err_code'] = 5
                 self.curr_results['flagged'] = True
 
         # filter for included mouse height range
@@ -372,7 +372,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display min-max heights error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.curr_results['err_code'] = 5
+                self.curr_results['err_code'] = 6
                 self.curr_results['flagged'] = True
 
         # Get overlayed ROI
@@ -391,7 +391,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
             self.curr_results['flagged'] = True
-            self.curr_results['err_code'] = 6
+            self.curr_results['err_code'] = 7
             self.curr_results['ret_code'] = "0x1f534"
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':

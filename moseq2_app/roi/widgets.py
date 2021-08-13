@@ -108,14 +108,15 @@ class InteractiveROIWidgets:
         self.error_codes = {
             -1: 'Passing',
             0: 'Could not compute background.',
-            1: 'Could not compute ROI.',
-            2: 'Current detected ROI may be too large. If ROI is acceptable, '
+            1: 'Could not automatically estimate depth range',
+            2: 'Could not compute ROI.',
+            3: 'Current detected ROI may be too large. If ROI is acceptable, '
                'Mark it as passing by clicking "Save ROI". Otherwise, change the depth range values.',
-            3: 'Current detected ROI is too small. If ROI is acceptable, '
+            4: 'Current detected ROI is too small. If ROI is acceptable, '
                'Mark it as passing. Otherwise, change the depth range values, or increase Dilate Iters.',
-            4: 'Could not apply ROI to loaded frames.',
-            5: 'Mouse height threshold range is incorrect.',
-            6: 'Could not extract mouse from raw data.'
+            5: 'Could not apply ROI to loaded frames.',
+            6: 'Mouse height threshold range is incorrect.',
+            7: 'Could not extract mouse from raw data.'
         }
 
         # groupings

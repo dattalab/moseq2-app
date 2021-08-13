@@ -109,9 +109,9 @@ class InteractiveFindRoiUtilites:
         if not res and (len(pixel_areas) > 0):
             self.curr_results['flagged'] = True
             if n_pixels < np.mean(pixel_areas):
-                self.curr_results['err_code'] = 3
+                self.curr_results['err_code'] = 4
             else:
-                self.curr_results['err_code'] = 2
+                self.curr_results['err_code'] = 3
             self.curr_results['ret_code'] = "0x1f534"
         else:
             # add accepted area size to
@@ -140,7 +140,12 @@ class InteractiveFindRoiUtilites:
             self.session_parameters[curr_session_key]['bg_threshold'] = int(threshold_value)
 
             # Threshold image to find depth at bucket center: the true depth
-            cX, cY = get_bucket_center(self.curr_bground_im, limit, threshold=threshold_value)
+            try:
+                cX, cY = get_bucket_center(self.curr_bground_im, limit, threshold=threshold_value)
+            except ZeroDivisionError as e:
+               print(e)
+               self.curr_results['err_code'] = 0
+               cY, cX = (int(x) for x in self.curr_bground_im.shape)
 
             # True depth is at the center of the bucket
             self.true_depth = self.curr_bground_im[cY][cX]
@@ -194,9 +199,11 @@ class InteractiveFindRoiUtilites:
                 # Compute background image; saving the image to a file
                 self.session_parameters[s].pop('output_dir', None)
                 get_bground_im_file(p, **self.session_parameters[s], output_dir=None)
-            except:
+            except Exception as e:
                 # Print error if an issue arises
-                display(f'Error, could not compute background for session: {s}.')
+                tb = sys.exc_info()[2]
+                display(f'{e.with_traceback(tb=tb)}')
+                self.curr_results['err_code'] = 0
                 pass
 
     def get_roi_and_depths(self):
@@ -242,7 +249,7 @@ class InteractiveFindRoiUtilites:
             # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
             # roi detection.
             self.curr_results['flagged'] = True
-            self.curr_results['err_code'] = 1
+            self.curr_results['err_code'] = 2
             self.curr_results['ret_code'] = "0x1f534"
 
             # setting the roi variable to 1's array to match the background image. This way,
@@ -253,7 +260,7 @@ class InteractiveFindRoiUtilites:
         except Exception as e:
             # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             self.curr_results['flagged'] = True
-            self.curr_results['err_code'] = 1
+            self.curr_results['err_code'] = 2
             self.curr_results['ret_code'] = "0x1f534"
             self.curr_results['roi'] = np.ones_like(self.curr_bground_im)
             self.update_checked_list()
