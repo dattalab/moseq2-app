@@ -9,7 +9,6 @@ import gc
 import os
 import numpy as np
 from bokeh.io import show
-from copy import deepcopy
 import ipywidgets as widgets
 from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output
@@ -22,11 +21,11 @@ from os.path import dirname, basename, join, relpath, abspath
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
+from moseq2_extract.util import get_strels, read_yaml
 from moseq2_extract.io.video import load_movie_data, get_video_info, get_movie_info
-from moseq2_extract.util import (detect_and_set_camera_parameters, check_filter_sizes, get_strels, read_yaml)
 
 
-class InteractiveFindRoi(InteractiveROIWidgets):
+class InteractiveFindRoi(InteractiveROIWidgets, InteractiveFindRoiUtilites):
 
     def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=False, overwrite=False):
         '''
@@ -62,6 +61,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.extraction_output = widgets.Output(layout=widgets.Layout(align_items='center', display='inline-block', height='100%', width='100%'))
 
         # Read default config parameters
+        self.config_data['config_file'] = config_file
         self.config_data = read_yaml(config_file)
 
         # Update DropDown menu items
@@ -72,35 +72,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Session selection dict key names
         self.keys = list(self.sessions.keys())
 
-        # Ensure config file is reading frames with >1 thread for fast reloading
-        if self.config_data.get('threads', 8) < 1:
-            self.config_data['threads'] = 8
-
-        # Ensure config file contains all required parameters prior to creating session_config
-        self.config_data = check_filter_sizes(self.config_data)
-
-        # Set camera type if not supplied
-        if 'camera_type' not in self.config_data:
-            self.config_data['camera_type'] = 'auto'
-
-        self.config_data['pixel_areas'] = []
-        self.config_data['autodetect'] = True
-        self.config_data['detect'] = True
-        if 'bg_roi_erode' not in self.config_data:
-            self.config_data['bg_roi_erode'] = (1, 1)
-        if 'bg_roi_dilate' not in self.config_data:
-            self.config_data['bg_roi_dilate'] = (1, 1)
-
-        # Create initial shared session_parameters dict
-        self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
-
-        # Update global session config: self.session_paramters
-        self.config_data['config_file'] = config_file
-        self.config_data['session_config_path'] = session_config
         self.get_session_config(session_config=session_config, overwrite=overwrite)
-
-        for k in self.keys:
-            self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
 
         # Create colored dots for each session item in the checked_list widget
         states = [0] * len(self.sessions.keys())

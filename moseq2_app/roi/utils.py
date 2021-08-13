@@ -5,6 +5,7 @@
 import os
 import gc
 import cv2
+import sys
 import warnings
 import numpy as np
 from math import isclose
@@ -14,10 +15,11 @@ import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 from os.path import join, dirname
 from IPython.display import display
+from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from moseq2_extract.io.video import get_movie_info, load_timestamps_from_movie
-from moseq2_extract.util import (set_bground_to_plane_fit, select_strel, read_yaml,  get_bucket_center)
-
+from moseq2_extract.util import (set_bground_to_plane_fit, select_strel,
+                                 read_yaml, get_bucket_center, check_filter_sizes)
 class InteractiveFindRoiUtilites:
     '''
 
@@ -39,6 +41,31 @@ class InteractiveFindRoiUtilites:
         Returns
         -------
         '''
+
+        # Ensure config file is reading frames with >1 thread for fast reloading
+        if self.config_data.get('threads', 8) < 1:
+            self.config_data['threads'] = 8
+
+        # Ensure config file contains all required parameters prior to creating session_config
+        self.config_data = check_filter_sizes(self.config_data)
+
+        # Set camera type if not supplied
+        if 'camera_type' not in self.config_data:
+            self.config_data['camera_type'] = 'auto'
+
+        self.config_data['pixel_areas'] = []
+        self.config_data['autodetect'] = True
+        self.config_data['detect'] = True
+        if 'bg_roi_erode' not in self.config_data:
+            self.config_data['bg_roi_erode'] = (1, 1)
+        if 'bg_roi_dilate' not in self.config_data:
+            self.config_data['bg_roi_dilate'] = (1, 1)
+
+        # Create initial shared session_parameters dict
+        self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
+
+        # Update global session config: self.session_paramters
+        self.config_data['session_config_path'] = session_config
 
         # Read individual session config if it exists
         if session_config is None:
@@ -63,6 +90,10 @@ class InteractiveFindRoiUtilites:
             for key in self.keys:
                 if key not in self.session_parameters:
                     self.session_parameters[key] = deepcopy(self.config_data)
+
+        # ensure that all the session's video reading parameters have been detected.
+        for k in self.keys:
+            self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
 
     def generate_session_config(self, path):
         '''
