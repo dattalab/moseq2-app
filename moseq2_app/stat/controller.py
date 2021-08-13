@@ -7,11 +7,12 @@ This module facilitates the interactive functionality for the statistics plottin
 '''
 
 import os
+import io
+import base64
 import warnings
 import numpy as np
 import pandas as pd
 from collections import defaultdict
-from IPython.display import clear_output
 from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
@@ -184,6 +185,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         for k in range(max_sylls):
             # remove group_info
             syll_info[k].pop('group_info', None)
+
+            # Open videos in encoded urls
+            video = io.open(syll_info[k]['crowd_movie_path'], 'r+b').read()
+            encoded = base64.b64encode(video)
+            syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
 
         info_df = pd.DataFrame(syll_info).T.sort_index()
         info_df['syllable'] = info_df.index

@@ -262,7 +262,7 @@ def setup_hovertool(renderers, callback=None):
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div>
                         <video
-                            src="@movies"; height="260"; alt="@movies"; width="260"; preload="true";
+                            src="data:video/mp4;base64,@movies"; height="260"; alt="data:video/mp4;base64,@movies"; width="260"; preload="true";
                             style="float: left; type: "video/mp4"; "margin: 0px 15px 15px 0px;"
                             border="2"; autoplay loop
                         ></video>
@@ -363,7 +363,7 @@ def get_syllable_info(df, sorting):
     cm_paths = []
     for cm in desc_data['crowd_movie_path'].to_numpy():
         try:
-            cm_paths.append(relpath(cm))
+            cm_paths.append(cm)
         except ValueError:
             # cm path does not exist
             cm_paths.append('')
