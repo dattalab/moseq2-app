@@ -197,12 +197,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
-        # Get widget values
-        minmax_heights = self.minmax_heights.value
-        fn = self.frame_num.value
-        dr = self.bg_roi_depth_range.value
-        di = self.dilate_iters.value
-
         curr_session_key = self.keys[self.checked_list.index]
 
         self.save_parameters.button_style = 'primary'
@@ -231,8 +225,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                           new_val=self.session_parameters[curr_session_key]['bg_roi_depth_range'])
         else:
             # Test updated parameters
+            dr = self.bg_roi_depth_range.value
             self.session_parameters[curr_session_key]['bg_roi_depth_range'] = (int(dr[0]), int(dr[1]))
-            self.session_parameters[curr_session_key]['dilate_iterations'] = di
+            self.session_parameters[curr_session_key]['dilate_iterations'] = self.dilate_iters.value
 
             if self.config_data['detect']:
                 # Update the session flag result
@@ -240,7 +235,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.all_results[curr_session_key] = self.curr_results['flagged']
 
         # display graphs
-        self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
+        self.prepare_data_to_plot(self.curr_results['roi'], self.minmax_heights.value, self.frame_num.value)
         gc.collect()
 
     def test_all_sessions(self, session_dict):
@@ -257,9 +252,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         Parameters
         ----------
-        bground_im (2D np.array): Computed session background
-        session (str): path to currently processed session
-        config_data (dict): Extraction configuration parameters
         session_dict (dict): dict of session directory names paired with their absolute paths.
 
         Returns
