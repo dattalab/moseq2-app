@@ -340,7 +340,7 @@ class TransitionGraphWidgets:
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == 'Duration':
             key = 'duration'
-            self.speed_thresholder.description = 'Threshold Nodes by Duration'
+            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
