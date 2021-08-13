@@ -12,6 +12,7 @@ import base64
 import warnings
 import numpy as np
 import pandas as pd
+from os.path import exists
 from collections import defaultdict
 from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
@@ -187,9 +188,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             syll_info[k].pop('group_info', None)
 
             # Open videos in encoded urls
-            video = io.open(syll_info[k]['crowd_movie_path'], 'r+b').read()
-            encoded = base64.b64encode(video)
-            syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
+            if exists(syll_info[k]['crowd_movie_path']):
+                video = io.open(syll_info[k]['crowd_movie_path'], 'r+b').read()
+                encoded = base64.b64encode(video)
+                syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
 
         info_df = pd.DataFrame(syll_info).T.sort_index()
         info_df['syllable'] = info_df.index
@@ -485,9 +487,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             for k in range(self.max_sylls):
                 # Open videos in encoded urls
-                video = io.open(self.syll_info[k]['crowd_movie_path'], 'r+b').read()
-                encoded = base64.b64encode(video)
-                self.syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
+                if exists(self.syll_info[k]['crowd_movie_path']):
+                    video = io.open(self.syll_info[k]['crowd_movie_path'], 'r+b').read()
+                    encoded = base64.b64encode(video)
+                    self.syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
 
             if self.df_path is not None:
                 print('Loading parquet files')
