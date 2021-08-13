@@ -167,10 +167,14 @@ class InteractiveROIWidgets:
 
         # Set extract frame range slider
         self.frame_range.observe(self.update_config_fr, names='value')
+
+        # Set frame number preview slider
         self.frame_num.observe(self.update_config_fn, names='value')
 
+        # Set depth range slider callback
         self.bg_roi_depth_range.observe(self.update_config_dr, names='value')
 
+        # Set dilate iterations callback
         self.dilate_iters.observe(self.update_config_di, names='value')
 
     def clear_on_click(self, b=None):
@@ -253,6 +257,7 @@ class InteractiveROIWidgets:
         Returns
         -------
         '''
+
         self.get_extraction(self.curr_session, self.curr_bground_im, self.curr_results['roi'])
 
     def mark_passing_button_clicked(self, b=None):
@@ -432,14 +437,16 @@ class InteractiveROIWidgets:
 
     def safe_widget_value_update(self, wid_obj, func, new_val, new_options=None, names='value'):
         '''
+        Function that is used to update the widget values and prevent triggering the `self.interactive_depth_finder()`,
+         and thus limiting the number of superfluous display reloads.
 
         Parameters
         ----------
-        wid_obj
-        func
-        new_val
-        new_options
-        names
+        wid_obj (ipywidgets.widget object): widget whose value to silently update.
+        func (function): widget callback function to temporarily silence.
+        new_val (int, or tuple): new widget value to update.
+        new_options (list): list of options given to update the checked_list widget with.
+        names (str): name of the variable being observed by the widget callback function.
 
         Returns
         -------

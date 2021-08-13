@@ -1,5 +1,9 @@
 '''
 
+This module contains a utility class which is extended by InteractiveFindRoi (IFR) in roi.controller.
+All the enclosed functionality depends on class attributes that are instantiated and mainly used in IFR controller
+and widget modules.
+
 '''
 
 import os
@@ -21,22 +25,22 @@ from moseq2_extract.io.video import get_movie_info, load_timestamps_from_movie
 from moseq2_extract.util import (set_bground_to_plane_fit, select_strel,
                                  read_yaml, get_bucket_center, check_filter_sizes)
 class InteractiveFindRoiUtilites:
-    '''
-
-    '''
 
     def __init__(self):
-        '''
-        '''
         pass
 
     def get_session_config(self, session_config, overwrite):
         '''
+        Helper function that is run within IRF controller __init__() function. The function will load in an existing
+        session_config.yaml file, otherwise will generate new ones.
+
+        Additionally, the function will ensure that a set of config_data parameters exist prior to running the
+        main functionality.
 
         Parameters
         ----------
-        session_config
-        overwrite
+        session_config (str): path to session_config.yaml file to create the file in or load from.
+        overwrite (bool): indicates whether to overwrite an existing session_config.yaml
 
         Returns
         -------
@@ -110,10 +114,12 @@ class InteractiveFindRoiUtilites:
 
     def check_roi_validity(self, n_pixels):
         '''
+        Updates the IFR controller class attribute `self.curr_results` based on whether the current ROI has an
+         acceptable number of captured pixels w.r.t previously viewed and passed sessions.
 
         Parameters
         ----------
-        n_pixels
+        n_pixels (float): number of pixels found in a given ROI.
 
         Returns
         -------
@@ -153,10 +159,13 @@ class InteractiveFindRoiUtilites:
 
     def autodetect_depth_range(self, curr_session_key):
         '''
+        Helper function to `get_roi_and_depths()`; computes the current session's depth range to automatically set and
+        use based on the depth value in the centroid of the bucket.
 
         Parameters
         ----------
-        curr_session_key
+        curr_session_key (str): key value for the currently displayed session that points to the session's raw data path
+        in the self.sessions dict.
 
         Returns
         -------
@@ -196,11 +205,13 @@ class InteractiveFindRoiUtilites:
 
     def handle_mkv_files(self, session_key, session_path):
         '''
+        Helper file to handle reading timestamps from mkv/Azure raw data in order to compute the background image.
 
         Parameters
         ----------
-        session_key
-        session_path
+        session_key (str): key value for the current session to display. Used to index+update the session configuration parameters.
+        session_path (str): path to the corresponding session to read the timestamps from.
+
         Returns
         -------
         '''
@@ -243,15 +254,8 @@ class InteractiveFindRoiUtilites:
         The true depth will be used to estimate the background depth_range, then it will update the
         widget values in real time.
 
-        Parameters
-        ----------
-        bground_im (2D np.array): Computed session background
-        session (str): path to currently processed session
-        config_data (dict): Extraction configuration parameters
-
         Returns
         -------
-        results (dict): dict that contains computed information. E.g. its ROI, and if it was flagged.
         '''
 
         curr_session_key = self.keys[self.checked_list.index]
@@ -325,14 +329,15 @@ class InteractiveFindRoiUtilites:
 
     def get_all_session_roi_results(self, session_dict):
         '''
+        Helper function for controller.IRF.test_all_sessions; computes each session's ROI and updates the checked_list
+        object in display as each session test is completed.
 
         Parameters
         ----------
-        session_dict
+        session_dict (dict): dictionary of found session names, mapped to their respective raw data paths.
 
         Returns
         -------
-
         '''
 
         checked_options = list(self.checked_list.options)

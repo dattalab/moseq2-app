@@ -13,6 +13,7 @@ import ipywidgets as widgets
 from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output
 from moseq2_app.gui.progress import get_session_paths
+from moseq2_extract.util import get_strels, read_yaml
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_app.roi.widgets import InteractiveROIWidgets
 from moseq2_extract.extract.proc import get_bground_im_file
@@ -21,7 +22,6 @@ from os.path import dirname, basename, join, relpath, abspath
 from moseq2_app.roi.view import plot_roi_results, show_extraction
 from moseq2_extract.extract.proc import apply_roi, threshold_chunk
 from moseq2_extract.helpers.extract import process_extract_batches
-from moseq2_extract.util import get_strels, read_yaml
 from moseq2_extract.io.video import load_movie_data, get_video_info, get_movie_info
 
 
@@ -80,13 +80,13 @@ class InteractiveFindRoi(InteractiveROIWidgets, InteractiveFindRoiUtilites):
         options = list(self.sessions.keys())
         colored_options = ['{} {}'.format(chr(c_base + s), o) for s, o in zip(states, options)]
 
-        # Set Initial List options
+        # Set Initial List options and session to display without triggering the view to reload
         self.safe_widget_value_update(wid_obj=self.checked_list,
                                       func=self.get_selected_session,
                                       new_val=colored_options[0],
                                       new_options=colored_options)
 
-        # Update main configuration parameters
+        # Update display with loaded configuration parameters: minmax and dilate_iters
         self.safe_widget_value_update(wid_obj=self.minmax_heights,
                                       func=self.update_minmax_config,
                                       new_val=(self.config_data.get('min_height', 10), self.config_data.get('max_height', 100)))
