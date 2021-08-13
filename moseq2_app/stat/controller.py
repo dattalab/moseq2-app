@@ -308,7 +308,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
             # run selected hypothesis test
             if ctrl_group != exp_group:
-                sig_sylls = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+                sig_sylls_indices = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+
+                # renumber the significant syllables s.t. they are plotted to match the current ordering.
+                ordermapping = {i: o for i, o in enumerate(ordering)}
+                sig_sylls = [ordermapping[x] for x in sig_sylls_indices]
 
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
