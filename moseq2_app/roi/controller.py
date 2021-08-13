@@ -61,8 +61,8 @@ class InteractiveFindRoi(InteractiveROIWidgets, InteractiveFindRoiUtilites):
         self.extraction_output = widgets.Output(layout=widgets.Layout(align_items='center', display='inline-block', height='100%', width='100%'))
 
         # Read default config parameters
-        self.config_data['config_file'] = config_file
         self.config_data = read_yaml(config_file)
+        self.config_data['config_file'] = config_file
 
         # Update DropDown menu items
         self.sessions = get_session_paths(data_path)
