@@ -483,6 +483,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             if self.max_sylls is None:
                 self.max_sylls = len(self.syll_info)
 
+            for k in range(self.max_sylls):
+                # Open videos in encoded urls
+                video = io.open(self.syll_info[k]['crowd_movie_path'], 'r+b').read()
+                encoded = base64.b64encode(video)
+                self.syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
+
             if self.df_path is not None:
                 print('Loading parquet files')
                 df = pd.read_parquet(self.df_path, engine='fastparquet')
