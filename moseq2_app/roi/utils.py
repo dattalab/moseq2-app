@@ -146,9 +146,11 @@ class InteractiveFindRoiUtilites:
         if not res and (len(pixel_areas) > 0):
             self.curr_results['flagged'] = True
             if n_pixels < np.mean(pixel_areas):
-                self.curr_results['err_code'] = 4
+                if self.curr_results['err_code'] < 0:
+                    self.curr_results['err_code'] = 4
             else:
-                self.curr_results['err_code'] = 3
+                if self.curr_results['err_code'] < 0:
+                    self.curr_results['err_code'] = 3
             self.curr_results['ret_code'] = "0x1f534"
         else:
             # add accepted area size to
@@ -284,7 +286,8 @@ class InteractiveFindRoiUtilites:
             # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
             # roi detection.
             self.curr_results['flagged'] = True
-            self.curr_results['err_code'] = 2
+            if self.curr_results['err_code'] < 0:
+                self.curr_results['err_code'] = 2
             self.curr_results['ret_code'] = "0x1f534"
 
             # setting the roi variable to 1's array to match the background image. This way,
@@ -295,7 +298,8 @@ class InteractiveFindRoiUtilites:
         except Exception as e:
             # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             self.curr_results['flagged'] = True
-            self.curr_results['err_code'] = 2
+            if self.curr_results['err_code'] < 0:
+                self.curr_results['err_code'] = 2
             self.curr_results['ret_code'] = "0x1f534"
             self.curr_results['roi'] = np.ones_like(self.curr_bground_im)
             self.update_checked_list()
