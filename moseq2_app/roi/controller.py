@@ -78,6 +78,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Ensure config file contains all required parameters prior to creating session_config
         self.config_data = check_filter_sizes(self.config_data)
+
+        # Set camera type if not supplied
+        if 'camera_type' not in self.config_data:
+            self.config_data['camera_type'] = 'auto'
+
         self.config_data['pixel_areas'] = []
         self.config_data['autodetect'] = True
         self.config_data['detect'] = True
@@ -90,9 +95,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters = {k: deepcopy(self.config_data) for k in self.keys}
 
         # Update global session config: self.session_paramters
-        self.get_session_config(session_config=session_config, overwrite=overwrite)
-        self.config_data['session_config_path'] = session_config
         self.config_data['config_file'] = config_file
+        self.config_data['session_config_path'] = session_config
+        self.get_session_config(session_config=session_config, overwrite=overwrite)
 
         for k in self.keys:
             self.session_parameters[k] = detect_and_set_camera_parameters(self.session_parameters[k], self.sessions[k])
