@@ -41,3 +41,4 @@ test_run/
 __pycache__
 
 *.eggs
+*.log
