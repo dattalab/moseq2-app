@@ -371,12 +371,10 @@ class InteractiveROIWidgets:
         -------
         '''
 
-        self.config_data['detect'] = False
-
         self.config_data['bg_roi_depth_range'] = (int(self.bg_roi_depth_range.value[0]), int(self.bg_roi_depth_range.value[1]))
 
         self.session_parameters[self.keys[self.checked_list.index]]['bg_roi_depth_range'] = deepcopy(self.config_data['bg_roi_depth_range'])
-
+        self.bg_roi_depth_range.value = event.new
         self.interactive_depth_finder()
 
     def update_config_di(self, event=None):
