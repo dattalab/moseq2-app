@@ -7,7 +7,9 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 
 import re
 import os
+import io
 import shutil
+import base64
 import numpy as np
 import pandas as pd
 from glob import glob
@@ -281,11 +283,15 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         video_dims = get_video_info(cm_path)['dims']
 
+        # open the video and encode to be displayed in jupyter notebook
+        video = io.open(cm_path, 'r+b').read()
+        encoded = base64.b64encode(video)
+
         # Create syllable crowd movie HTML div to embed
         video_div = f'''
                         <h2>{self.syll_select.index}: {syllables['label']}</h2>
                         <video
-                            src="{relpath(cm_path)}"; alt="{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
+                            src="data:video/mp4;base64,{encoded.decode("ascii")}"; alt="data:{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
                             style="float: left; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
