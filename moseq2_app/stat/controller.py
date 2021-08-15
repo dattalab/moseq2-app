@@ -188,6 +188,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             syll_info[k].pop('group_info', None)
 
             # Open videos in encoded urls
+            # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
             if exists(syll_info[k]['crowd_movie_path']):
                 video = io.open(syll_info[k]['crowd_movie_path'], 'r+b').read()
                 encoded = base64.b64encode(video)
@@ -487,6 +488,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             for k in range(self.max_sylls):
                 # Open videos in encoded urls
+                # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
                 if exists(self.syll_info[k]['crowd_movie_path']):
                     video = io.open(self.syll_info[k]['crowd_movie_path'], 'r+b').read()
                     encoded = base64.b64encode(video)

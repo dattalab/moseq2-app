@@ -284,6 +284,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         video_dims = get_video_info(cm_path)['dims']
 
         # open the video and encode to be displayed in jupyter notebook
+        # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
         video = io.open(cm_path, 'r+b').read()
         encoded = base64.b64encode(video)
 
@@ -747,6 +748,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             video_dims = get_video_info(cm_path[0])['dims']
 
             # open the video and encode to be displayed in jupyter notebook
+            # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
             video = io.open(cm_path[0], 'r+b').read()
             encoded = base64.b64encode(video)
 
