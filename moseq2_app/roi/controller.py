@@ -663,11 +663,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
-        else:
-            self.indicator.value = "<center><h2><font color='green';>Passing</h2></center>"
-            self.curr_results['flagged'] = False
-            self.curr_results['ret_code'] = "0x1f7e2"
-            self.update_checked_list(results=self.curr_results)
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
