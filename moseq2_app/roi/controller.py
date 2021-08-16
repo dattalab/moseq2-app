@@ -589,13 +589,11 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # set indicator error for incorrect ROI
         if self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f534"
-            self.update_checked_list(results=self.curr_results)
             self.indicator.value = '<center><h2><font color="red";>Flagged: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
                                    ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
         else:
             self.curr_results['flagged'] = False
             self.curr_results['ret_code'] = "0x1f7e2"
-            self.update_checked_list(results=self.curr_results)
             self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
         curr_session_key = self.keys[self.checked_list.index]
@@ -676,6 +674,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         clear_output()
 
         # Display extraction validation indicator text and circle
+        self.update_checked_list(results=self.curr_results)
         display(self.indicator)
 
         # Make and display plots
