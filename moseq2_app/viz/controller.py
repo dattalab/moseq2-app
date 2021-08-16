@@ -7,7 +7,9 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 
 import re
 import os
+import io
 import shutil
+import base64
 import numpy as np
 import pandas as pd
 from glob import glob
@@ -281,11 +283,16 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         video_dims = get_video_info(cm_path)['dims']
 
+        # open the video and encode to be displayed in jupyter notebook
+        # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+        video = io.open(cm_path, 'r+b').read()
+        encoded = base64.b64encode(video)
+
         # Create syllable crowd movie HTML div to embed
         video_div = f'''
                         <h2>{self.syll_select.index}: {syllables['label']}</h2>
                         <video
-                            src="{relpath(cm_path)}"; alt="{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
+                            src="data:video/mp4;base64,{encoded.decode("ascii")}"; alt="data:{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
                             style="float: left; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
@@ -738,26 +745,23 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             else:
                 group_info = pd.DataFrame(syll_info_df[group_name]).drop('pdf').to_html()
 
-            # Copy generated movie to temporary directory
-            cm_dir = os.path.dirname(cm_path[0])
-            tmp_path = os.path.join(cm_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(cm_path[0])}')
-            tmp_dirname = os.path.dirname(tmp_path)
+            video_dims = get_video_info(cm_path[0])['dims']
 
-            self.base_tmpdir = os.path.join(cm_dir, 'tmp')
-
-            os.makedirs(tmp_dirname, exist_ok=True)
-            shutil.copy2(cm_path[0], tmp_path)
-            video_dims = get_video_info(tmp_path)['dims']
+            # open the video and encode to be displayed in jupyter notebook
+            # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+            video = io.open(cm_path[0], 'r+b').read()
+            encoded = base64.b64encode(video)
 
             # Insert paths and table into HTML div
             group_txt = '''
                 {group_info}
                 <video
-                    src="{src}"; alt="{alt}"; height="{height}"; width="{width}"; preload="auto";
+                    src="data:video/mp4;base64,{src}"; alt="data:video/mp4;base64,{alt}"; 
+                    height="{height}"; width="{width}"; preload="auto";
                     style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                     border="2"; autoplay controls loop>
                 </video>
-            '''.format(group_info=group_info, src=relpath(tmp_path), alt=tmp_path, height=int(video_dims[1] * 0.8),
+            '''.format(group_info=group_info, src=encoded.decode('ascii'), alt=encoded.decode('ascii'), height=int(video_dims[1] * 0.8),
                        width=int(video_dims[0] * 0.8))
 
             divs.append(group_txt)
