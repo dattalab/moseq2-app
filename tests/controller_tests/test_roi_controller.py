@@ -187,9 +187,10 @@ class TestROIController(TestCase):
 
         self.gui.update_checked_list(self.gui.curr_results)
 
-        assert prev_res['ret_code'] != self.gui.curr_results['ret_code']
+        assert prev_res['ret_code'] == self.gui.curr_results['ret_code']
         assert prev_res['counted_pixels'] != self.gui.curr_results['counted_pixels']
-        assert curr_options != list(self.gui.checked_list.options)
+        # if the ret_code code is unchanged, then the checked_list should reflect the same state
+        assert curr_options == list(self.gui.checked_list.options)
 
     def test_interactive_depth_finder(self):
 
