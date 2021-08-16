@@ -482,7 +482,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # setting the roi variable to 1's array to match the background image. This way,
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
-            self.update_checked_list(results=curr_results)
             return curr_results
         except Exception as e:
             # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
@@ -490,7 +489,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
-            self.update_checked_list(results=curr_results)
             return curr_results
 
         if self.config_data['use_plane_bground']:
@@ -529,7 +527,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Save ROI
         curr_results['roi'] = rois[0]
         curr_results['counted_pixels'] = r
-        self.update_checked_list(results=curr_results)
         gc.collect()
 
         return curr_results
@@ -627,6 +624,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
                 self.curr_results['flagged'] = True
+                self.curr_results['ret_code'] = "0x1f534"
 
         # filter for included mouse height range
         try:
@@ -637,6 +635,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
+                self.curr_results['ret_code'] = "0x1f534"
 
         # Get overlayed ROI
         overlay = self.curr_bground_im.copy()
@@ -658,9 +657,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if not self.curr_results['flagged']:
                 self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
+                self.curr_results['ret_code'] = "0x1f534"
         else:
             self.indicator.value = "<center><h2><font color='green';>Passing</h2></center>"
             self.curr_results['flagged'] = False
+            self.curr_results['ret_code'] = "0x1f7e2"
+            self.update_checked_list(results=self.curr_results)
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
@@ -673,7 +675,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Clear output to update view
         clear_output()
 
-        # Display extraction validation indicator
+        # Display extraction validation indicator text and circle
         display(self.indicator)
 
         # Make and display plots
