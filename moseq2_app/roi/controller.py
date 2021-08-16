@@ -401,12 +401,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         else:
             self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
 
-        # Clear output to update view
-        clear_output()
-
-        # Display extraction validation indicator
-        display(self.indicator)
-
         # display graphs
         self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
 
@@ -675,6 +669,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             filtered_frames = np.flip(filtered_frames, 0) # segmented
         else:
             display_bg = self.curr_bground_im
+
+        # Clear output to update view
+        clear_output()
+
+        # Display extraction validation indicator
+        display(self.indicator)
 
         # Make and display plots
         plot_roi_results(self.formatted_key, display_bg, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
