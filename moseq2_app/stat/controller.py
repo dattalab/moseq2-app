@@ -7,11 +7,13 @@ This module facilitates the interactive functionality for the statistics plottin
 '''
 
 import os
+import io
+import base64
 import warnings
 import numpy as np
 import pandas as pd
+from os.path import exists
 from collections import defaultdict
-from IPython.display import clear_output
 from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
@@ -199,6 +201,13 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             # remove group_info
             syll_info[k].pop('group_info', None)
 
+            # Open videos in encoded urls
+            # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+            if exists(syll_info[k]['crowd_movie_path']):
+                video = io.open(syll_info[k]['crowd_movie_path'], 'r+b').read()
+                encoded = base64.b64encode(video)
+                syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
+
         info_df = pd.DataFrame(syll_info).T.sort_index()
         info_df['syllable'] = info_df.index
 
@@ -322,7 +331,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
             # run selected hypothesis test
             if ctrl_group != exp_group:
-                sig_sylls = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+                sig_sylls_indices = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+
+                # renumber the significant syllables s.t. they are plotted to match the current ordering.
+                sig_sylls = np.argsort(ordering)[sig_sylls_indices]
 
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
@@ -494,6 +506,14 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             # get max_sylls
             if self.max_sylls is None:
                 self.max_sylls = len(self.syll_info)
+
+            for k in range(self.max_sylls):
+                # Open videos in encoded urls
+                # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+                if exists(self.syll_info[k]['crowd_movie_path']):
+                    video = io.open(self.syll_info[k]['crowd_movie_path'], 'r+b').read()
+                    encoded = base64.b64encode(video)
+                    self.syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
 
             if self.df_path is not None:
                 print('Loading parquet files')

@@ -22,7 +22,7 @@ class SyllableStatWidgets:
 
         self.stat_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'], description='Stat to Plot:', disabled=False)
 
-        self.sorting_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Similarity', 'Difference'], description='Sorting:', disabled=False)
+        self.sorting_dropdown = widgets.Dropdown(options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center', 'Difference'], description='Sorting:', disabled=False)
         self.thresholding_dropdown = widgets.Dropdown(
             options=['usage', 'duration', '2D Velocity', '3D Velocity', 'Height', 'Distance to Center'],
             description='Threshold By:', disabled=False, style=style)
@@ -340,7 +340,7 @@ class TransitionGraphWidgets:
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
         elif event.new == 'Duration':
             key = 'duration'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
+            self.speed_thresholder.description = 'Threshold Nodes by Duration'
         elif event.new == '2D velocity':
             key = 'velocity_2d_mm'
             self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
