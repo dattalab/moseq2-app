@@ -26,7 +26,7 @@ assignees: ''
 3.
 4.
 
-**Screenshots**
+## Screenshots
 <!--- If applicable, add screenshots to help explain your problem. -->
 
 ## Context
