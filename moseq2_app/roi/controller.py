@@ -475,11 +475,17 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # setting the roi variable to 1's array to match the background image. This way,
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
+
+            # results within curr_results will be propagated into the display via calling update_checked_list() in
+            # prepare_data_to_plot()
             return curr_results
         except Exception as e:
             # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             print(e)
             curr_results['flagged'] = True
+
+            # ret_code within curr_results will be propagated into the display via calling update_checked_list() in
+            # prepare_data_to_plot()
             curr_results['ret_code'] = "0x1f534"
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
             return curr_results
