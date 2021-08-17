@@ -175,24 +175,35 @@ class TestROIController(TestCase):
 
         curr_options = deepcopy(list(self.gui.checked_list.options))
 
-        self.gui.config_data['bg_roi_depth_range'] = [500, 700]
-
-        self.gui.config_data['bg_roi_erode'] = [1, 1]
-
         # assumed previous failing state
         prev_res = {
-            'ret_code': '0x1f534',
+            'flagged': False,
+            'ret_code': '0x1f7e2', # ret_code -> green dot
             'counted_pixels': 0
         }
 
+        # get first instance of self.curr_results
         self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
 
-        self.gui.update_checked_list(self.gui.curr_results)
-
-        assert prev_res['ret_code'] != self.gui.curr_results['ret_code'] # state is now passing
-        assert prev_res['counted_pixels'] != self.gui.curr_results['counted_pixels']
-        # if the ret_code code is unchanged, then the checked_list should reflect the same state
+        # session returned flagged
+        assert self.gui.curr_results['flagged'] != prev_res['flagged']
+        assert self.gui.curr_results['ret_code'] == '0x1f534' # curr results is a red dot
         assert curr_options == list(self.gui.checked_list.options)
+
+        # assumed previous failing state
+        new_test_res = {
+            'flagged': False,
+            'ret_code': '0x1f7e2',
+            'counted_pixels': 1000
+        }
+
+        # update the value of self.gui.checked_list.options, not self.curr_results
+        self.gui.update_checked_list(new_test_res)
+
+        assert new_test_res['ret_code'] != self.gui.curr_results['ret_code'] # state is now passing
+
+        # since self.gui.checked_list.options was updated, the indicator color must be updated
+        assert curr_options != list(self.gui.checked_list.options)
 
     def test_interactive_depth_finder(self):
 
