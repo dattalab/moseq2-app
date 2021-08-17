@@ -656,10 +656,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
         
+        # Check if extracted chunk is empty
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
+                # set new text indicator flag value
+                self.indicator.value = '<center><h2><font color="red";>Flagged: Cannot Find Mouse. Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
+                # update the return code value to update the dot-indicator in the checked list accordingly
                 self.curr_results['ret_code'] = "0x1f534"
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
