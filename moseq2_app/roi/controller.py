@@ -398,7 +398,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.all_results[curr_session_key] = self.curr_results['flagged']
 
         # display graphs
-        self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
+        # self.prepare_data_to_plot(self.curr_results['roi'], minmax_heights, fn)
 
         gc.collect()
 
