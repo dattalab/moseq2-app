@@ -175,32 +175,24 @@ class TestROIController(TestCase):
 
         curr_options = deepcopy(list(self.gui.checked_list.options))
 
-        # assumed previous failing state
-        prev_res = {
-            'flagged': False,
+        # initialize an example results dict for a passing session
+        sample_passing_ex = {
+            'flagged': False, # passing
             'ret_code': '0x1f7e2', # ret_code -> green dot
             'counted_pixels': 0
         }
 
-        # get first instance of self.curr_results
+        # get first instance of self.curr_results indicating that the given session is failing
         self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
 
         # session returned flagged
-        assert self.gui.curr_results['flagged'] != prev_res['flagged']
+        assert self.gui.curr_results['flagged'] == True # session is not passing
         assert self.gui.curr_results['ret_code'] == '0x1f534' # curr results is a red dot
+        # checked_list options are unchanged; all still failing
         assert curr_options == list(self.gui.checked_list.options)
 
-        # assumed previous failing state
-        new_test_res = {
-            'flagged': False,
-            'ret_code': '0x1f7e2',
-            'counted_pixels': 1000
-        }
-
         # update the value of self.gui.checked_list.options, not self.curr_results
-        self.gui.update_checked_list(new_test_res)
-
-        assert new_test_res['ret_code'] != self.gui.curr_results['ret_code'] # state is now passing
+        self.gui.update_checked_list(sample_passing_ex)
 
         # since self.gui.checked_list.options was updated, the indicator color must be updated
         assert curr_options != list(self.gui.checked_list.options)
