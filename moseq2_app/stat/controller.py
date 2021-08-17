@@ -311,7 +311,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                 sig_sylls_indices = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
 
                 # renumber the significant syllables s.t. they are plotted to match the current ordering.
-                sig_sylls = sig_sylls = np.argsort(ordering)[sig_sylls_indices]
+                sig_sylls = np.argsort(ordering)[sig_sylls_indices]
 
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
