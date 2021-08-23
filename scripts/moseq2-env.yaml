@@ -11,6 +11,7 @@ dependencies:
   - conda-forge::opencv
   - jupyter_nbextensions_configurator
   - scikit-image=0.16.2
+  - fastparquet=0.4.1
   - pip:
       - numpy==1.18.3
       - pandas==1.0.5
