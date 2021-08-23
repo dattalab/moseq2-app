@@ -39,10 +39,13 @@ jobs:
       python: '3.6'
       stage: conda-script
       before_install:
-        - export PYTHONPATH=$PYTHONPATH:$(pwd)
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
-        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
+        - sudo add-apt-repository -y ppa:mc3man/xerus-media
+        - sudo apt-get install -y software-properties-common
+        - sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        - sudo apt-get update
+        - sudo apt install g++-7 -y
+        - export CC="$(which gcc-7)"
+        - export CXX="$(which g++-7)"
         - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
         - bash miniconda.sh -b -p $HOME/miniconda
