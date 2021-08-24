@@ -76,7 +76,7 @@ jobs:
         - brew install gcc@7
         - export CC="$(which gcc-7)"
         - export CXX="$(which g++-7)"
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
         - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "miniconda3_latest.sh"
         - chmod +x miniconda3_latest.sh  # turn script into executable
         - hash -r
@@ -127,7 +127,7 @@ jobs:
         - brew install gcc@7
         - export CC="$(which gcc-7)"
         - export CXX="$(which g++-7)"
-        - echo -e "machine github.com\n  login aymanzay\n  password $CI_USER_PASSWORD" > ~/.netrc
+        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
         - curl -L https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o "miniconda3_latest.sh"
         - chmod +x miniconda3_latest.sh  # turn script into excutable
         - hash -r
