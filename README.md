@@ -1,6 +1,6 @@
 [![Build Status](https://app.travis-ci.com/dattalab/moseq2-app.svg?token=ptXpSa3Fp9PKqkxJDkDr&branch=dev)](https://app.travis-ci.com/dattalab/moseq2-app)
 [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1XPHHifxcxChBFeDGgSmjllFdpQaZ4z9d?usp=sharing)
+[![Open In Colab](https://colab.research.google.com/drive/1JOFvvUIfQlhjWZ3MZ3yZ0_hryhI-u55U?usp=sharing)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
 
 Last Updated: 08/19/2021
@@ -20,7 +20,7 @@ All colab notebooks right now are temporarily shared from my Google drive.
 Users will get the "click one link and everything works" experience once the notebooks are public on Github. 
 --> 
 Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
-You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1XPHHifxcxChBFeDGgSmjllFdpQaZ4z9d?usp=sharing) on our test data or your data on Google Drive.
+You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1JOFvvUIfQlhjWZ3MZ3yZ0_hryhI-u55U?usp=sharing) on our test data or your data on Google Drive.
 
 # [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
 You can find more information about MoSeq Pipeline, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
@@ -37,7 +37,7 @@ conda create -n moseq2-app --file scripts/moseq2-env.yaml
 ### We provide step-by-step guides for installing MoSeq in a conda environment or Docker in the wiki [here](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).
 
 # Test data and Colab Demo
-You can try the entire MoSeq pipeline on [Google Colab](https://colab.research.google.com/drive/1XPHHifxcxChBFeDGgSmjllFdpQaZ4z9d?usp=sharing) using the test data. 
+You can try the entire MoSeq pipeline on [Google Colab](https://colab.research.google.com/drive/1JOFvvUIfQlhjWZ3MZ3yZ0_hryhI-u55U?usp=sharing) using the test data. 
 If you want to try the test data locally, you can find the test data and their descriptions [here](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data). 
 <!---Maybe put some crowd movies here?-->
 
