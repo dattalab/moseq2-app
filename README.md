@@ -58,10 +58,7 @@ If you want to try the test data locally, you can find the test data and their d
 
 # Events & News
 <!---Future events, project related news etc-->
-- Lorem ipsum dolor sit amet
-- consectetur adipiscing elit
-- Suspendisse ornare faucibus vestibulum
-- Etiam vel elit ac lorem bibendum suscipit
+Coming soon!!!
 
 # Publications
 <!---I think we have more than just these-->
