@@ -12,8 +12,7 @@ The MoSeq2 toolkit enables users to model mouse behavior across different experi
 measure the differences between their behavior usages, durations, transition patterns. etc.
 
 This package contains functionalities that can be used interactively in jupyter notebooks. 
-We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline for novice 
-programmers to process their depth videos of mice, and segment their behavior into what is denoted as "syllables".
+We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables".
 
 <!---
 All colab notebooks right now are temporarily shared from my Google drive. 
