@@ -311,7 +311,7 @@ class InteractiveROIWidgets:
 
         self.config_data['min_height'] = self.minmax_heights.value[0]
         self.config_data['max_height'] = self.minmax_heights.value[1]
-        self.config_data['detect'] = False
+        self.config_data['detect'] = True
 
     def update_config_dr(self, event=None):
         '''
