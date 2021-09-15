@@ -325,7 +325,8 @@ class InteractiveROIWidgets:
         -------
         '''
 
-        self.config_data['detect'] = False
+        # setting detect to true in order to update the displayed ROI based on the current DR values
+        self.config_data['detect'] = True
 
         self.config_data['bg_roi_depth_range'] = (int(self.bg_roi_depth_range.value[0]), int(self.bg_roi_depth_range.value[1]))
 
