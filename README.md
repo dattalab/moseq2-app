@@ -8,7 +8,7 @@ Last Updated: 08/19/2021
 # Overview
 
 <p align="center">
-  <img src="https://github.com/dattalab/moseq2-docs/blob/master/media/images/logos/Main%20Logo.png" />
+  <img src="https://drive.google.com/uc?export=view&id=1oc0_0mlN0VTZEPMQTg_hnYAC87Lb58MI" />
 </p>
 
 <!---Need to check the moseq pipeline image and see if there is any copy right issue. We could/probably should make our own-->
