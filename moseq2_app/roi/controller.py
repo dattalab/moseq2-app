@@ -592,15 +592,17 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
+        temp_indicator_val = self.indicator.value
+
         # set indicator error for incorrect ROI
         if self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f534"
-            self.indicator.value = '<center><h2><font color="red";>Flagged: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
+            temp_indicator_val = '<center><h2><font color="red";>Flagged: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
                                    ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
         else:
             self.curr_results['flagged'] = False
             self.curr_results['ret_code'] = "0x1f7e2"
-            self.indicator.value = '<center><h2><font color="green";>Passing</h2></center>'
+            temp_indicator_val = '<center><h2><font color="green";>Passing</h2></center>'
 
         curr_session_key = self.keys[self.checked_list.index]
 
@@ -626,12 +628,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # filter out regions outside of ROI
         try:
             filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
-            
+
         except:
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flagged: Could not apply ROI to loaded frames.</h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
 
@@ -642,7 +644,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # Display min-max heights error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flagged: Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
 
@@ -666,7 +668,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 # set new text indicator flag value
-                self.indicator.value = '<center><h2><font color="red";>Flagged: Cannot Find Mouse. Mouse Height threshold range is incorrect.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flagged: Cannot Find Mouse. Mouse Height threshold range is incorrect.</h2></center>'
                 self.curr_results['flagged'] = True
                 # update the return code value to update the dot-indicator in the checked list accordingly
                 self.curr_results['ret_code'] = "0x1f534"
@@ -685,6 +687,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # Display extraction validation indicator text and circle
         self.update_checked_list(results=self.curr_results)
         display(self.indicator)
+        self.indicator.value = temp_indicator_val
 
         # Make and display plots
         plot_roi_results(self.formatted_key, display_bg, roi, overlay, filtered_frames, result['depth_frames'][0], fn)
