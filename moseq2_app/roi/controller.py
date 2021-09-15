@@ -675,13 +675,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 # set new text indicator flag value
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse. Mouse Height threshold range is incorrect.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold range or computed ROI area.</h2></center>'
                 self.curr_results['flagged'] = True
                 # update the return code value to update the dot-indicator in the checked list accordingly
                 self.curr_results['ret_code'] = "0x1f534"
             else:
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Mouse Height threshold range is incorrect.</h2></center>'
                 # concatenating an additional error message related to extracted cropped image
+                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold range or computed ROI area.</h2></center>'
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
