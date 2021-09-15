@@ -6,7 +6,11 @@
 Last Updated: 08/19/2021
 
 # Overview
-<center><img src="https://drive.google.com/uc?export=view&id=1kHdmkBx_XlueTJocREDx4YeHGrjfYKJv"></center>
+
+<p align="center">
+  <img src="https://github.com/dattalab/moseq2-docs/blob/master/media/images/logos/Main%20Logo.png" />
+</p>
+
 <!---Need to check the moseq pipeline image and see if there is any copy right issue. We could/probably should make our own-->
 The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.
