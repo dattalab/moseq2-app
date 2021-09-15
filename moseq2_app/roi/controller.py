@@ -592,6 +592,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         -------
         '''
 
+        # temporary string value that will be used to collect all caught error messages
+        # and display them all once the final view is ready to be displayed.
         temp_indicator_val = self.indicator.value
 
         # set indicator error for incorrect ROI
@@ -636,6 +638,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
             else:
+                # concatenating an additional error message related to an incorrect or invalid ROI
                 temp_indicator_val += '<br><center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.</h2></center>'
 
         # filter for included mouse height range
@@ -649,6 +652,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
             else:
+                # concatenating an additional error message related to mouse height range
                 temp_indicator_val += '<br><center><h2><font color="red";>Flag: Mouse Height threshold range is incorrect.</h2></center>'
 
         # Get overlayed ROI
@@ -677,6 +681,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Mouse Height threshold range is incorrect.</h2></center>'
+                # concatenating an additional error message related to extracted cropped image
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
