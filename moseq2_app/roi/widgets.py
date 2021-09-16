@@ -54,9 +54,9 @@ class InteractiveROIWidgets:
         self.minmax_heights = widgets.IntRangeSlider(value=[10, 100], min=0, max=400, step=1,
                                                      description='', style=style,
                                                      continuous_update=False)
-        self.fr_label = widgets.Label(value="Frame Range to Extract", layout=self.label_layout)
+        self.fr_label = widgets.Label(value="Frame Range to Extract for Preview", layout=self.label_layout)
         self.frame_range = widgets.IntRangeSlider(value=[0, 300], min=0, max=3000, step=1,
-                                                  tooltip='Frames to Extract Sample',
+                                                  tooltip='Frames to Extract Sample for Preview',
                                                   description='', style=style, continuous_update=False)
 
         # check all button label
@@ -72,9 +72,9 @@ class InteractiveROIWidgets:
         self.check_all = widgets.Button(description='Check All Sessions', disabled=False,
                                         tooltip='Extract full session using current parameters')
 
-        self.extract_button = widgets.Button(description='Extract Sample', disabled=False, layout=self.button_layout,
+        self.extract_button = widgets.Button(description='Extract Sample Preview', disabled=False, layout=self.button_layout,
                                              tooltip='Preview extraction output')
-        self.mark_passing = widgets.Button(description='Save ROI', disabled=False,
+        self.mark_passing = widgets.Button(description='Accept and Save ROI', disabled=False,
                                            tooltip='If a session is incorrectly flagged, click this button to '
                                                    'mark the current session as passing, adding it to the list'
                                                    ' of acceptable ROI sizes, and saving it to a tiff file '
@@ -350,7 +350,7 @@ class InteractiveROIWidgets:
 
     def update_config_fr(self, event=None):
         '''
-        Callback function to update config dict with current UI depth range values
+        Callback function to update config dict with current UI frame range values
 
         Parameters
         ----------
@@ -366,7 +366,7 @@ class InteractiveROIWidgets:
 
     def update_config_fn(self, event=None):
         '''
-        Callback function to update config dict with current UI depth range values
+        Callback function to update config dict with current UI frame number values
 
         Parameters
         ----------
