@@ -307,6 +307,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         self.session_parameters[curr_session_key].pop('output_dir', None)
         self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
+        # self.interactive_depth_finder is called each time there is an interaction
         if self.main_out is None:
             self.main_out = widgets.interactive_output(self.interactive_depth_finder, {
                                                                                    'minmax_heights': self.minmax_heights,
