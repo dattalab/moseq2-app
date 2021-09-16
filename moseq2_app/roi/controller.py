@@ -37,7 +37,7 @@ from moseq2_extract.util import (get_bucket_center, get_strels, select_strel, re
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 
-    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=False, overwrite=False):
+    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=True, overwrite=False):
         '''
 
         Parameters

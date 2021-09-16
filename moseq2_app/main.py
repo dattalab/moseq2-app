@@ -99,7 +99,7 @@ def view_extraction(extractions, default=0):
     return extractions
 
 @filter_warnings
-def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=False, overwrite=False):
+def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=True, overwrite=False):
     '''
     Function to launch ROI detector interactive GUI in jupyter notebook
 
