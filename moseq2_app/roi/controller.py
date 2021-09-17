@@ -206,6 +206,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # test saved config data parameters on all sessions
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
+            self.checked_list.index = i
             if sessionName != self.curr_session:
                 # finfo is a key that points to a dict that contains the following keys:
                 # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
@@ -221,8 +222,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
                 # Get background image for each session and test the current parameters on it
                 self.session_parameters[sessionName].pop('output_dir', None)
+                # compute backgroup for getting ROI
                 bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
                 try:
+                    # self.config_data['true_depth'] returns a value if the user has interacted with the widget
+                    if not self.session_parameters[sessionName].get('true_depth'):
+                        # the self.config_data['autodetect'] need to be reset to True to detect the true depth value
+                        self.config_data['autodetect'] = True
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                 except:
                     sess_res = {'flagged': True, 'ret_code': '0x1f534'}
@@ -305,6 +311,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Get background and display UI plots
         self.session_parameters[curr_session_key].pop('output_dir', None)
+        # this step compute bground.tiff
         self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
         # self.interactive_depth_finder is called each time there is an interaction
