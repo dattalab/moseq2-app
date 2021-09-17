@@ -10,6 +10,7 @@ from ipywidgets import VBox, HBox
 from os.path import dirname, join
 from moseq2_extract.io.image import write_image
 from IPython.display import display, clear_output
+from moseq2_viz.util import read_yaml
 
 
 class InteractiveROIWidgets:
@@ -283,8 +284,15 @@ class InteractiveROIWidgets:
             self.session_parameters[k].pop('pixel_areas', None)
 
         # Update main config file
+        # self.config_data['bg_roi_depth_range'], [min_height], [max_height] may have been set to arbitary values due to user interactions
+        # hotfix: read in the old config_file and only update the relevant field
+        # update the newly added relevant fields
+        original_config = read_yaml(self.config_data['config_file'])
+        original_config['config_file'] = self.config_data['config_file']
+        original_config['session_config_path'] = self.config_data['session_config_path']
+
         with open(self.config_data['config_file'], 'w+') as f:
-            yaml.safe_dump(self.config_data, f)
+            yaml.safe_dump(original_config, f)
 
         # Update session parameters
         with open(self.config_data['session_config_path'], 'w+') as f:
