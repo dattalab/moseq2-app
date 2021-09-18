@@ -491,6 +491,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # setting the roi variable to 1's array to match the background image. This way,
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
+            # For consistency, when depth doesn't capture any area, set counted_pixels to 0 to avoid keyError
+            curr_results['counted_pixels'] = 0
 
             # results within curr_results will be propagated into the display via calling update_checked_list() in
             # prepare_data_to_plot()
@@ -504,6 +506,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # prepare_data_to_plot()
             curr_results['ret_code'] = "0x1f534"
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
+
+            # For consistency, when depth doesn't capture any area, set counted_pixels to 0 to avoid keyError
+            curr_results['counted_pixels'] = 0
             return curr_results
 
         if self.config_data['use_plane_bground']:
