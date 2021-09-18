@@ -175,7 +175,7 @@ class InteractiveROIWidgets:
         -------
         '''
 
-        if not self.in_test_all_session:
+        if not self.in_test_all_sessions:
             if event.old.split(' ')[1] != event.new.split(' ')[1]:
                 self.checked_list.value = event.new
 
