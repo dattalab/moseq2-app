@@ -44,6 +44,7 @@ class TestROIController(TestCase):
         assert self.gui.config_data['pixel_areas'] == []
         assert self.gui.config_data['autodetect'] == True
         assert self.gui.config_data['detect'] == True
+        assert self.gui.in_test_all_sessions == False
         assert self.gui.session_parameters != session_parameters
 
     def test_generate_session_config(self):
@@ -161,6 +162,7 @@ class TestROIController(TestCase):
 
         assert list(self.gui.all_results.keys()) == ['azure_test', 'test_session']
         assert list(self.gui.all_results.values()) == [False, True]
+        assert self.gui.in_test_all_sessions == False
 
     def test_interactive_find_roi_session_selector(self):
         self.gui.config_data['bg_roi_depth_range'] = [500, 700]
