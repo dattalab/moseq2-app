@@ -175,21 +175,22 @@ class InteractiveROIWidgets:
         -------
         '''
 
-        if event.old.split(' ')[1] != event.new.split(' ')[1]:
-            self.checked_list.value = event.new
+        if not self.in_test_all_session:
+            if event.old.split(' ')[1] != event.new.split(' ')[1]:
+                self.checked_list.value = event.new
 
-            gc.collect()
-            bokeh.io.curdoc().clear()
-            bokeh.io.state.State().reset()
-            bokeh.io.reset_output()
-            bokeh.io.output_notebook(hide_banner=True)
-            clear_output(wait=True)
-            self.main_out = None
+                gc.collect()
+                bokeh.io.curdoc().clear()
+                bokeh.io.state.State().reset()
+                bokeh.io.reset_output()
+                bokeh.io.output_notebook(hide_banner=True)
+                clear_output(wait=True)
+                self.main_out = None
 
-            self.config_data['detect'] = True
-            if self.autodetect_depths:
-                self.config_data['autodetect'] = True
-            self.interactive_find_roi_session_selector(self.checked_list.value)
+                self.config_data['detect'] = True
+                if self.autodetect_depths:
+                    self.config_data['autodetect'] = True
+                self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def extract_button_clicked(self, b=None):
         '''
@@ -260,7 +261,7 @@ class InteractiveROIWidgets:
             self.check_all.icon = 'check'
         else:
             self.check_all.button_style = 'danger'
-        self.check_all.description = 'Check All Sessions'
+        self.check_all.description = 'Check All Sessions ROI'
 
         self.save_parameters.layout = self.layout_visible
 

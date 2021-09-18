@@ -54,6 +54,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # main output gui to be reused
         self.main_out = None
         self.output = None
+        # Attribute to signifiy whether the object is running test all sessions
+        # if self.in_test_all_session is False, each time checked list is changed, the bokeh plot gets updated
+        # IF self.in_test_all_session is True, checked list changes won't refresh the bokeh plots
+        self.in_test_all_sessions = False
 
         self.autodetect_depths = autodetect_depths
 
@@ -201,6 +205,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         with their computed ROI for convenience.
         '''
         checked_options = list(self.checked_list.options)
+        # Set self.in_test_all_session to True to prevent bokeh plot refreshing
+        self.in_test_all_sessions = True
 
         self.npassing = 0
 
@@ -264,6 +270,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if self.autodetect_depths == False:
                 tmp_message += ' Try Clearing the output, and rerunning the cell with autodetect_depths = True'
             self.message.value = tmp_message
+        # set self.in_test_all_session back to False
+        self.in_test_all_sessions = False
 
     def interactive_find_roi_session_selector(self, session):
         '''
