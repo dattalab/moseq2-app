@@ -173,13 +173,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             try:
                 # finfo is a key that points to a dict that contains the following keys:
                 # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
-                if 'finfo' not in self.session_parameters[s]:
-                    self.session_parameters[s]['finfo'] = get_movie_info(p)
-                    if p.endswith('.mkv'):
-                        self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
-                                                                                              threads=self.config_data['threads'],
-                                                                                              mapping=self.config_data.get('mapping', 'DEPTH'))
-                        self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
+                self.session_parameters[s]['finfo'] = get_movie_info(p)
+                if p.endswith('.mkv'):
+                    self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
+                                                                                            threads=self.config_data['threads'],
+                                                                                            mapping=self.config_data.get('mapping', 'DEPTH'))
+                    self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
 
                 # Compute background image; saving the image to a file
                 self.session_parameters[s].pop('output_dir', None)
