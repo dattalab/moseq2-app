@@ -494,7 +494,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
             # For consistency, when depth doesn't capture any area, set counted_pixels to 0 to avoid keyError
-            curr_results['counted_pixels'] = 0
+            curr_results['counted_pixels'] = np.sum(curr_results['roi'])
 
             # results within curr_results will be propagated into the display via calling update_checked_list() in
             # prepare_data_to_plot()
@@ -510,7 +510,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
 
             # For consistency, when depth doesn't capture any area, set counted_pixels to 0 to avoid keyError
-            curr_results['counted_pixels'] = 0
+            curr_results['counted_pixels'] = np.sum(curr_results['roi'])
             return curr_results
 
         if self.config_data['use_plane_bground']:
