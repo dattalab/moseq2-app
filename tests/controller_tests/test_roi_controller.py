@@ -156,6 +156,12 @@ class TestROIController(TestCase):
         self.gui.config_data['bg_roi_depth_range'] = [500, 700]
         self.gui.config_data['bg_roi_erode'] = [1, 1]
 
+        # Add true depth to both session such that new range won't be computed
+        # Refelecting on the changes setting config_data['autodetect'] to True
+        # when there is no depth to compute the true depth and range
+        self.gui.session_parameters['azure_test']['true_depth'] = 514
+        self.gui.session_parameters['test_session']['true_depth'] = 49255
+
         self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
 
         self.gui.test_all_sessions(self.gui.sessions)
