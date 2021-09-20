@@ -148,8 +148,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if compute_bgs:
             self.compute_all_bgs()
         
-        print('in init', self.session_parameters)
-
     def generate_session_config(self, path):
         '''
         Generates the default/initial session configuration file.
@@ -236,12 +234,9 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                     if not self.session_parameters[sessionName].get('true_depth'):
                         # the self.config_data['autodetect'] need to be reset to True to detect the true depth value
                         self.config_data['autodetect'] = True
-                        print('did not find true depth')
-                    print(sessionName, self.config_data['autodetect'])
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                     # if roi doesn't fail
                     write_image(join(dirname(sessionPath), 'proc', f'roi_00.tiff'), sess_res['roi'])
-                    print('roi was sucessful')
                 except:
                     sess_res = {'flagged': True, 'ret_code': '0x1f534'}
 
@@ -445,7 +440,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         curr_session_key = self.keys[self.checked_list.index]
 
         if self.config_data['autodetect']:
-            print('detecting true depth')
             # Get max depth as a thresholding limit (this would be the DTD if it already was computed)
             limit = np.max(bground_im)
 
@@ -459,7 +453,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # True depth is at the center of the bucket
             self.true_depth = bground_im[cY][cX]
             self.session_parameters[curr_session_key]['true_depth'] = int(self.true_depth)
-            print(self.true_depth)
 
             # Get true depth range difference
             range_diff = 10 ** (len(str(int(self.true_depth))) - 1)
@@ -483,7 +476,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         try:
             # Get ROI
-            print('this is in ROI', curr_session_key, self.session_parameters[curr_session_key])
             rois, plane, bboxes, _, _, _ = get_roi(bground_im,
                                                    **self.session_parameters[curr_session_key],
                                                    strel_dilate=strel_dilate,
@@ -491,7 +483,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    get_all_data=True
                                                    )
         except ValueError:
-            print('ValueError')
             # bg depth range did not capture any area
             # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
             # roi detection.
@@ -508,7 +499,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # prepare_data_to_plot()
             return curr_results
         except Exception as e:
-            print('other excepted')
             # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
             print(e)
             curr_results['flagged'] = True
