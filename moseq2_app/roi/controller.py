@@ -621,12 +621,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # set indicator error for incorrect ROI
         if self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f534"
-            temp_indicator_val = '<center><h2><font color="red";>Flag: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
-                                   ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
+            temp_indicator_val = '<center><h2><font color="red";>Flag: Current ROI pixel area may be incorrect.' \
+                                   ' If the Overlayed ROI below is the intended ROI then click Accept and Save ROI' \
+                                       ' to save the ROI and mark the ROI as passing. Otherwise, change the depth range values.</h2></center>'
         else:
             self.curr_results['flagged'] = False
             self.curr_results['ret_code'] = "0x1f7e2"
-            temp_indicator_val = '<center><h2><font color="green";>Passing</h2></center>'
+            temp_indicator_val = '<center><h2><font color="green";>Passing ROI</h2></center>'
 
         curr_session_key = self.keys[self.checked_list.index]
 
@@ -653,29 +654,37 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         try:
             filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
         except:
+            # The reason why there could be an exception could only due to ROI and current frame have different shape
+            # Since all ROIs are computed with parameters, I don't see how it is possible to have an exception
             # Display ROI error and flag
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flag: Could not apply ROI to the current frame.' \
+                ' Check if the data is corruputed and check if the computed ROI and the current frame are not None and the same shape. </h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to an incorrect or invalid ROI
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.</h2></center>'
+                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.' \
+                    ' Check if the data is corruputed and check if the computed ROI and the current frame are not None and the same shape. </h2></center>'
 
         # filter for included mouse height range
         try:
             filtered_frames = threshold_chunk(filtered_frames, minmax_heights[0], minmax_heights[1])
         except:
             # Display min-max heights error and flag
+            # threshold chunk set all values not within mouse height range to 0 therefore, if filtered_frames is a numpy array
+            # there will not be an exception. If there is an exception, it could ONLY because filtered_frames not being a numpy array
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Mouse Height threshold range is incorrect.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flag: Unable to threshold the current frame with mouse height range.' \
+                    ' Check if the data is corrupted.</h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to mouse height range
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Mouse Height threshold range is incorrect.</h2></center>'
+                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Unable to threshold the current frame with mouse height range.' \
+                    ' Check if the data is corrupted.</h2></center>'
 
         # Get overlayed ROI
         overlay = self.curr_bground_im.copy()
@@ -697,13 +706,17 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 # set new text indicator flag value
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold range or computed ROI area.</h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold' \
+                    'range or there is no mouse in the computed ROI area. Adjust th mouse height range for thresholding the mouse height.' \
+                    'Adjust the depth range if the Overlayed ROI below is not the intended area. </h2></center>'
                 self.curr_results['flagged'] = True
                 # update the return code value to update the dot-indicator in the checked list accordingly
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to extracted cropped image
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold range or computed ROI area.</h2></center>'
+                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold' \
+                    'range or there is no mouse in the computed ROI area. Adjust th mouse height range for thresholding the mouse height.' \
+                    'Adjust the depth range if the Overlayed ROI below is not the intended area. </h2></center>'
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
