@@ -174,7 +174,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                 # finfo is a key that points to a dict that contains the following keys:
                 # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
                 self.session_parameters[s]['finfo'] = get_movie_info(p)
-                if p.endswith('.mkv'):
+                if p.endswith('.mkv') and 'timestamps' not in self.session_parameters[s]:
                     self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
                                                                                             threads=self.config_data['threads'],
                                                                                             mapping=self.config_data.get('mapping', 'DEPTH'))
