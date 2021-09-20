@@ -622,7 +622,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f534"
             temp_indicator_val = '<center><h2><font color="red";>Flag: Current ROI pixel area may be incorrect.' \
-                                   ' If the Overlayed ROI below is the intended ROI then click Accept and Save ROI' \
+                                   '<br>If the Overlayed ROI below is the intended ROI then click Accept and Save ROI' \
                                        ' to save the ROI and mark the ROI as passing. Otherwise, change the depth range values.</h2></center>'
         else:
             self.curr_results['flagged'] = False
@@ -660,13 +660,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
                 temp_indicator_val = '<center><h2><font color="red";>Flag: Could not apply ROI to the current frame.' \
-                ' Check if the data is corruputed and check if the computed ROI and the current frame are not None and the same shape. </h2></center>'
+                '<br>Check if the data is corruputed and check if the computed ROI and the current frame are not None and the same shape. </h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to an incorrect or invalid ROI
                 temp_indicator_val += '<br><center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.' \
-                    ' Check if the data is corruputed and check if the computed ROI and the current frame are not None and the same shape. </h2></center>'
+                    '<br>Check if the data is corruputed and check if the computed ROI and the current frame are not None and the same shape. </h2></center>'
 
         # filter for included mouse height range
         try:
@@ -678,13 +678,13 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             filtered_frames = curr_frame.copy()[0]
             if not self.curr_results['flagged']:
                 temp_indicator_val = '<center><h2><font color="red";>Flag: Unable to threshold the current frame with mouse height range.' \
-                    ' Check if the data is corrupted.</h2></center>'
+                    '<br>Check if the data is corrupted.</h2></center>'
                 self.curr_results['flagged'] = True
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to mouse height range
                 temp_indicator_val += '<br><center><h2><font color="red";>Flag: Unable to threshold the current frame with mouse height range.' \
-                    ' Check if the data is corrupted.</h2></center>'
+                    '<br>Check if the data is corrupted.</h2></center>'
 
         # Get overlayed ROI
         overlay = self.curr_bground_im.copy()
@@ -706,17 +706,19 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
             if not self.curr_results['flagged']:
                 # set new text indicator flag value
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold' \
-                    'range or there is no mouse in the computed ROI area. Adjust th mouse height range for thresholding the mouse height.' \
-                    'Adjust the depth range if the Overlayed ROI below is not the intended area. </h2></center>'
+                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse.' \
+                    '<br>Incorrect Mouse Height range or there is no mouse in the computed ROI area.' \
+                    ' Adjust th mouse height range for thresholding the mouse height. Adjust the depth range if ' \
+                    'the Overlayed ROI below is not the intended area. </h2></center>'
                 self.curr_results['flagged'] = True
                 # update the return code value to update the dot-indicator in the checked list accordingly
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to extracted cropped image
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold' \
-                    'range or there is no mouse in the computed ROI area. Adjust th mouse height range for thresholding the mouse height.' \
-                    'Adjust the depth range if the Overlayed ROI below is not the intended area. </h2></center>'
+                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse.' \
+                    '<br>Incorrect Mouse Height range or there is no mouse in the computed ROI area.' \
+                    ' Adjust th mouse height range for thresholding the mouse height. Adjust the depth range if ' \
+                    'the Overlayed ROI below is not the intended area. </h2></center>'
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
