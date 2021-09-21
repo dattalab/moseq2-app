@@ -301,7 +301,8 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     try:
         outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
     except:
-        outliers = [1]
+        # create a list of inlier list that matches the mean_df.index length
+        outliers = [1] * len(mean_df.index)
 
     # Get scalar anomalies based on quartile ranges
     for i, index in enumerate(mean_df.index):
