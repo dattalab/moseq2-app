@@ -14,7 +14,7 @@ class TestInteractiveScalarViewer(TestCase):
         del self.gui
 
     def test_init(self):
-        assert list(self.gui.checked_list.value) == ['velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'width_mm', 'length_mm']
+        assert list(self.gui.checked_list.value) == ['area_mm', 'velocity_2d_mm']
 
     def test_on_clear(self):
         self.gui.on_clear()
