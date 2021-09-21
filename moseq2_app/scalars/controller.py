@@ -37,13 +37,12 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         self.colors = px.colors.qualitative.Alphabet
 
         # populate column selector
-        self.columns = self.scalar_df.columns
-        to_drop = ['StartTime', 'SessionName', 'SubjectName', 'frame index', 'timestamps', 'h5_path', 'uuid', 'group']
-
-        self.checked_list.options = [c for c in self.columns if c not in to_drop]
+        self.checked_list.options = [
+            'area_mm', 'height_ave_mm', 'length_mm', 'velocity_2d_mm', 
+            'velocity_3d_mm', 'width_mm', 'dist_to_center_px']
 
         # set default values
-        self.checked_list.value = ['velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'width_mm', 'length_mm']
+        self.checked_list.value = ['area_mm', 'velocity_2d_mm']
 
     def make_graphs(self):
         '''
