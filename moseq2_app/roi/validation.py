@@ -420,40 +420,33 @@ def print_validation_results(scalar_df, status_dicts):
     # Run tests
     anomaly_dict = run_validation_tests(scalar_df, status_dicts)
 
-    errors = ['missing', 'dropped_frames', 'corrupted']
-    n_errs, n_warnings = 0, 0
+    n_warnings = 0
 
     n_sessions = len(anomaly_dict)
     print_dict = {}
 
     # Count Errors and warnings
     for k in anomaly_dict:
-        error, warning = False, False
+        warning = False
         for k1, v1 in anomaly_dict[k].items():
-            # v1 is polymorphic; it can be a bool, a dict, an array, or a float.
+            # v1 is polymorphic; bool for flags when False, dict for metadata
+            # float that represent the percentage for dropped frame, corrupted
+            # stationary, missing and size anomaly when the flags are True
             if k1 != 'metadata':
-                if k1 in errors and v1 != False:
-                    error = True
-                elif isinstance(v1, dict):
-                    # scalar anomalies
-                    if len(v1) > 0:
-                        warning = True
-                elif isinstance(v1, (float, type(np.array))):
+                # v1 is bool when k1 is not metadata 
+                if isinstance(v1, float):
                     warning = True
-                elif v1 == True:
+                elif v1:
                     warning = True
-
+        
+        # count the number of warnings
+        # add the sessions with warning to print_dict
         if warning:
             n_warnings += 1
             print_dict[k] = anomaly_dict[k]
-        if error:
-            n_errs += 1
-            print_dict[k] = anomaly_dict[k]
 
-    print(f'{bcolors.FAIL}{n_errs}/{n_sessions} were flagged with error.{bcolors.ENDC}')
     print(f'{bcolors.WARNING}{n_warnings}/{n_sessions} were flagged with warning(s).{bcolors.ENDC}')
-    print(f'Sessions with {bcolors.FAIL}"Error"{bcolors.ENDC} flags must be re-extracted or excluded.')
-    print(f'Sessions with {bcolors.WARNING}"Warning"{bcolors.ENDC} flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
+    print(f'Sessions with {bcolors.WARNING}"Warning"{bcolors.ENDC} flags may need visually inspection for outliers.\n')
 
     # Print results
     for k in print_dict:
@@ -462,33 +455,14 @@ def print_validation_results(scalar_df, status_dicts):
         subject_name = print_dict[k]['metadata']['SubjectName']
         print(f'{bcolors.BOLD}{bcolors.UNDERLINE}Session: {session_name}; Subject: {subject_name} flags:{bcolors.ENDC}')
         for k1, v1 in print_dict[k].items():
-            x = ''
             if k1 != 'metadata':
-                if k1 in errors and isinstance(v1, float):
-                    t = 'Error'
-                    x = f'{k1} - {v1*100:.2f}%'
-                elif k1 == 'position_heatmap' and not isinstance(v1, bool):
-                    x = 'position heatmaps'
-                    t = 'Warning - Position Heatmap flag raised'
-                    try:
-                        plot_heatmap(v1, f'{session_name}_{subject_name}')
-                    except:
-                        print(f'Could not plot heatmap: {session_name}_{subject_name}')
-                        pass
-                elif isinstance(v1, dict):
-                    t = 'Warning'
-                    if len(v1) > 0:
-                        x = list(v1.keys())
-                elif v1 == True:
-                    t = 'Warning'
+                # scalar anomaly flag
+                if v1:
                     x = f'{k1} flag raised'
+                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}')
+                # all the other flags
                 elif isinstance(v1, float):
-                    t = 'Warning'
                     x = f'{k1} flag raised: {v1*100:.2f}%'
-            if len(x) > 0:
-                if 'Warning' in t:
-                    t = f'{bcolors.WARNING}{t}'
-                elif 'Error' in t:
-                    t = f'{bcolors.FAIL}{t}'
-                print(f'\t{t}: {x}{bcolors.ENDC}')
+                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}') 
+        # I assume this is printing a new line
         print()
