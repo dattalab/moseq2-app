@@ -4,8 +4,9 @@ General utility functions.
 
 '''
 import pandas as pd
-from os.path import basename, join, exists
+from os.path import basename, join, exists, splitext
 from os import listdir, mkdir
+from glob import glob
 from shutil import copy2
 from collections import defaultdict
 from moseq2_app.gui.progress import update_progress
@@ -96,23 +97,25 @@ def setup_model_folders(progress_paths):
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     """
     # find all the models in the model master path
-    models = [file for file in listdir(progress_paths['model_master_path']) if file.endswith('.p')]
+    models = glob(join(progress_paths['main_model_path'], '*.p'))
     
     # initialize model dictionary
     model_dict = defaultdict(dict)
 
     for model in models:
-        model_dir = join(progress_paths['model_master_path'], model.split('.')[0])
-        # enusre previous progress are not wiped
-        if exists(model_dir):
-            if exists(join(model_dir, model)):
-                pass
-            else:
-                copy2(join(progress_paths['model_master_path'], model), model_dir)
-        else:
+        model_dir = splitext(model)[0]
+        # get the model file name to use as 
+        model = basename(model)
+        # Check if the model directory already exists
+        if not exists(model_dir):
+            print('Creating model folder for', model)
+            # make a model-specific folder
             mkdir(model_dir)
-            copy2(join(progress_paths['model_master_path'], model), model_dir)
-            print('Creating the model folder...')
+        
+        # check if the model is copied to the model-specific folder
+        if not exists(join(model_dir, model)):
+            copy2(join(progress_paths['main_model_path'], model), model_dir)
+        
         model_dict[model]['model_session_path'] = model_dir
         model_dict[model]['model_path'] = join(model_dir, model)
     return model_dict
