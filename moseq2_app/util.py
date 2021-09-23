@@ -4,6 +4,7 @@ General utility functions.
 
 '''
 import pandas as pd
+from copy import deepcopy
 from pprint import pprint
 from os.path import basename
 from moseq2_viz.util import read_yaml
@@ -81,7 +82,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def uuid_lookup(target_uuid, uuid_dict):
+def uuid_lookup(target_uuid, uuid_dict_source):
     """
     Look up session infomtion with full/partial uuid. Helper function for users to look up uuid after running interactive_scalar_summary
 
@@ -89,16 +90,14 @@ def uuid_lookup(target_uuid, uuid_dict):
     ----------
     target_uuid (str): full or partial uuid the user wants to look up.
     uuid_dict (dict): dictionary from interactive_scalar_summary widget that has all the session information 
-    """    
-    # prepare the dictionary for printing out the lookup result
-    for uuid, info in uuid_dict.items():
-         # remove unneeded field in dictionary
-        for key in ['ColorDataType', 'ColorResolution', 'DepthDataType', 'DepthResolution', 'IsLittleEndian', 'NidaqChannels', 'NidaqSamplingRate']:
-            del info['metadata'][key]
-        # move the file path information from info['path'] to info['metadata'] for printing
-        info['metadata']['h5 path'], info['metadata']['yaml path'] = info['path']
+    """
     
+    # deep copy the input dictionary
+    uuid_dict = deepcopy(uuid_dict_source)
+
     for uuid, info in uuid_dict.items():
         if target_uuid in uuid:
             print('UUID:', uuid)
-            pprint(info['metadata'])
+            # put the path in info['metadata'] for printing
+            info['metadata']['h5Path'], info['metadata']['yamlPath'] = info['path']
+            pprint({k: info['metadata'][k] for k in ['SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath']})
