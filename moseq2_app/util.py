@@ -4,6 +4,7 @@ General utility functions.
 
 '''
 import pandas as pd
+from pprint import pprint
 from os.path import basename
 from moseq2_viz.util import read_yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
@@ -79,3 +80,25 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+def uuid_lookup(target_uuid, uuid_dict):
+    """
+    Look up session infomtion with full/partial uuid. Helper function for users to look up uuid after running interactive_scalar_summary
+
+    Parameters
+    ----------
+    target_uuid (str): full or partial uuid the user wants to look up.
+    uuid_dict (dict): dictionary from interactive_scalar_summary widget that has all the session information 
+    """    
+    # prepare the dictionary for printing out the lookup result
+    for uuid, info in uuid_dict.items():
+         # remove unneeded field in dictionary
+        for key in ['ColorDataType', 'ColorResolution', 'DepthDataType', 'DepthResolution', 'IsLittleEndian', 'NidaqChannels', 'NidaqSamplingRate']:
+            del info['metadata'][key]
+        # move the file path information from info['path'] to info['metadata'] for printing
+        info['metadata']['h5 path'], info['metadata']['yaml path'] = info['path']
+    
+    for uuid, info in uuid_dict.items():
+        if target_uuid in uuid:
+            print('UUID:', uuid)
+            pprint(info['metadata'])
