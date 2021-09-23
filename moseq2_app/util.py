@@ -8,6 +8,7 @@ from os.path import basename, join, exists
 from os import listdir, mkdir
 from shutil import copy2
 from collections import defaultdict
+from moseq2_app.gui.progress import update_progress
 from moseq2_viz.util import read_yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.util import compute_behavioral_statistics
@@ -116,3 +117,25 @@ def setup_model_folders(progress_paths):
         model_dict[model]['model_path'] = join(model_dir, model)
     return model_dict
 
+def update_model_paths(desired_model, model_dict, progress_filepath):
+    """helper function to update relevant model paths in progress.yaml when specific model is chosen
+
+    Parameters
+    ----------
+    desired_model (str): file name of the desired specific model
+    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
+    progress_filepath (str): path to progress.yaml
+
+    Returns
+    -------
+    [type]
+        [description]
+    """    
+    progress_paths = update_progress(progress_filepath, 'model_session_path', model_dict[desired_model].get('model_session_path'))
+    progress_paths = update_progress(progress_filepath, 'model_path', model_dict[desired_model].get('model_path'))
+
+    # remove previously stored model-specific paths
+    progress_paths = update_progress(progress_filepath, 'crowd_dir', '')
+    progress_paths = update_progress(progress_filepath, 'syll_info', '')
+    progress_paths = update_progress(progress_filepath, 'df_info_path', '')
+    return progress_paths
