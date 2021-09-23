@@ -42,7 +42,7 @@ class GroupSettingWidgets:
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
 
         self.group_input = widgets.Text(value='', placeholder='Enter Group Name to Set', style=style,
-                                        description='Assign Group Name to', continuous_update=False, disabled=False)
+                                        description='New Group Name', continuous_update=False, disabled=False)
         self.save_button = widgets.Button(description='Set Group Name', style=style,
                                           disabled=False, tooltip='Set Group')
         self.update_index_button = widgets.Button(description='Update Index File', style=style,
