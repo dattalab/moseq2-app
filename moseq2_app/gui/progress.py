@@ -448,7 +448,7 @@ def get_pca_progress(progress_vars, pca_progress):
                     pca_progress[key] = True
             # changepoints field only include the filename with no path and extension
             elif key == 'changepoints_path':
-                # mannually construct the path for changepoints.h5
+                # manually construct the path for changepoints.h5
                 if exists(join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
                     pca_progress[key] = True
             else:
