@@ -133,12 +133,13 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
     -------
     [type]
         [description]
-    """    
-    progress_paths = update_progress(progress_filepath, 'model_session_path', model_dict[desired_model].get('model_session_path'))
-    progress_paths = update_progress(progress_filepath, 'model_path', model_dict[desired_model].get('model_path'))
+    """
 
-    # remove previously stored model-specific paths
-    progress_paths = update_progress(progress_filepath, 'crowd_dir', '')
-    progress_paths = update_progress(progress_filepath, 'syll_info', '')
-    progress_paths = update_progress(progress_filepath, 'df_info_path', '')
+    # update model_sseion_path and model_path
+    for key in ['model_session_path', 'model_path']:
+        progress_paths = update_progress(progress_filepath, key, model_dict[desired_model].get(key))
+
+    # reset paths in progress_paths
+    for key in ['crowd_dir', 'syll_info', 'df_info_path']:
+        progress_paths = update_progress(progress_filepath, key, '')
     return progress_paths
