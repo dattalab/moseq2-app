@@ -9,6 +9,8 @@ import gc
 import os
 import cv2
 import bokeh
+import io
+import base64
 import warnings
 import numpy as np
 from math import isclose
@@ -748,11 +750,19 @@ class InteractiveExtractionViewer:
         '''
 
         video_dims = get_video_info(input_file)['dims']
+        # input_file goes through encode and decode so it won't carry semantic meanings anymore
+        file_name = input_file
+        
+        # Open videos in encoded urls
+        # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+        vid = io.open(input_file, 'r+b').read()
+        encoded = base64.b64encode(vid)
+        input_file = encoded.decode('ascii')
 
         video_div = f'''
-                        <h2>{input_file}</h2>
+                        <h2>{file_name}</h2>
                         <video
-                            src="{relpath(input_file)}"; alt="{abspath(input_file)}"; id="preview";
+                            src="data:video/mp4;base64, {input_file}"; alt="data:video/mp4;base64, {input_file}"; id="preview";
                             height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                             style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
