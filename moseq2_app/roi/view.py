@@ -39,6 +39,8 @@ def show_extraction(input_file, video_file):
     tmp_path = join(vid_dir, 'tmp', f'{np.random.randint(0, 99999)}_{os.path.basename(video_file)}')
     tmp_dirname = dirname(tmp_path)
 
+    url = upload_public(input_file)
+
     if not exists(tmp_dirname):
         os.makedirs(tmp_dirname)
 
