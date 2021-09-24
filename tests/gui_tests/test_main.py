@@ -1,6 +1,7 @@
 import os
 import shutil
 import ruamel.yaml as yaml
+import multiprocessing as mp
 from unittest import TestCase
 from os.path import exists, join
 from moseq2_viz.util import parse_index
@@ -10,6 +11,9 @@ from moseq2_app.main import (interactive_roi_detector, preview_extractions, vali
                              interactive_group_setting, label_syllables, interactive_syllable_stats,
                              interactive_crowd_movie_comparison, interactive_transition_graph,
                              view_extraction, flip_classifier_tool)
+
+# Source: https://bugs.python.org/issue33725#msg329923
+mp.set_start_method('forkserver')
 
 class TestMain(TestCase):
 
