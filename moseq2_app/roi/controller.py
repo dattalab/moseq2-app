@@ -237,7 +237,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
                     # if roi doesn't fail
                     write_image(join(dirname(sessionPath), 'proc', f'roi_00.tiff'), sess_res['roi'])
-                except:
+                except Exception as e:
                     sess_res = {'flagged': True, 'ret_code': '0x1f534'}
 
                 # Save session parameters if it is not flagged

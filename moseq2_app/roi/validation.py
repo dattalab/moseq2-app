@@ -301,7 +301,7 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
 
     try:
         outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
-    except:
+    except Exception as e:
         outliers = [1]
 
     # Get scalar anomalies based on quartile ranges
@@ -473,7 +473,7 @@ def print_validation_results(scalar_df, status_dicts):
                     t = 'Warning - Position Heatmap flag raised'
                     try:
                         plot_heatmap(v1, f'{session_name}_{subject_name}')
-                    except:
+                    except Exception as e:
                         print(f'Could not plot heatmap: {session_name}_{subject_name}')
                         pass
                 elif isinstance(v1, dict):

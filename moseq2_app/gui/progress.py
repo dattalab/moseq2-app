@@ -303,7 +303,7 @@ def generate_intital_progressfile(filename='progress.yaml'):
         with open(join(base_dir, 'progress.log'), 'r') as f:
             try:
                 latest_log = f.readlines()[-1].split()[-1]
-            except:
+            except Exception as e:
                 latest_log = 'default'
 
         with open(join(base_dir, 'progress_log.pkl'), 'rb') as f:
