@@ -482,36 +482,20 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    strel_erode=strel_erode,
                                                    get_all_data=True
                                                    )
-        except ValueError:
+        except Exception as e:
             # bg depth range did not capture any area
             # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
             # roi detection.
+            print(e)
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
-
             # setting the roi variable to 1's array to match the background image. This way,
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
             # For consistency, when depth doesn't capture any area, set counted_pixels to the total number of pixel in the background
             curr_results['counted_pixels'] = np.sum(curr_results['roi'])
-
-            # results within curr_results will be propagated into the display via calling update_checked_list() in
-            # prepare_data_to_plot()
             return curr_results
-        except Exception as e:
-            # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
-            print(e)
-            curr_results['flagged'] = True
-
-            # ret_code within curr_results will be propagated into the display via calling update_checked_list() in
-            # prepare_data_to_plot()
-            curr_results['ret_code'] = "0x1f534"
-            curr_results['roi'] = np.ones_like(self.curr_bground_im)
-
-            # For consistency, when depth doesn't capture any area, set counted_pixels to 0 to avoid keyError
-            curr_results['counted_pixels'] = np.sum(curr_results['roi'])
-            return curr_results
-
+       
         if self.config_data['use_plane_bground']:
             print('Using plane fit for background...')
             self.curr_bground_im = set_bground_to_plane_fit(bground_im, plane, join(dirname(session), 'proc'))
