@@ -600,15 +600,15 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # temporary string value that will be used to collect all caught error messages
         # and display them all once the final view is ready to be displayed.
-        temp_indicator_val = self.indicator.value
+        print('prepare_data_to_plot beginning', self.curr_results['flagged'])
         temp_indicator_val = ''
 
         # set indicator error for incorrect ROI
         if self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f534"
-            temp_indicator_val = '<center><h2><font color="red";>Flag: Current ROI pixel area may be incorrect.' \
+            temp_indicator_val = '<center><h4><font color="red";>Flag: Current ROI pixel area may be incorrect.' \
                                    '<br>If the Overlayed ROI below is the intended ROI then click Accept and Save ROI' \
-                                       ' to save the ROI and mark the ROI as passing. Otherwise, change the depth range values.</h2></center>'
+                                       ' to save the ROI and mark the ROI as passing. Otherwise, change the depth range values.</h4></center>'
         
         curr_session_key = self.keys[self.checked_list.index]
 
@@ -652,29 +652,21 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
-        
-        # Check if extracted chunk is empty
+            # set new text indicator flag value
+
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
-            if not self.curr_results['flagged']:
-                # set new text indicator flag value
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse.' \
-                    '<br>The mouse height range is set incorrectly and should be adjusted or there is no mouse in the present ROI area.' \
-                    ' Adjust th mouse height rang to reasonable values, typically 0 - 120 mm. Adjust the depth range if ' \
-                    'the ROI below is not the intended area. </h2></center>'
-                self.curr_results['flagged'] = True
-                # update the return code value to update the dot-indicator in the checked list accordingly
-                self.curr_results['ret_code'] = "0x1f534"
-            else:
-                # concatenating an additional error message related to extracted cropped image
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse.' \
-                    '<br>The mouse height range is set incorrectly and should be adjusted or there is no mouse in the present ROI area.' \
-                    ' Adjust th mouse height rang to reasonable values, typically 0 - 120 mm. Adjust the depth range if ' \
-                    'the ROI below is not the intended area. </h2></center>'
+            temp_indicator_val += '<center><h4><font color="red";>Flag: Cannot Find Mouse.' \
+                '<br>The mouse height range is set incorrectly and should be adjusted or there is no mouse in the present ROI area.' \
+                ' Adjust th mouse height rang to reasonable values, typically 0 - 120 mm. Adjust the depth range if ' \
+                'the ROI below is not the intended area. </h4></center>'
+            self.curr_results['flagged'] = True
+            # update the return code value to update the dot-indicator in the checked list accordingly
+            self.curr_results['ret_code'] = "0x1f534"
 
         # If all tests passes, mark passing ROI
         if not self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f7e2"
-            temp_indicator_val = '<center><h2><font color="green";>Passing ROI</h2></center>'
+            temp_indicator_val = '<center><h4><font color="green";>Passing ROI</h4></center>'
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
