@@ -492,7 +492,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             # setting the roi variable to 1's array to match the background image. This way,
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
-            # For consistency, when depth doesn't capture any area, set counted_pixels to 0 to avoid keyError
+            # For consistency, when depth doesn't capture any area, set counted_pixels to the total number of pixel in the background
             curr_results['counted_pixels'] = np.sum(curr_results['roi'])
 
             # results within curr_results will be propagated into the display via calling update_checked_list() in
