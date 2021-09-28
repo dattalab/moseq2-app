@@ -227,7 +227,7 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
                 # Get background image for each session and test the current parameters on it
                 self.session_parameters[sessionName].pop('output_dir', None)
-                # compute backgroup for getting ROI
+                # compute background for getting ROI
                 bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
                 try:
                     # self.config_data['true_depth'] returns a value if the user has interacted with the widget
