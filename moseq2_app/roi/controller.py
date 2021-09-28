@@ -600,7 +600,6 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # temporary string value that will be used to collect all caught error messages
         # and display them all once the final view is ready to be displayed.
-        print('prepare_data_to_plot beginning', self.curr_results['flagged'])
         temp_indicator_val = ''
 
         # set indicator error for incorrect ROI
