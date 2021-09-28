@@ -691,18 +691,18 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if not self.curr_results['flagged']:
                 # set new text indicator flag value
                 temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse.' \
-                    '<br>Incorrect Mouse Height range or there is no mouse in the computed ROI area.' \
-                    ' Adjust th mouse height range for thresholding the mouse height. Adjust the depth range if ' \
-                    'the Overlayed ROI below is not the intended area. </h2></center>'
+                    '<br>The mouse height range is set incorrectly and should be adjusted or there is no mouse in the present ROI area.' \
+                    ' Adjust th mouse height rang to reasonable values, typically 0 - 120 mm. Adjust the depth range if ' \
+                    'the ROI below is not the intended area. </h2></center>'
                 self.curr_results['flagged'] = True
                 # update the return code value to update the dot-indicator in the checked list accordingly
                 self.curr_results['ret_code'] = "0x1f534"
             else:
                 # concatenating an additional error message related to extracted cropped image
                 temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse.' \
-                    '<br>Incorrect Mouse Height range or there is no mouse in the computed ROI area.' \
-                    ' Adjust th mouse height range for thresholding the mouse height. Adjust the depth range if ' \
-                    'the Overlayed ROI below is not the intended area. </h2></center>'
+                    '<br>The mouse height range is set incorrectly and should be adjusted or there is no mouse in the present ROI area.' \
+                    ' Adjust th mouse height rang to reasonable values, typically 0 - 120 mm. Adjust the depth range if ' \
+                    'the ROI below is not the intended area. </h2></center>'
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
