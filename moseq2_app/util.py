@@ -4,6 +4,8 @@ General utility functions.
 
 '''
 import pandas as pd
+from copy import deepcopy
+from pprint import pprint
 from os.path import basename, join, exists, splitext
 from os import listdir, mkdir
 from glob import glob
@@ -84,6 +86,26 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+def uuid_lookup(target_uuid, uuid_dict_source):
+    """
+    Look up session infomtion with full/partial uuid. Helper function for users to look up uuid after running interactive_scalar_summary
+
+    Parameters
+    ----------
+    target_uuid (str): full or partial uuid the user wants to look up.
+    uuid_dict (dict): dictionary from interactive_scalar_summary widget that has all the session information 
+    """
+    
+    # deep copy the input dictionary
+    uuid_dict = deepcopy(uuid_dict_source)
+
+    for uuid, info in uuid_dict.items():
+        if target_uuid in uuid:
+            print('UUID:', uuid)
+            # put the path in info['metadata'] for printing
+            info['metadata']['h5Path'], info['metadata']['yamlPath'] = info['path']
+            pprint({k: info['metadata'][k] for k in ['SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath']})
 
 def setup_model_folders(progress_paths):
     """Create model-specific folders
