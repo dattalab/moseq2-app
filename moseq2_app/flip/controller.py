@@ -409,7 +409,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         if self.clf is None:
             try:
                 joblib.load(self.output_file)
-            except:
+            except Exception as e:
                 print('Could not load provided classifier.')
                 return
 

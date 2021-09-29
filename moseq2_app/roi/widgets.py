@@ -10,6 +10,7 @@ from ipywidgets import VBox, HBox
 from os.path import dirname, join
 from moseq2_extract.io.image import write_image
 from IPython.display import display, clear_output
+from moseq2_viz.util import read_yaml
 
 
 class InteractiveROIWidgets:
@@ -44,9 +45,6 @@ class InteractiveROIWidgets:
                                            tooltip='Processed Frame Index to Display',
                                            disabled=False, continuous_update=False, style=style)
 
-        self.toggle_autodetect = widgets.Checkbox(value=False, description='Autodetect Depth Range',
-                                                  tooltip='Auto-detect depths', layout=widgets.Layout(display='none'))
-
         # extract widgets
         self.ext_label = widgets.Label(value="Extract Parameters", layout=self.label_layout)
 
@@ -54,9 +52,9 @@ class InteractiveROIWidgets:
         self.minmax_heights = widgets.IntRangeSlider(value=[10, 100], min=0, max=400, step=1,
                                                      description='', style=style,
                                                      continuous_update=False)
-        self.fr_label = widgets.Label(value="Frame Range to Extract", layout=self.label_layout)
+        self.fr_label = widgets.Label(value="Frame Range to Extract for Preview", layout=self.label_layout)
         self.frame_range = widgets.IntRangeSlider(value=[0, 300], min=0, max=3000, step=1,
-                                                  tooltip='Frames to Extract Sample',
+                                                  tooltip='Frames to Extract Sample for Preview',
                                                   description='', style=style, continuous_update=False)
 
         # check all button label
@@ -72,9 +70,9 @@ class InteractiveROIWidgets:
         self.check_all = widgets.Button(description='Check All Sessions', disabled=False,
                                         tooltip='Extract full session using current parameters')
 
-        self.extract_button = widgets.Button(description='Extract Sample', disabled=False, layout=self.button_layout,
+        self.extract_button = widgets.Button(description='Extract Sample Preview', disabled=False, layout=self.button_layout,
                                              tooltip='Preview extraction output')
-        self.mark_passing = widgets.Button(description='Save ROI', disabled=False,
+        self.mark_passing = widgets.Button(description='Accept and Save ROI', disabled=False,
                                            tooltip='If a session is incorrectly flagged, click this button to '
                                                    'mark the current session as passing, adding it to the list'
                                                    ' of acceptable ROI sizes, and saving it to a tiff file '
@@ -177,7 +175,7 @@ class InteractiveROIWidgets:
         -------
         '''
 
-        if event.old.split(' ')[1] != event.new.split(' ')[1]:
+        if not self.in_test_all_sessions and event.old.split(' ')[1] != event.new.split(' ')[1]:
             self.checked_list.value = event.new
 
             gc.collect()
@@ -190,7 +188,7 @@ class InteractiveROIWidgets:
 
             self.config_data['detect'] = True
             if self.autodetect_depths:
-                self.config_data['autodetect'] = True
+                self.config_data['autodetect'] = self.autodetect_depths
             self.interactive_find_roi_session_selector(self.checked_list.value)
 
     def extract_button_clicked(self, b=None):
@@ -262,7 +260,7 @@ class InteractiveROIWidgets:
             self.check_all.icon = 'check'
         else:
             self.check_all.button_style = 'danger'
-        self.check_all.description = 'Check All Sessions'
+        self.check_all.description = 'Check All Sessions ROI'
 
         self.save_parameters.layout = self.layout_visible
 
@@ -286,8 +284,15 @@ class InteractiveROIWidgets:
             self.session_parameters[k].pop('pixel_areas', None)
 
         # Update main config file
+        # self.config_data['bg_roi_depth_range'], [min_height], [max_height] may have been set to arbitary values due to user interactions
+        # hotfix: read in the old config_file and only update the relevant field
+        # update the newly added relevant fields
+        original_config = read_yaml(self.config_data['config_file'])
+        original_config['config_file'] = self.config_data['config_file']
+        original_config['session_config_path'] = self.config_data['session_config_path']
+
         with open(self.config_data['config_file'], 'w+') as f:
-            yaml.safe_dump(self.config_data, f)
+            yaml.safe_dump(original_config, f)
 
         # Update session parameters
         with open(self.config_data['session_config_path'], 'w+') as f:
@@ -350,7 +355,7 @@ class InteractiveROIWidgets:
 
     def update_config_fr(self, event=None):
         '''
-        Callback function to update config dict with current UI depth range values
+        Callback function to update config dict with current UI frame range values
 
         Parameters
         ----------
@@ -366,7 +371,7 @@ class InteractiveROIWidgets:
 
     def update_config_fn(self, event=None):
         '''
-        Callback function to update config dict with current UI depth range values
+        Callback function to update config dict with current UI frame number values
 
         Parameters
         ----------

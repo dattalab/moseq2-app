@@ -4,7 +4,14 @@ General utility functions.
 
 '''
 import pandas as pd
-from os.path import basename
+from copy import deepcopy
+from pprint import pprint
+from os.path import basename, join, exists, splitext
+from os import listdir, mkdir
+from glob import glob
+from shutil import copy2
+from collections import defaultdict
+from moseq2_app.gui.progress import update_progress
 from moseq2_viz.util import read_yaml
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.util import compute_behavioral_statistics
@@ -79,3 +86,82 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+def uuid_lookup(target_uuid, uuid_dict_source):
+    """
+    Look up session infomtion with full/partial uuid. Helper function for users to look up uuid after running interactive_scalar_summary
+
+    Parameters
+    ----------
+    target_uuid (str): full or partial uuid the user wants to look up.
+    uuid_dict (dict): dictionary from interactive_scalar_summary widget that has all the session information 
+    """
+    
+    # deep copy the input dictionary
+    uuid_dict = deepcopy(uuid_dict_source)
+
+    for uuid, info in uuid_dict.items():
+        if target_uuid in uuid:
+            print('UUID:', uuid)
+            # put the path in info['metadata'] for printing
+            info['metadata']['h5Path'], info['metadata']['yamlPath'] = info['path']
+            pprint({k: info['metadata'][k] for k in ['SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath']})
+
+def setup_model_folders(progress_paths):
+    """Create model-specific folders
+
+    Parameters
+    ----------
+    progress_paths (dict): dictionary of notebook progress paths.
+
+    Returns
+    -------
+    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
+    """
+    # find all the models in the model master path
+    models = glob(join(progress_paths['main_model_path'], '*.p'))
+    
+    # initialize model dictionary
+    model_dict = defaultdict(dict)
+
+    for model in models:
+        model_dir = splitext(model)[0]
+        # get the model file name to use as 
+        model = basename(model)
+        # Check if the model directory already exists
+        if not exists(model_dir):
+            print('Creating model folder for', model)
+            # make a model-specific folder
+            mkdir(model_dir)
+        
+        # check if the model is copied to the model-specific folder
+        if not exists(join(model_dir, model)):
+            copy2(join(progress_paths['main_model_path'], model), model_dir)
+        
+        model_dict[model]['model_session_path'] = model_dir
+        model_dict[model]['model_path'] = join(model_dir, model)
+    return model_dict
+
+def update_model_paths(desired_model, model_dict, progress_filepath):
+    """helper function to update relevant model paths in progress.yaml when specific model is chosen
+
+    Parameters
+    ----------
+    desired_model (str): file name of the desired specific model
+    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
+    progress_filepath (str): path to progress.yaml
+
+    Returns
+    -------
+    [type]
+        [description]
+    """
+
+    # update model_sseion_path and model_path
+    for key in ['model_session_path', 'model_path']:
+        progress_paths = update_progress(progress_filepath, key, model_dict[desired_model].get(key))
+
+    # reset paths in progress_paths
+    for key in ['crowd_dir', 'syll_info', 'df_info_path']:
+        progress_paths = update_progress(progress_filepath, key, '')
+    return progress_paths
