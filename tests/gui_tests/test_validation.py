@@ -138,7 +138,7 @@ class TestExtractionValidation(TestCase):
         assert len(list(status_dicts.keys())) == 1
         assert list(status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']) == ['metadata', 'scalar_anomaly',
                                                 'dropped_frames', 'corrupted', 'stationary', 'missing',
-                                                'size_anomaly', 'position_heatmap']
+                                                'size_anomaly']
 
     def test_run_heatmap_kl_divergence_test(self):
         paths = {

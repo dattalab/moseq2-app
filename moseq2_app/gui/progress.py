@@ -303,7 +303,7 @@ def generate_intital_progressfile(filename='progress.yaml'):
         with open(join(base_dir, 'progress.log'), 'r') as f:
             try:
                 latest_log = f.readlines()[-1].split()[-1]
-            except:
+            except Exception as e:
                 latest_log = 'default'
 
         with open(join(base_dir, 'progress_log.pkl'), 'rb') as f:
@@ -445,6 +445,11 @@ def get_pca_progress(progress_vars, pca_progress):
         if progress_vars.get(key) is not None:
             if key == 'pca_dirname':
                 if exists(join(progress_vars[key], 'pca.h5')):
+                    pca_progress[key] = True
+            # changepoints field only include the filename with no path and extension
+            elif key == 'changepoints_path':
+                # manually construct the path for changepoints.h5
+                if exists(join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
                     pca_progress[key] = True
             else:
                 if exists(progress_vars[key]):
