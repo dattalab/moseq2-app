@@ -2,6 +2,8 @@
 Interactive ROI/Extraction Bokeh visualization functions.
 '''
 import os
+import io
+import base64
 import shutil
 import numpy as np
 import ipywidgets as widgets
@@ -27,6 +29,7 @@ def show_extraction(input_file, video_file):
 
     Returns
     -------
+    output (ipywidgets.Output widget): HTML canvas where the video is being displayed.
     '''
 
     # Copy generated movie to temporary directory
@@ -42,10 +45,16 @@ def show_extraction(input_file, video_file):
 
     video_dims = get_video_info(tmp_path)['dims']
 
+    # Open videos in encoded urls
+    # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+    vid = io.open(tmp_path, 'r+b').read()
+    encoded = base64.b64encode(vid)
+    tmp_path = encoded.decode('ascii')
+
     video_div = f'''
                     <h2>{input_file}</h2>
                     <video
-                        src="{relpath(tmp_path)}"; alt="{tmp_path}"; 
+                        src="data:video/mp4;base64, {tmp_path}"; alt="data:video/mp4;base64, {tmp_path}"; 
                         height="{video_dims[1]}"; width="{video_dims[0]}"; preload="auto";
                         style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                         border="2"; autoplay controls loop>
@@ -61,6 +70,7 @@ def show_extraction(input_file, video_file):
 
     display(output)
 
+    return output
 
 def bokeh_plot_helper(bk_fig, image):
     '''

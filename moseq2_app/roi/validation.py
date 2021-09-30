@@ -7,8 +7,9 @@ The module contains extraction validation functions that test extractions' scala
 import scipy
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from copy import deepcopy
+from os.path import exists
+import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml
@@ -25,7 +26,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     ----------
     timestamps (1D np.array): Session's recorded timestamp array.
     fps (int): Frames per second
-    scaling_factor (float): factor to divide timestamps by to convert timestamp units into seconds
+    scaling_factor (float): factor to divide timestamps by to convert timestamp milliseconds into seconds.
 
     Returns
     -------
@@ -33,7 +34,12 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     '''
 
     # Find the time difference between frames.
-    diff = np.diff(timestamps) / scaling_factor
+    diff = np.diff(timestamps)
+
+    # Check if the timestamps are in milliseconds based on the mean difference amount
+    if np.mean(diff) > 10:
+        # rescale the timestamps to seconds
+        diff /= scaling_factor
 
     # Find the average time difference between frames.
     avgTime = np.mean(diff)
@@ -134,11 +140,16 @@ def get_scalar_df(path_dict):
     scalar_dfs = []
 
     # Get scalar dicts for all the sessions
-    for v in path_dict.values():
+    for k, v in path_dict.items():
+        if not v.endswith('.mp4'):
+            continue
         # Get relevant extraction paths
         h5path = v.replace('mp4', 'h5')
         yamlpath = v.replace('mp4', 'yaml')
 
+        if not exists(yamlpath):
+            print(f'No valid yaml path for session: {k}')
+            continue
         stat_dict = read_yaml(yamlpath)
 
         metadata = stat_dict['metadata']
@@ -236,14 +247,20 @@ def make_session_status_dicts(paths):
         'stationary': False,
         'missing': False,
         'size_anomaly': False,
-        'position_heatmap': False
     }
 
     # Get flags
-    for v in paths.values():
+    for k, v in paths.items():
+        if not v.endswith('.mp4'):
+            continue
+
         # get yaml metadata
-        yamlpath = v.replace('mp4', 'yaml')
-        h5path = v.replace('mp4', 'h5')
+        yamlpath = v.replace('.mp4', '.yaml')
+        h5path = v.replace('.mp4', '.h5')
+
+        if not exists(yamlpath):
+            print(f'No valid yaml path for session: {k}')
+            continue
 
         stat_dict = read_yaml(yamlpath)
         status_dicts[stat_dict['uuid']] = deepcopy(flags)
@@ -283,8 +300,9 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
 
     try:
         outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())
-    except:
-        outliers = [1]
+    except Exception as e:
+        # create a list of inlier list that matches the mean_df.index length
+        outliers = [1] * len(mean_df.index)
 
     # Get scalar anomalies based on quartile ranges
     for i, index in enumerate(mean_df.index):
@@ -341,11 +359,6 @@ def run_validation_tests(scalar_df, status_dicts):
     '''
 
     sessionNames = list(scalar_df.uuid.unique())
-
-    try:
-        status_dicts = run_heatmap_kl_divergence_test(scalar_df, status_dicts)
-    except:
-        pass
 
     for s in sessionNames:
         df = scalar_df[scalar_df['uuid'] == s]
@@ -407,39 +420,33 @@ def print_validation_results(scalar_df, status_dicts):
     # Run tests
     anomaly_dict = run_validation_tests(scalar_df, status_dicts)
 
-    errors = ['missing', 'dropped_frames', 'corrupted']
-    n_errs, n_warnings = 0, 0
+    n_warnings = 0
 
     n_sessions = len(anomaly_dict)
     print_dict = {}
 
     # Count Errors and warnings
     for k in anomaly_dict:
-        error, warning = False, False
+        warning = False
         for k1, v1 in anomaly_dict[k].items():
+            # v1 is polymorphic; bool for flags when False, dict for metadata
+            # float that represent the percentage for dropped frame, corrupted
+            # stationary, missing and size anomaly when the flags are True
             if k1 != 'metadata':
-                if k1 in errors and v1 == True:
-                    error = True
-                elif isinstance(v1, dict):
-                    # scalar anomalies
-                    if len(v1) > 0:
-                        warning = True
-                elif isinstance(v1, (float, type(np.array))):
+                # v1 is bool when k1 is not metadata 
+                if isinstance(v1, float):
                     warning = True
-                elif v1 == True:
+                elif v1:
                     warning = True
-
+        
+        # count the number of warnings
+        # add the sessions with warning to print_dict
         if warning:
             n_warnings += 1
             print_dict[k] = anomaly_dict[k]
-        if error:
-            n_errs += 1
-            print_dict[k] = anomaly_dict[k]
 
-    print(f'{bcolors.FAIL}{n_errs}/{n_sessions} were flagged with error.{bcolors.ENDC}')
     print(f'{bcolors.WARNING}{n_warnings}/{n_sessions} were flagged with warning(s).{bcolors.ENDC}')
-    print(f'Sessions with {bcolors.FAIL}"Error"{bcolors.ENDC} flags must be re-extracted or excluded.')
-    print(f'Sessions with {bcolors.WARNING}"Warning"{bcolors.ENDC} flags can be visually inspected for the plotted/listed scalar inconsistencies.\n')
+    print(f'Sessions with {bcolors.WARNING}"Warning"{bcolors.ENDC} flags may need visually inspection for outliers.\n')
 
     # Print results
     for k in print_dict:
@@ -448,33 +455,14 @@ def print_validation_results(scalar_df, status_dicts):
         subject_name = print_dict[k]['metadata']['SubjectName']
         print(f'{bcolors.BOLD}{bcolors.UNDERLINE}Session: {session_name}; Subject: {subject_name} flags:{bcolors.ENDC}')
         for k1, v1 in print_dict[k].items():
-            x = ''
             if k1 != 'metadata':
-                if k1 in errors and isinstance(v1, float):
-                    t = 'Error'
-                    x = f'{k1} - {v1*100:.2f}%'
-                elif k1 == 'position_heatmap' and not isinstance(v1, bool):
-                    x = 'position heatmaps'
-                    t = 'Warning - Position Heatmap flag raised'
-                    try:
-                        plot_heatmap(v1, f'{session_name}_{subject_name}')
-                    except:
-                        print(f'Could not plot heatmap: {session_name}_{subject_name}')
-                        pass
-                elif isinstance(v1, dict):
-                    t = 'Warning'
-                    if len(v1) > 0:
-                        x = list(v1.keys())
-                elif v1 == True:
-                    t = 'Warning'
+                # scalar anomaly flag
+                if v1:
                     x = f'{k1} flag raised'
+                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}')
+                # all the other flags
                 elif isinstance(v1, float):
-                    t = 'Warning'
                     x = f'{k1} flag raised: {v1*100:.2f}%'
-            if len(x) > 0:
-                if 'Warning' in t:
-                    t = f'{bcolors.WARNING}{t}'
-                elif 'Error' in t:
-                    t = f'{bcolors.FAIL}{t}'
-                print(f'\t{t}: {x}{bcolors.ENDC}')
+                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}') 
+        # I assume this is printing a new line
         print()

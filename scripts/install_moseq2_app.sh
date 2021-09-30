@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pip install -e .
+pip install .
 
 # Install and Enable widget extensions configurator
 jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix

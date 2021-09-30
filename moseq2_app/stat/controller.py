@@ -7,16 +7,20 @@ This module facilitates the interactive functionality for the statistics plottin
 '''
 
 import os
+import io
+import base64
 import warnings
 import numpy as np
 import pandas as pd
+from os.path import exists
 from collections import defaultdict
-from IPython.display import clear_output
-from moseq2_viz.util import get_sorted_index, read_yaml
+from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
+from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.model.dist import get_behavioral_distance
+from moseq2_viz.model.stat import run_kruskal, run_pairwise_stats
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
 from moseq2_app.stat.widgets import SyllableStatWidgets, TransitionGraphWidgets
@@ -54,11 +58,15 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.index_path = index_path
         self.df_path = df_path
 
+        # If user inputs load_parquet=True in main.py function label_syllables()
+        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
+        # to load the data from.
         if load_parquet:
             if df_path is not None:
                 if not os.path.exists(df_path):
                     self.df_path = None
         else:
+            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
             self.df_path = None
 
         self.df = None
@@ -73,6 +81,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Load all the data
         self.interactive_stat_helper()
         self.df = self.df[self.df['syllable'] < self.max_sylls]
+
         self.session_names = sorted(list(self.df.SessionName.unique()))
         self.subject_names = sorted(list(self.df.SubjectName.unique()))
 
@@ -86,56 +95,37 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.dropdown_mapping = {
             'usage': 'usage',
+            'duration': 'duration',
             'distance to center': 'dist_to_center_px',
             '2d velocity': 'velocity_2d_mm',
             '3d velocity': 'velocity_3d_mm',
             'height': 'height_ave_mm',
             'similarity': 'similarity',
             'difference': 'difference',
+            'KW & Dunn\'s': 'kw',
+            'Z-Test': 'z_test',
+            'T-Test': 't_test',
+            'Mann-Whitney': 'mw'
         }
 
         self.clear_button.on_click(self.clear_on_click)
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
-    def clear_on_click(self, b):
-        '''
-        Clears the cell output
+        # Compute the syllable dendrogram values
+        self.compute_dendrogram()
 
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-
-    def on_grouping_update(self, event):
-        '''
-        Updates the MultipleSelect widget upon selecting groupby == SubjectName or SessionName.
-        Hides it if groupby == group.
-
-        Parameters
-        ----------
-        event (user clicks new grouping)
-
-        Returns
-        -------
-        '''
-
-        if event.new == 'SessionName':
-            self.session_sel.layout.display = "flex"
-            self.session_sel.layout.align_items = 'stretch'
-            self.session_sel.options = self.session_names
-        elif event.new == 'SubjectName':
-            self.session_sel.layout.display = "flex"
-            self.session_sel.layout.align_items = 'stretch'
-            self.session_sel.options = self.subject_names
-        else:
-            self.session_sel.layout.display = "none"
-
-        self.session_sel.value = [self.session_sel.options[0]]
+        # Plot the Bokeh graph with the currently selected data.
+        self.out = interactive_output(self.interactive_syll_stats_grapher, {
+            'stat': self.stat_dropdown,
+            'sort': self.sorting_dropdown,
+            'groupby': self.grouping_dropdown,
+            'errorbar': self.errorbar_dropdown,
+            'sessions': self.session_sel,
+            'ctrl_group': self.ctrl_dropdown,
+            'exp_group': self.exp_dropdown,
+            'hyp_test': self.hyp_test_dropdown,
+            'thresh': self.thresholding_dropdown
+        })
 
     def compute_dendrogram(self):
         '''
@@ -150,6 +140,20 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                                     self.model_path,
                                     max_syllable=self.max_sylls,
                                     distances='ar[init]')['ar[init]']
+
+        # Finding the first syllable where the distance between 2 states is np.nan
+        # If/when that np.nan syllable-pair distance is found,
+        # the nan distances, including the following syllables, will be removed from the matrix X.
+        # The reason why the matrix X is cut off upon finding the first np.nan distance is because the
+        # syllables are already relabeled by usage, therefore if a syllable is reported to be not used, then
+        # the subsequent syllables will also not be used.
+        is_missing = np.isnan(X)
+        if is_missing.any():
+            print('Existing model does not have equal amount of requested states.')
+            max_states = int(max(np.where(is_missing.any(1), is_missing.argmax(1), np.nan)))
+            print(f'Visualizing max number of available states: {max_states}')
+            X = X[:max_states, :max_states]
+
         Z = linkage(X, 'complete')
 
         # Get Dendrogram Metadata
@@ -183,6 +187,13 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             # remove group_info
             syll_info[k].pop('group_info', None)
 
+            # Open videos in encoded urls
+            # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+            if exists(syll_info[k]['crowd_movie_path']):
+                video = io.open(syll_info[k]['crowd_movie_path'], 'r+b').read()
+                encoded = base64.b64encode(video)
+                syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
+
         info_df = pd.DataFrame(syll_info).T.sort_index()
         info_df['syllable'] = info_df.index
 
@@ -192,16 +203,22 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Read index file
         self.sorted_index = get_sorted_index(self.index_path)
 
-        if set(self.sorted_index['files']) != set(model_data['metadata']['uuids']):
+        if not set(model_data['metadata']['uuids']).issubset(set(self.sorted_index['files'])):
             print('Error: Index file UUIDs do not match model UUIDs.')
 
         # Get max syllables if None is given
         if self.max_sylls is None:
             self.max_sylls = max_sylls
 
+        # if load_parquet=True, and self.df_path points to an existing parquet file,
+        # then the syllable statistics DataFrame will be loaded from the parquet file.
+        # otherwise, the DataFrame is computed from scratch
         if self.df_path is not None:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
+            if len(df.syllable.unique()) < self.max_sylls:
+                print('Requested more syllables than the parquet file holds, recomputing requested dataset.')
+                df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
         else:
             print('Syllable DataFrame not found. Computing syllable statistics...')
             df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
@@ -209,8 +226,59 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
+        # When syllable usage is 0, the scalars will have nan affecting the interactive stat plot
+        # Since syllable usage is 0, the nan in scalars will be filled with 0
+        self.df.fillna(0, inplace=True)
 
-    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group):
+    def run_selected_hypothesis_test(self, hyp_test_name, stat, ctrl_group, exp_group):
+        '''
+        Helper function that computes the significant syllables for a given pair of groups given
+         a name for the type of hypothesis test to run, and the statistic to run the test on.
+
+        Parameters
+        ----------
+        hyp_test_name (str): Name of hypothesis test to run. options=['KW & Dunn\s', 'Z-Test', 'T-Test', 'Mann-Whitney']
+        stat (str): Syllable statistic to compute hypothesis test on. options=['usage', 'distance to center', 'similarity', 'difference']
+        ctrl_group (str): Name of control group to compute group difference sorting with.
+        exp_group (str): Name of comparative group to compute group difference sorting with.
+
+        Returns
+        -------
+        sig_sylls (list): list of significant syllables to mark on plotted statistics figure
+        '''
+
+        if self.dropdown_mapping[hyp_test_name] == 'kw':
+            # run KW and Dunn's Test
+            sig_syll_dict = run_kruskal(self.df, statistic=stat, max_syllable=self.max_sylls)[2]
+
+            # get corresponding computed significant syllables from pair dict
+            if (ctrl_group, exp_group) in sig_syll_dict:
+                sig_sylls = sig_syll_dict[(ctrl_group, exp_group)]
+            elif (exp_group, ctrl_group) in sig_syll_dict:
+                sig_sylls = sig_syll_dict[(exp_group, ctrl_group)]
+            else:
+                raise KeyError('Selected groups are not compatible with KW hypothesis test.')
+
+        elif self.dropdown_mapping[hyp_test_name] == 'z_test':
+            # run z-test
+            intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
+                                                     test_type='z_test', statistic=stat, max_syllable=self.max_sylls)
+        elif self.dropdown_mapping[hyp_test_name] == 't_test':
+            # run t-test
+            intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
+                                                     test_type='t_test', statistic=stat, max_syllable=self.max_sylls)
+        elif self.dropdown_mapping[hyp_test_name] == 'mw':
+            # run Mann-Whitney test
+            intersect_sig_sylls = run_pairwise_stats(self.df, ctrl_group, exp_group,
+                                                     test_type='mw', statistic=stat, max_syllable=self.max_sylls)
+
+        if self.dropdown_mapping[hyp_test_name] != 'kw':
+            sig_sylls = list(intersect_sig_sylls[intersect_sig_sylls["is_sig"] == True].index)
+
+        return sig_sylls
+
+
+    def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, hyp_test='KW & Dunn\'s', thresh='usage'):
         '''
         Helper function that is responsible for handling ipywidgets interactions and updating the currently
          displayed Bokeh plot.
@@ -225,22 +293,35 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
-
+        hyp_test (str or ipywidgets.DropDown): Name of hypothesis testing method to use to compute significant syllables.
+        thresh (str or ipywidgets.DropDown): Name of statistic to threshold the graph by using the Bokeh Slider
         Returns
         -------
         '''
 
+        # initialize sig_sylls list variable to prevent UnboundLocalError
+        sig_sylls = []
+
         # Get current dataFrame to plot
-        df = self.df
+        df = self.df.fillna(0)
 
         # Handle names to query DataFrame with
         stat = self.dropdown_mapping[stat.lower()]
         sortby = self.dropdown_mapping[sort.lower()]
+        thresh = self.dropdown_mapping[thresh.lower()]
 
         # Get selected syllable sorting
         if sort.lower() == 'difference':
             # display Text for groups to input experimental groups
             ordering = sort_syllables_by_stat_difference(df, ctrl_group, exp_group, stat=stat)
+
+            # run selected hypothesis test
+            if ctrl_group != exp_group:
+                sig_sylls_indices = self.run_selected_hypothesis_test(hyp_test, stat, ctrl_group, exp_group)
+
+                # renumber the significant syllables s.t. they are plotted to match the current ordering.
+                sig_sylls = np.argsort(ordering)[sig_sylls_indices]
+
         elif sort.lower() == 'similarity':
             ordering = self.results['leaves']
         elif sort.lower() != 'usage':
@@ -267,8 +348,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             self.cladogram = graph_dendrogram(self, self.syll_info)
             self.results['cladogram'] = self.cladogram
 
-        self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby,
-                                       errorbar=errorbar, syllable_families=self.results, sort_name=sort)
+        self.stat_fig = bokeh_plotting(df, stat, ordering, mean_df=mean_df, groupby=groupby, errorbar=errorbar,
+                                       syllable_families=self.results, sort_name=sort, thresh=thresh, sig_sylls=sig_sylls)
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
@@ -300,10 +381,15 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.max_sylls = max_sylls
         self.plot_vertically = plot_vertically
 
+        # If user inputs load_parquet=True in main.py function label_syllables()
+        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
+        # to load the data from.
         if load_parquet:
-            if df_path is not None and not os.path.exists(df_path):
-                self.df_path = None
+            if df_path is not None:
+                if not os.path.exists(df_path):
+                    self.df_path = None
         else:
+            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
             self.df_path = None
 
         # Load Model
@@ -328,88 +414,12 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Manage dropdown menu values
         self.scalar_dict = {
             'Default': 'speeds_2d',
+            'Duration': 'duration',
             '2D velocity': 'speeds_2d',
             '3D velocity': 'speeds_3d',
             'Height': 'heights',
             'Distance to Center': 'dists'
         }
-
-    def clear_on_click(self, b):
-        '''
-        Clears the cell output
-
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
-
-        clear_output()
-
-    def set_range_widget_values(self):
-        '''
-        After the dataset is initialized, the threshold range sliders' values will be set
-         according to the standard deviations of the dataset.
-
-        Returns
-        -------
-        '''
-
-        # Update threshold range values
-        edge_threshold_stds = int(np.max(self.trans_mats) / np.std(self.trans_mats))
-        usage_threshold_stds = int(self.df['usage'].max() / self.df['usage'].std()) + 2
-        speed_threshold_stds = int(self.df['velocity_2d_mm'].max() / self.df['velocity_2d_mm'].std()) + 2
-
-        self.edge_thresholder.options = [float('%.3f' % (np.std(self.trans_mats) * i)) for i in
-                                         range(edge_threshold_stds)]
-        self.edge_thresholder.index = (1, edge_threshold_stds - 1)
-
-        self.usage_thresholder.options = [float('%.3f' % (self.df['usage'].std() * i)) for i in
-                                          range(usage_threshold_stds)]
-        self.usage_thresholder.index = (0, usage_threshold_stds - 1)
-
-        self.speed_thresholder.options = [float('%.3f' % (self.df['velocity_2d_mm'].std() * i)) for i in
-                                          range(speed_threshold_stds)]
-        self.speed_thresholder.index = (0, speed_threshold_stds - 1)
-
-    def on_set_scalar(self, event):
-        '''
-        Updates the scalar threshold slider filter criteria according to the current node coloring.
-        Changes the name of the slider as well.
-
-        Parameters
-        ----------
-        event (dropdown event): User changes selected dropdown value
-
-        Returns
-        -------
-        '''
-
-        if event.new == 'Default' or event.new == '2D velocity':
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-        elif event.new == '2D velocity':
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-        elif event.new == '3D velocity':
-            key = 'velocity_3d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 3D Velocity'
-        elif event.new == 'Height':
-            key = 'height_ave_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by Height'
-        elif event.new == 'Distance to Center':
-            key = 'dist_to_center_px'
-            self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
-        else:
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-
-        scalar_threshold_stds = int(self.df[key].max() / self.df[key].std()) + 2
-        self.speed_thresholder.options = [float('%.3f' % (self.df[key].std() * i)) for i in
-                                          range(scalar_threshold_stds)]
-        self.speed_thresholder.index = (0, scalar_threshold_stds - 1)
 
     def compute_entropies(self, labels, label_group):
         '''
@@ -479,6 +489,14 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             if self.max_sylls is None:
                 self.max_sylls = len(self.syll_info)
 
+            for k in range(self.max_sylls):
+                # Open videos in encoded urls
+                # Implementation from: https://github.com/jupyter/notebook/issues/1024#issuecomment-338664139
+                if exists(self.syll_info[k]['crowd_movie_path']):
+                    video = io.open(self.syll_info[k]['crowd_movie_path'], 'r+b').read()
+                    encoded = base64.b64encode(video)
+                    self.syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
+
             if self.df_path is not None:
                 print('Loading parquet files')
                 df = pd.read_parquet(self.df_path, engine='fastparquet')
@@ -510,6 +528,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         Parameters
         ----------
+        layout (string)
+        scalar_color (string)
         edge_threshold (tuple or ipywidgets.FloatRangeSlider): Transition probability range to include in graphs.
         usage_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable usage range to include in graphs.
         speed_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable speed range to include in graphs.
@@ -529,6 +549,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             # Get anchored group scalars
             scalars = defaultdict(list)
             _scalar_map = {
+                'duration': 'duration',
                 'speeds_2d': 'velocity_2d_mm',
                 'speeds_3d': 'velocity_3d_mm',
                 'heights': 'height_ave_mm',

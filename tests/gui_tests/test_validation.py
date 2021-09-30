@@ -3,6 +3,7 @@ import numpy as np
 from copy import deepcopy
 from unittest import TestCase
 from moseq2_app.util import index_to_dataframe
+from moseq2_extract.io.video import load_timestamps_from_movie
 from moseq2_viz.scalars.util import compute_all_pdf_data
 from moseq2_app.roi.validation import get_scalar_df, check_timestamp_error_percentage, count_nan_rows, \
     count_missing_mouse_frames, count_frames_with_small_areas, count_stationary_frames, compute_kl_divergences, \
@@ -14,15 +15,23 @@ class TestExtractionValidation(TestCase):
     def test_check_timestamp_error_percentage(self):
 
         paths = {
-            'session_1': 'data/test_session/proc/results_00.mp4'
+            'session_1': 'data/test_session/proc/results_00.mp4',
+            'azure_test': 'data/azure_test/nfov_test.mkv'
         }
 
         h5path = paths['session_1'].replace('mp4', 'h5')
-        timestamps = h5py.File(h5path, 'r')['timestamps'][()]
+
+        with h5py.File(h5path, 'r') as f:
+            timestamps = f['timestamps'][()]
 
         percent_error = check_timestamp_error_percentage(timestamps)
 
         assert percent_error == 0.011003544858038812
+
+        azure_ts = load_timestamps_from_movie(paths['azure_test'])
+        percent_error = check_timestamp_error_percentage(azure_ts)
+
+        assert percent_error == 0.2615314701204273
 
     def test_count_nan_rows(self):
 
@@ -129,7 +138,7 @@ class TestExtractionValidation(TestCase):
         assert len(list(status_dicts.keys())) == 1
         assert list(status_dicts['5c72bf30-9596-4d4d-ae38-db9a7a28e912']) == ['metadata', 'scalar_anomaly',
                                                 'dropped_frames', 'corrupted', 'stationary', 'missing',
-                                                'size_anomaly', 'position_heatmap']
+                                                'size_anomaly']
 
     def test_run_heatmap_kl_divergence_test(self):
         paths = {
@@ -180,7 +189,8 @@ class TestExtractionValidation(TestCase):
 
     def test_print_validation_results(self):
         paths = {
-            'session_1': 'data/test_session/proc/results_00.mp4'
+            'session_1': 'data/test_session/proc/results_00.mp4',
+            'azure_test': 'data/azure_test/nfov_test.mkv'
         }
 
         status_dicts = make_session_status_dicts(paths)
@@ -196,5 +206,5 @@ class TestExtractionValidation(TestCase):
 
         index_data, df = index_to_dataframe(index_path)
 
-        assert df.shape == (2, 14)
+        assert df.shape == (2, 15)
         assert isinstance(index_data, dict)
