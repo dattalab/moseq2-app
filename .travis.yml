@@ -116,7 +116,6 @@ jobs:
 
     - env: ISOLATED=true
       os: osx
-      osx_image: xcode12.5
       addons:
         homebrew:
           packages:
