@@ -116,12 +116,13 @@ jobs:
 
     - env: ISOLATED=true
       os: osx
-      osx_image: xcode10.2
+      osx_image: xcode12.5
       addons:
         homebrew:
           packages:
+            - python@3.7
             - gcc@7
-      python: '3.7'
+      language: shell
       stage: latest-pythons
       before_install:
         - brew install gcc@7
