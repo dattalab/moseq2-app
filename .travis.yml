@@ -6,8 +6,6 @@ dist: xenial
 stages:
   - pip-install
   - conda-script
-  - name: conda-script-osx
-    if: branch = release
   - name: latest-pythons
     if: branch = release
 
@@ -71,7 +69,7 @@ jobs:
           packages:
             - gcc@7
       language: shell
-      stage: conda-script-osx
+      stage: latest-pythons
       before_install:
         - brew install gcc@7
         - export CC="$(which gcc-7)"
@@ -113,28 +111,3 @@ jobs:
         - pytest --cov-report xml --cov-report term
       after_success:
         - codecov -t $CC_TEST_REPORTER_ID
-
-    - env: ISOLATED=true
-      os: osx
-      osx_image: xcode10.2
-      addons:
-        homebrew:
-          packages:
-            - python@3.7
-            - gcc@7
-      language: shell
-      stage: latest-pythons
-      before_install:
-        - brew install gcc@7
-        - brew install python@3.7
-        - export CC="$(which gcc-7)"
-        - export CXX="$(which g++-7)"
-        - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
-        - pip install -U pip
-        - pip install pytest==5.4.1 codecov pytest-cov
-      install:
-        - ./scripts/install_moseq2_app.sh
-      before_script:
-        - ./scripts/download_test_dataset.sh
-      script:
-        - pytest
