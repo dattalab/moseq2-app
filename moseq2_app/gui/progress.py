@@ -220,12 +220,15 @@ def find_progress(base_progress):
     if exists(join(base_dir, 'aggregate_results/')):
         base_progress['train_data_dir'] = join(base_dir, 'aggregate_results/')
     
+    # initialize param
+    pca_score = None
+    changepoint = None
     # Read config.yaml to get the pca related paths
     if exists(base_progress['config_file'] ):
         with open(base_progress['config_file'] , 'r') as f:
             config_data = yaml.safe_load(f)
         pca_score = config_data.get('pca_file_scores')
-        changepoint = config_data.get('pca_file_components')
+        changepoint = config_data.get('changepoint_file')
     
     # if pca_score is in config.yaml and the file exists, use that in the progress dictionary
     if pca_score and exists(pca_score):
