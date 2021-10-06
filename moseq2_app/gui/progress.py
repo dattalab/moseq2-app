@@ -14,7 +14,7 @@ from time import sleep
 import ruamel.yaml as yaml
 from tqdm.auto import tqdm
 from datetime import datetime
-from os.path import dirname, basename, exists, join, abspath
+from os.path import dirname, basename, exists, join, abspath, splitext
 from moseq2_extract.helpers.data import check_completion_status
 
 progress_log = 'progress.log'
@@ -219,42 +219,59 @@ def find_progress(base_progress):
 
     if exists(join(base_dir, 'aggregate_results/')):
         base_progress['train_data_dir'] = join(base_dir, 'aggregate_results/')
-
-    if exists(join(base_dir, '_pca/')):
+    
+    # Read config.yaml to get the pca related paths
+    if exists(base_progress['config_file'] ):
+        with open(base_progress['config_file'] , 'r') as f:
+            config_data = yaml.safe_load(f)
+        pca_score = config_data.get('pca_file_scores')
+        changepoint = config_data.get('pca_file_components')
+    
+    # if pca_score is in config.yaml and the file exists, use that in the progress dictionary
+    if pca_score and exists(pca_score):
+        base_progress['pca_dirname'] = dirname(pca_score)
+        base_progress['scores_filename'] = basename(pca_score)
+        base_progress['scores_path'] = pca_score
+    # use default
+    elif exists(join(base_dir, '_pca/')):
         base_progress['pca_dirname'] = join(base_dir, '_pca/')
         base_progress['scores_filename'] = 'pca_scores'
         if exists(join(base_progress['pca_dirname'], base_progress['scores_filename'] +'.h5')):
             base_progress['scores_path'] = join(base_dir, '_pca/', 'pca_scores.h5')
-
-        if exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
-            base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
-
+    else:
+        print('Unable to find PC score file. Please manually add PCA paths using update_progress function')
+    
+    # if changepoint is in config.yaml and the file exists, use that in the progress dictionary
+    if changepoint and exists(changepoint):
+        base_progress['changepoints_path'] = changepoint
+    # use default
+    elif exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
+        base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
+    else:
+        print('Unable to find changepoint file. Please manually add PCA paths using update_progress function')
+             
     models = glob(join(base_dir, '**/*.p'), recursive=True)
     if len(models) == 1:
         base_progress['model_path'] = models[0]
         base_progress['model_session_path'] = dirname(models[0])
+        base_progress['main_model_path'] = dirname(models[0])
 
         if exists(join(dirname(models[0]), 'syll_info.yaml')):
             base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
 
     elif len(models) > 1:
         paths = sorted(models, key=os.path.getmtime)
-
         print(f'More than 1 model found. Setting model path to latest generated model: {paths[0]}')
 
         base_progress['model_path'] = paths[0]
         base_progress['model_session_path'] = dirname(paths[0])
+        base_progress['main_model_path'] = dirname(models[0])
 
         if exists(join(dirname(paths[0]), 'syll_info.yaml')):
             base_progress['syll_info'] = join(dirname(paths[0]), 'syll_info.yaml')
 
         if exists(join(dirname(paths[0]), 'crowd_movies/')):
             base_progress['crowd_dir'] = join(dirname(paths[0]), 'crowd_movies/')
-
-        print('To change the model path, run the following commands')
-        print(">>> update_progress(progress_filepath, 'model_session_path', [YOUR_PATH_HERE]")
-        print(">>> update_progress(progress_filepath, 'model_path', [YOUR_PATH_HERE]")
-
     return base_progress
 
 def generate_intital_progressfile(filename='progress.yaml'):
@@ -315,6 +332,7 @@ def generate_intital_progressfile(filename='progress.yaml'):
                 base_progress_vars = find_progress(base_progress_vars)
 
     # Find progress in given base directory
+    # Is this step extra? I think it is
     base_progress_vars = find_progress(base_progress_vars)
 
     with open(filename, 'w') as f:
