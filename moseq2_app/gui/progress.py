@@ -244,6 +244,18 @@ def find_progress(base_progress):
     else:
         print('Unable to find PC score file. Please manually add PCA paths using update_progress function')
     
+    # Add pc score to moseq2-index.yaml file if it is empty because it is run from cli
+    if base_progress.get('index_file') and exists(base_progress.get('index_file')):
+        with open(base_progress.get('index_file'), 'r') as f:
+            index_params = yaml.safe_load(f)
+        if base_progress.get('scores_path') and exists(base_progress.get('scores_path')):
+            index_params['pca_path'] = base_progress.get('scores_path')
+
+        with open(base_progress.get('index_file'), 'w') as f:
+            yaml.safe_dump(index_params, f)
+    else:
+        print('Please ensure "pca_path" in moseq2-index.yaml is not empty before running interactive model analysis')
+    
     # if changepoint is in config.yaml and the file exists, use that in the progress dictionary
     if changepoint and exists(changepoint):
         base_progress['changepoints_path'] = changepoint
