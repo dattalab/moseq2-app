@@ -4,8 +4,8 @@ python: '3.6'
 dist: xenial
 
 stages:
-  - conda-script
   - pip-install
+  - conda-script
   - name: latest-pythons
     if: branch = release
 
