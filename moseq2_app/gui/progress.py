@@ -12,6 +12,7 @@ import logging
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
+from moseq2_viz.util import read_yaml
 from tqdm.auto import tqdm
 from datetime import datetime
 from os.path import dirname, basename, exists, join, abspath, splitext
@@ -156,8 +157,7 @@ def update_progress(progress_file, varK, varV):
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
-    with open(progress_file, 'r') as f:
-        progress = yaml.safe_load(f)
+    progress = read_yaml(progress_file)
 
     if isinstance(varV, str):
         old_value = progress.get(varK, '') # get previous variable to print
@@ -225,8 +225,8 @@ def find_progress(base_progress):
     changepoint = None
     # Read config.yaml to get the pca related paths
     if exists(base_progress['config_file'] ):
-        with open(base_progress['config_file'] , 'r') as f:
-            config_data = yaml.safe_load(f)
+        config_data = read_yaml(base_progress['config_file'])
+        
         pca_score = config_data.get('pca_file_scores')
         changepoint = config_data.get('changepoint_file')
     
@@ -246,8 +246,7 @@ def find_progress(base_progress):
     
     # Add pc score to moseq2-index.yaml file if it is empty because it is run from cli
     if base_progress.get('index_file') and exists(base_progress.get('index_file')):
-        with open(base_progress.get('index_file'), 'r') as f:
-            index_params = yaml.safe_load(f)
+        index_params = read_yaml(base_progress.get('index_file'))
         if base_progress.get('scores_path') and exists(base_progress.get('scores_path')):
             index_params['pca_path'] = base_progress.get('scores_path')
 
@@ -376,8 +375,7 @@ def load_progress(progress_file):
 
     if exists(progress_file):
         print('Updating notebook variables...')
-        with open(progress_file, 'r') as f:
-            progress_vars = yaml.safe_load(f)
+        progress_vars = read_yaml(progress_file)
     else:
         print('Progress file not found. To generate a new one, set restore_progress_vars(progress_file, init=True)')
         progress_vars = None
@@ -588,8 +586,7 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
 
     # Check if progress file exists
     if exists(progress_filepath):
-        with open(progress_filepath, 'r') as f:
-            progress_vars = yaml.safe_load(f)
+        progress_vars = read_yaml(progress_filepath)
 
         print('Found progress file, displaying progress...\n')
         # Display progress bars
