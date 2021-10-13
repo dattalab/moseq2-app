@@ -23,13 +23,14 @@ The fitting procedures used by MoSeq allow it to flexibly learn the identity, nu
 
 By combining MoSeq with electrophysiological, multi-color photometry, and miniscope methods, neural correlates for 3D behavioral syllables have recently been identified in dorsolateral striatum (DLS) (Mar-kowitz et al., 2018). Furthermore, MoSeq has been combined with optogenetic stimulation to reveal the differential consequences of activating the motor cortex, the dorsal striatum, and the ventral striatum (Pisanello et al.,2017; Wiltschko et al., 2015). These results are consistent with similar results recently obtained using marker-based approaches to explore the relationship between 3D posture and activity in posterior parietal cortex (Mimica et al., 2018).
 
+## MoSeq2 Toolkit
 <!---Need to check the moseq pipeline image and see if there is any copy right issue. We could/probably should make our own-->
 The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.
 
 This package contains functionalities that can be used interactively in jupyter notebooks. 
-We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables".
-
+We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has Google Colab notebooks and a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
+You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1JOFvvUIfQlhjWZ3MZ3yZ0_hryhI-u55U?usp=sharing) on our test data or your data on Google Drive.
 <!---
 All colab notebooks right now are temporarily shared from my Google drive. 
 Users will get the "click one link and everything works" experience once the notebooks are public on Github. 
