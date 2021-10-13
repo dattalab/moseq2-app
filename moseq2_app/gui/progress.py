@@ -345,10 +345,6 @@ def generate_intital_progressfile(filename='progress.yaml'):
                 # fallback
                 base_progress_vars = find_progress(base_progress_vars)
 
-    # Find progress in given base directory
-    # Is this step extra? I think it is
-    base_progress_vars = find_progress(base_progress_vars)
-
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)
 
