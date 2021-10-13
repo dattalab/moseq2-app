@@ -275,8 +275,8 @@ def find_progress(base_progress):
 
     if exists(join(dirname(models[0]), 'syll_info.yaml')):
         base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
-    if exists(join(dirname(paths[0]), 'crowd_movies/')):
-        base_progress['crowd_dir'] = join(dirname(paths[0]), 'crowd_movies/')
+    if exists(join(dirname(models[0]), 'crowd_movies/')):
+        base_progress['crowd_dir'] = join(dirname(models[0]), 'crowd_movies/')
     return base_progress
 
 def generate_intital_progressfile(filename='progress.yaml'):
