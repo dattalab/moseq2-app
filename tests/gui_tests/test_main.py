@@ -1,10 +1,11 @@
 import os
 import shutil
+from moseq2_extract.io.video import read_frames
 import ruamel.yaml as yaml
 import multiprocessing as mp
 from unittest import TestCase
 from os.path import exists, join
-from moseq2_viz.util import parse_index
+from moseq2_viz.util import parse_index, read_yaml
 from moseq2_extract.helpers.wrappers import extract_wrapper
 from moseq2_app.gui.progress import generate_missing_metadata
 from moseq2_app.main import (interactive_roi_detector, preview_extractions, validate_extractions,
@@ -70,8 +71,7 @@ class TestMain(TestCase):
 
     def test_interactive_roi(self):
 
-        with open('data/config.yaml', 'r') as f:
-            config_data = yaml.safe_load(f)
+        config_data = read_yaml('data/config.yaml')
 
         config_data['camera_type'] = 'auto'
         config_data['bg_roi_depth_range'] = [300, 600]
@@ -92,8 +92,7 @@ class TestMain(TestCase):
         # generate sample metadata json for each session that is missing one
         generate_missing_metadata('data/azure_test/', 'azure_test')
 
-        with open('data/config.yaml', 'r') as f:
-            config_data = yaml.safe_load(f)
+        config_data = read_yaml('data/config.yaml')
 
         config_data['camera_type'] = 'auto'
         config_data['bg_roi_depth_range'] = [300, 600]
@@ -130,8 +129,7 @@ class TestMain(TestCase):
         assert exists(self.progress_paths['df_info_path'])
         assert exists('data/moseq_scalar_dataframe.parquet')
 
-        with open(self.progress_paths['syll_info'], 'r') as f:
-            pg = yaml.safe_load(f)
+        pg = read_yaml(self.progress_paths['syll_info'])
 
         assert len(pg) == 10
 
@@ -142,8 +140,7 @@ class TestMain(TestCase):
         label_syllables(self.progress_paths, max_syllables=10)
 
         assert exists(self.progress_paths['syll_info'])
-        with open(self.progress_paths['syll_info'], 'r') as f:
-            pg = yaml.safe_load(f)
+        pg = read_yaml(self.progress_paths['syll_info'])
 
         assert len(pg) == 10
 
