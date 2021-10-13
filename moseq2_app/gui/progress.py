@@ -382,24 +382,21 @@ def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, 
     vars (dict): All progress file variables
     '''
 
-    yml = yaml.YAML()
-    yml.indent(mapping=2, offset=2)
-
-    # Restore loaded variables or overwrite with fresh state
-    if init:
-        if overwrite:
-            print('Overwriting progress file with initial progress.')
-            progress_vars = generate_intital_progressfile(progress_file)
-        else:
-            if exists(progress_file):
-                progress_vars = load_progress(progress_file)
-            else:
-                progress_vars = generate_intital_progressfile(progress_file)
-    elif overwrite:
+    # overwrite the progress file is overwrite is True
+    if overwrite:
         print('Overwriting progress file with initial progress.')
         progress_vars = generate_intital_progressfile(progress_file)
     else:
-        progress_vars = load_progress(progress_file)
+        if init:
+            # restore progress file if it exists
+            if exists(progress_file):
+                progress_vars = load_progress(progress_file)
+            # generate new progress file if it doesn't exists
+            else:
+                progress_vars = generate_intital_progressfile(progress_file)
+        # restore progress file if it is not init
+        else:
+            progress_vars = load_progress(progress_file)
 
     return progress_vars
 
