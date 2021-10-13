@@ -35,8 +35,29 @@ You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1JOF
 All colab notebooks right now are temporarily shared from my Google drive. 
 Users will get the "click one link and everything works" experience once the notebooks are public on Github. 
 --> 
-Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
-You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1JOFvvUIfQlhjWZ3MZ3yZ0_hryhI-u55U?usp=sharing) on our test data or your data on Google Drive.
+## Which one do I use?
+**Jupter Notebook**
+|Pros                                                   |Cons                                          |
+|-------------------------------------------------------|----------------------------------------------|
+|Easy to use                                            |Extract all sessions sequentially (slow)      |
+|Shows both the code blocks and the output              |Doesn't support automation and parallelization|
+|Comes with interactive widgets to analyze model results|Less tunable parameters than the CLI          |
+
+**Google Colab Notebook**
+|Pros                                               |Cons                                                                                            |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------|
+|No local installation and environment set up needed|Extract all sessions sequentially (slow)                                                        |
+|Comes with MoSeq test data to try MoSeq out        |Google Colab has usage limit so the runtime may be disconnected before the pipeline finishes    |
+|Could be used directly on data in Google Drive     |All the necessary packages need to be installed every time at the beginning of a runtime session|
+
+**Command Line Interface (CLI)**
+|Pros                                                                     |Cons                                                         |
+|-------------------------------------------------------------------------|-------------------------------------------------------------|
+|Supports extracting sessions parallelly (fast)                           |Could be confusing for users that have never used a CLI      |
+|Faster, more efficient and more tunable paramters                        |Limited visualization capabilities and no interactive widgets|
+|Could be used in bash scripts flexibly for automation and parallelization|                                                             |
+
+If you are interested in using the CLI for extraction and modeling, but using the interactive widgets in the Jupyter notebooks to find parameters and analyze results interactively, you can find more information in [CLI extraction and modeling documentation](https://github.com/dattalab/moseq2-app/wiki/Command-Line-Interface-for-Extraction-and-Modeling) and [Interactive Model Results Exploration Notebook documentation](https://github.com/dattalab/moseq2-app/wiki/Interactive-Model-Results-Exploration-Notebook-Instructions).
 
 # [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
 You can find more information about MoSeq Pipeline, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
