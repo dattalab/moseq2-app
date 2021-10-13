@@ -264,27 +264,19 @@ def find_progress(base_progress):
         print('Unable to find changepoint file. Please manually add PCA paths using update_progress function')
              
     models = glob(join(base_dir, '**/*.p'), recursive=True)
-    if len(models) == 1:
-        base_progress['model_path'] = models[0]
-        base_progress['model_session_path'] = dirname(models[0])
-        base_progress['main_model_path'] = dirname(models[0])
 
-        if exists(join(dirname(models[0]), 'syll_info.yaml')):
-            base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
+    if len(models) > 1:
+        models = sorted(models, key=os.path.getmtime)
+        print(f'More than 1 model found. Setting model path to latest generated model: {models[0]}')
+    
+    base_progress['model_path'] = models[0]
+    base_progress['model_session_path'] = dirname(models[0])
+    base_progress['main_model_path'] = dirname(models[0])
 
-    elif len(models) > 1:
-        paths = sorted(models, key=os.path.getmtime)
-        print(f'More than 1 model found. Setting model path to latest generated model: {paths[0]}')
-
-        base_progress['model_path'] = paths[0]
-        base_progress['model_session_path'] = dirname(paths[0])
-        base_progress['main_model_path'] = dirname(models[0])
-
-        if exists(join(dirname(paths[0]), 'syll_info.yaml')):
-            base_progress['syll_info'] = join(dirname(paths[0]), 'syll_info.yaml')
-
-        if exists(join(dirname(paths[0]), 'crowd_movies/')):
-            base_progress['crowd_dir'] = join(dirname(paths[0]), 'crowd_movies/')
+    if exists(join(dirname(models[0]), 'syll_info.yaml')):
+        base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
+    if exists(join(dirname(paths[0]), 'crowd_movies/')):
+        base_progress['crowd_dir'] = join(dirname(paths[0]), 'crowd_movies/')
     return base_progress
 
 def generate_intital_progressfile(filename='progress.yaml'):
