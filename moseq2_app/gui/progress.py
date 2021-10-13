@@ -249,11 +249,10 @@ def find_progress(base_progress):
         index_params = read_yaml(base_progress.get('index_file'))
         if base_progress.get('scores_path') and exists(base_progress.get('scores_path')):
             index_params['pca_path'] = base_progress.get('scores_path')
-
-        with open(base_progress.get('index_file'), 'w') as f:
-            yaml.safe_dump(index_params, f)
-    else:
-        print('Please ensure "pca_path" in moseq2-index.yaml is not empty before running interactive model analysis')
+            with open(base_progress.get('index_file'), 'w') as f:
+                yaml.safe_dump(index_params, f)
+        else:
+            print('Please ensure "pca_path" in moseq2-index.yaml is not empty before running interactive model analysis')
     
     # if changepoint is in config.yaml and the file exists, use that in the progress dictionary
     if changepoint and exists(changepoint):
