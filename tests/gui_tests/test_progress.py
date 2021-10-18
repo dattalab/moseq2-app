@@ -2,6 +2,7 @@ import os
 import shutil
 from copy import deepcopy
 import ruamel.yaml as yaml
+from moseq2_viz.util import read_yaml
 from unittest import TestCase
 from os.path import exists, join
 from moseq2_extract.helpers.wrappers import extract_wrapper
@@ -65,8 +66,7 @@ class TestNotebookProgress(TestCase):
         new_prog = update_progress(progress_file, 'config_file', 'test_path')
         assert new_prog['config_file'] == 'test_path'
 
-        with open(progress_file, 'r') as f:
-            read_progs = yaml.safe_load(f)
+        read_progs = read_yaml(progress_file)
 
         assert read_progs != self.base_progress_vars
 
@@ -83,8 +83,7 @@ class TestNotebookProgress(TestCase):
 
         assert new_prog != self.base_progress_vars
 
-        with open('data/config.yaml', 'r') as f:
-            config_data = yaml.safe_load(f)
+        config_data = read_yaml('data/config.yaml')
 
         with open('data/session_config.yaml', 'w') as f:
             yaml.safe_dump(config_data, f)
@@ -156,8 +155,7 @@ class TestNotebookProgress(TestCase):
     def test_get_extraction_progress(self):
         base_dir = 'data/'
 
-        with open('data/config.yaml', 'r') as f:
-            config_data = yaml.safe_load(f)
+        config_data = read_yaml('data/config.yaml')
 
         extract_wrapper('data/azure_test/nfov_test.mkv',
                         None,

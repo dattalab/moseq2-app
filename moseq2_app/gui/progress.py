@@ -12,9 +12,10 @@ import logging
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
+from moseq2_viz.util import read_yaml
 from tqdm.auto import tqdm
 from datetime import datetime
-from os.path import dirname, basename, exists, join, abspath
+from os.path import dirname, basename, exists, join, abspath, splitext
 from moseq2_extract.helpers.data import check_completion_status
 
 progress_log = 'progress.log'
@@ -156,8 +157,7 @@ def update_progress(progress_file, varK, varV):
     yml = yaml.YAML()
     yml.indent(mapping=2, offset=2)
 
-    with open(progress_file, 'r') as f:
-        progress = yaml.safe_load(f)
+    progress = read_yaml(progress_file)
 
     if isinstance(varV, str):
         old_value = progress.get(varK, '') # get previous variable to print
@@ -219,42 +219,64 @@ def find_progress(base_progress):
 
     if exists(join(base_dir, 'aggregate_results/')):
         base_progress['train_data_dir'] = join(base_dir, 'aggregate_results/')
-
-    if exists(join(base_dir, '_pca/')):
+    
+    # initialize param
+    pca_score = None
+    changepoint = None
+    # Read config.yaml to get the pca related paths
+    if exists(base_progress['config_file'] ):
+        config_data = read_yaml(base_progress['config_file'])
+        
+        pca_score = config_data.get('pca_file_scores')
+        changepoint = config_data.get('changepoint_file')
+    
+    # if pca_score is in config.yaml and the file exists, use that in the progress dictionary
+    if pca_score and exists(pca_score):
+        base_progress['pca_dirname'] = dirname(pca_score)
+        base_progress['scores_filename'] = basename(pca_score)
+        base_progress['scores_path'] = pca_score
+    # use default
+    elif exists(join(base_dir, '_pca/')):
         base_progress['pca_dirname'] = join(base_dir, '_pca/')
         base_progress['scores_filename'] = 'pca_scores'
         if exists(join(base_progress['pca_dirname'], base_progress['scores_filename'] +'.h5')):
             base_progress['scores_path'] = join(base_dir, '_pca/', 'pca_scores.h5')
-
-        if exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
-            base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
-
+    else:
+        print('Unable to find PC score file. Please manually add PCA paths using update_progress function')
+    
+    # Add pc score to moseq2-index.yaml file if it is empty because it is run from cli
+    if base_progress.get('index_file') and exists(base_progress.get('index_file')):
+        index_params = read_yaml(base_progress.get('index_file'))
+        if base_progress.get('scores_path') and exists(base_progress.get('scores_path')):
+            index_params['pca_path'] = base_progress.get('scores_path')
+            with open(base_progress.get('index_file'), 'w') as f:
+                yaml.safe_dump(index_params, f)
+        else:
+            print('Please ensure "pca_path" in moseq2-index.yaml is the path to pc_score h5 file before running interactive model analysis')
+    
+    # if changepoint is in config.yaml and the file exists, use that in the progress dictionary
+    if changepoint and exists(changepoint):
+        base_progress['changepoints_path'] = changepoint
+    # use default
+    elif exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
+        base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
+    else:
+        print('Unable to find changepoint file. Please manually add PCA paths using update_progress function')
+             
     models = glob(join(base_dir, '**/*.p'), recursive=True)
-    if len(models) == 1:
-        base_progress['model_path'] = models[0]
-        base_progress['model_session_path'] = dirname(models[0])
 
-        if exists(join(dirname(models[0]), 'syll_info.yaml')):
-            base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
+    if len(models) > 1:
+        models = sorted(models, key=os.path.getmtime)
+        print(f'More than 1 model found. Setting model path to latest generated model: {models[0]}')
+    
+    base_progress['model_path'] = models[0]
+    base_progress['model_session_path'] = dirname(models[0])
+    base_progress['main_model_path'] = dirname(models[0])
 
-    elif len(models) > 1:
-        paths = sorted(models, key=os.path.getmtime)
-
-        print(f'More than 1 model found. Setting model path to latest generated model: {paths[0]}')
-
-        base_progress['model_path'] = paths[0]
-        base_progress['model_session_path'] = dirname(paths[0])
-
-        if exists(join(dirname(paths[0]), 'syll_info.yaml')):
-            base_progress['syll_info'] = join(dirname(paths[0]), 'syll_info.yaml')
-
-        if exists(join(dirname(paths[0]), 'crowd_movies/')):
-            base_progress['crowd_dir'] = join(dirname(paths[0]), 'crowd_movies/')
-
-        print('To change the model path, run the following commands')
-        print(">>> update_progress(progress_filepath, 'model_session_path', [YOUR_PATH_HERE]")
-        print(">>> update_progress(progress_filepath, 'model_path', [YOUR_PATH_HERE]")
-
+    if exists(join(dirname(models[0]), 'syll_info.yaml')):
+        base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
+    if exists(join(dirname(models[0]), 'crowd_movies/')):
+        base_progress['crowd_dir'] = join(dirname(models[0]), 'crowd_movies/')
     return base_progress
 
 def generate_intital_progressfile(filename='progress.yaml'):
@@ -314,9 +336,6 @@ def generate_intital_progressfile(filename='progress.yaml'):
                 # fallback
                 base_progress_vars = find_progress(base_progress_vars)
 
-    # Find progress in given base directory
-    base_progress_vars = find_progress(base_progress_vars)
-
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)
 
@@ -343,8 +362,7 @@ def load_progress(progress_file):
 
     if exists(progress_file):
         print('Updating notebook variables...')
-        with open(progress_file, 'r') as f:
-            progress_vars = yaml.safe_load(f)
+        progress_vars = read_yaml(progress_file)
     else:
         print('Progress file not found. To generate a new one, set restore_progress_vars(progress_file, init=True)')
         progress_vars = None
@@ -364,24 +382,21 @@ def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, 
     vars (dict): All progress file variables
     '''
 
-    yml = yaml.YAML()
-    yml.indent(mapping=2, offset=2)
-
-    # Restore loaded variables or overwrite with fresh state
-    if init:
-        if overwrite:
-            print('Overwriting progress file with initial progress.')
-            progress_vars = generate_intital_progressfile(progress_file)
-        else:
-            if exists(progress_file):
-                progress_vars = load_progress(progress_file)
-            else:
-                progress_vars = generate_intital_progressfile(progress_file)
-    elif overwrite:
+    # overwrite the progress file is overwrite is True
+    if overwrite:
         print('Overwriting progress file with initial progress.')
         progress_vars = generate_intital_progressfile(progress_file)
     else:
-        progress_vars = load_progress(progress_file)
+        if init:
+            # restore progress file if it exists
+            if exists(progress_file):
+                progress_vars = load_progress(progress_file)
+            # generate new progress file if it doesn't exists
+            else:
+                progress_vars = generate_intital_progressfile(progress_file)
+        # restore progress file if it is not init
+        else:
+            progress_vars = load_progress(progress_file)
 
     return progress_vars
 
@@ -555,8 +570,7 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
 
     # Check if progress file exists
     if exists(progress_filepath):
-        with open(progress_filepath, 'r') as f:
-            progress_vars = yaml.safe_load(f)
+        progress_vars = read_yaml(progress_filepath)
 
         print('Found progress file, displaying progress...\n')
         # Display progress bars

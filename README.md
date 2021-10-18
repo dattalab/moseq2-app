@@ -11,8 +11,6 @@ Last Updated: 08/19/2021
   <img src="https://drive.google.com/uc?export=view&id=1oc0_0mlN0VTZEPMQTg_hnYAC87Lb58MI" />
 </p>
 
-## Why MoSeq
-
 <!---Adapted from 
 Datta, Sandeep Robert, David J. Anderson, Kristin Branson, Pietro Perona, and Andrew Leifer. 2019. “Computational Neuroethology: A Call to Action.” Neuron 104 (1): 11–24.
 If this looks good, I will add citation links to the mentioned paper
@@ -60,7 +58,7 @@ You can find more information about MoSeq Pipeline, installation, step-by-step i
 
 # Installation
 Installing MoSeq2 and the dependencies requires **Python version 3.7, gcc-7 and g++-7**. We recommend using our conda environment yaml file to install MoSeq. Run the following to clone the repository and install MoSeq2 and the Jupyter extensions:
-<!---Current branch is dev but will update that to release later.-->
+
 ```bash
 git clone -b dev https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
@@ -72,7 +70,7 @@ conda create -n moseq2-app --file scripts/moseq2-env.yaml
 # Test data and Colab Demo
 You can try the entire MoSeq pipeline on [Google Colab](https://colab.research.google.com/drive/1JOFvvUIfQlhjWZ3MZ3yZ0_hryhI-u55U?usp=sharing) using the test data. 
 If you want to try the test data locally, you can find the test data and their descriptions [here](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data). 
-<!---Maybe put some crowd movies here?-->
+
 
 # Community Support and Contributing
 - Please join [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com) to post questions and interactive with MoSeq developers and users.
@@ -82,7 +80,6 @@ If you want to try the test data locally, you can find the test data and their d
 - Please tell us what you think by filling out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
 # Versions
-<!---The current changelog is really messy, we either remove it entirely or clean it up. We should remove the road map too-->
 - Current version: Version 0.2.1
 - [Changelog](https://github.com/dattalab/moseq2-app/wiki/Changelog)
 
