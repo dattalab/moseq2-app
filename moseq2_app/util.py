@@ -4,6 +4,7 @@ General utility functions.
 
 '''
 import pandas as pd
+import ruamel.yaml as yaml
 from copy import deepcopy
 from pprint import pprint
 from os.path import basename, join, exists, splitext
@@ -11,8 +12,9 @@ from os import listdir, mkdir
 from glob import glob
 from shutil import copy2
 from collections import defaultdict
-from moseq2_app.gui.progress import update_progress
+from contextlib import contextmanager
 from moseq2_viz.util import read_yaml
+from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.util import compute_behavioral_statistics
 
@@ -165,3 +167,13 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
     for key in ['crowd_dir', 'syll_info', 'df_info_path']:
         progress_paths = update_progress(progress_filepath, key, '')
     return progress_paths
+
+
+@contextmanager
+def update_config(path: str) -> dict:
+    config = read_yaml(path)
+    try:
+        yield config
+    finally:
+        with open(path, 'w') as config_path:
+            yaml.safe_dump(config, config_path)
