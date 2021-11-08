@@ -9,6 +9,8 @@ import gc
 import os
 import cv2
 import bokeh
+import io
+import base64
 import warnings
 import numpy as np
 from math import isclose
@@ -40,7 +42,7 @@ except (ImportError, ModuleNotFoundError) as error:
 
 class InteractiveFindRoi(InteractiveROIWidgets):
 
-    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=False, overwrite=False):
+    def __init__(self, data_path, config_file, session_config, compute_bgs=True, autodetect_depths=True, overwrite=False):
         '''
 
         Parameters
@@ -57,6 +59,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         # main output gui to be reused
         self.main_out = None
         self.output = None
+        # Attribute to signifiy whether the object is running test all sessions
+        # if self.in_test_all_sessions is False, each time checked list is changed, the bokeh plot gets updated
+        # IF self.in_test_all_sessions is True, checked list changes won't refresh the bokeh plots
+        self.in_test_all_sessions = False
 
         self.autodetect_depths = autodetect_depths
 
@@ -172,13 +178,12 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             try:
                 # finfo is a key that points to a dict that contains the following keys:
                 # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
-                if 'finfo' not in self.session_parameters[s]:
-                    self.session_parameters[s]['finfo'] = get_movie_info(p)
-                    if p.endswith('.mkv'):
-                        self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
-                                                                                              threads=self.config_data['threads'],
-                                                                                              mapping=self.config_data.get('mapping', 'DEPTH'))
-                        self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
+                self.session_parameters[s]['finfo'] = get_movie_info(p)
+                if p.endswith('.mkv') and 'timestamps' not in self.session_parameters[s]:
+                    self.session_parameters[s]['timestamps'] = load_timestamps_from_movie(p,
+                                                                                            threads=self.config_data['threads'],
+                                                                                            mapping=self.config_data.get('mapping', 'DEPTH'))
+                    self.session_parameters[s]['finfo']['nframes'] = len(self.session_parameters[s]['timestamps'])
 
                 # Compute background image; saving the image to a file
                 self.session_parameters[s].pop('output_dir', None)
@@ -204,11 +209,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         with their computed ROI for convenience.
         '''
         checked_options = list(self.checked_list.options)
+        # Set self.in_test_all_session to True to prevent bokeh plot refreshing
+        self.in_test_all_sessions = True
 
         self.npassing = 0
 
         # test saved config data parameters on all sessions
         for i, (sessionName, sessionPath) in enumerate(session_dict.items()):
+            self.checked_list.index = i
             if sessionName != self.curr_session:
                 # finfo is a key that points to a dict that contains the following keys:
                 # ['file', 'dims', 'fps', 'nframes']. These are determined from moseq2-extract.io.video.get_video_info()
@@ -224,10 +232,17 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
                 # Get background image for each session and test the current parameters on it
                 self.session_parameters[sessionName].pop('output_dir', None)
+                # compute background for getting ROI
                 bground_im = get_bground_im_file(sessionPath, **self.session_parameters[sessionName])
                 try:
+                    # self.config_data['true_depth'] returns a value if the user has interacted with the widget
+                    if not self.session_parameters[sessionName].get('true_depth'):
+                        # the self.config_data['autodetect'] need to be reset to True to detect the true depth value
+                        self.config_data['autodetect'] = True
                     sess_res = self.get_roi_and_depths(bground_im, sessionPath)
-                except:
+                    # if roi doesn't fail
+                    write_image(join(dirname(sessionPath), 'proc', 'roi_00.tiff'), sess_res['roi'])
+                except Exception as e:
                     sess_res = {'flagged': True, 'ret_code': '0x1f534'}
 
                 # Save session parameters if it is not flagged
@@ -261,6 +276,8 @@ class InteractiveFindRoi(InteractiveROIWidgets):
             if self.autodetect_depths == False:
                 tmp_message += ' Try Clearing the output, and rerunning the cell with autodetect_depths = True'
             self.message.value = tmp_message
+        # set self.in_test_all_session back to False
+        self.in_test_all_sessions = False
 
     def interactive_find_roi_session_selector(self, session):
         '''
@@ -308,8 +325,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # Get background and display UI plots
         self.session_parameters[curr_session_key].pop('output_dir', None)
+        # this step compute bground.tiff
         self.curr_bground_im = get_bground_im_file(self.curr_session, **self.session_parameters[curr_session_key])
 
+        # self.interactive_depth_finder is called each time there is an interaction
         if self.main_out is None:
             self.main_out = widgets.interactive_output(self.interactive_depth_finder, {
                                                                                    'minmax_heights': self.minmax_heights,
@@ -468,29 +487,18 @@ class InteractiveFindRoi(InteractiveROIWidgets):
                                                    strel_erode=strel_erode,
                                                    get_all_data=True
                                                    )
-        except ValueError:
+        except Exception as e:
             # bg depth range did not capture any area
             # flagged + ret_code are used to display a red circle in the session selector to indicate a failed
             # roi detection.
+            print(e)
             curr_results['flagged'] = True
             curr_results['ret_code'] = "0x1f534"
-
             # setting the roi variable to 1's array to match the background image. This way,
             # bokeh will still have an image to display.
             curr_results['roi'] = np.ones_like(self.curr_bground_im)
-
-            # results within curr_results will be propagated into the display via calling update_checked_list() in
-            # prepare_data_to_plot()
-            return curr_results
-        except Exception as e:
-            # catching any remaining possible exceptions to preserve the integrity of the interactive GUI.
-            print(e)
-            curr_results['flagged'] = True
-
-            # ret_code within curr_results will be propagated into the display via calling update_checked_list() in
-            # prepare_data_to_plot()
-            curr_results['ret_code'] = "0x1f534"
-            curr_results['roi'] = np.ones_like(self.curr_bground_im)
+            # For consistency, when depth doesn't capture any area, set counted_pixels to the total number of pixel in the background
+            curr_results['counted_pixels'] = np.sum(curr_results['roi'])
             return curr_results
 
         if self.config_data['use_plane_bground']:
@@ -597,17 +605,14 @@ class InteractiveFindRoi(InteractiveROIWidgets):
 
         # temporary string value that will be used to collect all caught error messages
         # and display them all once the final view is ready to be displayed.
-        temp_indicator_val = self.indicator.value
+        temp_indicator_val = ''
 
         # set indicator error for incorrect ROI
         if self.curr_results['flagged']:
             self.curr_results['ret_code'] = "0x1f534"
-            temp_indicator_val = '<center><h2><font color="red";>Flag: Current ROI pixel area may be incorrect. If ROI is acceptable,' \
-                                   ' Mark it as passing. Otherwise, change the depth range values.</h2></center>'
-        else:
-            self.curr_results['flagged'] = False
-            self.curr_results['ret_code'] = "0x1f7e2"
-            temp_indicator_val = '<center><h2><font color="green";>Passing</h2></center>'
+            temp_indicator_val = '<center><h4><font color="red";>Flag: Current ROI pixel area may be incorrect.' \
+                                   '<br>If the Overlayed ROI below is the intended ROI then click Accept and Save ROI' \
+                                       ' to save the ROI and mark the ROI as passing. Otherwise, change the depth range values.</h4></center>'
 
         curr_session_key = self.keys[self.checked_list.index]
 
@@ -631,32 +636,10 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         curr_frame = (self.curr_bground_im - raw_frames)
 
         # filter out regions outside of ROI
-        try:
-            filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
-        except:
-            # Display ROI error and flag
-            filtered_frames = curr_frame.copy()[0]
-            if not self.curr_results['flagged']:
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.</h2></center>'
-                self.curr_results['flagged'] = True
-                self.curr_results['ret_code'] = "0x1f534"
-            else:
-                # concatenating an additional error message related to an incorrect or invalid ROI
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Could not apply ROI to loaded frames.</h2></center>'
+        filtered_frames = apply_roi(curr_frame, roi)[0].astype(self.config_data['frame_dtype'])
 
         # filter for included mouse height range
-        try:
-            filtered_frames = threshold_chunk(filtered_frames, minmax_heights[0], minmax_heights[1])
-        except:
-            # Display min-max heights error and flag
-            filtered_frames = curr_frame.copy()[0]
-            if not self.curr_results['flagged']:
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Mouse Height threshold range is incorrect.</h2></center>'
-                self.curr_results['flagged'] = True
-                self.curr_results['ret_code'] = "0x1f534"
-            else:
-                # concatenating an additional error message related to mouse height range
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Mouse Height threshold range is incorrect.</h2></center>'
+        filtered_frames = threshold_chunk(filtered_frames, minmax_heights[0], minmax_heights[1])
 
         # Get overlayed ROI
         overlay = self.curr_bground_im.copy()
@@ -673,18 +656,21 @@ class InteractiveFindRoi(InteractiveROIWidgets):
         except:
             # Display error and flag
             result = {'depth_frames': np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))}
+            # set new text indicator flag value
 
-        # Check if extracted chunk is empty
         if (result['depth_frames'] == np.zeros((1, self.config_data['crop_size'][0], self.config_data['crop_size'][1]))).all():
-            if not self.curr_results['flagged']:
-                # set new text indicator flag value
-                temp_indicator_val = '<center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold range or computed ROI area.</h2></center>'
-                self.curr_results['flagged'] = True
-                # update the return code value to update the dot-indicator in the checked list accordingly
-                self.curr_results['ret_code'] = "0x1f534"
-            else:
-                # concatenating an additional error message related to extracted cropped image
-                temp_indicator_val += '<br><center><h2><font color="red";>Flag: Cannot Find Mouse. Incorrect Mouse Height threshold range or computed ROI area.</h2></center>'
+            temp_indicator_val += '<center><h4><font color="red";>Flag: Cannot Find Mouse.' \
+                '<br>The mouse height range is set incorrectly and should be adjusted or there is no mouse in the present ROI area.' \
+                ' Adjust th mouse height rang to reasonable values, typically 0 - 120 mm. Adjust the depth range if ' \
+                'the ROI below is not the intended area. </h4></center>'
+            self.curr_results['flagged'] = True
+            # update the return code value to update the dot-indicator in the checked list accordingly
+            self.curr_results['ret_code'] = "0x1f534"
+
+        # If all tests passes, mark passing ROI
+        if not self.curr_results['flagged']:
+            self.curr_results['ret_code'] = "0x1f7e2"
+            temp_indicator_val = '<center><h4><font color="green";>Passing ROI</h4></center>'
 
         if self.config_data.get('camera_type', 'kinect') == 'azure':
             # orienting preview images to match sample extraction
