@@ -4,6 +4,7 @@ import shutil
 import bokeh.io
 import numpy as np
 import ruamel.yaml as yaml
+from moseq2_viz.util import read_yaml
 from os.path import exists
 from unittest import TestCase
 from moseq2_app.flip.controller import FlipRangeTool
@@ -17,9 +18,7 @@ class TestFlipController(TestCase):
         # generate sample metadata json for each session that is missing one
         generate_missing_metadata('data/azure_test/', 'azure_test')
 
-        with open('data/config.yaml', 'r') as f:
-            config_data = yaml.safe_load(f)
-
+        config_data = read_yaml('data/config.yaml')
         config_data['camera_type'] = 'auto'
         config_data['bg_roi_depth_range'] = [300, 600]
         config_data['chunk_size'] = 10
