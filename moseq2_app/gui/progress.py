@@ -232,9 +232,9 @@ def find_progress(base_progress):
     
     # if pca_score is in config.yaml and the file exists, use that in the progress dictionary
     if pca_score and exists(pca_score):
-        base_progress['pca_dirname'] = dirname(pca_score)
+        base_progress['pca_dirname'] = abspath(dirname(pca_score))
         base_progress['scores_filename'] = basename(pca_score)
-        base_progress['scores_path'] = pca_score
+        base_progress['scores_path'] = abspath(pca_score)
     # use default
     elif exists(join(base_dir, '_pca/')):
         base_progress['pca_dirname'] = join(base_dir, '_pca/')
