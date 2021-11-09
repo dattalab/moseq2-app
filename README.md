@@ -13,13 +13,11 @@ Last Updated: 08/19/2021
 
 <!---Adapted from 
 Datta, Sandeep Robert, David J. Anderson, Kristin Branson, Pietro Perona, and Andrew Leifer. 2019. “Computational Neuroethology: A Call to Action.” Neuron 104 (1): 11–24.
-If this looks good, I will add citation links to the mentioned paper
 -->
 Motion Sequencing (MoSeq) is an unsupervised machine learning method to describe behavior. MoSeq takes 3D depth videos as input and then uses statistical learning techniques to fit an autoregressive hidden Markov model that parses behavior into a set of sub-second motifs called syllables. By combining MoSeq with electrophysiology, multi-color photometry, and miniscope methods, neural correlates for 3D behavioral syllables have recently been identified in the dorsolateral striatum (DLS) ([Markowitz et al., 2018](https://www.sciencedirect.com/science/article/pii/S0092867418305129)). Furthermore, MoSeq has been combined with optogenetic stimulation to reveal the differential consequences of activating the motor cortex, the dorsal striatum, and the ventral striatum ([Pisanello et al.,2017](https://www.nature.com/articles/nn.4591); [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375)). These results are consistent with similar results recently obtained using marker-based approaches to explore the relationship between 3D posture and activity in the posterior parietal cortex ([Mimica et al., 2018](https://www.science.org/doi/10.1126/science.aau2013)).
 
 ## MoSeq2 Toolkit
-The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and
-measure the differences between their behavior usages, durations, transition patterns. etc.
+The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and measure the differences between their behavior usages, durations, transition patterns. etc.
 
 This package contains functionalities that can be used interactively in jupyter notebooks. 
 We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has Google Colab notebooks and a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
@@ -50,7 +48,7 @@ You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/15K0
 **MoSeq Docker Container**
 |Pros                                                                     |Cons                                                                            |
 |-------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-|Simple installation with full MoSeq functionalities                       |No instruction for using Docker container on high-performance computing clusters|
+|Simple installation with minimum local environment setup                 |No instruction for using Docker container on high-performance computing clusters|
 |Include both Jupyter Notebooks and CLI tools                             |May require some additional port configuration for Jupyter notebooks            |
 
 If you are interested in using the CLI for extraction and modeling, but using the interactive widgets in the Jupyter notebooks to find parameters and analyze results interactively, you can find more information in [CLI extraction and modeling documentation](https://github.com/dattalab/moseq2-app/wiki/Command-Line-Interface-for-Extraction-and-Modeling) and [Interactive Model Results Exploration Notebook documentation](https://github.com/dattalab/moseq2-app/wiki/Interactive-Model-Results-Exploration-Notebook-Instructions).
@@ -82,11 +80,8 @@ If you want to try the test data locally, you can find the test data and their d
 - Please tell us what you think by filling out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
 # Versions
-- Current version: Version 0.2.1
+- Current version: Version 1.0.1beta
 - [Changelog](https://github.com/dattalab/moseq2-app/wiki/Changelog)
-
-# License
-<!---We should probably pick a license-->
 
 # Events & News
 <!---Future events, project related news etc-->
