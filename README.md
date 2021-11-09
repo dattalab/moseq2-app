@@ -48,6 +48,12 @@ You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/15K0
 |Faster, more efficient and more tunable paramters                        |Limited visualization capabilities and no interactive widgets|
 |Could be used in bash scripts flexibly for automation and parallelization|                                                             |
 
+**MoSeq Docker Container**
+|Pros                                                                     |Cons                                                                            |
+|-------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+|Simple intallation with full MoSeq functionalities                       |No instruction for using Docker container on high performance computing clusters|
+|Include both Jupyter Notebooks and CLI tools                             |May require some additional port configuration for Jupyter notebooks            |
+
 If you are interested in using the CLI for extraction and modeling, but using the interactive widgets in the Jupyter notebooks to find parameters and analyze results interactively, you can find more information in [CLI extraction and modeling documentation](https://github.com/dattalab/moseq2-app/wiki/Command-Line-Interface-for-Extraction-and-Modeling) and [Interactive Model Results Exploration Notebook documentation](https://github.com/dattalab/moseq2-app/wiki/Interactive-Model-Results-Exploration-Notebook-Instructions).
 
 # [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
