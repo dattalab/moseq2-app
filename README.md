@@ -15,10 +15,9 @@ Last Updated: 08/19/2021
 Datta, Sandeep Robert, David J. Anderson, Kristin Branson, Pietro Perona, and Andrew Leifer. 2019. “Computational Neuroethology: A Call to Action.” Neuron 104 (1): 11–24.
 If this looks good, I will add citation links to the mentioned paper
 -->
-Motion Sequencing (MoSeq) is an unsupervised machine learning method to describe behavior. MoSeq takes 3D depth videos as input and then uses statistical learning techniques to fit an autoregressive hidden Markov model that parses behavior into a set of sub-second motifs called syllables. By combining MoSeq with electrophysiology, multi-color photometry, and miniscope methods, neural correlates for 3D behavioral syllables have recently been identified in dorsolateral striatum (DLS) ([Markowitz et al., 2018](https://www.sciencedirect.com/science/article/pii/S0092867418305129)). Furthermore, MoSeq has been combined with optogenetic stimulation to reveal the differential consequences of activating the motor cortex, the dorsal striatum, and the ventral striatum ([Pisanello et al.,2017](https://www.nature.com/articles/nn.4591); [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375)). These results are consistent with similar results recently obtained using marker-based approaches to explore the relationship between 3D posture and activity in posterior parietal cortex ([Mimica et al., 2018](https://www.science.org/doi/10.1126/science.aau2013)).
+Motion Sequencing (MoSeq) is an unsupervised machine learning method to describe behavior. MoSeq takes 3D depth videos as input and then uses statistical learning techniques to fit an autoregressive hidden Markov model that parses behavior into a set of sub-second motifs called syllables. By combining MoSeq with electrophysiology, multi-color photometry, and miniscope methods, neural correlates for 3D behavioral syllables have recently been identified in the dorsolateral striatum (DLS) ([Markowitz et al., 2018](https://www.sciencedirect.com/science/article/pii/S0092867418305129)). Furthermore, MoSeq has been combined with optogenetic stimulation to reveal the differential consequences of activating the motor cortex, the dorsal striatum, and the ventral striatum ([Pisanello et al.,2017](https://www.nature.com/articles/nn.4591); [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375)). These results are consistent with similar results recently obtained using marker-based approaches to explore the relationship between 3D posture and activity in the posterior parietal cortex ([Mimica et al., 2018](https://www.science.org/doi/10.1126/science.aau2013)).
 
 ## MoSeq2 Toolkit
-<!---Need to check the moseq pipeline image and see if there is any copy right issue. We could/probably should make our own-->
 The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and
 measure the differences between their behavior usages, durations, transition patterns. etc.
 
@@ -27,7 +26,7 @@ We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to
 You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/15K0NkFdieW0R2G6Vi_X3Ac9ke__NaDEi?usp=sharing) on our test data or your data on Google Drive.
 
 ## Which one do I use?
-**Jupter Notebook**
+**Jupyter Notebook**
 |Pros                                                   |Cons                                          |
 |-------------------------------------------------------|----------------------------------------------|
 |Easy to use                                            |Extract all sessions sequentially (slow)      |
@@ -38,20 +37,20 @@ You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/15K0
 |Pros                                               |Cons                                                                                            |
 |---------------------------------------------------|------------------------------------------------------------------------------------------------|
 |No local installation and environment set up needed|Extract all sessions sequentially (slow)                                                        |
-|Comes with MoSeq test data to try MoSeq out        |Google Colab has usage limit so the runtime may be disconnected before the pipeline finishes    |
+|Comes with MoSeq test data to try MoSeq out        |Google Colab has a usage limit so the runtime may be disconnected before the pipeline finishes    |
 |Could be used directly on data in Google Drive     |All the necessary packages need to be installed every time at the beginning of a runtime session|
 
 **Command Line Interface (CLI)**
 |Pros                                                                     |Cons                                                         |
 |-------------------------------------------------------------------------|-------------------------------------------------------------|
 |Supports extracting sessions parallelly (fast)                           |Could be confusing for users that have never used a CLI      |
-|Faster, more efficient and more tunable paramters                        |Limited visualization capabilities and no interactive widgets|
+|Faster, more efficient, and more tunable parameters                        |Limited visualization capabilities and no interactive widgets|
 |Could be used in bash scripts flexibly for automation and parallelization|                                                             |
 
 **MoSeq Docker Container**
 |Pros                                                                     |Cons                                                                            |
 |-------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-|Simple intallation with full MoSeq functionalities                       |No instruction for using Docker container on high performance computing clusters|
+|Simple installation with full MoSeq functionalities                       |No instruction for using Docker container on high-performance computing clusters|
 |Include both Jupyter Notebooks and CLI tools                             |May require some additional port configuration for Jupyter notebooks            |
 
 If you are interested in using the CLI for extraction and modeling, but using the interactive widgets in the Jupyter notebooks to find parameters and analyze results interactively, you can find more information in [CLI extraction and modeling documentation](https://github.com/dattalab/moseq2-app/wiki/Command-Line-Interface-for-Extraction-and-Modeling) and [Interactive Model Results Exploration Notebook documentation](https://github.com/dattalab/moseq2-app/wiki/Interactive-Model-Results-Exploration-Notebook-Instructions).
@@ -60,10 +59,10 @@ If you are interested in using the CLI for extraction and modeling, but using th
 You can find more information about MoSeq Pipeline, installation, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
 
 # Installation
-Installing MoSeq2 and the dependencies requires **Python version 3.7, gcc-7 and g++-7**. We recommend using our conda environment yaml file to install MoSeq. Run the following to clone the repository and install MoSeq2 and the Jupyter extensions:
+Installing MoSeq2 and the dependencies requires **Python version 3.7, gcc-7, and g++-7**. We recommend using our conda environment yaml file to install MoSeq. Run the following to clone the repository and install MoSeq2 and the Jupyter extensions:
 
 ```bash
-git clone -b dev https://github.com/dattalab/moseq2-app.git
+git clone -b release https://github.com/dattalab/moseq2-app.git
 cd moseq2-app
 conda create -n moseq2-app --file scripts/moseq2-env.yaml
 ./scripts/install_moseq2_app.sh
