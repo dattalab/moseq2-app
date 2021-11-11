@@ -3,7 +3,7 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15K0NkFdieW0R2G6Vi_X3Ac9ke__NaDEi?usp=sharing)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
 
-Last Updated: 08/19/2021
+Last Updated: 11/09/2021
 
 # Overview
 
