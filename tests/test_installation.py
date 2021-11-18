@@ -15,10 +15,10 @@ class TestInstallation(TestCase):
     def test_check_moseq2_model(self):
         import moseq2_model
 
-        assert moseq2_model.__version__ == 'v1.0.0beta'
+        assert moseq2_model.__version__ == 'v1.0.1beta'
 
 
     def test_check_moseq2_viz(self):
         import moseq2_viz
 
-        assert moseq2_viz.__version__ == 'v1.0.1beta'
+        assert moseq2_viz.__version__ == 'v1.0.2beta'
