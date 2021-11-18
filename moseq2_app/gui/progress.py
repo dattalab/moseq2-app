@@ -268,15 +268,15 @@ def find_progress(base_progress):
     if len(models) > 1:
         models = sorted(models, key=os.path.getmtime)
         print(f'More than 1 model found. Setting model path to latest generated model: {models[0]}')
-    
-    base_progress['model_path'] = models[0]
-    base_progress['model_session_path'] = dirname(models[0])
-    base_progress['main_model_path'] = dirname(models[0])
-
-    if exists(join(dirname(models[0]), 'syll_info.yaml')):
-        base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
-    if exists(join(dirname(models[0]), 'crowd_movies/')):
-        base_progress['crowd_dir'] = join(dirname(models[0]), 'crowd_movies/')
+    # avoid models not found
+    if len(models) > 0:
+        base_progress['model_path'] = models[0]
+        base_progress['model_session_path'] = dirname(models[0])
+        base_progress['main_model_path'] = dirname(models[0])
+        if exists(join(dirname(models[0]), 'syll_info.yaml')):
+            base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
+        if exists(join(dirname(models[0]), 'crowd_movies/')):
+            base_progress['crowd_dir'] = join(dirname(models[0]), 'crowd_movies/')
     return base_progress
 
 def generate_intital_progressfile(filename='progress.yaml'):
