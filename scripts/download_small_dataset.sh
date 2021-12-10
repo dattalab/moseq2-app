@@ -4,45 +4,45 @@ cp notebooks/*.ipynb small_test_ds
 cd small_test_ds
 
 # amphetamine data
-curl -L -o amphetamine_example_0.zip https://www.dropbox.com/sh/gnx4htuvmb7ue65/AACB-twQSGiERqkHHEUiLc5ya?dl=1 && unzip amphetamine_example_0.zip -d amphetamine_example_0
+curl -L -o amphetamine_example_0.zip https://www.dropbox.com/sh/83fqdwq286g8s1v/AABi4UJ_qUz4NCO11eWxKSDqa?dl=1 && unzip amphetamine_example_0.zip -d amphetamine_example_0
 rm amphetamine_example_0.zip
-curl -L -o amphetamine_example_1.zip https://www.dropbox.com/sh/e2o8v9skrb0ef6b/AAA0y6no4eNPHzqMxd-eQqYxa?dl=1 && unzip amphetamine_example_1.zip -d amphetamine_example_1
+curl -L -o amphetamine_example_1.zip https://www.dropbox.com/sh/why3uo79sor1y30/AABepic1Lv3ScUw88Vh_JSsna?dl=1 && unzip amphetamine_example_1.zip -d amphetamine_example_1
 rm amphetamine_example_1.zip
-curl -L -o amphetamine_example_2.zip https://www.dropbox.com/sh/k7ieoducleexbpq/AAAQKOAjKt1k1nU2L5OzYsNsa?dl=1 && unzip amphetamine_example_2.zip -d amphetamine_example_2 
+curl -L -o amphetamine_example_2.zip https://www.dropbox.com/sh/9rg3kca1bkku4eu/AAA7CRykuVUBalxxey7ChvQJa?dl=1 && unzip amphetamine_example_2.zip -d amphetamine_example_2 
 rm amphetamine_example_2.zip
-curl -L -o amphetamine_example_3.zip https://www.dropbox.com/sh/yywypn9m6z1lpyt/AABAPaoEJugycnLNI0ICNnnXa?dl=1 && unzip amphetamine_example_3.zip -d amphetamine_example_3 
+curl -L -o amphetamine_example_3.zip https://www.dropbox.com/sh/25q6skfnajy4z5t/AAAE2bnD3Ep6M63ltDUJQ6t8a?dl=1 && unzip amphetamine_example_3.zip -d amphetamine_example_3 
 rm amphetamine_example_3.zip
-curl -L -o amphetamine_example_4.zip https://www.dropbox.com/sh/0y39kqswphvemuq/AADfkxAEq5tJtwZIY8YgqNaza?dl=1 && unzip amphetamine_example_4.zip -d amphetamine_example_4 
+curl -L -o amphetamine_example_4.zip https://www.dropbox.com/sh/h1ovn9z8puclnez/AABh_HWydvnPBv8YW_kHLU4pa?dl=1 && unzip amphetamine_example_4.zip -d amphetamine_example_4 
 rm amphetamine_example_4.zip
-curl -L -o amphetamine_example_5.zip https://www.dropbox.com/sh/vrqvg575ak84mjn/AAAd7lWMcawniKuuV_uHgRqga?dl=1 && unzip amphetamine_example_5.zip -d amphetamine_example_5 
+curl -L -o amphetamine_example_5.zip https://www.dropbox.com/sh/0hg8581a5td4b67/AABfaYb2C-u8esScNz_gQFqQa?dl=1 && unzip amphetamine_example_5.zip -d amphetamine_example_5 
 rm amphetamine_example_5.zip
-curl -L -o amphetamine_example_6.zip https://www.dropbox.com/sh/4w32uvmuyrenbkp/AADGdnkEI3X5C6TTP3Jcv7mFa?dl=1 && unzip amphetamine_example_6.zip -d amphetamine_example_6 
+curl -L -o amphetamine_example_6.zip https://www.dropbox.com/sh/1zwkumqs1z4mjt8/AABSTHpzgfIfVE0MvfHjNx59a?dl=1 && unzip amphetamine_example_6.zip -d amphetamine_example_6 
 rm amphetamine_example_6.zip
-curl -L -o amphetamine_example_7.zip https://www.dropbox.com/sh/usw26uj3cbtn2dp/AADLkV03ekUu-DVTG8-Kj14fa?dl=1 && unzip amphetamine_example_7.zip -d amphetamine_example_7 
+curl -L -o amphetamine_example_7.zip https://www.dropbox.com/sh/0nb4auvkpaftyql/AABoLLvipDQIWRLymE7TllD8a?dl=1 && unzip amphetamine_example_7.zip -d amphetamine_example_7 
 rm amphetamine_example_7.zip
-curl -L -o amphetamine_example_8.zip https://www.dropbox.com/sh/iw17wldhuljnjk4/AAAlvlKbw9MfDFr0S5jnrGE3a?dl=1 && unzip amphetamine_example_8.zip -d amphetamine_example_8 
+curl -L -o amphetamine_example_8.zip https://www.dropbox.com/sh/kgounlr9rolife7/AAAtGEiWQ8XNlxMpvVYsgFg5a?dl=1 && unzip amphetamine_example_8.zip -d amphetamine_example_8 
 rm amphetamine_example_8.zip
-curl -L -o amphetamine_example_9.zip https://www.dropbox.com/sh/k4bpz38cah38kfe/AAAum45yLdrAvc-2ct6WiU59a?dl=1 && unzip amphetamine_example_9.zip -d amphetamine_example_9 
+curl -L -o amphetamine_example_9.zip https://www.dropbox.com/sh/ecjbz6fsuwar8zj/AAAl2ZYtr06nw5hs6YD8AFbua?dl=1 && unzip amphetamine_example_9.zip -d amphetamine_example_9 
 rm amphetamine_example_9.zip
 
 # saline data
-curl -L -o saline_example_0.zip https://www.dropbox.com/sh/ca9nbj2vlsn8hyq/AACuBEODDwaizuITN6DjXv39a?dl=1 && unzip saline_example_0.zip -d saline_example_0
+curl -L -o saline_example_0.zip https://www.dropbox.com/sh/llp16zjf0jrsq0w/AABbNoYMOOdgqCWYSbR4Upn-a?dl=1 && unzip saline_example_0.zip -d saline_example_0
 rm saline_example_0.zip
-curl -L -o saline_example_1.zip https://www.dropbox.com/sh/87yzfv07d6tcrre/AAB0qXcgzGf-vRoTove34GGRa?dl=1 && unzip saline_example_1.zip -d saline_example_1
+curl -L -o saline_example_1.zip https://www.dropbox.com/sh/w37dducjj2g7nts/AADe0CjD_uHmLsMTfrJIlyU1a?dl=1 && unzip saline_example_1.zip -d saline_example_1
 rm saline_example_1.zip
-curl -L -o saline_example_2.zip https://www.dropbox.com/sh/u3hhekkzeejk0a5/AAAjt2WNDbX3U-G80IVDkahBa?dl=1 && unzip saline_example_2.zip -d saline_example_2
+curl -L -o saline_example_2.zip https://www.dropbox.com/sh/1bt5qjrvhk4e574/AACGj5x4Efy46gyccuH47DkTa?dl=1 && unzip saline_example_2.zip -d saline_example_2
 rm saline_example_2.zip
-curl -L -o saline_example_3.zip https://www.dropbox.com/sh/a71pzlze1sbvuq3/AADTKZ_9LAzrQ3xSeJk_1GdMa?dl=1 && unzip saline_example_3.zip -d saline_example_3
+curl -L -o saline_example_3.zip https://www.dropbox.com/sh/iuvri6u5s2t5grl/AACqZMs5g1h4hqR6aNLBGas0a?dl=1 && unzip saline_example_3.zip -d saline_example_3
 rm saline_example_3.zip
-curl -L -o saline_example_4.zip https://www.dropbox.com/sh/91gsub2ok6thnzo/AADSKuQuKSjQEcuT1SDlsICja?dl=1 && unzip saline_example_4.zip -d saline_example_4
+curl -L -o saline_example_4.zip https://www.dropbox.com/sh/iar29qw8fe3wylc/AABN571BpB2O7dabY19n8R70a?dl=1 && unzip saline_example_4.zip -d saline_example_4
 rm saline_example_4.zip
-curl -L -o saline_example_5.zip https://www.dropbox.com/sh/ogolgcyg7wvr9sj/AAD6Mwni4rMgsnDvnmst626na?dl=1 && unzip saline_example_5.zip -d saline_example_5
+curl -L -o saline_example_5.zip https://www.dropbox.com/sh/wnj99x2sa23jfqf/AADaZphFNFsCDzbnxrRbiZxha?dl=1 && unzip saline_example_5.zip -d saline_example_5
 rm saline_example_5.zip
-curl -L -o saline_example_6.zip https://www.dropbox.com/sh/kpfec602vq8tt2x/AAC7A1H9gO-I-BxjoU1pXT9la?dl=1 && unzip saline_example_6.zip -d saline_example_6
+curl -L -o saline_example_6.zip https://www.dropbox.com/sh/iysofph8f24epz3/AACSXj7hy9Tri996bzvNHZHNa?dl=1 && unzip saline_example_6.zip -d saline_example_6
 rm saline_example_6.zip
-curl -L -o saline_example_7.zip https://www.dropbox.com/sh/9ghc0ksm7s2bip1/AABPyyA7wsZSjybHh0OjbAf6a?dl=1 && unzip saline_example_7.zip -d saline_example_7
+curl -L -o saline_example_7.zip https://www.dropbox.com/sh/0mnvqklu6zi4ojz/AACWPIWwGxelQu4flXta1ge7a?dl=1 && unzip saline_example_7.zip -d saline_example_7
 rm saline_example_7.zip
-curl -L -o saline_example_8.zip https://www.dropbox.com/sh/j08a0do8tresa4r/AADXQ6SdUI1Ux6DZNzr2tOBVa?dl=1 && unzip saline_example_8.zip -d saline_example_8
+curl -L -o saline_example_8.zip https://www.dropbox.com/sh/e4olxcsajuqmh96/AAChcUBY4qfL3tyY5Kf1V5Gsa?dl=1 && unzip saline_example_8.zip -d saline_example_8
 rm saline_example_8.zip
-curl -L -o saline_example_9.zip https://www.dropbox.com/sh/o4j4iznywl7fkwq/AABvP6U7EEc6VqsdH8rDgpk6a?dl=1 && unzip saline_example_9.zip -d saline_example_9
+curl -L -o saline_example_9.zip https://www.dropbox.com/sh/sz4i7yjgpz9qr2x/AADE8rE3m2pB_mxwsF9DezGpa?dl=1 && unzip saline_example_9.zip -d saline_example_9
 rm saline_example_9.zip
