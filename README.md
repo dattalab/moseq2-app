@@ -1,6 +1,6 @@
 [![Build Status](https://app.travis-ci.com/dattalab/moseq2-app.svg?token=ptXpSa3Fp9PKqkxJDkDr&branch=dev)](https://app.travis-ci.com/dattalab/moseq2-app)
 [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15K0NkFdieW0R2G6Vi_X3Ac9ke__NaDEi?usp=sharing)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
 
 Last Updated: 11/09/2021
@@ -23,7 +23,7 @@ The MoSeq2 toolkit enables users to model mouse behavior across different experi
 
 This package contains functionalities that can be used interactively in jupyter notebooks. 
 We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has Google Colab notebooks and a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
-You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/15K0NkFdieW0R2G6Vi_X3Ac9ke__NaDEi?usp=sharing) on our test data or your data on Google Drive.
+You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) on our test data or your data on Google Drive.
 
 ## Which one do I use?
 **Jupyter Notebook**
@@ -70,7 +70,7 @@ conda create -n moseq2-app --file scripts/moseq2-env.yaml
 ### We provide step-by-step guides for installing MoSeq in a conda environment or Docker in the wiki [here](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).
 
 # Test data and Colab Demo
-You can try the entire MoSeq pipeline on [Google Colab](https://colab.research.google.com/drive/15K0NkFdieW0R2G6Vi_X3Ac9ke__NaDEi?usp=sharing) using the test data. 
+You can try the entire MoSeq pipeline on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) using the test data. 
 If you want to try the test data locally, you can find the test data and their descriptions [here](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data). 
 
 
