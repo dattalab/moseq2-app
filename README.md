@@ -1,30 +1,38 @@
 [![Build Status](https://app.travis-ci.com/dattalab/moseq2-app.svg?token=ptXpSa3Fp9PKqkxJDkDr&branch=dev)](https://app.travis-ci.com/dattalab/moseq2-app)
-[![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing)
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
-
-Last Updated: 11/09/2021
-
-# Overview
-
 <p align="center">
   <img src="https://drive.google.com/uc?export=view&id=1oc0_0mlN0VTZEPMQTg_hnYAC87Lb58MI" />
 </p>
 
+Welcome to the `moseq2-app` repository. Motion Sequencing (MoSeq) is an unsupervised machine learning method used to describe mouse behavior and `moseq2-app` is the starting point to MoSeq2 package suite.
+
+ To get started, head over to the [wiki](https://github.com/dattalab/moseq2-app/wiki) to find which installation option works best for your environment and detailed documentation for the MoSeq2 package suite.
+
+**Quick Links:**
+[![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
+
+Last Updated: 12/23/2021
+
+# Overview
+
 <!---Adapted from 
 Datta, Sandeep Robert, David J. Anderson, Kristin Branson, Pietro Perona, and Andrew Leifer. 2019. “Computational Neuroethology: A Call to Action.” Neuron 104 (1): 11–24.
 -->
-Motion Sequencing (MoSeq) is an unsupervised machine learning method used to describe mouse behavior. MoSeq takes 3D depth videos as input (obtained using commercially-available sensors) and then uses statistical learning techniques to identify the components of mouse body language. This is achieved by fitting an autoregressive hidden Markov model that parses behavior into a set of sub-second motifs called syllables. This segmentation naturally yields boundaries between syllables, and therefore also reveals the structure that governs the interconnections between syllables over time, which we refer to as behavioral grammar (see [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375) for the first description of MoSeq). Because MoSeq relies on unsupervised machine learning, MoSeq discovers the set of syllables and grammar expressed in any given experiment. By combining MoSeq with electrophysiology, multi-color photometry, and miniscope methods, neural correlates for 3D behavioral syllables have recently been identified in the dorsolateral striatum (DLS) ([Markowitz et al., 2018](https://www.sciencedirect.com/science/article/pii/S0092867418305129)). Furthermore, MoSeq has been combined with optogenetic stimulation to reveal the differential consequences of activating the motor cortex, the dorsal striatum, and the ventral striatum ([Pisanello et al.,2017](https://www.nature.com/articles/nn.4591); [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375)). These results are consistent with similar results recently obtained using marker-based approaches to explore the relationship between 3D posture and activity in the posterior parietal cortex ([Mimica et al., 2018](https://www.science.org/doi/10.1126/science.aau2013)).
+**MoSeq takes 3D depth videos as input (obtained using commercially-available sensors) and then uses statistical learning techniques to identify the components of mouse body language.** This is achieved by fitting an autoregressive hidden Markov model that parses behavior into a set of sub-second motifs called syllables. This segmentation naturally yields boundaries between syllables, and therefore also reveals the structure that governs the interconnections between syllables over time, which we refer to as behavioral grammar (see [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375) for the first description of MoSeq). 
+
+Because MoSeq relies on unsupervised machine learning, MoSeq discovers the set of syllables and grammar expressed in any given experiment. By combining MoSeq with electrophysiology, multi-color photometry, and miniscope methods, neural correlates for 3D behavioral syllables have recently been identified in the dorsolateral striatum (DLS) ([Markowitz et al., 2018](https://www.sciencedirect.com/science/article/pii/S0092867418305129)). Furthermore, MoSeq has been combined with optogenetic stimulation to reveal the differential consequences of activating the motor cortex, the dorsal striatum, and the ventral striatum ([Pisanello et al.,2017](https://www.nature.com/articles/nn.4591); [Wiltschko et al., 2015](https://www.sciencedirect.com/science/article/pii/S0896627315010375)). These results are consistent with similar results recently obtained using marker-based approaches to explore the relationship between 3D posture and activity in the posterior parietal cortex ([Mimica et al., 2018](https://www.science.org/doi/10.1126/science.aau2013)).
 
 There are two basic steps to MoSeq, and this GitHub repository and the wiki supports both. First, 3D data need to be acquired. Here you will find instructions for assembling a standard MoSeq data acquisition platform, and code to acquire 3D videos of mice as they freely behave. Second, these 3D data need to be modeled. We provide several different methods for modeling the data using MoSeq, which are compared below. We continue development of MoSeq and plan to incorporate additional features in the near future. 
 
-## MoSeq2 Toolkit
+## MoSeq2 package suite
 The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and measure the differences between their behavior usages, durations, transition patterns. etc.
 
 This package contains functionalities that can be used interactively in jupyter notebooks. 
 We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has Google Colab notebooks and a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) on our test data or your data on Google Drive.
 
+<!--- commented out for now before I find these guys a new home
 ## Which one do I use?
 **Jupyter Notebook**
 |Pros                                                   |Cons                                          |
@@ -54,25 +62,22 @@ You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV9
 |Include both Jupyter Notebooks and CLI tools                             |May require some additional port configuration for Jupyter notebooks            |
 
 If you are interested in using the CLI for extraction and modeling, but using the interactive widgets in the Jupyter notebooks to find parameters and analyze results interactively, you can find more information in [CLI extraction and modeling documentation](https://github.com/dattalab/moseq2-app/wiki/Command-Line-Interface-for-Extraction-and-Modeling) and [Interactive Model Results Exploration Notebook documentation](https://github.com/dattalab/moseq2-app/wiki/Interactive-Model-Results-Exploration-Notebook-Instructions).
+-->
 
-# [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
-You can find more information about MoSeq Pipeline, installation, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
 
-# Installation
-Installing MoSeq2 and the dependencies requires **Python version 3.7, gcc-7, and g++-7**. We recommend using our conda environment yaml file to install MoSeq. Run the following to clone the repository and install MoSeq2 and the Jupyter extensions:
 
-```bash
-git clone -b release https://github.com/dattalab/moseq2-app.git
-cd moseq2-app
-conda create -n moseq2-app --file scripts/moseq2-env.yaml
-./scripts/install_moseq2_app.sh
-```
-### We provide step-by-step guides for installing MoSeq in a conda environment or Docker in the wiki [here](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).
+# Getting Started
+If you are new to MoSeq and interested to know if it suits your needs, you can try our [Google Colab Notebook](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing).
 
-# Test data and Colab Demo
-You can try the entire MoSeq pipeline on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) using the test data. 
-If you want to try the test data locally, you can find the test data and their descriptions [here](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data). 
+If you like MoSeq and you are interested in installing it in your environment, you can install the MoSeq2 pakage suite with either Conda or Docker. 
 
+- If you are interested in using a standardized/containerized version of the MoSeq2 package suite with simple installation steps and minimum local environment setup, we recommend installing the MoSeq2 package suite with Docker.
+
+- If you are familiar with Conda/terminal, and you enjoy more control over the packages and virtual environment, we recommend installing the MoSeq2 package suite with Conda.
+
+### **We provide step-by-step guides for installing the MoSeq2 package suite in the [installation documentation](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).**
+
+You can find more information about the MoSeq2 package suite, the acquisition and analysis pipleline, documentation for Command Line Interface (CLI), tutorials, etc. in the [wiki](https://github.com/dattalab/moseq2-app/wiki). If you want to explore MoSeq functionalities, check out the guide for [downloading test data](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data).
 
 # Community Support and Contributing
 - Please join [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com) to post questions and interactive with MoSeq developers and users.
@@ -82,7 +87,7 @@ If you want to try the test data locally, you can find the test data and their d
 - Please tell us what you think by filling out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
 # Versions
-- Current version: Version 1.0.1beta
+- Current version: Version 1.0.2beta
 - [Changelog](https://github.com/dattalab/moseq2-app/wiki/Changelog)
 
 # Events & News
