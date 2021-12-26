@@ -32,40 +32,6 @@ This package contains functionalities that can be used interactively in jupyter 
 We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has Google Colab notebooks and a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) on our test data or your data on Google Drive.
 
-<!--- commented out for now before I find these guys a new home
-## Which one do I use?
-**Jupyter Notebook**
-|Pros                                                   |Cons                                          |
-|-------------------------------------------------------|----------------------------------------------|
-|Easy to use                                            |Extract all sessions sequentially (slow)      |
-|Shows both the code blocks and the output              |Doesn't support automation and parallelization|
-|Comes with interactive widgets to analyze model results|Less tunable parameters than the CLI          |
-
-**Google Colab Notebook**
-|Pros                                               |Cons                                                                                            |
-|---------------------------------------------------|------------------------------------------------------------------------------------------------|
-|No local installation and environment set up needed|Extract all sessions sequentially (slow)                                                        |
-|Comes with MoSeq test data to try MoSeq out        |Google Colab has a usage limit so the runtime may be disconnected before the pipeline finishes    |
-|Could be used directly on data in Google Drive     |All the necessary packages need to be installed every time at the beginning of a runtime session|
-
-**Command Line Interface (CLI)**
-|Pros                                                                     |Cons                                                         |
-|-------------------------------------------------------------------------|-------------------------------------------------------------|
-|Supports extracting sessions parallelly (fast)                           |Could be confusing for users that have never used a CLI      |
-|Faster, more efficient, and more tunable parameters                        |Limited visualization capabilities and no interactive widgets|
-|Could be used in bash scripts flexibly for automation and parallelization|                                                             |
-
-**MoSeq Docker Container**
-|Pros                                                                     |Cons                                                                            |
-|-------------------------------------------------------------------------|--------------------------------------------------------------------------------|
-|Simple installation with minimum local environment setup                 |No instruction for using Docker container on high-performance computing clusters|
-|Include both Jupyter Notebooks and CLI tools                             |May require some additional port configuration for Jupyter notebooks            |
-
-If you are interested in using the CLI for extraction and modeling, but using the interactive widgets in the Jupyter notebooks to find parameters and analyze results interactively, you can find more information in [CLI extraction and modeling documentation](https://github.com/dattalab/moseq2-app/wiki/Command-Line-Interface-for-Extraction-and-Modeling) and [Interactive Model Results Exploration Notebook documentation](https://github.com/dattalab/moseq2-app/wiki/Interactive-Model-Results-Exploration-Notebook-Instructions).
--->
-
-
-
 # Getting Started
 If you are new to MoSeq and interested to know if it suits your needs, you can try our [Google Colab Notebook](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing).
 
