@@ -1,7 +1,7 @@
-.git
-.cache
-*.md
-tests/
-*.pdf
-demos/
-docs/
+**/.git
+**/.cache
+**/*.md
+**/tests
+**/*.pdf
+**/demos
+**/docs
