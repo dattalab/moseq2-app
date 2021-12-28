@@ -1,0 +1,1 @@
+Run `build-docker.sh` from inside this folder in order to start the docker build. This script runs two builds. The first one is better tested, but larger than the second one. Make sure you have all the latest  moseq2 repos downloaded and in the same directory.
