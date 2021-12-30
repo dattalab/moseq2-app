@@ -3,6 +3,7 @@
 *.avi
 
 *.json
+!jupyter_notebook_config.json
 
 *.dat
 
