@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 pip install .
 
 # Install and Enable widget extensions configurator
