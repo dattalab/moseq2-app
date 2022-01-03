@@ -59,5 +59,6 @@ EXPOSE 8888
 RUN echo "source /venv/bin/activate" >> ~/.bashrc
 SHELL ["/bin/bash", "-c"]
 
-ENTRYPOINT ./copy-notebooks.py && \
+ENTRYPOINT source /venv/bin/activate && \
+./copy-notebooks.py && \
 SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8888 --ip=0.0.0.0 --no-browser --allow-root
