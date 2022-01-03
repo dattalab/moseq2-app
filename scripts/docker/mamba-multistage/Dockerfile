@@ -49,7 +49,7 @@ COPY --from=condabuild /root/*.ipynb .
 COPY jupyter_notebook_config.json /root/.jupyter/jupyter_notebook_config.json
 COPY --from=condabuild /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-RUN apt update && apt install -y libglib2.0-0 libsm6 libxrender-dev libxext6 && apt purge -y && apt clean -y && apt autoremove -y
+RUN apt update && apt install -y libglib2.0-0 libsm6 libxrender-dev libxext6 && apt purge -y && apt clean -y && apt autoremove -y && rm -rf /var/lib/apt/lists/*
 
 COPY copy-notebooks.py .
 RUN chmod +x ./copy-notebooks.py
