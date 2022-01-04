@@ -6,6 +6,7 @@ dependencies:
   - python=3.7
   - pip
   - conda-forge::ffmpeg=4.2.0
+  - fastparquet==0.4.1
   # - conda-forge::opencv
   - pip:
       - qgrid
@@ -43,6 +44,5 @@ dependencies:
       - statsmodels==0.10.2
       - jupyter-bokeh==2.0.3
       - jupyter==1.0.0
-      - fastparquet==0.4.1
       - plotly==4.14.3
       - jupyter_nbextensions_configurator
