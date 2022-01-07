@@ -121,7 +121,7 @@ def setup_model_folders(progress_paths):
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     """
     # find all the models in the model master path
-    models = glob(join(progress_paths['main_model_path'], '*.p'))
+    models = glob(join(progress_paths['base_model_path'], '*.p'))
     
     # initialize model dictionary
     model_dict = defaultdict(dict)
@@ -138,7 +138,7 @@ def setup_model_folders(progress_paths):
         
         # check if the model is copied to the model-specific folder
         if not exists(join(model_dir, model)):
-            copy2(join(progress_paths['main_model_path'], model), model_dir)
+            copy2(join(progress_paths['base_model_path'], model), model_dir)
         
         model_dict[model]['model_session_path'] = model_dir
         model_dict[model]['model_path'] = join(model_dir, model)
