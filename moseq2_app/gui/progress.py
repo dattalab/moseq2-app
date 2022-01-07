@@ -272,7 +272,7 @@ def find_progress(base_progress):
     if len(models) > 0:
         base_progress['model_path'] = models[0]
         base_progress['model_session_path'] = dirname(models[0])
-        base_progress['main_model_path'] = dirname(models[0])
+        base_progress['base_model_path'] = dirname(models[0])
         if exists(join(dirname(models[0]), 'syll_info.yaml')):
             base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
         if exists(join(dirname(models[0]), 'crowd_movies/')):
