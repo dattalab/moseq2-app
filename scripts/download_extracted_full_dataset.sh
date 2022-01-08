@@ -123,7 +123,7 @@ moseq2-extract aggregate-results
 # Update Index File
 moseq2-viz add-group moseq2-index.yaml -k SessionName -v saline -g Saline
 moseq2-viz add-group moseq2-index.yaml -k SessionName -v amphetamine -g Amphetamine
-python -c """
+python -c "
 import os
 import ruamel.yaml as yaml
 with open('moseq2-index.yaml', 'r') as f:
@@ -133,4 +133,4 @@ index['pca_path'] = os.path.join(os.getcwd(), '_pca/pca_scores.h5')
 with open('moseq2-index.yaml', 'w') as f:
   yaml.safe_dump(index, f)
 print('PCA Scores path set in index file')
-"""
+"

@@ -242,7 +242,7 @@ def find_progress(base_progress):
         if exists(join(base_progress['pca_dirname'], base_progress['scores_filename'] +'.h5')):
             base_progress['scores_path'] = join(base_dir, '_pca/', 'pca_scores.h5')
     else:
-        print('Unable to find PC score file. Please manually add PCA paths using update_progress function')
+        print('Unable to find PC score file. Either:\n    1) run the pca step, or if you did\n    2) manually add PCA paths using the update_progress function')
     
     # Add pc score to moseq2-index.yaml file if it is empty because it is run from cli
     if base_progress.get('index_file') and exists(base_progress.get('index_file')):
@@ -261,7 +261,7 @@ def find_progress(base_progress):
     elif exists(join(base_progress['pca_dirname'], 'changepoints.h5')):
         base_progress['changepoints_path'] = join(base_progress['pca_dirname'], 'changepoints.h5')
     else:
-        print('Unable to find changepoint file. Please manually add PCA paths using update_progress function')
+        print('Unable to find changepoint file. Either:\n    1) run the pca step, or if you did\n    2) manually add PCA paths using the update_progress function')
              
     models = glob(join(base_dir, '**/*.p'), recursive=True)
 
@@ -272,7 +272,7 @@ def find_progress(base_progress):
     if len(models) > 0:
         base_progress['model_path'] = models[0]
         base_progress['model_session_path'] = dirname(models[0])
-        base_progress['main_model_path'] = dirname(models[0])
+        base_progress['base_model_path'] = dirname(models[0])
         if exists(join(dirname(models[0]), 'syll_info.yaml')):
             base_progress['syll_info'] = join(dirname(models[0]), 'syll_info.yaml')
         if exists(join(dirname(models[0]), 'crowd_movies/')):
