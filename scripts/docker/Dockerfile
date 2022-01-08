@@ -12,7 +12,7 @@ COPY moseq2-model /root/moseq2-model
 # add a default password to notebook: moseq
 RUN mkdir -p /root/.jupyter
 COPY jupyter_notebook_config.json /root/.jupyter/jupyter_notebook_config.json
-COPY copy-notebooks.py .
+COPY copy-notebooks-download-scripts.py .
 
 # only need g++ to install moseq2-model
 ARG DEBIAN_FRONTEND=noninteractive
@@ -34,9 +34,9 @@ RUN --mount=type=cache,target=/opt/conda/pkgs apt update && \
     apt clean -y && \
     apt autoremove -y && \
     cp /root/moseq2-app/notebooks/*.ipynb . && \
-    chmod +x ./copy-notebooks.py
+    chmod +x ./copy-notebooks-download-scripts.py
 
 VOLUME [ "/data" ]
 EXPOSE 8888
 
-ENTRYPOINT ./copy-notebooks.py && SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8888 --ip=0.0.0.0 --no-browser --allow-root
+ENTRYPOINT ./copy-notebooks-download-scripts.py && SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8888 --ip=0.0.0.0 --no-browser --allow-root

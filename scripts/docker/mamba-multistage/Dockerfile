@@ -51,8 +51,8 @@ COPY --from=condabuild /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-cert
 
 RUN apt update && apt install -y libglib2.0-0 libsm6 libxrender-dev libxext6 && apt purge -y && apt clean -y && apt autoremove -y && rm -rf /var/lib/apt/lists/*
 
-COPY copy-notebooks.py .
-RUN chmod +x ./copy-notebooks.py
+COPY copy-notebooks-download-scripts.py .
+RUN chmod +x ./copy-notebooks-download-scripts.py
 VOLUME [ "/data" ]
 EXPOSE 8888
 
@@ -60,5 +60,5 @@ RUN echo "source /venv/bin/activate" >> ~/.bashrc
 SHELL ["/bin/bash", "-c"]
 
 ENTRYPOINT source /venv/bin/activate && \
-./copy-notebooks.py && \
+./copy-notebooks-download-scripts.py && \
 SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8888 --ip=0.0.0.0 --no-browser --allow-root
