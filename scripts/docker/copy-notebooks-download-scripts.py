@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import warnings
 from os.path import exists, join
+from os import makedirs
 from shutil import copy2
 
 # look for moseq notebooks in the base dir
@@ -35,6 +36,8 @@ for nb in MOSEQ_NOTEBOOKS:
     out_path = join(DATA_PATH, nb)
     if not exists(out_path):
         copy2(nb, out_path)
+
+makedirs(join(DATA_PATH, 'scripts'), exist_ok=True)
 
 for script in DOWNLOAD_SCRIPTS:
     out_path = join(DATA_PATH, 'scripts', script)
