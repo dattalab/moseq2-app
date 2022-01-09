@@ -17,7 +17,7 @@ COPY copy-notebooks-download-scripts.py .
 # only need g++ to install moseq2-model
 ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/opt/conda/pkgs apt update && \
-    apt install -y g++ libglib2.0-0 libsm6 libxrender-dev libxext6 && \
+    apt install -y g++ libglib2.0-0 libsm6 libxrender-dev libxext6 curl unzip && \
     mamba env update -n base --file /root/moseq2-app/scripts/moseq2-env.yaml && \
     jupyter nbextensions_configurator enable --sys-prefix && \
     pip install ./moseq2-extract && \
@@ -34,6 +34,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs apt update && \
     apt clean -y && \
     apt autoremove -y && \
     cp /root/moseq2-app/notebooks/*.ipynb . && \
+    cp /root/moseq2-app/scripts/*.sh . && \
     chmod +x ./copy-notebooks-download-scripts.py
 
 VOLUME [ "/data" ]
