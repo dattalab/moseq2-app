@@ -13,9 +13,9 @@ MOSEQ_NOTEBOOKS = [
 
 # look for download scripts in the base dir
 DOWNLOAD_SCRIPTS = ["download_extracted_model_results.sh",
-                    "download_small_dataset.sh", 
-                    "install_moseq2_app.sh", 
-                    "download_extracted_full_dataset.sh", 
+                    "download_small_dataset.sh",
+                    "install_moseq2_app.sh",
+                    "download_extracted_full_dataset.sh",
                     "download_full_dataset.sh",
                     "download_test_dataset.sh"
 ]
