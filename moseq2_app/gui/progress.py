@@ -575,3 +575,21 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
         print('Found progress file, displaying progress...\n')
         # Display progress bars
         print_progress(progress_vars['base_dir'], progress_vars, exts=exts)
+
+def progress_path_sanity_check(progress_paths, progress_filepath='./progress.yaml'):
+    # necessary paths to check for the analysis pipeline
+    must_have_paths = ['base_dir', 'config_file', 'index_file', 'train_data_dir', 'pca_dirname', 
+                       'scores_filename', 'scores_path', 'changepoints_path']
+    
+    # keywords that should be in the paths
+    keywords = [abspath(dirname(progress_filepath)), 'config.yaml', 'moseq2-index.yaml', 'aggregate_results', '_pca',
+            'pca_scores','pca_scores.h5', 'changepoints']
+    # zip the necessary paths and keywords for checking
+    must_have_paths = dict(zip(must_have_paths, keywords))
+
+    # sanity check for discrepancies
+    for key, value in must_have_paths.items():
+        if value not in progress_paths.get(key, ''):
+            print(f'Please check and correct the path in {key}. The default path should contain {value}')
+            print('File names are not default values, please check if this is intentional')
+            print('=' * 20)
