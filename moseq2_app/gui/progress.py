@@ -12,10 +12,13 @@ import logging
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
-from moseq2_viz.util import read_yaml
+from operator import add
+from toolz import compose
 from tqdm.auto import tqdm
+from functools import reduce
 from datetime import datetime
-from os.path import dirname, basename, exists, join, abspath, splitext
+from moseq2_viz.util import read_yaml
+from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
 
 progress_log = 'progress.log'
@@ -43,6 +46,41 @@ def generate_missing_metadata(sess_dir, sess_name):
 
     with open(join(sess_dir, 'metadata.json'), 'w') as fp:
         json.dump(sample_meta, fp)
+
+
+def _is_extracted(folder):
+    '''
+    Parameters:
+        folder (str): path to depth recording
+    '''
+    if not exists(join(folder, 'proc')):
+        return False
+    elif not exists(join(folder, 'proc', 'results_00.yaml')):
+        return False
+    # if results.yaml exists, then check if extraction has successfully completed
+    results_dict = read_yaml(join(folder, 'proc', 'results_00.yaml'))
+    return results_dict.get('complete', False)
+
+
+def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi')):
+
+    # look for files in subfolders
+    files = [glob(join(data_dir, '**', f'*.{ext}'), recursive=True) for ext in extensions]
+    # concatenate all files of different extensions
+    files = reduce(add, files)
+
+    def _has_metadata(folder):
+        return exists(join(folder, 'metadata.json'))
+
+    # remove any folder that doesn't have a metadata.json file
+    files = list(filter(compose(_has_metadata, dirname), files))
+
+    if skip_extracted:
+        # filter any folders that have been extracted
+        files = list(filter(compose(_is_extracted, dirname), files))
+
+    return files
+
 
 def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mkv', 'avi']):
     '''
