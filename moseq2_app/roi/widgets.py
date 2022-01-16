@@ -118,6 +118,9 @@ class InteractiveROIWidgets:
                               self.message],
                              layout=self.box_layout)
 
+        self.setup_event_listeners()
+
+    def setup_event_listeners(self):
         ### Event Listeners ###
 
         self.clear_button.on_click(self.clear_on_click)

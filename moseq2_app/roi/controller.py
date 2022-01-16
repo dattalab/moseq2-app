@@ -8,7 +8,6 @@ the widgets.py file to facilitate the real-time interaction.
 import gc
 import os
 import cv2
-import bokeh
 import io
 import base64
 import warnings
