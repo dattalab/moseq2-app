@@ -12,6 +12,8 @@ from moseq2_extract.io.image import write_image
 from IPython.display import display, clear_output
 from moseq2_viz.util import read_yaml
 
+from moseq2_app.util import write_yaml
+
 
 class InteractiveROIWidgets:
     '''
@@ -294,12 +296,9 @@ class InteractiveROIWidgets:
         original_config['config_file'] = self.config_data['config_file']
         original_config['session_config_path'] = self.config_data['session_config_path']
 
-        with open(self.config_data['config_file'], 'w+') as f:
-            yaml.safe_dump(original_config, f)
-
-        # Update session parameters
-        with open(self.config_data['session_config_path'], 'w+') as f:
-            yaml.safe_dump(self.session_parameters, f)
+        # Update all comfig parameters
+        write_yaml(original_config, self.config_data['config_file'])
+        write_yaml(self.session_parameters, self.config_data['session_config_path'])
 
         self.save_parameters.button_style = 'success'
         self.save_parameters.icon = 'check'

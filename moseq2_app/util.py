@@ -18,6 +18,12 @@ from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_viz.model.util import compute_behavioral_statistics
 
+
+def write_yaml(data, file):
+    with open(file, 'w') as yaml_f:
+        yaml.safe_dump(data, yaml_f)
+
+
 def merge_labels_with_scalars(sorted_index, model_path):
     '''
     Computes all the syllable statistics to plot, including syllable scalars.

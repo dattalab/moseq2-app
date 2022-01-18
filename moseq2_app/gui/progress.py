@@ -48,18 +48,22 @@ def generate_missing_metadata(sess_dir, sess_name):
         json.dump(sample_meta, fp)
 
 
-def _is_extracted(folder):
+def _is_unextracted(folder):
     '''
     Parameters:
         folder (str): path to depth recording
     '''
     if not exists(join(folder, 'proc')):
-        return False
+        return True
     elif not exists(join(folder, 'proc', 'results_00.yaml')):
-        return False
+        return True
     # if results.yaml exists, then check if extraction has successfully completed
     results_dict = read_yaml(join(folder, 'proc', 'results_00.yaml'))
-    return results_dict.get('complete', False)
+    return not results_dict.get('complete', False)
+
+
+def _has_metadata(folder):
+    return exists(join(folder, 'metadata.json'))
 
 
 def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi')):
@@ -67,17 +71,14 @@ def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi')
     # look for files in subfolders
     files = [glob(join(data_dir, '**', f'*.{ext}'), recursive=True) for ext in extensions]
     # concatenate all files of different extensions
-    files = reduce(add, files)
-
-    def _has_metadata(folder):
-        return exists(join(folder, 'metadata.json'))
+    files = sorted(reduce(add, files))
 
     # remove any folder that doesn't have a metadata.json file
     files = list(filter(compose(_has_metadata, dirname), files))
 
     if skip_extracted:
         # filter any folders that have been extracted
-        files = list(filter(compose(_is_extracted, dirname), files))
+        files = list(filter(compose(_is_unextracted, dirname), files))
 
     return files
 
