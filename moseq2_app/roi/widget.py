@@ -80,6 +80,8 @@ class ArenaMaskWidget:
         folder = self.session_data.path
         background = self.get_background(folder)
 
+        # TODO: utilize the auto depth feature to define depth range
+
         session_config = self.session_config[folder]
 
         strel_dilate = select_strel(session_config['bg_roi_shape'], tuple(session_config['bg_roi_dilate']))
@@ -207,6 +209,11 @@ class ArenaMaskData(param.Parameterized):
     @param.depends('compute_arena_mask', 'compute_extraction', 'frame_num')
     def display(self):
         panels = []
+        # @versey-sherry:
+        # - add x, y bounds to these images
+        # - change the colormap to cubehelix
+        # - add tooltip back in so people can see the depth of the bucket
+        # - make sure the images that are plotted fill the entire plot
         for k, v in self.images.items():
             if not isinstance(v, np.ndarray):
                 im = hv.Image([], label=k)
