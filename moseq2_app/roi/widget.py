@@ -109,7 +109,7 @@ class ArenaMaskWidget:
 
         # get segmented frame
         raw_frames = load_movie_data(self.sessions[folder],
-                                     range(0, 300),
+                                     range(1, 301),
                                      **session_config,
                                      frame_size=background.shape[::-1])
 
@@ -156,13 +156,13 @@ class ArenaMaskData(param.Parameterized):
     # defines the range of depth values needed to compute mask for floor
     depth_range = param.Range(default=(650, 750), bounds=(400, 1000), label="Floor depth range (mm)")
     # defines how many iterations cv2.dilate should be run on mask computed for floor
-    mask_dilations = param.Integer(default=1, bounds=(0, 10), label="Floor mask dilation iterations")
+    mask_dilations = param.Integer(default=3, bounds=(0, 10), label="Floor mask dilation iterations")
     # defines thresholds used to locate mouse for extractions
-    mouse_height = param.Range(default=(10, 100), bounds=(0, 175), label="Mouse height clip (mm)")
+    mouse_height = param.Range(default=(10, 110), bounds=(0, 175), label="Mouse height clip (mm)")
     # stores the extracted frame number to display
-    frame_num = param.Integer(default=0, bounds=(0, 300), label="Display frame (index)")
+    frame_num = param.Integer(default=1, bounds=(0, 300), label="Display frame (index)")
     # stores images of the arena and extractions
-    images = param.Dict(default={'Background': None, 'Arena mask': None, 'Extracted mouse': None, 'Frame (background removed)': None})
+    images = param.Dict(default={'Background': None, 'Arena mask': None, 'Extracted mouse': None, 'Frame (background subtracted)': None})
     # stores class object that holds the underlying data
     controller: ArenaMaskWidget = param.Parameter()
 
@@ -182,6 +182,8 @@ class ArenaMaskData(param.Parameterized):
         except ValueError:
             self.path = paths[0]
         self.images['Background'] = self.controller.get_background()
+        self.param.trigger('compute_arena_mask')
+        self.param.trigger('compute_extraction')
 
     @param.depends('compute_arena_mask', watch=True)
     def get_arena_mask(self):
