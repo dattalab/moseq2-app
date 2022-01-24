@@ -41,5 +41,5 @@ setup(
                       'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@release',
                       'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@release'
                       ],
-    python_requires='>=3.6,<3.8'
+    python_requires='>=3.7,<3.8'
 )
