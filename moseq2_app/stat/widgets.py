@@ -258,7 +258,7 @@ class TransitionGraphWidgets:
         ui_layout = widgets.Layout(flex_flow='row', border='solid', align_items='stretch',
                                    width='100%', justify_content='space-around')
 
-        self.graph_layout_dropdown = widgets.Dropdown(options=['circular',  'spring', 'spectral'],
+        self.graph_layout_dropdown = widgets.Dropdown(options=['circular',  'spring'],
                                                       description='Graph Layout',
                                                       style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
