@@ -12,6 +12,7 @@ from copy import deepcopy
 from tqdm.auto import tqdm
 from functools import reduce
 from panel.viewable import Viewer
+from bokeh.models import HoverTool
 from os.path import exists, basename, dirname
 from moseq2_extract.util import select_strel, get_strels
 from moseq2_app.util import write_yaml, read_yaml
@@ -22,6 +23,13 @@ from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.extract.proc import get_bground_im_file, get_roi, apply_roi, threshold_chunk
 from moseq2_extract.extract.extract import extract_chunk
 
+
+_hover_dict = {
+    'Background': HoverTool(tooltips=[('Distance from camera (mm)', '@image')]),
+    'Arena mask': HoverTool(tooltips=[('Mask', '@image')]),
+    'Extracted mouse': HoverTool(tooltips=[('Height from floor (mm)', '@image')]),
+    'Frame (background subtracted)': HoverTool(tooltips=[('Height from floor (mm)', '@image')]),
+}
 
 class ArenaMaskWidget:
     def __init__(self, data_dir, config_file, session_config_path) -> None:
@@ -38,13 +46,19 @@ class ArenaMaskWidget:
         # creates session-specific configurations
         if exists(session_config_path):
             session_parameters = read_yaml(session_config_path)
-            for _session in tqdm(set(map(lambda f: basename(dirname(f)), sessions)) - set(session_parameters), desc="Setting camera parameters", leave=False):
-                full_path = [x for x in sessions if _session in x][0]
-                session_parameters[_session] = detect_and_set_camera_parameters(deepcopy(self.config_data), full_path)
+            new_sessions = set(map(lambda f: basename(dirname(f)), sessions)) - set(session_parameters)
+            if len(new_sessions) > 0:
+                for _session in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
+                    full_path = [x for x in sessions if _session in x][0]
+                    session_parameters[_session] = detect_and_set_camera_parameters(deepcopy(self.config_data), full_path)
+                # write session config with default parameters for new sessions
+                write_yaml(session_parameters, self.session_config_path)
+
         else:
-            session_parameters = {basename(dirname(f)): detect_and_set_camera_parameters(deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
+            session_parameters = {basename(dirname(f)): detect_and_set_camera_parameters(
+                deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
             write_yaml(session_parameters, self.session_config_path)
-        
+
         # instantiate ArenaMaskData with the first session in this list
         self.session_data = ArenaMaskData(path=list(session_parameters)[0], controller=self)
         self.session_data.param.path.objects = list(session_parameters)  # generates object selector in gui
@@ -88,11 +102,11 @@ class ArenaMaskWidget:
         strel_erode = select_strel(session_config['bg_roi_shape'], tuple(session_config['bg_roi_erode']))
 
         rois, plane, bboxes, _, _, _ = get_roi(background,
-                                                **session_config,
-                                                strel_dilate=strel_dilate,
-                                                strel_erode=strel_erode,
-                                                get_all_data=True
-                                                )
+                                               **session_config,
+                                               strel_dilate=strel_dilate,
+                                               strel_erode=strel_erode,
+                                               get_all_data=True
+                                               )
         self.masks[folder] = rois[0]
         # add to view
         return background, rois[0]
@@ -119,18 +133,18 @@ class ArenaMaskWidget:
         frames = (background - raw_frames)
 
         # filter out regions outside of ROI
-        frames = apply_roi(frames, mask)#.astype(session_config['frame_dtype'])
+        frames = apply_roi(frames, mask)
 
         # filter for included mouse height range
         frames = threshold_chunk(frames, session_config['min_height'], session_config['max_height'])
 
         struct_elements = get_strels(session_config)
         extraction = extract_chunk(raw_frames.copy(),
-                               roi=mask,
-                               bground=background,
-                               **session_config,
-                               **struct_elements,
-                              )
+                                   roi=mask,
+                                   bground=background,
+                                   **session_config,
+                                   **struct_elements,
+                                   )
         return extraction['depth_frames'], frames
 
     def get_background(self, folder=None):
@@ -144,7 +158,7 @@ class ArenaMaskWidget:
             bground = get_bground_im_file(file, frame_stride=1000)
             # save for recall later
             self.backgrounds[folder] = bground
-            
+
         return self.backgrounds[folder]
 
 
@@ -162,14 +176,16 @@ class ArenaMaskData(param.Parameterized):
     # defines thresholds used to locate mouse for extractions
     mouse_height = param.Range(default=(10, 110), bounds=(0, 175), label="Mouse height clip (mm)")
     # stores the extracted frame number to display
-    frame_num = param.Integer(default=1, bounds=(0, 300), label="Display frame (index)")
+    frame_num = param.Integer(default=1, bounds=(1, 299), label="Display frame (index)")
     # stores images of the arena and extractions
-    images = param.Dict(default={'Background': None, 'Arena mask': None, 'Extracted mouse': None, 'Frame (background subtracted)': None})
+    images = param.Dict(default={'Background': None, 'Arena mask': None,
+                        'Extracted mouse': None, 'Frame (background subtracted)': None})
     # stores class object that holds the underlying data
     controller: ArenaMaskWidget = param.Parameter()
 
     ### flags and actions ###
-    computing = param.Boolean(default=False)  # used to indicate a computation is being performed
+    computing_arena = param.Boolean(default=False)  # used to indicate a computation is being performed
+    computing_extraction = param.Boolean(default=False)  # used to indicate a computation is being performed
     # used to trigger the computation of the arena mask via a button
     compute_arena_mask = param.Action(lambda x: x.param.trigger('compute_arena_mask'), label="Compute arena mask")
     # used to trigger the computation of a small extraction via a button
@@ -189,44 +205,48 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('compute_arena_mask', watch=True)
     def get_arena_mask(self):
-        self.computing = True
+        self.computing_arena = True
         background, mask = self.controller.compute_arena_mask()
         self.images['Arena mask'] = mask
         self.images['Background'] = background
 
-        self.computing = False
+        self.computing_arena = False
 
     @param.depends('compute_extraction', watch=True)
     def get_extraction(self):
-        self.computing = True
+        self.computing_extraction = True
         mouse, frame = self.controller.compute_extraction()
         self.images['Extracted mouse'] = mouse
         self.images['Frame (background subtracted)'] = frame
 
-        self.computing = False
+        self.computing_extraction = False
 
-    # @param.depends('images', watch=True)
     @param.depends('compute_arena_mask', 'compute_extraction', 'frame_num')
     def display(self):
         panels = []
-        # @versey-sherry:
-        # - add x, y bounds to these images
-        # - change the colormap to cubehelix
-        # - add tooltip back in so people can see the depth of the bucket
-        # - make sure the images that are plotted fill the entire plot
         for k, v in self.images.items():
             if not isinstance(v, np.ndarray):
                 im = hv.Image([], label=k)
             elif k in ('Extracted mouse', 'Frame (background subtracted)'):
-                im = hv.Image(v[self.frame_num], label=k)
+                im = hv.Image(v[self.frame_num], label=k, bounds=(0, 0, v.shape[2], v.shape[1])
+                              ).opts(xlim=(0, v.shape[2]), ylim=(0, v.shape[1]), framewise=True)
             else:
-                im = hv.Image(v, label=k)
-            panels.append(im)
-        panels = reduce(add, panels).cols(2)
-        return panels.opts(shared_axes=False)
+                im = hv.Image(v, label=k, bounds=(
+                    0, 0, *v.shape[::-1])).opts(xlim=(0, v.shape[1]), ylim=(0, v.shape[0]), framewise=True)
+            panels.append(im.opts(
+                hv.opts.Image(
+                    tools=[_hover_dict[k]],
+                    cmap='cubehelix',
+                    xlabel="Width (pixels)",
+                    ylabel="Height (pixels)",
+                ),
+            ))
+        panels = reduce(add, panels).opts(hv.opts.Image()).cols(2)
+        return panels.opts(shared_axes=False, framewise=True)
+
 
 class ArenaMaskView(Viewer):
-    
+
     def __init__(self, session_data: ArenaMaskData, controller: ArenaMaskWidget, **params):
         super().__init__(**params)
 
@@ -237,7 +257,8 @@ class ArenaMaskView(Viewer):
 
         ### subsection: arena mask parameters ###
         auto_depth = pn.widgets.Checkbox.from_param(session_data.param.auto_depth)
-        arena_depth_range = pn.widgets.IntRangeSlider.from_param(session_data.param.depth_range, step=5, disabled=auto_depth.value)
+        arena_depth_range = pn.widgets.IntRangeSlider.from_param(
+            session_data.param.depth_range, step=5, disabled=auto_depth.value)
         auto_depth.link(arena_depth_range, value='disabled')
         mask_dilate_iters = pn.widgets.IntSlider.from_param(session_data.param.mask_dilations, step=1)
         compute_mask_btn = pn.widgets.Button.from_param(session_data.param.compute_arena_mask)
@@ -251,9 +272,25 @@ class ArenaMaskView(Viewer):
         save_one_session_btn = pn.widgets.Button(name="Save parameters for this session and move to next")
         save_one_session_btn.on_click(controller.save_session_parameters)
 
-        indicator = pn.widgets.Progress(active=True, bar_color='warning', visible=False, name='Computing...', sizing_mode='stretch_width')
-        computing_check = pn.widgets.Checkbox.from_param(session_data.param.computing, value=False, visible=False)
+        # computing arena indicator
+        indicator = pn.Row(
+            pn.pane.Markdown('Finding arena...', width=100),
+            pn.widgets.Progress(active=True, bar_color='warning', width=160),
+            visible=False,
+            height=45,
+        )
+        computing_check = pn.widgets.Checkbox.from_param(session_data.param.computing_arena, value=False, visible=False)
         computing_check.link(indicator, value='visible')
+
+        # computing extraction
+        indicator2 = pn.Row(
+            pn.pane.Markdown('Extracting...', width=100),
+            pn.widgets.Progress(active=True, bar_color='info', width=160),
+            visible=False,
+            height=45,
+        )
+        computing_check2 = pn.widgets.Checkbox.from_param(session_data.param.computing_extraction, value=False, visible=False)
+        computing_check2.link(indicator2, value='visible')
 
         ### link all subsections into GUI layout ###
 
@@ -273,13 +310,13 @@ class ArenaMaskView(Viewer):
             '### Save',
             save_one_session_btn,
             indicator,
+            indicator2,
         )
 
         # define widget containing plots of arena and extraction
-        self.plotting_col = hv.DynamicMap(session_data.display)
+        self.plotting_col = hv.DynamicMap(session_data.display).opts(framewise=True)
 
         self._layout = pn.Row(self.gui_col, self.plotting_col)
 
     def __panel__(self):
         return self._layout
-
