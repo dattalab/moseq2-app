@@ -42,6 +42,9 @@ jobs:
         - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
         - sudo apt-get update
         - sudo apt install build-essential
+        - sudo apt -y install g++-7
+        - export CC="$(which gcc-7)"
+        - export CXX="$(which g++-7)"
         - echo -e "machine github.com\n  login $CI_USERNAME\n  password $CI_USER_PASSWORD" > ~/.netrc
         - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
         - bash miniconda.sh -b -p $HOME/miniconda
