@@ -231,9 +231,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
 
     inputs = ['model_path', 'config_file', 'index_file']
 
-    error = validate_inputs(inputs, progress_paths)
-
-    if error:
+    if validate_inputs(inputs, progress_paths):
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
