@@ -400,47 +400,6 @@ def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, 
 
     return progress_vars
 
-
-def show_progress_bar(nfound, total, desc):
-    '''
-    Helper function to print progress bars for each MoSeq-step progress dict
-
-    Parameters
-    ----------
-    i_dict (dict): Progress dict.
-    nfound (int): Total number of found progress items
-    total (int): Total number of progress items
-    desc (str): Progress description text to display.
-
-    Returns
-    -------
-    '''
-
-    for e in tqdm(list(range(total)), total=total, desc=desc, bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        sleep(0.03)
-        if e == nfound:
-            break
-
-def count_total_found_items(i_dict):
-    '''
-    Counts the total number of found progress items
-
-    Parameters
-    ----------
-    i_dict (dict): Dict containing paths to respective pipelines items.
-
-    Returns
-    -------
-    num_files (int): Number of found previously computed paths.
-    '''
-
-    num_files = 0
-    for v in i_dict.values():
-        if v == True:
-            num_files += 1
-
-    return num_files
-
 def get_pca_progress(progress_vars, pca_progress):
     '''
     Updates the PCA progress dict variables and prints the names of the missing keys.
