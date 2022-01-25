@@ -9,8 +9,8 @@ import ipywidgets as widgets
 from IPython.display import display
 from bokeh.io import output_notebook, show
 from moseq2_extract.util import filter_warnings
-from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_extract.gui import get_selected_sessions
+from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
