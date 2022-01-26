@@ -299,7 +299,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     errs_x (list): list of x-indices to plot the error bar lines within.
     errs_y (list): list of y-indices to plot the error bar lines within.
     '''
-
+    
     # Get group specific dataframe indices
     df_group = df[df[groupby] == group]
     grouped = df_group.groupby('syllable')[[stat]]
@@ -324,6 +324,10 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     if errorbar == 'CI 95%':
         miny = [e[0] for e in stat_err]
         maxy = [e[1] for e in stat_err]
+    # miny, maxy is just y. Sorry, I have to do this to match the rest of the code
+    elif errorbar == 'None':
+        miny = aux_df[stat]
+        maxy = aux_df[stat]
     else:
         miny = aux_df[stat] - stat_err[stat]
         maxy = aux_df[stat] + stat_err[stat]
