@@ -43,7 +43,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     '''
 
-    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, duration_opt, crowd_movie_dir, save_path):
+    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, select_median_duration_instances, crowd_movie_dir, save_path):
         '''
         Initializes class context parameters, reads and creates the syllable information dict.
 
@@ -52,7 +52,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         model_fit (dict): Loaded trained model dict.
         index_file (str): Path to saved index file.
         max_sylls (int): Maximum number of syllables to preview and label.
-        duration_opt (bool): if true, select examples with syallable duration closer to median.
+        select_median_duration_instances (bool): if true, select examples with syallable duration closer to median.
         save_path (str): Path to save syllable label information dictionary.
         '''
 
@@ -63,7 +63,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # by passing max_syllables=None to the wrapper/main.py function::label_syllables. Otherwise, if a integer
         # is inputted, then self.max_sylls is set to that same integer.
         self.max_sylls = max_sylls
-        self.duration_opt = duration_opt
+        self.select_median_duration_instances = select_median_duration_instances
 
         self.config_data = read_yaml(config_file)
 
@@ -347,7 +347,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         config_data['separate_by'] = ''
         config_data['specific_syllable'] = None
         config_data['max_syllable'] = self.max_sylls
-        config_data['duration_opt'] = self.duration_opt
+        config_data['select_median_duration_instances'] = self.select_median_duration_instances
         config_data['max_examples'] = 20
         config_data['gaussfilter_space'] = [0, 0]
         config_data['medfilter_space'] = [0]
