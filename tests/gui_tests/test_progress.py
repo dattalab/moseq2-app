@@ -7,7 +7,7 @@ from unittest import TestCase
 from os.path import exists, join
 from moseq2_extract.helpers.wrappers import extract_wrapper
 from moseq2_app.gui.progress import generate_missing_metadata, get_session_paths, update_progress, \
-    restore_progress_vars, show_progress_bar, count_total_found_items, get_pca_progress, load_progress, \
+    restore_progress_vars, get_pca_progress, load_progress, \
     get_extraction_progress, print_progress, check_progress, find_progress, generate_intital_progressfile
 
 
@@ -126,22 +126,6 @@ class TestNotebookProgress(TestCase):
         assert test_restore2 != self.base_progress_vars
 
         os.remove(progress_file)
-
-    def test_show_progress_bar(self):
-
-        nfound = 5
-        total = 10
-        desc='test'
-
-        show_progress_bar(nfound, total, desc)
-
-    def test_count_total_found_items(self):
-
-        i_dict = {'1': True,
-                  '2': False}
-
-        n = count_total_found_items(i_dict)
-        assert n == 1
 
     def test_get_pca_progress(self):
         i_dict = {'pca_dirname': '',

@@ -400,47 +400,6 @@ def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, 
 
     return progress_vars
 
-
-def show_progress_bar(nfound, total, desc):
-    '''
-    Helper function to print progress bars for each MoSeq-step progress dict
-
-    Parameters
-    ----------
-    i_dict (dict): Progress dict.
-    nfound (int): Total number of found progress items
-    total (int): Total number of progress items
-    desc (str): Progress description text to display.
-
-    Returns
-    -------
-    '''
-
-    for e in tqdm(list(range(total)), total=total, desc=desc, bar_format='{desc}: {n_fmt}/{total_fmt} {bar}'):
-        sleep(0.03)
-        if e == nfound:
-            break
-
-def count_total_found_items(i_dict):
-    '''
-    Counts the total number of found progress items
-
-    Parameters
-    ----------
-    i_dict (dict): Dict containing paths to respective pipelines items.
-
-    Returns
-    -------
-    num_files (int): Number of found previously computed paths.
-    '''
-
-    num_files = 0
-    for v in i_dict.values():
-        if v == True:
-            num_files += 1
-
-    return num_files
-
 def get_pca_progress(progress_vars, pca_progress):
     '''
     Updates the PCA progress dict variables and prints the names of the missing keys.
@@ -461,10 +420,12 @@ def get_pca_progress(progress_vars, pca_progress):
             if key == 'pca_dirname':
                 if exists(join(progress_vars[key], 'pca.h5')):
                     pca_progress[key] = True
-            # changepoints field only include the filename with no path and extension
+            # changepoints field only include the filename with no path and extension or abspath to the file
             elif key == 'changepoints_path':
+                if dirname(abspath(progress_vars[key])) == abspath(progress_vars['pca_dirname']) and exists(progress_vars[key]):
+                    pca_progress[key] = True
                 # manually construct the path for changepoints.h5
-                if exists(join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
+                elif exists(join(progress_vars['pca_dirname'], progress_vars[key] + '.h5')):
                     pca_progress[key] = True
             else:
                 if exists(progress_vars[key]):
@@ -531,8 +492,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
                     'changepoints_path': False,
                     'index_file': False}
 
-    modeling_progress = {'model_path': False}
-    analysis_progress = {'syll_info': False}
+    modeling_progress = {'base_model_path': False}
 
     # Get Extract Progress
     path_dict, num_extracted = get_extraction_progress(base_dir, exts=exts)
@@ -541,18 +501,16 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     pca_progress = get_pca_progress(progress_vars, pca_progress)
 
     # Get Modeling Path
-    if progress_vars.get('model_path') is not None:
-        if exists(progress_vars['model_path']):
+    if progress_vars.get('base_model_path'):
+        base_model_path = progress_vars.get('base_model_path')
+        if exists(base_model_path):
             modeling_progress['model_path'] = True
+            model_num = len(glob(join(base_model_path, '*.p')))
 
-    if progress_vars.get('syll_info') is not None:
-        if exists(progress_vars['syll_info']):
-            analysis_progress['syll_info'] = True
-
-    show_progress_bar(num_extracted, len(path_dict.keys()), desc="Extraction Progress")
-    show_progress_bar(count_total_found_items(pca_progress), len(pca_progress.keys()), desc="PCA Progress")
-    show_progress_bar(count_total_found_items(modeling_progress), len(modeling_progress.keys()), desc="Modeling Progress")
-    show_progress_bar(count_total_found_items(analysis_progress), len(analysis_progress.keys()), desc="Analysis Progress")
+    print(f'Extraction Progress: {num_extracted} out of {len(path_dict.keys())} session(s) extracted')
+    print(f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress.keys())} items finished')
+    if modeling_progress.get('model_path'):
+        print(f'Found {model_num} model(s)')
 
 def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'mkv', 'avi', 'tar.gz']):
     '''
