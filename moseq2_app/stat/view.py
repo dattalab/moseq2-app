@@ -15,10 +15,9 @@ from os.path import relpath
 from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
-from bokeh.palettes import Spectral4
+from bokeh.palettes import Spectral4, Set1_9, Set2_8, Set3_12, Colorblind8
 from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
-from bokeh.palettes import Category20_20, Category20b_20
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
@@ -460,8 +459,6 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     '''
     warnings.filterwarnings('ignore')
 
-    pickers = []
-
     slider = RangeSlider(start=0, end=0.001, value=(0, 0.001), step=0.001,
                          format="0[.]000", title=f"Display Syllables Within {thresh_stat} Range")
 
@@ -517,20 +514,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         # update hover tools to match the thresholded plot points
         hover = setup_hovertool([circle])
         fig.add_tools(hover)
-        # set up color pickers and link the selection to all the drawn glyphs
-        if groupby == 'group':
-            picker = ColorPicker(title=f"{group} Line Color")
-            # set color for the line
-            picker.js_link('color', line.glyph, 'line_color')
-            # set color to fill the dots 
-            picker.js_link('color', circle.glyph, 'fill_color')
-            # set color to fill the dot outlines
-            picker.js_link('color', circle.glyph, 'line_color')
-            picker.js_link('color', error_bars.glyph, 'line_color')
-
-            pickers.append(picker)
-
-    return pickers, slider, searchbox
+    return slider, searchbox
 
 def set_grouping_colors(df, groupby):
     '''
@@ -549,31 +533,35 @@ def set_grouping_colors(df, groupby):
     colors (list): list of all the colors used to plot the glyphs
     '''
 
-    # Concatenate two category 20 palettes to make a bigger palette
-    palette = Category20_20 + Category20b_20
+    # Use a bigger pallette
+    palette = Set1_9 + Set2_8 + Set3_12 + Colorblind8
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
     if groupby == 'group':
         groups = list(df.group.unique())
-        group_colors = colors
+        group_colors = palette[:len(groups)]
     else:
+        # find unique selections of the selected sessions from the widget
         groups = list(df[groupby].unique())
+        # subset the selected sessionss from the dataframe
         tmp_groups = df[df[groupby].isin(groups)]
 
         sess_groups = []
         for s in groups:
             sess_groups.append(list(tmp_groups[tmp_groups[groupby] == s].group)[0])
 
-        # generate a list of unique groups
+        # generate a list of unique experimental groups
         unique_group = np.unique(sess_groups)
-        # generate a dictionary for group index in the colo palette
+
+        # generate a dictionary for group index in the color palette
         color_map = dict(zip(unique_group, range(len(unique_group))))
 
-        # When the user is trying to plot over 40 experiment groups at the same time
+        # When the user is trying to plot over 256 experiment groups at the same time
         if len(unique_group) > len(palette):
             print('Too many groups to plot. Some colors may be resued')
 
+        # find a color for each group
         for group, index in color_map.items():
             try:
                 color_map[group] = palette[index]
@@ -583,10 +571,10 @@ def set_grouping_colors(df, groupby):
                 # set color index to the last item in pallette to resue color
                 color_map[group] = palette[-1]
         group_colors = list(color_map.values())
-        colors = [colorscale(color_map[sg], 0.5 + random.random()) for sg in sess_groups]
+        colors = [colorscale(color_map[sg], random.uniform(0, 2)) for sg in sess_groups]
     return groups, group_colors, colors
 
-def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
+def format_stat_plot(p, df, searchbox, slider, sorting):
     '''
     Edits the bokeh figures x-axis such that the syllable labels are also displayed, and are slanted 45 degrees.
      Sets the legend to be interactive where users can hide line plots by clicking on their legend item.
@@ -624,9 +612,6 @@ def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
 
     # Create gridplot of color pickers
     output_grid = [searchbox, slider]
-    if len(pickers) > 0:
-        color_pickers = gridplot(pickers, ncols=2)
-        output_grid.append(color_pickers)
     output_grid.append(p)
 
     # Pack widgets together with figure
@@ -678,14 +663,14 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
 
     # draw line plots, setup hovertool, thresholding slider and group color pickers
     if list(sorting) == syllable_families['leaves']:
-        pickers, slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
+        slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
                                      sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
     else:
-        pickers, slider, searchbox = draw_stats(p, df, groups, colors, sorting,
+        slider, searchbox = draw_stats(p, df, groups, colors, sorting,
                                      groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # Format Bokeh plot with widgets
-    graph_n_pickers = format_stat_plot(p, df, searchbox, slider, pickers, sorting)
+    graph_n_pickers = format_stat_plot(p, df, searchbox, slider, sorting)
 
     # Display figure and widgets
     show(graph_n_pickers)
