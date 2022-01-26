@@ -520,8 +520,11 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         # set up color pickers and link the selection to all the drawn glyphs
         if groupby == 'group':
             picker = ColorPicker(title=f"{group} Line Color")
+            # set color for the line
             picker.js_link('color', line.glyph, 'line_color')
+            # set color to fill the dots 
             picker.js_link('color', circle.glyph, 'fill_color')
+            # set color to fill the dot outlines
             picker.js_link('color', circle.glyph, 'line_color')
             picker.js_link('color', error_bars.glyph, 'line_color')
 
