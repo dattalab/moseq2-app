@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml
-from moseq2_viz.scalars.util import compute_all_pdf_data
 
 
 def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):

@@ -14,7 +14,7 @@ from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
-from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
+from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
     interactive_syllable_labeler_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
     interactive_plot_transition_graph_wrapper

@@ -8,10 +8,6 @@ import ipywidgets as widgets
 from IPython.display import display, clear_output
 
 class InteractiveScalarWidgets:
-    '''
-    Class that contains Ipywidget widgets and layouts to facilitate interactive ROI finding functionality.
-    This class is extended by the controller class InteractiveFindRoi.
-    '''
 
     def __init__(self):
         '''
