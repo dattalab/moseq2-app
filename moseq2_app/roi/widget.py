@@ -14,10 +14,9 @@ from panel.viewable import Viewer
 from bokeh.models import HoverTool
 from os.path import exists, basename, dirname
 from moseq2_extract.util import select_strel, get_strels
-from moseq2_app.util import write_yaml, read_yaml
+from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config
 from moseq2_app.gui.progress import get_sessions
 from moseq2_extract.io.video import load_movie_data
-from moseq2_app.roi.controller import read_and_clean_config
 from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.extract.proc import get_bground_im_file, get_roi, apply_roi, threshold_chunk
 from moseq2_extract.extract.extract import extract_chunk

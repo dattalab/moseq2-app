@@ -8,7 +8,7 @@ import ruamel.yaml as yaml
 from copy import deepcopy
 from pprint import pprint
 from os.path import basename, join, exists, splitext
-from os import listdir, mkdir
+from os import mkdir
 from glob import glob
 from shutil import copy2
 from collections import defaultdict
@@ -16,7 +16,24 @@ from contextlib import contextmanager
 from moseq2_viz.util import read_yaml
 from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
+from moseq2_extract.util import read_yaml, check_filter_sizes
 from moseq2_viz.model.util import compute_behavioral_statistics
+
+
+def read_and_clean_config(config_file):
+    config_data = read_yaml(config_file)
+    config_data = check_filter_sizes(config_data)
+    config_data['threads'] = max(1, config_data.get('threads', 8))
+
+    # TODO: see if this is necessary
+    # set defaults if the keys don't exist
+    config_data = {
+        'bg_roi_erode': (1, 1),
+        'bg_roi_dilate': (1, 1),
+        **config_data
+    }
+
+    return config_data
 
 
 def write_yaml(data, file):

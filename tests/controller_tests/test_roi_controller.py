@@ -228,17 +228,3 @@ class TestROIController(TestCase):
         assert self.gui.session_parameters[curr_session_key]['bg_roi_depth_range'] == (414, 614)
         assert self.gui.session_parameters[curr_session_key] != config_before
         assert self.gui.curr_results['ret_code'] == '0x1f7e2'
-
-    def test_prepare_data_to_plot(self):
-
-        self.gui.config_data['bg_roi_depth_range'] = [100, 700]
-        self.gui.config_data['bg_roi_erode'] = [1, 1]
-
-        minmax_heights = [1, 101]
-        fn = 0
-        self.gui.interactive_find_roi_session_selector(self.gui.checked_list.value)
-        self.gui.prepare_data_to_plot(self.gui.curr_results['roi'], minmax_heights, fn)
-
-        assert self.gui.session_parameters['azure_test']['min_height'] == int(minmax_heights[0])
-        assert self.gui.session_parameters['azure_test']['max_height'] == int(minmax_heights[1])
-        assert self.gui.session_parameters['azure_test']['true_depth'] == int(self.gui.true_depth)
