@@ -49,7 +49,7 @@ def validate_extractions_wrapper(input_dir):
     print_validation_results(scalar_df, status_dicts)
 
 def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file,
-                                         max_syllables=None, n_explained=99, select_median_duration_instances=False):
+                                         max_syllables=None, n_explained=99, select_median_duration_instances=False, max_exmaples = 20):
     '''
     Wrapper function to launch a syllable crowd movie preview and interactive labeling application.
 
@@ -89,6 +89,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
                               config_file=config_file,
                               max_sylls=max_sylls,
                               select_median_duration_instances=select_median_duration_instances,
+                              max_exmaples = max_exmaples,
                               crowd_movie_dir=crowd_movie_dir,
                               save_path=output_file)
 
