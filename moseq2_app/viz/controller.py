@@ -348,7 +348,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         config_data['separate_by'] = ''
         config_data['specific_syllable'] = None
         config_data['max_syllable'] = self.max_sylls
-        config_data['max_exmaples'] = self.max_examples
+        config_data['max_examples'] = self.max_examples
         config_data['select_median_duration_instances'] = self.select_median_duration_instances
         config_data['gaussfilter_space'] = [0, 0]
         config_data['medfilter_space'] = [0]
