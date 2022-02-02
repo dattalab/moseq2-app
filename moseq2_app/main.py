@@ -208,7 +208,7 @@ def interactive_scalar_summary(index_file):
     return viewer
 
 @filter_warnings
-def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False):
+def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
     '''
     Interactive syllable labeling tool accessible from the jupyter notebook.
 
@@ -237,7 +237,8 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
 
     interactive_syllable_labeler_wrapper(model_path, config_file,
                                          index_file, crowd_dir, syll_info_path,
-                                         max_syllables=max_syllables, n_explained=n_explained, select_median_duration_instances=select_median_duration_instances)
+                                         max_syllables=max_syllables, n_explained=n_explained, 
+                                         select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
