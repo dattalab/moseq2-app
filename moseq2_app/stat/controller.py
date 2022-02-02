@@ -289,7 +289,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
             ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
-        errorbar (str or ipywidgets.DropDown): Error bar to display. ['CI 95%' ,'SEM', 'STD']
+        errorbar (str or ipywidgets.DropDown): Error bar to display. ['None', 'CI 95%' ,'SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
@@ -340,7 +340,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if groupby == 'SessionName' or groupby == 'SubjectName':
             mean_df = df.copy()
             df = df[df[groupby].isin(self.session_sel.value)]
+            # set error bar to None because error bars are not implemented corectly in SessionName and SubjectName
+            errorbar = "None"
+            self.error_box.layout.display = "none"
         else:
+            self.error_box.layout.display = "block"
             mean_df = None
 
         # Compute cladogram if it does not already exist
