@@ -43,7 +43,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     '''
 
-    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, crowd_movie_dir, save_path):
+    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, select_median_duration_instances, max_examples, crowd_movie_dir, save_path):
         '''
         Initializes class context parameters, reads and creates the syllable information dict.
 
@@ -52,6 +52,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         model_fit (dict): Loaded trained model dict.
         index_file (str): Path to saved index file.
         max_sylls (int): Maximum number of syllables to preview and label.
+        select_median_duration_instances (bool): if true, select examples with syallable duration closer to median.
         save_path (str): Path to save syllable label information dictionary.
         '''
 
@@ -62,6 +63,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # by passing max_syllables=None to the wrapper/main.py function::label_syllables. Otherwise, if a integer
         # is inputted, then self.max_sylls is set to that same integer.
         self.max_sylls = max_sylls
+        self.select_median_duration_instances = select_median_duration_instances
+        self.max_examples = max_examples
 
         self.config_data = read_yaml(config_file)
 
@@ -345,8 +348,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         config_data['separate_by'] = ''
         config_data['specific_syllable'] = None
         config_data['max_syllable'] = self.max_sylls
-        config_data['max_examples'] = 20
-
+        config_data['max_examples'] = self.max_examples
+        config_data['select_median_duration_instances'] = self.select_median_duration_instances
         config_data['gaussfilter_space'] = [0, 0]
         config_data['medfilter_space'] = [0]
         config_data['sort'] = True
@@ -376,7 +379,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if not os.path.exists(crowd_movie_dir):
             print('Crowd movies not found. Generating movies...')
             config_data = self.set_default_cm_parameters(config_data)
-
             # Generate movies if directory does not exist
             crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, crowd_movie_dir, config_data)['all']
         else:

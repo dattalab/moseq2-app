@@ -34,7 +34,7 @@ class SyllableStatWidgets:
         self.session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,
                                                   layout=self.layout_hidden, disabled=False)
 
-        self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
+        self.errorbar_dropdown = widgets.Dropdown(options=['None', 'CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
         self.hyp_test_dropdown = widgets.Dropdown(options=['KW & Dunn\'s', 'Z-Test', 'T-Test', 'Mann-Whitney'], description='Hypothesis Test:',
                                                   style=style, disabled=False)
@@ -42,13 +42,14 @@ class SyllableStatWidgets:
         ## boxes
         self.data_layout = widgets.Layout(flex_flow='row', padding='top', justify_content='space-around', width='100%')
 
-        self.stat_box = VBox([self.stat_dropdown, self.errorbar_dropdown])
+        self.stat_box = VBox([self.stat_dropdown])
+        self.error_box = VBox([self.errorbar_dropdown])
         self.mutation_box = VBox([self.ctrl_dropdown, self.exp_dropdown, self.hyp_test_dropdown])
 
         self.sorting_box = VBox([self.sorting_dropdown, self.mutation_box, self.thresholding_dropdown])
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
-        self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
+        self.stat_widget_box = VBox([HBox([VBox([self.stat_box, self.error_box]), self.sorting_box, self.session_box])])
     
     def clear_on_click(self, b=None):
         '''
@@ -90,7 +91,6 @@ class SyllableStatWidgets:
             self.session_sel.layout.display = "none"
 
         self.session_sel.value = [self.session_sel.options[0]]
-
 class SyllableStatBokehCallbacks:
     def __init__(self, condition=''):
         '''

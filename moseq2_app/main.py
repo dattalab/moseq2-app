@@ -9,8 +9,8 @@ import ipywidgets as widgets
 from IPython.display import display
 from bokeh.io import output_notebook, show
 from moseq2_extract.util import filter_warnings
-from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_extract.gui import get_selected_sessions
+from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
@@ -208,7 +208,7 @@ def interactive_scalar_summary(index_file):
     return viewer
 
 @filter_warnings
-def label_syllables(progress_paths, max_syllables=None, n_explained=99):
+def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
     '''
     Interactive syllable labeling tool accessible from the jupyter notebook.
 
@@ -231,15 +231,14 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
 
     inputs = ['model_path', 'config_file', 'index_file']
 
-    error = validate_inputs(inputs, progress_paths)
-
-    if error:
+    if validate_inputs(inputs, progress_paths):
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
     interactive_syllable_labeler_wrapper(model_path, config_file,
                                          index_file, crowd_dir, syll_info_path,
-                                         max_syllables=max_syllables, n_explained=n_explained)
+                                         max_syllables=max_syllables, n_explained=n_explained, 
+                                         select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):

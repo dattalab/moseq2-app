@@ -58,7 +58,9 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['model_path'],
                                    self.progress_paths['index_file'],
                                    self.progress_paths['config_file'],
-                                   6,
+                                   6, # max syll
+                                   False, # not choose the instances closer to median
+                                   20, # set number of examples
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
@@ -99,7 +101,9 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['model_path'],
                                    self.progress_paths['index_file'],
                                    self.progress_paths['config_file'],
-                                   5,
+                                   5, # max syll
+                                   False, # not choose the instances closer to median
+                                   20, # set number of examples
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
@@ -115,7 +119,9 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['model_path'],
                                    self.progress_paths['index_file'],
                                    self.progress_paths['config_file'],
-                                   5,
+                                   5, # max syll
+                                   False, # not choose the instances closer to median
+                                   20, # set number of examples
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
