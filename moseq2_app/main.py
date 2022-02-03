@@ -228,6 +228,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
     index_file = progress_paths['index_file']
     crowd_dir = progress_paths['crowd_dir']
     syll_info_path = progress_paths['syll_info']
+    fig_dir = progress_paths['plot_path']
 
     inputs = ['model_path', 'config_file', 'index_file']
 
@@ -236,7 +237,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
         return
 
     interactive_syllable_labeler_wrapper(model_path, config_file,
-                                         index_file, crowd_dir, syll_info_path,
+                                         index_file, crowd_dir, syll_info_path, fig_dir,
                                          max_syllables=max_syllables, n_explained=n_explained, 
                                          select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
 
