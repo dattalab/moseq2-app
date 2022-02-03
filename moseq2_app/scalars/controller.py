@@ -126,6 +126,8 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         Returns
         -------
         '''
+        
+        # https://plotly.com/python/configuration-options/#customizing-download-plot-options
         plotly_config = {
             'toImageButtonOptions': {
                 'format': 'svg', # one of png, svg, jpeg, webp
