@@ -1392,10 +1392,10 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
         # initialize bokeh plot with title and joined panning/zooming coordinates
         if len(plots) == 0:
-            plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2))
+            plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2), output_backend="svg")
         else:
             # Connecting pan-zoom interaction across plots
-            plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
+            plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range, output_backend="svg")
 
         # format the plot and set up the tooltips
         format_plot(plot)
