@@ -22,7 +22,8 @@ class TestSyllableLabeler(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         if exists(progress_paths['syll_info']):
@@ -48,7 +49,8 @@ class TestSyllableLabeler(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         bokeh.io.output_notebook()
@@ -245,7 +247,8 @@ class TestCrowdMovieComparison(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         if exists(progress_paths['syll_info']):
@@ -289,7 +292,8 @@ class TestCrowdMovieComparison(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         self.grouped_data_dir = 'data/grouped_crowd_movies/'
