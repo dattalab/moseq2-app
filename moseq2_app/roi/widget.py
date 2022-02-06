@@ -33,7 +33,7 @@ _hover_dict = {
 
 
 class ArenaMaskWidget:
-    def __init__(self, data_dir, config_file, session_config_path) -> None:
+    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False) -> None:
         self.backgrounds = {}
         self.extracts = {}
         self.data_dir = data_dir
@@ -41,7 +41,7 @@ class ArenaMaskWidget:
 
         self.config_data = read_and_clean_config(config_file)
 
-        sessions = get_sessions(data_dir)
+        sessions = get_sessions(data_dir, skip_extracted=skip_extracted)
 
         # creates session-specific configurations
         if exists(session_config_path):
