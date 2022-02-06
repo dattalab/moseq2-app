@@ -8,7 +8,6 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 import re
 import os
 import io
-import shutil
 import base64
 import numpy as np
 import pandas as pd
@@ -19,7 +18,7 @@ import ruamel.yaml as yaml
 import ipywidgets as widgets
 from bokeh.layouts import column
 from bokeh.plotting import figure
-from os.path import relpath, exists
+from os.path import exists
 from moseq2_extract.util import read_yaml
 from moseq2_viz.util import get_sorted_index
 from bokeh.models import Div, CustomJS, Slider
@@ -35,6 +34,9 @@ from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_posi
 yml = yaml.YAML()
 yml.indent(mapping=3, offset=2)
 
+def _initialize_syll_info_dict(max_sylls):
+    return {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in range(max_sylls)}
+
 class SyllableLabeler(SyllableLabelerWidgets):
     '''
 
@@ -43,7 +45,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
     '''
 
-    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, crowd_movie_dir, save_path):
+    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, select_median_duration_instances, max_examples, crowd_movie_dir, save_path):
         '''
         Initializes class context parameters, reads and creates the syllable information dict.
 
@@ -52,6 +54,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         model_fit (dict): Loaded trained model dict.
         index_file (str): Path to saved index file.
         max_sylls (int): Maximum number of syllables to preview and label.
+        select_median_duration_instances (bool): if true, select examples with syallable duration closer to median.
         save_path (str): Path to save syllable label information dictionary.
         '''
 
@@ -62,6 +65,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # by passing max_syllables=None to the wrapper/main.py function::label_syllables. Otherwise, if a integer
         # is inputted, then self.max_sylls is set to that same integer.
         self.max_sylls = max_sylls
+        self.select_median_duration_instances = select_median_duration_instances
+        self.max_examples = max_examples
 
         self.config_data = read_yaml(config_file)
 
@@ -87,8 +92,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
                 if os.path.exists(self.df_output_file):
                     os.remove(self.df_output_file)
 
-                self.syll_info = {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i
-                                    in range(max_sylls)}
+                self.syll_info = _initialize_syll_info_dict(max_sylls)
 
             for i in range(max_sylls):
                 if 'group_info' not in self.syll_info[i]:
@@ -98,11 +102,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
             if os.path.exists(self.df_output_file):
                 os.remove(self.df_output_file)
 
-            self.syll_info = {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in
-                              range(max_sylls)}
+            self.syll_info = _initialize_syll_info_dict(max_sylls)
 
             # Write to file
-            with open(self.save_path, 'w+') as f:
+            with open(self.save_path, 'w') as f:
                 yml.dump(self.syll_info, f)
 
         # Initialize button callbacks
@@ -139,7 +142,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             tmp[syll].pop('group_info', None)
 
         # Write to file
-        with open(self.save_path, 'w+') as f:
+        with open(self.save_path, 'w') as f:
             yml.dump(tmp, f)
 
         if curr_syll is not None:
@@ -196,8 +199,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             # Compute a syllable summary Dataframe containing usage-based
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            df['SubjectName'] = df['SubjectName'].astype(str)
-            df['SessionName'] = df['SessionName'].astype(str)
+            df = df.astype(dict(SubjectName=str, SessionName=str))
             print('Writing main syllable info to parquet')
             df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
             scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
@@ -345,8 +347,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         config_data['separate_by'] = ''
         config_data['specific_syllable'] = None
         config_data['max_syllable'] = self.max_sylls
-        config_data['max_examples'] = 20
-
+        config_data['max_examples'] = self.max_examples
+        config_data['select_median_duration_instances'] = self.select_median_duration_instances
         config_data['gaussfilter_space'] = [0, 0]
         config_data['medfilter_space'] = [0]
         config_data['sort'] = True
@@ -376,7 +378,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if not os.path.exists(crowd_movie_dir):
             print('Crowd movies not found. Generating movies...')
             config_data = self.set_default_cm_parameters(config_data)
-
             # Generate movies if directory does not exist
             crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, crowd_movie_dir, config_data)['all']
         else:

@@ -126,6 +126,13 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         Returns
         -------
         '''
-
+        
+        # https://plotly.com/python/configuration-options/#customizing-download-plot-options
+        plotly_config = {
+            'toImageButtonOptions': {
+                'format': 'svg', # one of png, svg, jpeg, webp
+                'scale': 1 # Multiply title/legend/axis/canvas sizes by this factor
+                }
+            }
         fig = self.make_graphs()
-        fig.show()
+        fig.show(config=plotly_config)

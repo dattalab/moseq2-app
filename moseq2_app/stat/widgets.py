@@ -34,7 +34,7 @@ class SyllableStatWidgets:
         self.session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,
                                                   layout=self.layout_hidden, disabled=False)
 
-        self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
+        self.errorbar_dropdown = widgets.Dropdown(options=['None', 'CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
         self.hyp_test_dropdown = widgets.Dropdown(options=['KW & Dunn\'s', 'Z-Test', 'T-Test', 'Mann-Whitney'], description='Hypothesis Test:',
                                                   style=style, disabled=False)
@@ -42,13 +42,14 @@ class SyllableStatWidgets:
         ## boxes
         self.data_layout = widgets.Layout(flex_flow='row', padding='top', justify_content='space-around', width='100%')
 
-        self.stat_box = VBox([self.stat_dropdown, self.errorbar_dropdown])
+        self.stat_box = VBox([self.stat_dropdown])
+        self.error_box = VBox([self.errorbar_dropdown])
         self.mutation_box = VBox([self.ctrl_dropdown, self.exp_dropdown, self.hyp_test_dropdown])
 
         self.sorting_box = VBox([self.sorting_dropdown, self.mutation_box, self.thresholding_dropdown])
         self.session_box = VBox([self.grouping_dropdown, self.session_sel])
 
-        self.stat_widget_box = VBox([HBox([self.stat_box, self.sorting_box, self.session_box])])
+        self.stat_widget_box = VBox([HBox([VBox([self.stat_box, self.error_box]), self.sorting_box, self.session_box])])
     
     def clear_on_click(self, b=None):
         '''
@@ -90,7 +91,6 @@ class SyllableStatWidgets:
             self.session_sel.layout.display = "none"
 
         self.session_sel.value = [self.session_sel.options[0]]
-
 class SyllableStatBokehCallbacks:
     def __init__(self, condition=''):
         '''
@@ -238,14 +238,14 @@ class SyllableStatBokehCallbacks:
 class TransitionGraphWidgets:
 
 
-    '''
-    edge_thresholder = widgets.FloatRangeSlider(value=[0.0025, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
-                                                description='Edges weights to display', continuous_update=False)
-    usage_thresholder = widgets.FloatRangeSlider(value=[0, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
-                                                description='Usage nodes to display', continuous_update=False)
-    speed_thresholder = widgets.FloatRangeSlider(value=[-25, 200], min=-50, max=200, step=1, style=style, readout_format='.1f',
-                                                description='Threshold nodes by speed', continuous_update=False)
-    '''
+    
+    # edge_thresholder = widgets.FloatRangeSlider(value=[0.0025, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
+    #                                             description='Edges weights to display', continuous_update=False)
+    # usage_thresholder = widgets.FloatRangeSlider(value=[0, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
+    #                                             description='Usage nodes to display', continuous_update=False)
+    # speed_thresholder = widgets.FloatRangeSlider(value=[-25, 200], min=-50, max=200, step=1, style=style, readout_format='.1f',
+    #                                             description='Threshold nodes by speed', continuous_update=False)
+    
 
     def __init__(self):
         style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
@@ -258,7 +258,7 @@ class TransitionGraphWidgets:
         ui_layout = widgets.Layout(flex_flow='row', border='solid', align_items='stretch',
                                    width='100%', justify_content='space-around')
 
-        self.graph_layout_dropdown = widgets.Dropdown(options=['circular',  'spring', 'spectral'],
+        self.graph_layout_dropdown = widgets.Dropdown(options=['circular',  'spring'],
                                                       description='Graph Layout',
                                                       style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
@@ -286,7 +286,9 @@ class TransitionGraphWidgets:
         self.thresholding_box = HBox([
                                       VBox([self.graph_layout_dropdown, self.edge_thresholder, self.usage_thresholder],
                                            layout=col1_layout),
-                                      VBox([self.color_nodes_dropdown, self.speed_thresholder], layout=col2_layout)],
+                                      # VBox([self.color_nodes_dropdown, self.speed_thresholder], layout=col2_layout)],
+                                      # remove color node selector for now since there is no indication what the colors mean 
+                                      VBox([self.speed_thresholder], layout=col2_layout)],
                                            layout=ui_layout)
 
     def clear_on_click(self, b=None):

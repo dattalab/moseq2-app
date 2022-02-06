@@ -9,12 +9,12 @@ import ipywidgets as widgets
 from IPython.display import display
 from bokeh.io import output_notebook, show
 from moseq2_extract.util import filter_warnings
-from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_extract.gui import get_selected_sessions
+from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
-from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
+from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
     interactive_syllable_labeler_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
     interactive_plot_transition_graph_wrapper
@@ -99,34 +99,6 @@ def view_extraction(extractions, default=0):
     return extractions
 
 @filter_warnings
-def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=True, overwrite=False):
-    '''
-    Function to launch ROI detector interactive GUI in jupyter notebook
-
-    Parameters
-    ----------
-    progress_paths (dict): dictionary of notebook progress paths.
-    compute_all_bgs (bool): if True, computes all the sessions' background images to speed up the UI.
-    overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
-
-    Returns
-    -------
-    '''
-
-    config_file = progress_paths['config_file']
-    session_config = progress_paths['session_config']
-
-    roi_app = InteractiveFindRoi(progress_paths.get('base_dir', './'),
-                                 config_file,
-                                 session_config,
-                                 compute_bgs=compute_all_bgs,
-                                 autodetect_depths=autodetect_depths,
-                                 overwrite=overwrite)
-
-    # Run interactive application
-    roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
-
-@filter_warnings
 def preview_extractions(input_dir, flipped=False):
     '''
     Function to launch a dynamic video loader that displays extraction session mp4s.
@@ -208,7 +180,7 @@ def interactive_scalar_summary(index_file):
     return viewer
 
 @filter_warnings
-def label_syllables(progress_paths, max_syllables=None, n_explained=99):
+def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
     '''
     Interactive syllable labeling tool accessible from the jupyter notebook.
 
@@ -228,18 +200,18 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99):
     index_file = progress_paths['index_file']
     crowd_dir = progress_paths['crowd_dir']
     syll_info_path = progress_paths['syll_info']
+    fig_dir = progress_paths['plot_path']
 
     inputs = ['model_path', 'config_file', 'index_file']
 
-    error = validate_inputs(inputs, progress_paths)
-
-    if error:
+    if validate_inputs(inputs, progress_paths):
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
     interactive_syllable_labeler_wrapper(model_path, config_file,
-                                         index_file, crowd_dir, syll_info_path,
-                                         max_syllables=max_syllables, n_explained=n_explained)
+                                         index_file, crowd_dir, syll_info_path, fig_dir,
+                                         max_syllables=max_syllables, n_explained=n_explained, 
+                                         select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
