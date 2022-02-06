@@ -22,7 +22,8 @@ class TestSyllableLabeler(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         if exists(progress_paths['syll_info']):
@@ -48,7 +49,8 @@ class TestSyllableLabeler(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         bokeh.io.output_notebook()
@@ -60,6 +62,7 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['config_file'],
                                    6, # max syll
                                    False, # not choose the instances closer to median
+                                   20, # set number of examples
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
@@ -102,6 +105,7 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['config_file'],
                                    5, # max syll
                                    False, # not choose the instances closer to median
+                                   20, # set number of examples
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
@@ -119,6 +123,7 @@ class TestSyllableLabeler(TestCase):
                                    self.progress_paths['config_file'],
                                    5, # max syll
                                    False, # not choose the instances closer to median
+                                   20, # set number of examples
                                    self.progress_paths['crowd_dir'],
                                    self.progress_paths['syll_info'])
 
@@ -242,7 +247,8 @@ class TestCrowdMovieComparison(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         if exists(progress_paths['syll_info']):
@@ -286,7 +292,8 @@ class TestCrowdMovieComparison(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         self.grouped_data_dir = 'data/grouped_crowd_movies/'

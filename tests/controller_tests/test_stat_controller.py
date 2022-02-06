@@ -20,7 +20,8 @@ class TestSyllableStatController(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         if exists(progress_paths['syll_info']):
@@ -47,7 +48,8 @@ class TestSyllableStatController(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
 
@@ -165,7 +167,8 @@ class TestTransitionGraphController(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         if exists(progress_paths['syll_info']):
@@ -192,7 +195,8 @@ class TestTransitionGraphController(TestCase):
             'model_path': 'data/test_model.p',
             'crowd_dir': 'data/crowd_movies/',
             'syll_info': 'data/syll_info.yaml',
-            'df_info_path': 'data/syll_df.parquet'
+            'df_info_path': 'data/syll_df.parquet',
+            'plot_path': 'data/plot'
         }
 
         bokeh.io.output_notebook()
