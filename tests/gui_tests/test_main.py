@@ -8,7 +8,7 @@ from os.path import exists, join
 from moseq2_viz.util import parse_index, read_yaml
 from moseq2_extract.helpers.wrappers import extract_wrapper
 from moseq2_app.gui.progress import generate_missing_metadata
-from moseq2_app.main import (interactive_roi_detector, preview_extractions, validate_extractions,
+from moseq2_app.main import (preview_extractions, validate_extractions,
                              interactive_group_setting, label_syllables, interactive_syllable_stats,
                              interactive_crowd_movie_comparison, interactive_transition_graph,
                              view_extraction, flip_classifier_tool)
@@ -69,21 +69,6 @@ class TestMain(TestCase):
     def test_view_extraction(self):
         out = view_extraction([], default=0)
         assert out == []
-
-    def test_interactive_roi(self):
-
-        config_data = read_yaml('data/config.yaml')
-
-        config_data['camera_type'] = 'auto'
-        config_data['bg_roi_depth_range'] = [300, 600]
-        config_data['chunk_size'] = 10
-        config_data['threads'] = 6
-        config_data['bg_roi_erode'] = (1, 1)
-
-        with open('data/config.yaml', 'w') as f:
-            yaml.safe_dump(config_data, f)
-
-        interactive_roi_detector(self.progress_paths, compute_all_bgs=True, autodetect_depths=False)
 
     def test_interactive_extraction_preview(self):
 

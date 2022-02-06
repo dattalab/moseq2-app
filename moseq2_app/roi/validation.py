@@ -4,7 +4,6 @@ The module contains extraction validation functions that test extractions' scala
  timestamps, and position heatmaps.
 
 '''
-import scipy
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -13,7 +12,6 @@ import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml
-from moseq2_viz.scalars.util import compute_all_pdf_data
 
 
 def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
@@ -167,61 +165,6 @@ def get_scalar_df(path_dict):
     return scalar_df
 
 
-def compute_kl_divergences(pdfs, groups, sessions, sessionNames, oob=False):
-    '''
-    Computes KL divergence for all sessions and returns the divergences
-    Consider trying Jensen Shannon or Wasserstein instead!!
-
-    Parameters
-    ----------
-    pdfs (list): list of 2d probability density functions (heatmaps) describing mouse position.
-    groups (list): list of groups corresponding to the pdfs indices
-    sessions (list): list of sessions corresponding to the pdfs indices
-    sessionNames (list): list of sessionNames corresponding to the pdfs indices
-    oob (boolean): Compute out-of-bag KL-divergences
-
-    Returns
-    -------
-    kl_divergences (pd.Dataframe): dataframe with mouse group, session, subjectname, and kl divergence
-    '''
-
-    if oob:
-        divergence_vals = []
-        for i, pdf in enumerate(pdfs):
-            oob_mean_pdf = pdfs[np.arange(len(pdfs)) != i].mean(0).flatten()
-            divergence_vals.append(scipy.stats.entropy(pk=oob_mean_pdf, qk=pdf.flatten()))
-    else:
-        overall_mean_pdf = pdfs.mean(0).flatten()
-        divergence_vals = [scipy.stats.entropy(pk=overall_mean_pdf, qk=pdf.flatten()) for pdf in pdfs]
-
-    kl_divergences = pd.DataFrame({"group": groups,
-                                   "session": sessions,
-                                   "sessionName": sessionNames,
-                                   "divergence": divergence_vals})
-
-    return kl_divergences
-
-def get_kl_divergence_outliers(kl_divergences):
-    '''
-    Returns the position PDFs that are over 2 standard deviations away from the mean position divergence.
-
-    Parameters
-    ----------
-    kl_divergences (pd.Dataframe): dataframe with group, session, subjectName, and divergence
-
-    Returns
-    -------
-    outliers (pd.Dataframe): dataframe of outlier sessions
-    '''
-
-    kl_sorted = kl_divergences.sort_values(by='divergence', ascending=False).reset_index(drop=True)
-
-    kl_mean = kl_sorted['divergence'].mean()
-    kl_std = kl_sorted['divergence'].std()
-
-    outliers = kl_sorted[kl_sorted['divergence'] >= kl_mean + 2 * kl_std]
-    return outliers
-
 def make_session_status_dicts(paths):
     '''
     Returns the flag status dicts for all the found completed extracted sessions. Additionally performs
@@ -312,36 +255,6 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     return status_dicts
 
 
-def run_heatmap_kl_divergence_test(scalar_df, status_dicts):
-    '''
-
-    Finds the position PDF outlier sessions and updates the status_dicts with the respective position heatmap flag.
-
-    Parameters
-    ----------
-    scalar_df (pd.DataFrame): Computed Scalar DataFrame
-    status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
-
-    Returns
-    -------
-    status_dicts (dict): stacked dictionary object containing updated position_heatmap flags.
-    '''
-
-    pdfs, groups, sessions, sessionNames = compute_all_pdf_data(scalar_df, key='uuid')
-
-    kl_divergences = compute_kl_divergences(pdfs, groups, sessions, sessionNames)
-
-    outliers = list(set(get_kl_divergence_outliers(kl_divergences).sessionName))
-
-    outlier_indices = [i for i, e in enumerate(sessionNames) if e in outliers]
-    outlier_pdfs = pdfs[outlier_indices]
-
-    for o, pdf in zip(outliers, outlier_pdfs):
-        status_dicts[o]['position_heatmap'] = pdf
-
-    return status_dicts
-
-
 def run_validation_tests(scalar_df, status_dicts):
     '''
 
@@ -385,23 +298,6 @@ def run_validation_tests(scalar_df, status_dicts):
 
     return status_dicts
 
-def plot_heatmap(heatmap, title):
-    '''
-    Plots and displays outlier heatmap with the SessionName as the title.
-
-    Parameters
-    ----------
-    heatmap (2d np.array): outlier position PDF
-    title (str): plot title
-
-    Returns
-    -------
-    '''
-
-    im = plt.imshow(np.array(heatmap) / np.array(heatmap).max())
-    plt.colorbar(im, fraction=0.046, pad=0.04)
-    plt.title(f'{title}')
-    plt.show(block=False)
 
 def print_validation_results(scalar_df, status_dicts):
     '''

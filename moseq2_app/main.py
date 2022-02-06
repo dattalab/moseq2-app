@@ -14,7 +14,7 @@ from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
-from moseq2_app.roi.controller import InteractiveFindRoi, InteractiveExtractionViewer
+from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
     interactive_syllable_labeler_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
     interactive_plot_transition_graph_wrapper
@@ -97,34 +97,6 @@ def view_extraction(extractions, default=0):
         return [extractions[default]]
 
     return extractions
-
-@filter_warnings
-def interactive_roi_detector(progress_paths, compute_all_bgs=True, autodetect_depths=True, overwrite=False):
-    '''
-    Function to launch ROI detector interactive GUI in jupyter notebook
-
-    Parameters
-    ----------
-    progress_paths (dict): dictionary of notebook progress paths.
-    compute_all_bgs (bool): if True, computes all the sessions' background images to speed up the UI.
-    overwrite (bool): if True, will overwrite the previously saved session_config.yaml file
-
-    Returns
-    -------
-    '''
-
-    config_file = progress_paths['config_file']
-    session_config = progress_paths['session_config']
-
-    roi_app = InteractiveFindRoi(progress_paths.get('base_dir', './'),
-                                 config_file,
-                                 session_config,
-                                 compute_bgs=compute_all_bgs,
-                                 autodetect_depths=autodetect_depths,
-                                 overwrite=overwrite)
-
-    # Run interactive application
-    roi_app.interactive_find_roi_session_selector(roi_app.checked_list.value)
 
 @filter_warnings
 def preview_extractions(input_dir, flipped=False):
