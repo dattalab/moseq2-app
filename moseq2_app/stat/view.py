@@ -1087,12 +1087,13 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     '''
 
     # node colors for difference graphs
+    # node size is likely related to node diameters from https://towardsdatascience.com/customizing-networkx-graphs-f80b4e69bedf
     if difference_graph:
         node_color = {s: 'red' if usages[s] > 0 else 'blue' for s in node_indices}
-        node_size = {s: max(15., 10 + abs(usages[s] * 500)) for s in node_indices}
+        node_size = {s: max(15., 10 + abs(usages[s] * 1000)) for s in node_indices}
     else:
         node_color = {s: 'red' for s in node_indices}
-        node_size = {s: max(15., abs(usages[s] * 500)) for s in node_indices}
+        node_size = {s: max(15., abs(usages[s] * 1000)) for s in node_indices}
 
     # setting node attributes
     nx.set_node_attributes(graph, node_color, "node_color")
@@ -1283,12 +1284,13 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
         # get node positions
         if len(plots) == 0:
             x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
-            syllable = list(graph.nodes)
+            # find the nodes and cast the labels to a string
+            syllable = [str(n) for n in list(graph.nodes._nodes.keys())]
         else:
             new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
                           graph_renderer.layout_provider.graph_layout}
             x, y = zip(*new_layout.values())
-            syllable = [a if a in node_indices else '' for a in new_layout]
+            syllable = [str(a) if a in node_indices else '' for a in new_layout]
     except Exception as e:
         # If the graph has been thresholded such that there are missing syllables, or is empty altogether
         # (with or without thresholding) we remove all the node label coordinates.
@@ -1436,7 +1438,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         # get node labels and draw their numbers on each node
         labels = get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
 
-        # render labels
+        # render labels 
         plot.renderers.append(labels)
 
         # get plot legends
