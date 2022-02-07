@@ -2,7 +2,6 @@
 Constructs a jupyter notebook viewable widget users can use to identify the arena floor
 and to validate extractions performed on a small chunk of data. 
 '''
-from gc import callbacks
 import param
 import numpy as np
 import panel as pn
@@ -42,6 +41,9 @@ class ArenaMaskWidget:
         self.config_data = read_and_clean_config(config_file)
 
         sessions = get_sessions(data_dir, skip_extracted=skip_extracted)
+        if len(sessions) == 0:
+            self.view = None
+            return
 
         # creates session-specific configurations
         if exists(session_config_path):
@@ -70,7 +72,10 @@ class ArenaMaskWidget:
         self.view = ArenaMaskView(self.session_data)
 
     def _repr_mimebundle_(self, include=None, exclude=None):
+        if self.view is None:
+            return 'No sessions to show. They are all extracted.'
         return self.view._repr_mimebundle_(include, exclude)
+
 
     def set_session_config_vars(self):
         folder = self.session_data.path
