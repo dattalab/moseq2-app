@@ -8,8 +8,7 @@ from shutil import copy2
 MOSEQ_NOTEBOOKS = [
     "Flip-Classifier-Training-Notebook.ipynb",
     "MoSeq2-Extract-Modeling-Notebook.ipynb",
-    "MoSeq2-Analysis-Visualization-Notebook.ipynb",
-    "Data-Download-Notebook.ipynb"
+    "MoSeq2-Analysis-Visualization-Notebook.ipynb"
 ]
 
 # look for download scripts in the base dir
