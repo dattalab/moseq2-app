@@ -38,7 +38,9 @@ RUN --mount=type=cache,target=/opt/conda/pkgs apt update && \
     chmod +x ./copy-notebooks-download-scripts.py
 
 VOLUME [ "/data" ]
-EXPOSE 8888
+# jupyter port
+EXPOSE 8786
+# dask port
 EXPOSE 8787
 
 ENTRYPOINT ./copy-notebooks-download-scripts.py && SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8888 --ip=0.0.0.0 --no-browser --allow-root
