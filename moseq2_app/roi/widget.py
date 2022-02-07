@@ -43,6 +43,7 @@ class ArenaMaskWidget:
         sessions = get_sessions(data_dir, skip_extracted=skip_extracted)
         if len(sessions) == 0:
             self.view = None
+            print('No sessions to show. There are either no sessions present or they are all extracted.')
             return
 
         # creates session-specific configurations
@@ -72,9 +73,8 @@ class ArenaMaskWidget:
         self.view = ArenaMaskView(self.session_data)
 
     def _repr_mimebundle_(self, include=None, exclude=None):
-        if self.view is None:
-            return 'No sessions to show. They are all extracted.'
-        return self.view._repr_mimebundle_(include, exclude)
+        if self.view is not None:
+            return self.view._repr_mimebundle_(include, exclude)
 
 
     def set_session_config_vars(self):
