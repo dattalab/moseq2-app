@@ -43,4 +43,4 @@ EXPOSE 8786
 # dask port
 EXPOSE 8787
 
-ENTRYPOINT ./copy-notebooks-download-scripts.py && SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8888 --ip=0.0.0.0 --no-browser --allow-root
+ENTRYPOINT ./copy-notebooks-download-scripts.py && SHELL=/bin/bash jupyter notebook --notebook-dir=/data --port=8786 --ip=0.0.0.0 --no-browser --allow-root
