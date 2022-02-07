@@ -48,8 +48,8 @@ def merge_labels_with_scalars(sorted_index, model_path):
     Parameters
     ----------
     sorted_index (dict): Sorted dict of modeled sessions
-    model_fit (dict): Trained ARHMM results dict
-    model_path (str): Respective path to the ARHMM model in use.
+    model_fit (dict): Trained AR-HMM results dict
+    model_path (str): Respective path to the AR-HMM model in use.
     max_sylls (int): Maximum number of syllables to include
 
     Returns
