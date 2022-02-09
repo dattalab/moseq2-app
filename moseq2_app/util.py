@@ -165,7 +165,7 @@ def setup_model_folders(progress_paths):
         
         model_dict[model]['model_session_path'] = model_dir
         model_dict[model]['model_path'] = join(model_dir, model)
-    return model_dict
+    return dict(model_dict)  # remove defaultdict class
 
 def update_model_paths(desired_model, model_dict, progress_filepath):
     """helper function to update relevant model paths in progress.yaml when specific model is chosen
@@ -181,6 +181,9 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
     [type]
         [description]
     """
+
+    if desired_model not in model_dict:
+        print(f'{desired_model} not found in model_dict. Make sure desired_model is one of the keys in model_dict. See keys with list(model_dict)')
 
     # update model_session_path and model_path
     for key in ['model_session_path', 'model_path']:
