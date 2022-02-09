@@ -34,7 +34,7 @@ class SyllableStatWidgets:
         self.session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,
                                                   layout=self.layout_hidden, disabled=False)
 
-        self.errorbar_dropdown = widgets.Dropdown(options=['None', 'CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
+        self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'None', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
         self.hyp_test_dropdown = widgets.Dropdown(options=['KW & Dunn\'s', 'Z-Test', 'T-Test', 'Mann-Whitney'], description='Hypothesis Test:',
                                                   style=style, disabled=False)
