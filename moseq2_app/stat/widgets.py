@@ -34,7 +34,7 @@ class SyllableStatWidgets:
         self.session_sel = widgets.SelectMultiple(options=[], description='Sessions:', rows=10,
                                                   layout=self.layout_hidden, disabled=False)
 
-        self.errorbar_dropdown = widgets.Dropdown(options=['None', 'CI 95%', 'SEM', 'STD'], description='Error Bars:', disabled=False)
+        self.errorbar_dropdown = widgets.Dropdown(options=['CI 95%', 'None', 'SEM', 'STD'], description='Error Bars:', disabled=False)
 
         self.hyp_test_dropdown = widgets.Dropdown(options=['KW & Dunn\'s', 'Z-Test', 'T-Test', 'Mann-Whitney'], description='Hypothesis Test:',
                                                   style=style, disabled=False)
@@ -236,17 +236,6 @@ class SyllableStatBokehCallbacks:
                self.js_condition_pass + self.js_condition_fail + self.js_update
 
 class TransitionGraphWidgets:
-
-
-    
-    # edge_thresholder = widgets.FloatRangeSlider(value=[0.0025, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
-    #                                             description='Edges weights to display', continuous_update=False)
-    # usage_thresholder = widgets.FloatRangeSlider(value=[0, 1], min=0, max=1, step=0.001, style=style, readout_format='.4f',
-    #                                             description='Usage nodes to display', continuous_update=False)
-    # speed_thresholder = widgets.FloatRangeSlider(value=[-25, 200], min=-50, max=200, step=1, style=style, readout_format='.1f',
-    #                                             description='Threshold nodes by speed', continuous_update=False)
-    
-
     def __init__(self):
         style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
 
@@ -263,23 +252,12 @@ class TransitionGraphWidgets:
                                                       style=style, value='circular', continuous_update=False,
                                                       layout=widgets.Layout(align_items='stretch', width='80%'))
 
-        self.color_nodes_dropdown = widgets.Dropdown(options=['Default', 'Duration', '2D velocity',
-                                                              '3D velocity', 'Height', 'Distance to Center',
-                                                              'Entropy-In', 'Entropy-Out'],
-                                                     description='Node Coloring',
-                                                     style=style, value='Default', continuous_update=False,
-                                                     layout=widgets.Layout(align_items='stretch', width='80%'))
-
         self.edge_thresholder = widgets.FloatRangeSlider(style=style, step=0.001, min=0, readout_format='.4f',
                                                          description='Threshold Edge Weights',
                                                          layout=widgets.Layout(align_items='stretch', width='90%'),
                                                          continuous_update=False)
         self.usage_thresholder = widgets.FloatRangeSlider(style=style, step=0.001, min=0, readout_format='.3f',
                                                           description='Threshold Nodes by Usage',
-                                                          layout=widgets.Layout(align_items='stretch', width='90%'),
-                                                          continuous_update=False)
-        self.speed_thresholder = widgets.FloatRangeSlider(style=style, step=0.01, min=0, readout_format='.2f',
-                                                          description='Threshold Nodes by Speed',
                                                           layout=widgets.Layout(align_items='stretch', width='90%'),
                                                           continuous_update=False)
 
@@ -320,44 +298,3 @@ class TransitionGraphWidgets:
 
         self.usage_thresholder.max = self.df['usage'].max()
         self.usage_thresholder.value = (0, self.df['usage'].max())
-
-        self.speed_thresholder.max = self.df['velocity_2d_mm'].max()
-        self.speed_thresholder.value = (0, self.df['velocity_2d_mm'].max())
-
-    def on_set_scalar(self, event):
-        '''
-        Updates the scalar threshold slider filter criteria according to the current node coloring.
-        Changes the name of the slider as well.
-
-        Parameters
-        ----------
-        event (dropdown event): User changes selected dropdown value
-
-        Returns
-        -------
-        '''
-
-        if event.new == 'Default' or event.new == '2D velocity':
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-        elif event.new == 'Duration':
-            key = 'duration'
-            self.speed_thresholder.description = 'Threshold Nodes by Duration'
-        elif event.new == '2D velocity':
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-        elif event.new == '3D velocity':
-            key = 'velocity_3d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 3D Velocity'
-        elif event.new == 'Height':
-            key = 'height_ave_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by Height'
-        elif event.new == 'Distance to Center':
-            key = 'dist_to_center_px'
-            self.speed_thresholder.description = 'Threshold Nodes by Distance to Center'
-        else:
-            key = 'velocity_2d_mm'
-            self.speed_thresholder.description = 'Threshold Nodes by 2D Velocity'
-
-        self.speed_thresholder.max = self.df[key].max()
-        self.speed_thresholder.value = (0, self.df[key].max())

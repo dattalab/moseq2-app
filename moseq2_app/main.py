@@ -208,10 +208,11 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
         print('Set the correct paths to the missing variables and run the function again.')
         return
 
-    interactive_syllable_labeler_wrapper(model_path, config_file,
+    max_sylls = interactive_syllable_labeler_wrapper(model_path, config_file,
                                          index_file, crowd_dir, syll_info_path, fig_dir,
                                          max_syllables=max_syllables, n_explained=n_explained, 
                                          select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
+    return max_sylls
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
@@ -247,7 +248,7 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
                                      info_path=syll_info_path, max_sylls=max_syllable, load_parquet=load_parquet)
 
     display(istat.clear_button, istat.stat_widget_box, istat.out)
-    show(istat.cladogram)
+    # show(istat.cladogram)
 
 @filter_warnings
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):

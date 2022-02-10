@@ -470,8 +470,6 @@ def get_pca_progress(progress_vars, pca_progress):
                 if exists(progress_vars[key]):
                     pca_progress[key] = True
 
-        if not pca_progress[key]:
-            print(f'PCA path missing: {key}')
     return pca_progress
 
 def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
@@ -547,7 +545,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
             model_num = len(glob(join(base_model_path, '*.p')))
 
     print(f'Extraction Progress: {num_extracted} out of {len(path_dict.keys())} session(s) extracted')
-    print(f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress.keys())} items finished')
+    print(f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress.keys())} items finished: {", ".join(key for key, v in pca_progress.items() if v)} left')
     if modeling_progress.get('model_path'):
         print(f'Found {model_num} model(s)')
 

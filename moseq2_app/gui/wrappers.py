@@ -96,6 +96,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Launch and display interactive API
     output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
     display(labeler.clear_button, labeler.syll_select, output)
+    return max_sylls
 
     def on_syll_change(change):
         '''
@@ -180,7 +181,6 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
                               'scalar_color': i_trans_graph.color_nodes_dropdown,
                               'edge_threshold': i_trans_graph.edge_thresholder,
                               'usage_threshold': i_trans_graph.usage_thresholder,
-                              'speed_threshold': i_trans_graph.speed_thresholder,
                               })
 
     # Display widgets and bokeh network plots

@@ -63,12 +63,12 @@ class ArenaMaskWidget:
                 deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
             write_yaml(session_parameters, self.session_config_path)
 
-        # instantiate ArenaMaskData with the first session in this list
-        self.session_data = ArenaMaskData(path=list(session_parameters)[0], controller=self)
-        self.session_data.param.path.objects = list(session_parameters)  # generates object selector in gui
-
         self.session_config = session_parameters
         self.sessions = {basename(dirname(f)): f for f in sessions}
+
+        # instantiate ArenaMaskData with the first session in this list
+        self.session_data = ArenaMaskData(path=list(self.sessions)[0], controller=self)
+        self.session_data.param.path.objects = list(self.sessions)  # generates object selector in gui
 
         self.view = ArenaMaskView(self.session_data)
 

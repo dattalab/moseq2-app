@@ -112,7 +112,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
         # Compute the syllable dendrogram values
-        self.compute_dendrogram()
+        # self.compute_dendrogram()
 
         # Plot the Bokeh graph with the currently selected data.
         self.out = interactive_output(self.interactive_syll_stats_grapher, {
@@ -410,9 +410,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
         self.set_range_widget_values()
 
-        # Set color dropdown callback
-        self.color_nodes_dropdown.observe(self.on_set_scalar, names='value')
-
         self.clear_button.on_click(self.clear_on_click)
 
         # Manage dropdown menu values
@@ -524,7 +521,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             self.compute_entropy_differences()
 
-    def interactive_transition_graph_helper(self, layout, scalar_color, edge_threshold, usage_threshold, speed_threshold):
+    def interactive_transition_graph_helper(self, layout, scalar_color, edge_threshold, usage_threshold):
         '''
 
         Helper function that generates all the transition graphs given the currently selected
@@ -572,15 +569,11 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                 'usages': usages_anchor,
                 'usage_threshold': usage_threshold
             }
-            speed_kwargs = {
-                'speeds': scalar_anchor,
-                'speed_threshold': speed_threshold
-            }
 
             # Create graph with nodes and edges
             ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
                 self.trans_mats[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
-                keep_orphans=True, max_syllable=self.max_sylls, **usage_kwargs, **speed_kwargs)
+                keep_orphans=True, max_syllable=self.max_sylls, **usage_kwargs)
             indices = [e[:-1] for e in ebunch_anchor]
 
             # Get graph anchor
@@ -603,7 +596,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                                                                 arrows=True,
                                                                                 scalars=scalars,
                                                                                 usage_kwargs=usage_kwargs,
-                                                                                speed_kwargs=speed_kwargs)
+                                                                                )
 
             # interactive plot transition graphs
             plot_interactive_transition_graph(graphs, pos, self.group,
