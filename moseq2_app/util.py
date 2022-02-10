@@ -182,8 +182,7 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
         [description]
     """
 
-    if desired_model not in model_dict:
-        print(f'{desired_model} not found in model_dict. Make sure desired_model is one of the keys in model_dict. See keys with list(model_dict)')
+    assert desired_model in model_dict, f'{desired_model} not found in model_dict. Make sure desired_model is one of the keys in model_dict. Possible keys: \n{"\n".join(map(str, model_dict))}'
 
     # update model_session_path and model_path
     for key in ['model_session_path', 'model_path']:
