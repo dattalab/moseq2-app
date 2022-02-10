@@ -1,8 +1,8 @@
-[![Build Status](https://app.travis-ci.com/dattalab/moseq2-app.svg?token=ptXpSa3Fp9PKqkxJDkDr&branch=dev)](https://app.travis-ci.com/dattalab/moseq2-app)
+<!-- [![Build Status](https://app.travis-ci.com/dattalab/moseq2-app.svg?token=ptXpSa3Fp9PKqkxJDkDr&branch=dev)](https://app.travis-ci.com/dattalab/moseq2-app)
 <p align="center">
   <img src="https://drive.google.com/uc?export=view&id=1oc0_0mlN0VTZEPMQTg_hnYAC87Lb58MI" />
 </p>
-
+ -->
 Welcome to the `moseq2-app` repository. Motion Sequencing (MoSeq) is an unsupervised machine learning method used to describe mouse behavior and `moseq2-app` is the starting point to MoSeq2 package suite.
 
  To get started, head over to the [wiki](https://github.com/dattalab/moseq2-app/wiki) to find which installation option works best for your environment and detailed documentation for the MoSeq2 package suite.
