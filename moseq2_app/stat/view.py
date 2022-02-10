@@ -986,10 +986,10 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     # edge colors for difference graphs
     if difference_graph:
         edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
-        edge_width = {e: graph.edges()[e]['weight'] * 350 for e in graph.edges()}
+        edge_width = {e: abs(graph.edges()[e]['weight'] * 400) for e in graph.edges()}
     else:
         edge_color = {e: 'black' for e in graph.edges()}
-        edge_width = {e: graph.edges()[e]['weight'] * 200 for e in graph.edges()}
+        edge_width = {e: graph.edges()[e]['weight'] * 250 for e in graph.edges()}
 
     selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
 

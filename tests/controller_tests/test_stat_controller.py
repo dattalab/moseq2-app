@@ -261,24 +261,6 @@ class TestTransitionGraphController(TestCase):
         assert self.gui.usage_thresholder.value == (0, 0.6744186046511628)
         assert self.gui.speed_thresholder.value == (0, 5.0545125007629395)
 
-    def test_on_set_scalar(self):
-
-        class Event:
-            def __init__(self, new='Default'):
-                self.new = new
-
-        event = Event('Height')
-        self.gui.on_set_scalar(event)
-        assert self.gui.speed_thresholder.description == 'Threshold Nodes by Height'
-
-        event = Event('Distance to Center')
-        self.gui.on_set_scalar(event)
-        assert self.gui.speed_thresholder.description == 'Threshold Nodes by Distance to Center'
-
-        event = Event('Center')
-        self.gui.on_set_scalar(event)
-        assert self.gui.speed_thresholder.description == 'Threshold Nodes by 2D Velocity'
-
     def test_compute_entropies(self):
 
         # Get labels and optionally relabel them by usage sorting
