@@ -181,7 +181,6 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
                               'scalar_color': i_trans_graph.color_nodes_dropdown,
                               'edge_threshold': i_trans_graph.edge_thresholder,
                               'usage_threshold': i_trans_graph.usage_thresholder,
-                              'speed_threshold': i_trans_graph.speed_thresholder,
                               })
 
     # Display widgets and bokeh network plots
