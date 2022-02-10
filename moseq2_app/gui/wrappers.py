@@ -96,6 +96,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Launch and display interactive API
     output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
     display(labeler.clear_button, labeler.syll_select, output)
+    return max_sylls
 
     def on_syll_change(change):
         '''
