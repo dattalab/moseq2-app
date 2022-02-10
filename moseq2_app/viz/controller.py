@@ -181,10 +181,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
                 self.group_syll_info[syll]['group_info'][group_name] = {
                     'usage': gd[group_name]['usage'][syll],
                     'duration (s)': gd[group_name]['duration'][syll],
-                    '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
-                    '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
+                    '2D velocity (mm/frame)': gd[group_name]['velocity_2d_mm'][syll],
+                    '3D velocity (mm/frame)': gd[group_name]['velocity_3d_mm'][syll],
                     'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                    'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
+                    'distance to center (pixels)': gd[group_name]['dist_to_center_px'][syll],
                 }
 
     def get_mean_syllable_info(self):
@@ -549,10 +549,10 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                         self.group_syll_info[syll]['group_info'][group_name] = {
                             'usage': gd[group_name]['usage'][syll],
                             'duration (s)': gd[group_name]['duration'][syll],
-                            '2D velocity (mm/s)': gd[group_name]['velocity_2d_mm'][syll],
-                            '3D velocity (mm/s)': gd[group_name]['velocity_3d_mm'][syll],
+                            '2D velocity (mm/frame)': gd[group_name]['velocity_2d_mm'][syll],
+                            '3D velocity (mm/frame)': gd[group_name]['velocity_3d_mm'][syll],
                             'height (mm)': gd[group_name]['height_ave_mm'][syll],
-                            'dist_to_center_px': gd[group_name]['dist_to_center_px'][syll],
+                            'distance to center (pixels)': gd[group_name]['dist_to_center_px'][syll],
                         }
                     except KeyError:
                         # if a syllable is not in the given group, a KeyError will arise.
@@ -634,12 +634,11 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                 try:
                     self.session_dict[syll]['session_info'][session_name] = {
                         'usage': sd[session_name]['usage'][syll],
-                        'duration': sd[session_name]['duration'][syll],
-                        '2D velocity (mm/s)': sd[session_name]['velocity_2d_mm'][syll],
-                        '3D velocity (mm/s)': sd[session_name]['velocity_3d_mm'][syll],
+                        'duration (s)': sd[session_name]['duration'][syll],
+                        '2D velocity (mm/frame)': sd[session_name]['velocity_2d_mm'][syll],
+                        '3D velocity (mm/frame)': sd[session_name]['velocity_3d_mm'][syll],
                         'height (mm)': sd[session_name]['height_ave_mm'][syll],
-                        'duration': sd[session_name]['duration'][syll],
-                        'dist_to_center_px': sd[session_name]['dist_to_center_px'][syll],
+                        'distance to center (pixels)': sd[session_name]['dist_to_center_px'][syll],
                     }
                 except KeyError:
                     # if a syllable is not in the given group, a KeyError will arise.

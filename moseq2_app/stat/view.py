@@ -11,7 +11,6 @@ import itertools
 import numpy as np
 import pandas as pd
 import networkx as nx
-from os.path import relpath
 from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
@@ -21,7 +20,7 @@ from bokeh.models.tickers import FixedTicker
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
-                          Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
+                          Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
 
 def graph_dendrogram(obj, syll_info):
     '''
@@ -75,29 +74,6 @@ def graph_dendrogram(obj, syll_info):
 
     return cladogram
 
-def clamp(val, minimum=0, maximum=255):
-    '''
-    Caps the given R/G/B value to set min and max values
-
-    https://thadeusb.com/weblog/2010/10/10/python_scale_hex_color/
-
-    Parameters
-    ----------
-    val (float): value for given color tuple member
-    minimum (int): min thresholding value
-    maximum (int): max thresholding value
-
-    Returns
-    -------
-    val (int): thresholded color tuple member
-    '''
-
-    if val < minimum:
-        return minimum
-    if val > maximum:
-        return maximum
-    return val
-
 def colorscale(hexstr, scalefactor):
     """
     Scales a hex string by ``scalefactor``. Returns scaled hex string.
@@ -118,13 +94,10 @@ def colorscale(hexstr, scalefactor):
     if scalefactor < 0 or len(hexstr) != 6:
         return hexstr
 
-    r, g, b = int(hexstr[:2], 16), int(hexstr[2:4], 16), int(hexstr[4:], 16)
+    rgb = int(hexstr[:2], 16), int(hexstr[2:4], 16), int(hexstr[4:], 16)
+    rgb = tuple(int(max(min(x * scalefactor, 255), 0)) for x in rgb)
 
-    r = int(clamp(r * scalefactor))
-    g = int(clamp(g * scalefactor))
-    b = int(clamp(b * scalefactor))
-
-    return "#%02x%02x%02x" % (r, g, b)
+    return "#%02x%02x%02x" % rgb
 
 def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, pct=5):
     '''
@@ -252,10 +225,10 @@ def setup_hovertool(renderers, callback=None):
                     <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
                     <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
-                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/frame</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/frame</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Distance to Center: @dist_to_center{0.000} pixels</span></div>
                     <div><span style="font-size: 12px;">group-error: +/- @sem{0.000}</span></div>
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
@@ -967,14 +940,14 @@ def setup_trans_graph_tooltips(plot):
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
                     <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
-                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/frame</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/frame</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
-                    <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
+                    <div><span style="font-size: 12px;">Distance to center: @dist_to_center_px{0.000} pixels</span></div>
+                    <div><span style="font-size: 12px;">Entropy in: @ent_in{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Entropy out: @ent_out{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Outgoing syllables: @next</span></div>
+                    <div><span style="font-size: 12px;">Incoming syllables: @prev</span></div>
                     <div>
                         <video
                             src="data:video/mp4;base64,@movies"; height="260"; alt="data:video/mp4;base64,@movies"; width="260"; preload="true";

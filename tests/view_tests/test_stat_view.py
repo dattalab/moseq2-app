@@ -1,23 +1,12 @@
 import numpy as np
 from unittest import TestCase
 from bokeh.plotting import figure
-from moseq2_app.stat.view import clamp, colorscale, format_graphs, get_difference_legend_items
+from moseq2_app.stat.view import colorscale, format_graphs, get_difference_legend_items
 
 class TestStatView(TestCase):
 
     def test_graph_dendrogram(self):
         pass
-
-    def test_clamp(self):
-
-        val1 = clamp(-10)
-        val2 = clamp(300)
-        val3 = clamp(151.12345)
-
-        assert val1 == 0
-        assert val1 != val2
-        assert val2 == 255
-        assert val3 == 151.12345
 
     def test_colorscale(self):
         ret = colorscale('#111111', -1)
