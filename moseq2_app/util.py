@@ -188,6 +188,7 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
     # update model_session_path and model_path
     for key in ['model_session_path', 'model_path']:
         progress_paths = update_progress(progress_filepath, key, model_dict[desired_model].get(key))
+    progress_paths = update_progress(progress_filepath, 'plot_path', join(model_dict[desired_model]['model_session_path'], 'plots/'))
 
     # reset paths in progress_paths
     for key in ['crowd_dir', 'syll_info', 'df_info_path']:
