@@ -112,7 +112,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
         # Compute the syllable dendrogram values
-        # self.compute_dendrogram()
+        self.compute_dendrogram()
 
         # Plot the Bokeh graph with the currently selected data.
         self.out = interactive_output(self.interactive_syll_stats_grapher, {
