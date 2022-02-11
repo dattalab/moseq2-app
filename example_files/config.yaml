@@ -1,0 +1,154 @@
+# moseq2-extract parameters
+angle_hampel_sig: 3
+angle_hampel_span: 0
+bg_roi_depth_range: [650, 750]
+bg_roi_dilate: [10, 10]
+bg_roi_erode: [1, 1]
+bg_roi_fill_holes: true
+bg_roi_gradient_filter: false
+bg_roi_gradient_kernel: 7
+bg_roi_gradient_threshold: 3000
+bg_roi_index: 0
+bg_roi_shape: ellipse
+bg_roi_weights: [1, 0.1, 1]
+bg_sort_roi_by_position: false
+bg_sort_roi_by_position_max_rois: 2
+cable_filter_iters: 0
+cable_filter_shape: rectangle
+cable_filter_size: [5, 5]
+camera_type: auto
+centroid_hampel_sig: 3
+centroid_hampel_span: 0
+chunk_overlap: 0
+chunk_size: 3000
+cluster_type: local
+compress: false
+compress_chunk_size: 3000
+compress_threads: 3
+compute_raw_scalars: false
+config_file: null
+crop_size: [80, 80]
+delete: false
+detected_true_depth: auto
+dilate_iterations: 1
+erode_iterations: 0
+flip_classifier: /data/flip_classifier_k2_c57_10to13weeks.pkl
+flip_classifier_smoothing: 51
+fps: 30
+frame_dtype: uint8
+frame_trim: &id001 [0, 0]
+graduate_walls: false
+manual_set_depth_range: false
+mapping: DEPTH
+max_height: 120
+max_states: 100
+model_smoothing_clips: *id001
+movie_dtype: <i2
+noise_tolerance: 30
+output_dir: proc
+output_file: null
+pixel_format: gray16le
+progress_bar: false
+recompute_bg: false
+skip_completed: false
+spatial_filter_size: [3]
+tail_filter_iters: 1
+tail_filter_shape: ellipse
+tail_filter_size: [9, 9]
+temporal_filter_size: [0]
+threads: 8
+tracking_model_init: raw
+tracking_model_ll_clip: -100
+tracking_model_ll_threshold: -100
+tracking_model_mask_threshold: -16
+tracking_model_segment: true
+use_cc: true
+use_checkpoint: false
+use_fft: false
+use_plane_bground: false
+use_tracking_model: false
+widen_radius: 0
+write_movie: true
+
+# moseq2-pca parameters
+changepoint_file: /data/_pca/changepoints.h5
+cores: 1
+dask_cache_path: /data/_pca
+dask_port: '8787'
+data_size: 4603980800
+detrend_window: 0
+dims: 300
+fill_gaps: true
+gaussfilter_space: [1.5, 1]
+gaussfilter_time: 0
+h5_mask_path: /frames_mask
+h5_path: /frames
+input_dir: /data
+inputs: [/data/aggregate_results/2019-03-20_14-37-10_amphetamine_example_7_000062_results_00.h5,
+  /data/aggregate_results/2019-03-20_15-52-08_amphetamine_example_4_000067_results_00.h5,
+  /data/aggregate_results/2019-03-20_16-12-37_saline_example_3_000066_results_00.h5,
+  /data/aggregate_results/2019-03-20_16-48-39_amphetamine_example_1_000065_results_00.h5,
+  /data/aggregate_results/2019-03-20_17-01-46_amphetamine_example_8_000068_results_00.h5,
+  /data/aggregate_results/2019-03-20_17-02-13_amphetamine_example_6_000070_results_00.h5,
+  /data/aggregate_results/2019-03-20_17-02-28_amphetamine_example_0_00071_results_00.h5,
+  /data/aggregate_results/2019-03-20_17-31-08_saline_example_6_000068_results_00.h5,
+  /data/aggregate_results/2019-03-20_17-31-38_saline_example_0_000070_results_00.h5,
+  /data/aggregate_results/2019-03-20_18-14-21_amphetamine_example_5_000072_results_00.h5,
+  /data/aggregate_results/2019-03-20_18-28-45_saline_example_1_000069_results_00.h5,
+  /data/aggregate_results/2019-03-20_18-36-56_saline_example_5_000072_results_00.h5,
+  /data/aggregate_results/2019-03-20_18-37-21_saline_example_7_000074_results_00.h5,
+  /data/aggregate_results/2019-03-21_11-49-19_amphetamine_example_3_000076_results_00.h5,
+  /data/aggregate_results/2019-03-21_12-11-37_saline_example_8_000079_results_00.h5,
+  /data/aggregate_results/2019-03-21_12-46-54_amphetamine_example_2_000077_results_00.h5,
+  /data/aggregate_results/2019-03-21_13-08-35_saline_example_9_000077_results_00.h5,
+  /data/aggregate_results/2019-03-21_13-22-56_saline_example_2_000086_results_00.h5,
+  /data/aggregate_results/2019-03-21_13-23-09_saline_example_4_000087_results_00.h5,
+  /data/aggregate_results/2019-03-21_13-58-13_amphetamine_example_9_000081_results_00.h5]
+klags: 6
+local_processes: false
+mask_height_threshold: 5
+mask_threshold: -16
+medfilter_space: [0]
+medfilter_time: [0]
+memory: 15GB
+min_height: 10
+missing_data: false
+missing_data_iters: 10
+neighbors: 1
+nworkers: 1
+overwrite_pca: false
+overwrite_pca_apply: false
+overwrite_pca_train: false
+pca_file: /data/_pca/pca.h5
+pca_file_components: /data/_pca/pca.h5
+pca_file_scores: /data/_pca/pca_scores.h5
+pca_path: /components
+percent_split: 0
+processes: 1
+queue: debug
+rank: 25
+recon_pcs: 10
+sigma: 3.5
+threshold: 0.5
+timeout: 5
+verbose: false
+wall_time: 06:00:00
+
+# moseq2-model paramters
+alpha: 5.7
+checkpoint_freq: 10
+gamma: 1000.0
+hold_out: false
+kappa: null
+ncpus: 0
+nfolds: 2
+npcs: 10
+num_iter: 50
+robust: true
+select_groups: false
+separate_trans: false
+start_time: 2022-02-09_14-38-34
+
+
+
+
