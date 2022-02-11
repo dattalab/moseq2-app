@@ -266,7 +266,8 @@ class TransitionGraphWidgets:
                                            layout=col1_layout),
                                       # VBox([self.color_nodes_dropdown, self.speed_thresholder], layout=col2_layout)],
                                       # remove color node selector for now since there is no indication what the colors mean 
-                                      VBox([self.speed_thresholder], layout=col2_layout)],
+                                      #VBox([self.speed_thresholder], layout=col2_layout)
+                                      ],
                                            layout=ui_layout)
 
     def clear_on_click(self, b=None):
