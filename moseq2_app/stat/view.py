@@ -65,7 +65,7 @@ def graph_dendrogram(obj, syll_info):
         cladogram.line(x='x', y='y', source=source)
 
     xtick_labels = [syll_info.get(lbl, {'label': ''})['label'] for lbl in labels]
-    xticks = [f'{num} - {lbl}' for num, lbl in zip(labels, xtick_labels)]
+    xticks = [f'{lbl} - {num}' if len(lbl) > 0 else f'{num}' for num, lbl in zip(labels, xtick_labels)]
 
     # Set x-axis ticks
     cladogram.xaxis.ticker = FixedTicker(ticks=labels)
@@ -576,7 +576,7 @@ def format_stat_plot(p, df, searchbox, slider, sorting):
 
     xtick_numbers = list(label_df['syllable'])
     xtick_labels = list(label_df['label'])
-    xticks = [f'{lbl} - {num}' for num, lbl in zip(xtick_numbers, xtick_labels)]
+    xticks = [f'{lbl} - {num}' if len(lbl) > 0 else f'{num}' for num, lbl in zip(xtick_numbers, xtick_labels)]
 
     # Setting dynamics xticks
     p.xaxis.ticker = FixedTicker(ticks=list(sorting))
