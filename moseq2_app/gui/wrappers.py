@@ -178,7 +178,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     # Make graphs
     out = interactive_output(i_trans_graph.interactive_transition_graph_helper,
                              {'layout': i_trans_graph.graph_layout_dropdown,
-                              'scalar_color': i_trans_graph.color_nodes_dropdown,
+                              # 'scalar_color': i_trans_graph.color_nodes_dropdown,
                               'edge_threshold': i_trans_graph.edge_thresholder,
                               'usage_threshold': i_trans_graph.usage_thresholder,
                               })

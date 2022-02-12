@@ -112,7 +112,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.grouping_dropdown.observe(self.on_grouping_update, names='value')
 
         # Compute the syllable dendrogram values
-        # self.compute_dendrogram()
+        self.compute_dendrogram()
 
         # Plot the Bokeh graph with the currently selected data.
         self.out = interactive_output(self.interactive_syll_stats_grapher, {
@@ -521,7 +521,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             self.compute_entropy_differences()
 
-    def interactive_transition_graph_helper(self, layout, scalar_color, edge_threshold, usage_threshold):
+    def interactive_transition_graph_helper(self, layout, edge_threshold, usage_threshold):
         '''
 
         Helper function that generates all the transition graphs given the currently selected
@@ -562,8 +562,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                 for new_scalar, old_scalar in _scalar_map.items():
                     scalars[new_scalar].append(dict(group_df[old_scalar]))
 
-            key = self.scalar_dict.get(scalar_color, 'speeds_2d')
-            scalar_anchor = scalars[key][anchor]
+            # key = self.scalar_dict.get(scalar_color, 'speeds_2d')
+            # scalar_anchor = scalars[key][anchor]
 
             usage_kwargs = {
                 'usages': usages_anchor,
@@ -602,4 +602,4 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             plot_interactive_transition_graph(graphs, pos, self.group,
                                             group_names, usages, self.syll_info,
                                             self.incoming_transition_entropy, self.outgoing_transition_entropy,
-                                            scalars=scalars, scalar_color=scalar_color, plot_vertically=self.plot_vertically)
+                                            scalars=scalars, plot_vertically=self.plot_vertically)
