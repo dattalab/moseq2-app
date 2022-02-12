@@ -545,7 +545,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
             model_num = len(glob(join(base_model_path, '*.p')))
 
     print(f'Extraction Progress: {num_extracted} out of {len(path_dict.keys())} session(s) extracted')
-    print(f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress.keys())} items finished: {", ".join(key for key, v in pca_progress.items() if v)} left')
+    print(f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress.keys())} items finished: {", ".join(key for key, v in pca_progress.items() if not v)} left')
     if modeling_progress.get('model_path'):
         print(f'Found {model_num} model(s)')
 
