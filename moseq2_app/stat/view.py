@@ -70,7 +70,7 @@ def graph_dendrogram(obj, syll_info):
     # Set x-axis ticks
     cladogram.xaxis.ticker = FixedTicker(ticks=labels)
     cladogram.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
-    cladogram.xaxis.major_label_orientation = np.pi / 4
+    cladogram.xaxis.major_label_orientation = np.pi / 2
 
     return cladogram
 
@@ -581,7 +581,7 @@ def format_stat_plot(p, df, searchbox, slider, sorting):
     # Setting dynamics xticks
     p.xaxis.ticker = FixedTicker(ticks=list(sorting))
     p.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
-    p.xaxis.major_label_orientation = np.pi / 4
+    p.xaxis.major_label_orientation = np.pi / 2
 
     # Setting interactive legend
     p.legend.click_policy = "mute"
