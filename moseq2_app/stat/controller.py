@@ -303,7 +303,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
             ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
-        errorbar (str or ipywidgets.DropDown): Error bar to display. ['CI 95%' ,'SEM', 'STD']
+        errorbar (str or ipywidgets.DropDown): Error bar to display. ['None', 'CI 95%' ,'SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
         ctrl_group (str or ipywidgets.DropDown): Name of control group to compute group difference sorting with.
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
@@ -354,7 +354,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if groupby == 'SessionName' or groupby == 'SubjectName':
             mean_df = df.copy()
             df = df[df[groupby].isin(self.session_sel.value)]
+            # set error bar to None because error bars are not implemented corectly in SessionName and SubjectName
+            errorbar = "None"
+            self.error_box.layout.display = "none"
         else:
+            self.error_box.layout.display = "block"
             mean_df = None
 
         # Compute cladogram if it does not already exist
@@ -419,9 +423,6 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.initialize_transition_data()
 
         self.set_range_widget_values()
-
-        # Set color dropdown callback
-        self.color_nodes_dropdown.observe(self.on_set_scalar, names='value')
 
         self.clear_button.on_click(self.clear_on_click)
 
@@ -538,7 +539,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             self.compute_entropy_differences()
 
-    def interactive_transition_graph_helper(self, layout, scalar_color, edge_threshold, usage_threshold, speed_threshold):
+    def interactive_transition_graph_helper(self, layout, edge_threshold, usage_threshold):
         '''
 
         Helper function that generates all the transition graphs given the currently selected
@@ -579,22 +580,18 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                 for new_scalar, old_scalar in _scalar_map.items():
                     scalars[new_scalar].append(dict(group_df[old_scalar]))
 
-            key = self.scalar_dict.get(scalar_color, 'speeds_2d')
-            scalar_anchor = scalars[key][anchor]
+            # key = self.scalar_dict.get(scalar_color, 'speeds_2d')
+            # scalar_anchor = scalars[key][anchor]
 
             usage_kwargs = {
                 'usages': usages_anchor,
                 'usage_threshold': usage_threshold
             }
-            speed_kwargs = {
-                'speeds': scalar_anchor,
-                'speed_threshold': speed_threshold
-            }
 
             # Create graph with nodes and edges
             ebunch_anchor, orphans = convert_transition_matrix_to_ebunch(
                 self.trans_mats[anchor], self.trans_mats[anchor], edge_threshold=edge_threshold,
-                keep_orphans=True, max_syllable=self.max_sylls, **usage_kwargs, **speed_kwargs)
+                keep_orphans=True, max_syllable=self.max_sylls, **usage_kwargs)
             indices = [e[:-1] for e in ebunch_anchor]
 
             # Get graph anchor
@@ -617,10 +614,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                                                                 arrows=True,
                                                                                 scalars=scalars,
                                                                                 usage_kwargs=usage_kwargs,
-                                                                                speed_kwargs=speed_kwargs)
+                                                                                )
 
             # interactive plot transition graphs
             plot_interactive_transition_graph(graphs, pos, self.group,
                                             group_names, usages, self.syll_info,
                                             self.incoming_transition_entropy, self.outgoing_transition_entropy,
-                                            scalars=scalars, scalar_color=scalar_color, plot_vertically=self.plot_vertically)
+                                            scalars=scalars, plot_vertically=self.plot_vertically)

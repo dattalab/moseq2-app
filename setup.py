@@ -32,7 +32,8 @@ setup(
     packages=find_packages(),
     setup_requires=['numpy==1.18.3', 'pandas==1.0.5'],
     install_requires=['jupyter-bokeh==2.0.3', 'jupyter==1.0.0', 'ruamel.yaml==0.16.5', 'seaborn==0.11.0',
-                      'bokeh==2.2.1', 'fastparquet==0.4.1', 'pandas==1.0.5', 'joblib==0.15.1', 'scipy==1.3.2',
+                      'bokeh==2.4.2', 'fastparquet==0.4.1', 'pandas==1.0.5', 'joblib==0.15.1', 'scipy==1.3.2',
+                      'holoviews==1.14.7', 'panel==0.12.6',
                       'qgrid==1.3.1', 'ipython==7.14.0', 'ipywidgets==7.5.1', 'numpy==1.18.3', 'scikit-image==0.16.2',
                       'scikit-learn==0.20.3', 'opencv-python==4.1.2.30', 'h5py==2.10.0', 'matplotlib==3.1.2', 'plotly==4.14.3',
                       #'moseq2-extract @ git+https://github.com/dattalab/moseq2-extract.git@release',
@@ -40,5 +41,5 @@ setup(
                       #'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@release',
                       #'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@release'
                       ],
-    python_requires='>=3.6,<3.8'
+    python_requires='>=3.7,<3.8'
 )

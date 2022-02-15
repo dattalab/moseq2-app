@@ -11,19 +11,16 @@ import itertools
 import numpy as np
 import pandas as pd
 import networkx as nx
-from os.path import relpath
 from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
-from bokeh.palettes import Spectral4
+from bokeh.palettes import Spectral4, Set1_9, Set2_8, Set3_12, Colorblind8
 from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
-from bokeh.palettes import Category20_20, Category20b_20
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
-                          Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool, ColorPicker)
-from IPython.display import HTML
+                          Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
 
 def graph_dendrogram(obj, syll_info):
     '''
@@ -68,37 +65,14 @@ def graph_dendrogram(obj, syll_info):
         cladogram.line(x='x', y='y', source=source)
 
     xtick_labels = [syll_info.get(lbl, {'label': ''})['label'] for lbl in labels]
-    xticks = [f'{lbl} ({num})' for num, lbl in zip(labels, xtick_labels)]
+    xticks = [f'{lbl} - {num}' if len(lbl) > 0 else f'{num}' for num, lbl in zip(labels, xtick_labels)]
 
     # Set x-axis ticks
     cladogram.xaxis.ticker = FixedTicker(ticks=labels)
     cladogram.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
-    cladogram.xaxis.major_label_orientation = np.pi / 4
+    cladogram.xaxis.major_label_orientation = np.pi / 2
 
     return cladogram
-
-def clamp(val, minimum=0, maximum=255):
-    '''
-    Caps the given R/G/B value to set min and max values
-
-    https://thadeusb.com/weblog/2010/10/10/python_scale_hex_color/
-
-    Parameters
-    ----------
-    val (float): value for given color tuple member
-    minimum (int): min thresholding value
-    maximum (int): max thresholding value
-
-    Returns
-    -------
-    val (int): thresholded color tuple member
-    '''
-
-    if val < minimum:
-        return minimum
-    if val > maximum:
-        return maximum
-    return val
 
 def colorscale(hexstr, scalefactor):
     """
@@ -120,13 +94,10 @@ def colorscale(hexstr, scalefactor):
     if scalefactor < 0 or len(hexstr) != 6:
         return hexstr
 
-    r, g, b = int(hexstr[:2], 16), int(hexstr[2:4], 16), int(hexstr[4:], 16)
+    rgb = int(hexstr[:2], 16), int(hexstr[2:4], 16), int(hexstr[4:], 16)
+    rgb = tuple(int(max(min(x * scalefactor, 255), 0)) for x in rgb)
 
-    r = int(clamp(r * scalefactor))
-    g = int(clamp(g * scalefactor))
-    b = int(clamp(b * scalefactor))
-
-    return "#%02x%02x%02x" % (r, g, b)
+    return "#%02x%02x%02x" % rgb
 
 def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, pct=5):
     '''
@@ -254,10 +225,10 @@ def setup_hovertool(renderers, callback=None):
                     <div><span style="font-size: 12px; font-weight: bold;">syllable: @number{0}</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
                     <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
-                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/frame</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/frame</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Distance to Center: @dist_to_center{0.000} pixels</span></div>
                     <div><span style="font-size: 12px;">group-error: +/- @sem{0.000}</span></div>
                     <div><span style="font-size: 12px;">label: @label</span></div>
                     <div><span style="font-size: 12px;">description: @desc</span></div>
@@ -302,7 +273,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     errs_x (list): list of x-indices to plot the error bar lines within.
     errs_y (list): list of y-indices to plot the error bar lines within.
     '''
-
+    
     # Get group specific dataframe indices
     df_group = df[df[groupby] == group]
     grouped = df_group.groupby('syllable')[[stat]]
@@ -327,6 +298,10 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     if errorbar == 'CI 95%':
         miny = [e[0] for e in stat_err]
         maxy = [e[1] for e in stat_err]
+    # miny, maxy is just y. Sorry, I have to do this to match the rest of the code
+    elif errorbar == 'None':
+        miny = aux_df[stat]
+        maxy = aux_df[stat]
     else:
         miny = aux_df[stat] - stat_err[stat]
         maxy = aux_df[stat] + stat_err[stat]
@@ -462,8 +437,6 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     '''
     warnings.filterwarnings('ignore')
 
-    pickers = []
-
     slider = RangeSlider(start=0, end=0.001, value=(0, 0.001), step=0.001,
                          format="0[.]000", title=f"Display Syllables Within {thresh_stat} Range")
 
@@ -519,17 +492,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
         # update hover tools to match the thresholded plot points
         hover = setup_hovertool([circle])
         fig.add_tools(hover)
-        # set up color pickers and link the selection to all the drawn glyphs
-        if groupby == 'group':
-            picker = ColorPicker(title=f"{group} Line Color")
-            picker.js_link('color', line.glyph, 'line_color')
-            picker.js_link('color', circle.glyph, 'fill_color')
-            picker.js_link('color', circle.glyph, 'line_color')
-            picker.js_link('color', error_bars.glyph, 'line_color')
-
-            pickers.append(picker)
-
-    return pickers, slider, searchbox
+    return slider, searchbox
 
 def set_grouping_colors(df, groupby):
     '''
@@ -548,31 +511,35 @@ def set_grouping_colors(df, groupby):
     colors (list): list of all the colors used to plot the glyphs
     '''
 
-    # Concatenate two category 20 palettes to make a bigger palette
-    palette = Category20_20 + Category20b_20
+    # Use a bigger pallette
+    palette = Set1_9 + Set2_8 + Set3_12 + Colorblind8
     colors = itertools.cycle(palette)
 
     # Set grouping variable to plot separately
     if groupby == 'group':
         groups = list(df.group.unique())
-        group_colors = colors
+        group_colors = palette[:len(groups)]
     else:
+        # find unique selections of the selected sessions from the widget
         groups = list(df[groupby].unique())
+        # subset the selected sessionss from the dataframe
         tmp_groups = df[df[groupby].isin(groups)]
 
         sess_groups = []
         for s in groups:
             sess_groups.append(list(tmp_groups[tmp_groups[groupby] == s].group)[0])
 
-        # generate a list of unique groups
+        # generate a list of unique experimental groups
         unique_group = np.unique(sess_groups)
-        # generate a dictionary for group index in the colo palette
+
+        # generate a dictionary for group index in the color palette
         color_map = dict(zip(unique_group, range(len(unique_group))))
 
-        # When the user is trying to plot over 40 experiment groups at the same time
+        # When the user is trying to plot over 256 experiment groups at the same time
         if len(unique_group) > len(palette):
             print('Too many groups to plot. Some colors may be resued')
 
+        # find a color for each group
         for group, index in color_map.items():
             try:
                 color_map[group] = palette[index]
@@ -582,10 +549,10 @@ def set_grouping_colors(df, groupby):
                 # set color index to the last item in pallette to resue color
                 color_map[group] = palette[-1]
         group_colors = list(color_map.values())
-        colors = [colorscale(color_map[sg], 0.5 + random.random()) for sg in sess_groups]
+        colors = [colorscale(color_map[sg], random.uniform(0, 2)) for sg in sess_groups]
     return groups, group_colors, colors
 
-def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
+def format_stat_plot(p, df, searchbox, slider, sorting):
     '''
     Edits the bokeh figures x-axis such that the syllable labels are also displayed, and are slanted 45 degrees.
      Sets the legend to be interactive where users can hide line plots by clicking on their legend item.
@@ -610,12 +577,12 @@ def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
 
     xtick_numbers = list(label_df['syllable'])
     xtick_labels = list(label_df['label'])
-    xticks = [f'({num}) {lbl}' for num, lbl in zip(xtick_numbers, xtick_labels)]
+    xticks = [f'{lbl} - {num}' if len(lbl) > 0 else f'{num}' for num, lbl in zip(xtick_numbers, xtick_labels)]
 
     # Setting dynamics xticks
     p.xaxis.ticker = FixedTicker(ticks=list(sorting))
     p.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
-    p.xaxis.major_label_orientation = np.pi / 4
+    p.xaxis.major_label_orientation = np.pi / 2
 
     # Setting interactive legend
     p.legend.click_policy = "mute"
@@ -623,9 +590,6 @@ def format_stat_plot(p, df, searchbox, slider, pickers, sorting):
 
     # Create gridplot of color pickers
     output_grid = [searchbox, slider]
-    if len(pickers) > 0:
-        color_pickers = gridplot(pickers, ncols=2)
-        output_grid.append(color_pickers)
     output_grid.append(p)
 
     # Pack widgets together with figure
@@ -677,14 +641,14 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
 
     # draw line plots, setup hovertool, thresholding slider and group color pickers
     if list(sorting) == syllable_families['leaves']:
-        pickers, slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
+        slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
                                      sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
     else:
-        pickers, slider, searchbox = draw_stats(p, df, groups, colors, sorting,
+        slider, searchbox = draw_stats(p, df, groups, colors, sorting,
                                      groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # Format Bokeh plot with widgets
-    graph_n_pickers = format_stat_plot(p, df, searchbox, slider, pickers, sorting)
+    graph_n_pickers = format_stat_plot(p, df, searchbox, slider, sorting)
 
     # Display figure and widgets
     show(graph_n_pickers)
@@ -976,14 +940,14 @@ def setup_trans_graph_tooltips(plot):
                     <div><span style="font-size: 12px;">description: @desc</span></div>
                     <div><span style="font-size: 12px;">usage: @usage{0.000}</span></div>
                     <div><span style="font-size: 12px;">duration: @duration{0.000} seconds</span></div>
-                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/s</span></div>
-                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/s</span></div>
+                    <div><span style="font-size: 12px;">2D velocity: @speed_2d{0.000} mm/frame</span></div>
+                    <div><span style="font-size: 12px;">3D velocity: @speed_3d{0.000} mm/frame</span></div>
                     <div><span style="font-size: 12px;">Height: @height{0.000} mm</span></div>
-                    <div><span style="font-size: 12px;">Distance to Center px: @dist_to_center_px{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Entropy-In: @ent_in{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Entropy-Out: @ent_out{0.000}</span></div>
-                    <div><span style="font-size: 12px;">Next Syllable: @next</span></div>
-                    <div><span style="font-size: 12px;">Previous Syllable: @prev</span></div>
+                    <div><span style="font-size: 12px;">Distance to center: @dist_to_center_px{0.000} pixels</span></div>
+                    <div><span style="font-size: 12px;">Entropy in: @ent_in{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Entropy out: @ent_out{0.000}</span></div>
+                    <div><span style="font-size: 12px;">Outgoing syllables: @next</span></div>
+                    <div><span style="font-size: 12px;">Incoming syllables: @prev</span></div>
                     <div>
                         <link rel="stylesheet" href="/nbextensions/google.colab/tabbar.css">
                         <video
@@ -1023,10 +987,10 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     # edge colors for difference graphs
     if difference_graph:
         edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
-        edge_width = {e: graph.edges()[e]['weight'] * 350 for e in graph.edges()}
+        edge_width = {e: abs(graph.edges()[e]['weight'] * 400) for e in graph.edges()}
     else:
         edge_color = {e: 'black' for e in graph.edges()}
-        edge_width = {e: graph.edges()[e]['weight'] * 200 for e in graph.edges()}
+        edge_width = {e: graph.edges()[e]['weight'] * 250 for e in graph.edges()}
 
     selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
 
@@ -1097,12 +1061,13 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     '''
 
     # node colors for difference graphs
+    # node size is likely related to node diameters from https://towardsdatascience.com/customizing-networkx-graphs-f80b4e69bedf
     if difference_graph:
         node_color = {s: 'red' if usages[s] > 0 else 'blue' for s in node_indices}
-        node_size = {s: max(15., 10 + abs(usages[s] * 500)) for s in node_indices}
+        node_size = {s: max(15., 10 + abs(usages[s] * 1000)) for s in node_indices}
     else:
         node_color = {s: 'red' for s in node_indices}
-        node_size = {s: max(15., abs(usages[s] * 500)) for s in node_indices}
+        node_size = {s: max(15., abs(usages[s] * 1000)) for s in node_indices}
 
     # setting node attributes
     nx.set_node_attributes(graph, node_color, "node_color")
@@ -1293,12 +1258,13 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
         # get node positions
         if len(plots) == 0:
             x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
-            syllable = list(graph.nodes)
+            # find the nodes and cast the labels to a string
+            syllable = [str(n) for n in list(graph.nodes._nodes.keys())]
         else:
             new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
                           graph_renderer.layout_provider.graph_layout}
             x, y = zip(*new_layout.values())
-            syllable = [a if a in node_indices else '' for a in new_layout]
+            syllable = [str(a) if a in node_indices else '' for a in new_layout]
     except Exception as e:
         # If the graph has been thresholded such that there are missing syllables, or is empty altogether
         # (with or without thresholding) we remove all the node label coordinates.
@@ -1402,10 +1368,10 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
         # initialize bokeh plot with title and joined panning/zooming coordinates
         if len(plots) == 0:
-            plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2))
+            plot = figure(title=f"{group_names[i]}", x_range=(-1.2, 1.2), y_range=(-1.2, 1.2), output_backend="svg")
         else:
             # Connecting pan-zoom interaction across plots
-            plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range)
+            plot = figure(title=f"{group_names[i]}", x_range=plots[0].x_range, y_range=plots[0].y_range, output_backend="svg")
 
         # format the plot and set up the tooltips
         format_plot(plot)
@@ -1446,7 +1412,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         # get node labels and draw their numbers on each node
         labels = get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
 
-        # render labels
+        # render labels 
         plot.renderers.append(labels)
 
         # get plot legends

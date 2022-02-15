@@ -48,51 +48,8 @@ def validate_extractions_wrapper(input_dir):
     # Print Results
     print_validation_results(scalar_df, status_dicts)
 
-def interactive_group_setting_wrapper(index_filepath):
-    '''
-
-    Wrapper function that handles the interactive group display and value updating.
-
-    Parameters
-    ----------
-    index_filepath (str): Path to index file.
-
-    Returns
-    -------
-    '''
-
-    index_grid = GroupSettingWidgets(index_filepath)
-
-    # Add callback functions
-    index_grid.clear_button.on_click(index_grid.clear_clicked)
-    index_grid.update_index_button.on_click(index_grid.update_clicked)
-    index_grid.save_button.on_click(index_grid.update_table)
-
-    # Display output
-    display(index_grid.clear_button, index_grid.group_set)
-    display(index_grid.qgrid_widget)
-
-    return index_grid
-
-def interactive_scalar_summary_wrapper(index_filepath):
-    '''
-    Wrapper function to launch the session scalar summary plot.
-
-    Parameters
-    ----------
-    index_filepath (str): Path to index file to plot scalars from.
-
-    Returns
-    -------
-    viewer (InteractiveScalarViewer obj): Scalar summary viewer object.
-    '''
-
-    viewer = InteractiveScalarViewer(index_filepath)
-
-    return viewer
-
-def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file,
-                                         max_syllables=None, n_explained=99):
+def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file, fig_dir,
+                                         max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
     '''
     Wrapper function to launch a syllable crowd movie preview and interactive labeling application.
 
@@ -121,7 +78,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
     # Get Maximum number of syllables to include
     if max_syllables is None:
-        max_sylls = compute_syllable_explained_variance(model, n_explained=n_explained)
+        max_sylls = compute_syllable_explained_variance(model, fig_dir, n_explained=n_explained)
     else:
         max_sylls = max_syllables
 
@@ -131,13 +88,15 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
                               index_file=index_file,
                               config_file=config_file,
                               max_sylls=max_sylls,
+                              select_median_duration_instances=select_median_duration_instances,
+                              max_examples=max_examples,
                               crowd_movie_dir=crowd_movie_dir,
                               save_path=output_file)
 
     # Launch and display interactive API
     output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
     display(labeler.clear_button, labeler.syll_select, output)
-    return labeler
+    return max_sylls
 
     def on_syll_change(change):
         '''
@@ -219,10 +178,9 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     # Make graphs
     out = interactive_output(i_trans_graph.interactive_transition_graph_helper,
                              {'layout': i_trans_graph.graph_layout_dropdown,
-                              'scalar_color': i_trans_graph.color_nodes_dropdown,
+                              # 'scalar_color': i_trans_graph.color_nodes_dropdown,
                               'edge_threshold': i_trans_graph.edge_thresholder,
                               'usage_threshold': i_trans_graph.usage_thresholder,
-                              'speed_threshold': i_trans_graph.speed_thresholder,
                               })
 
     # Display widgets and bokeh network plots

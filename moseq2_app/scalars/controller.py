@@ -62,7 +62,6 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         self.fig = make_subplots(rows=len(selected_cols), cols=2)
 
         for j, c in enumerate(selected_cols):
-            j = j + 1
             for i, g in enumerate(unique_groups):
                 y = self.mean_df[self.mean_df['group'] == g][c]
                 std_y = self.std_df[self.std_df['group'] == g][c]
@@ -74,9 +73,7 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
                 texts = [f'SessionName: {sn}<br>SubjectName: {sj}<br>uuid: {u}' for sn, sj, u in
                          zip(session_name, subject_name, uuid)]
 
-                show = True
-                if j > 1:
-                    show = False
+                show = j < 1
 
                 v1 = go.Violin(y=y,
                                name=g,
@@ -91,9 +88,9 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
                                hovertemplate=f'Mean {c}: ' + "%{y}<br>%{text}"
                                )
 
-                self.fig.add_trace(v1, row=j, col=1)
+                self.fig.add_trace(v1, row=j + 1, col=1)
 
-                self.fig.update_yaxes(title_text=f"{c}", row=j, col=1)
+                self.fig.update_yaxes(title_text=f"{c}", row=j + 1, col=1)
 
                 v2 = go.Violin(y=std_y,
                                name=g,
@@ -108,7 +105,7 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
                                hovertemplate=f'STD {c}: ' + "%{y}<br>%{text}"
                                )
 
-                self.fig.add_trace(v2, row=j, col=2)
+                self.fig.add_trace(v2, row=j + 1, col=2)
 
         self.fig.update_xaxes(title_text=f"Mean", row=len(selected_cols), col=1)
         self.fig.update_xaxes(title_text=f"STD", row=len(selected_cols), col=2)
@@ -126,6 +123,13 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         Returns
         -------
         '''
-
+        
+        # https://plotly.com/python/configuration-options/#customizing-download-plot-options
+        plotly_config = {
+            'toImageButtonOptions': {
+                'format': 'svg', # one of png, svg, jpeg, webp
+                'scale': 1 # Multiply title/legend/axis/canvas sizes by this factor
+                }
+            }
         fig = self.make_graphs()
-        fig.show()
+        fig.show(config=plotly_config)

@@ -110,7 +110,7 @@ class GroupSettingWidgets:
         updated_index = {'files': list(self.df.drop(meta_cols, axis=1).to_dict(orient='index').values()),
                          'pca_path': self.index_dict['pca_path']}
 
-        with open(self.index_filepath, 'w+') as f:
+        with open(self.index_filepath, 'w') as f:
             yaml.safe_dump(updated_index, f)
 
         self.update_index_button.button_style = 'success'

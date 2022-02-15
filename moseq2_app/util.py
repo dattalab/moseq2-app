@@ -8,7 +8,7 @@ import ruamel.yaml as yaml
 from copy import deepcopy
 from pprint import pprint
 from os.path import basename, join, exists, splitext
-from os import listdir, mkdir
+from os import mkdir
 from glob import glob
 from shutil import copy2
 from collections import defaultdict
@@ -16,7 +16,30 @@ from contextlib import contextmanager
 from moseq2_viz.util import read_yaml
 from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
+from moseq2_extract.util import read_yaml, check_filter_sizes
 from moseq2_viz.model.util import compute_behavioral_statistics
+
+
+def read_and_clean_config(config_file):
+    config_data = read_yaml(config_file)
+    config_data = check_filter_sizes(config_data)
+    config_data['threads'] = max(1, config_data.get('threads', 8))
+
+    # TODO: see if this is necessary
+    # set defaults if the keys don't exist
+    config_data = {
+        'bg_roi_erode': (1, 1),
+        'bg_roi_dilate': (1, 1),
+        **config_data
+    }
+
+    return config_data
+
+
+def write_yaml(data, file):
+    with open(file, 'w') as yaml_f:
+        yaml.safe_dump(data, yaml_f)
+
 
 def merge_labels_with_scalars(sorted_index, model_path):
     '''
@@ -25,8 +48,8 @@ def merge_labels_with_scalars(sorted_index, model_path):
     Parameters
     ----------
     sorted_index (dict): Sorted dict of modeled sessions
-    model_fit (dict): Trained ARHMM results dict
-    model_path (str): Respective path to the ARHMM model in use.
+    model_fit (dict): Trained AR-HMM results dict
+    model_path (str): Respective path to the AR-HMM model in use.
     max_sylls (int): Maximum number of syllables to include
 
     Returns
@@ -121,7 +144,7 @@ def setup_model_folders(progress_paths):
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     """
     # find all the models in the model master path
-    models = glob(join(progress_paths['main_model_path'], '*.p'))
+    models = glob(join(progress_paths['base_model_path'], '*.p'))
     
     # initialize model dictionary
     model_dict = defaultdict(dict)
@@ -138,11 +161,11 @@ def setup_model_folders(progress_paths):
         
         # check if the model is copied to the model-specific folder
         if not exists(join(model_dir, model)):
-            copy2(join(progress_paths['main_model_path'], model), model_dir)
+            copy2(join(progress_paths['base_model_path'], model), model_dir)
         
         model_dict[model]['model_session_path'] = model_dir
         model_dict[model]['model_path'] = join(model_dir, model)
-    return model_dict
+    return dict(model_dict)  # remove defaultdict class
 
 def update_model_paths(desired_model, model_dict, progress_filepath):
     """helper function to update relevant model paths in progress.yaml when specific model is chosen
@@ -159,9 +182,12 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
         [description]
     """
 
-    # update model_sseion_path and model_path
+    assert desired_model in model_dict, '{} not found in model_dict. Make sure desired_model is one of the keys in model_dict. \nPossible keys: \n{}'.format(desired_model, "\n".join(map(str, model_dict)))
+
+    # update model_session_path and model_path
     for key in ['model_session_path', 'model_path']:
         progress_paths = update_progress(progress_filepath, key, model_dict[desired_model].get(key))
+    progress_paths = update_progress(progress_filepath, 'plot_path', join(model_dict[desired_model]['model_session_path'], 'plots/'))
 
     # reset paths in progress_paths
     for key in ['crowd_dir', 'syll_info', 'df_info_path']:
