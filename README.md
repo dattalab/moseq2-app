@@ -53,16 +53,18 @@ You can find more information about the MoSeq2 package suite, the acquisition an
 - Please tell us what you think by filling out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
 
 # Versions
-- Current version: Version 1.0.2beta
+- Current version: Version 1.1.1
 - [Changelog](https://github.com/dattalab/moseq2-app/wiki/Changelog)
 
 # Events & News
 <!---Future events, project related news etc-->
-Coming soon!!!
+We are hosting a tutorial workshop on Thursday, March 3rd, 2022 at 1:30-4PM EST.
+Fill out [this form](https://forms.gle/gp2ipZ6BTyFf1GrA8)
+by March 2nd to register for the workshop and receive the Zoom link and password.
 
 # Publications
-<!---I think we have more than just these-->
 - [Mapping Sub-Second Structure in Mouse Behavior](http://datta.hms.harvard.edu/wp-content/uploads/2018/01/pub_23.pdf)
 - [The Striatum Organizes 3D Behavior via Moment-to-Moment Action Selection](http://datta.hms.harvard.edu/wp-content/uploads/2019/06/Markowitz.final_.pdf)
-- [Revealing the structure of pharmacobehavioral space through motion sequencing](https://www.nature.com/articles/s41593-020-00706-3)
 - [Q&A: Understanding the composition of behavior](http://datta.hms.harvard.edu/wp-content/uploads/2019/06/Datta-QA.pdf)
+- [Computational Neuroethology: A Call to Action]("http://datta.hms.harvard.edu/wp-content/uploads/2020/01/AC2A.pdf")
+- [Revealing the structure of pharmacobehavioral space through motion sequencing](https://www.nature.com/articles/s41593-020-00706-3)
