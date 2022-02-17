@@ -38,7 +38,7 @@ setup(
                       'scikit-learn==0.20.3', 'opencv-python==4.1.2.30', 'h5py==2.10.0', 'matplotlib==3.1.2', 'plotly==4.14.3',
                       'moseq2-extract @ git+https://github.com/dattalab/moseq2-extract.git@release',
                       'moseq2-pca @ git+https://github.com/dattalab/moseq2-pca.git@release',
-                      'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@releasae',
+                      'moseq2-model @ git+https://github.com/dattalab/moseq2-model.git@release',
                       'moseq2-viz @ git+https://github.com/dattalab/moseq2-viz.git@release'
                       ],
     python_requires='>=3.7,<3.8'
