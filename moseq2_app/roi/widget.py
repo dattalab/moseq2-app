@@ -2,6 +2,7 @@
 Constructs a jupyter notebook viewable widget users can use to identify the arena floor
 and to validate extractions performed on a small chunk of data. 
 '''
+from distutils.command.config import config
 import param
 import numpy as np
 import panel as pn
@@ -62,6 +63,11 @@ class ArenaMaskWidget:
             session_parameters = {basename(dirname(f)): detect_and_set_camera_parameters(
                 deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
             write_yaml(session_parameters, self.session_config_path)
+
+        # add session_config path to config.yaml
+        temp_config_data = read_yaml(config_file)
+        temp_config_data['session_config_path'] = session_config_path
+        write_yaml(temp_config_data, config_file)
 
         self.session_config = session_parameters
         self.sessions = {basename(dirname(f)): f for f in sessions}
