@@ -4,6 +4,7 @@ This module handles all jupyter notebook progress related functionalities.
 
 '''
 
+from distutils import extension
 import os
 import uuid
 import json
@@ -66,12 +67,14 @@ def _has_metadata(folder):
     return exists(join(folder, 'metadata.json'))
 
 
-def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi', '.tar.gz')):
+def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi', 'tar.gz')):
 
     # look for files in subfolders
     files = [glob(join(data_dir, '**', f'*.{ext}'), recursive=True) for ext in extensions]
+    print(extensions)
     # concatenate all files of different extensions
     files = sorted(reduce(add, files))
+    print(files)
 
     # remove any folder that doesn't have a metadata.json file
     files = list(filter(compose(_has_metadata, dirname), files))
