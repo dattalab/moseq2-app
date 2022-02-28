@@ -66,7 +66,7 @@ def _has_metadata(folder):
     return exists(join(folder, 'metadata.json'))
 
 
-def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi')):
+def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi', '.tar.gz')):
 
     # look for files in subfolders
     files = [glob(join(data_dir, '**', f'*.{ext}'), recursive=True) for ext in extensions]
