@@ -2,7 +2,7 @@
 Constructs a jupyter notebook viewable widget users can use to identify the arena floor
 and to validate extractions performed on a small chunk of data. 
 '''
-from distutils.command.config import config
+
 import param
 import numpy as np
 import panel as pn
