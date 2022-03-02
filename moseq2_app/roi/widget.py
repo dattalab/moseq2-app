@@ -2,6 +2,7 @@
 Constructs a jupyter notebook viewable widget users can use to identify the arena floor
 and to validate extractions performed on a small chunk of data. 
 '''
+
 import param
 import numpy as np
 import panel as pn
@@ -18,8 +19,9 @@ from moseq2_extract.io.video import load_movie_data
 from moseq2_extract.util import select_strel, get_strels
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
-from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config
+from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config, update_config
 from moseq2_extract.extract.proc import get_bground_im_file, get_roi, apply_roi, threshold_chunk
+
 
 
 # contains display parameters for the bokeh hover tools
@@ -62,6 +64,11 @@ class ArenaMaskWidget:
             session_parameters = {basename(dirname(f)): detect_and_set_camera_parameters(
                 deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
             write_yaml(session_parameters, self.session_config_path)
+
+        # add session_config path to config.yaml
+
+        with update_config(config_file) as temp_config_data:
+            temp_config_data['session_config_path'] = session_config_path
 
         self.session_config = session_parameters
         self.sessions = {basename(dirname(f)): f for f in sessions}
