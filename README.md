@@ -50,7 +50,7 @@ You can find more information about the MoSeq2 package suite, the acquisition an
 - If you encounter bugs, errors or issues, please submit a Bug report [here](https://github.com/dattalab/moseq2-app/issues/new/choose). We encourage you to check out the [troubleshooting and tips section](https://github.com/dattalab/moseq2-app/wiki/Troubleshooting-and-Tips) and search your issues in [the existing issues](https://github.com/dattalab/moseq2-app/issues) first.   
 - If you want to see certain features in MoSeq or you have new ideas, please submit a Feature request [here](https://github.com/dattalab/moseq2-app/issues/new/choose).
 - If you want to contribute to our codebases, please check out our [Developer Guidelines](https://github.com/dattalab/moseq2-app/wiki/MoSeq-Developer-Guidelines).
-- Please tell us what you think by filling out [this user survey](https://forms.gle/FbtEN8E382y8jF3p6).
+- Please tell us what you think by filling out [this user survey](https://forms.gle/S88jptAEs41mQjff7).
 
 # Versions
 - Current version: Version 1.1.1
