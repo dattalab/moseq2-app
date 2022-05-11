@@ -50,6 +50,7 @@ jobs:
         - source "$HOME/miniconda/etc/profile.d/conda.sh"
         - hash -r
         - conda config --set always_yes yes --set changeps1 no
+        - conda config --set channel_priority strict
         - conda env create -n moseq2-app --file scripts/moseq2-env.yaml
         - conda activate moseq2-app
         - pip install pytest codecov
