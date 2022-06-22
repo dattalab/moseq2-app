@@ -23,7 +23,7 @@ from moseq2_extract.helpers.data import check_completion_status
 
 progress_log = 'progress.log'
 progress_pkl = 'progress_log.pkl'
-logging.basicConfig(filename=progress_log, level=logging.INFO)
+# logging.basicConfig(filename=progress_log, level=logging.INFO)
 
 def generate_missing_metadata(sess_dir, sess_name):
     '''
