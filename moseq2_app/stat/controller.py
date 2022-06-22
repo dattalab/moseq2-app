@@ -603,3 +603,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                             group_names, usages, self.syll_info,
                                             self.incoming_transition_entropy, self.outgoing_transition_entropy,
                                             scalars=scalars, plot_vertically=self.plot_vertically)
+
+
+class SyllableDendrogram(InteractiveSyllableStats):
+    """Bokeh object that shows the dendrogram
+    """
+    def __init__(self, index_path, model_path, df_path, info_path, max_sylls, load_parquet):
+        super().__init__(index_path, model_path, df_path, info_path, max_sylls, load_parquet)
