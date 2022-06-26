@@ -8,7 +8,6 @@ import os
 import uuid
 import json
 import pickle
-import logging
 from glob import glob
 from time import sleep
 import ruamel.yaml as yaml
@@ -21,9 +20,6 @@ from moseq2_viz.util import read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
 
-progress_log = 'progress.log'
-progress_pkl = 'progress_log.pkl'
-# logging.basicConfig(filename=progress_log, level=logging.INFO)
 
 def generate_missing_metadata(sess_dir, sess_name):
     '''
@@ -164,20 +160,6 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
 
     return path_dict
 
-def update_pickle_log(log_dict):
-
-    if not exists(progress_pkl):
-        with open(progress_pkl, 'wb+') as fp:
-            pickle.dump(log_dict, fp)
-    else:
-        with open(progress_pkl, 'rb') as fp:
-            old_log = pickle.load(fp)
-
-        log_dict.update(old_log)
-
-        with open(progress_pkl, 'wb+') as fp:
-            pickle.dump(log_dict, fp)
-
 def update_progress(progress_file, varK, varV):
     '''
     Updates progress file with new notebook variable
@@ -199,16 +181,9 @@ def update_progress(progress_file, varK, varV):
     progress = read_yaml(progress_file)
 
     if isinstance(varV, str):
-        old_value = progress.get(varK, '') # get previous variable to print
+        old_value = progress.get(varK, '') # get previous variable to print        
 
-        # update pickle log with latest uuid-progress key-value pair
-        curr_id = str(progress.get('snapshot', uuid.uuid4()))
-
-        log_dict = {curr_id: progress}
-
-        if old_value != varV:
-            update_pickle_log(log_dict)
-        else:
+        if old_value == varV:
             print('Variables are the same. No update necessary.')
             return progress
 
@@ -219,9 +194,6 @@ def update_progress(progress_file, varK, varV):
 
         with open(progress_file, 'w') as f:
             yml.dump(progress, f)
-
-        # update log file
-        logging.info(f'{datetime.now()}, {progress["snapshot"]}, {varK}: {old_value} -> {varV}')
 
         print(f'Successfully updated progress file with {varK} -> {varV}')
     else:
@@ -356,33 +328,13 @@ def generate_intital_progressfile(filename='progress.yaml'):
                           'plot_path': join(base_dir, 'plots/'),
                           'snapshot': str(uuid.uuid4())}
 
-    if (not exists(join(base_dir, 'progress.log'))) or (not exists(join(base_dir, 'progress_log.pkl'))):
-        # Find progress in given base directory
-        base_progress_vars = find_progress(base_progress_vars)
-    else:
-        ### Get latest uuid from log and load it from pkl
-        with open(join(base_dir, 'progress.log'), 'r') as f:
-            try:
-                latest_log = f.readlines()[-1].split()[-1]
-            except Exception as e:
-                latest_log = 'default'
-
-        with open(join(base_dir, 'progress_log.pkl'), 'rb') as f:
-            pickle_logs = pickle.load(f)
-            if latest_log in pickle_logs:
-                base_progress_vars = pickle_logs[latest_log]
-            else:
-                # fallback
-                base_progress_vars = find_progress(base_progress_vars)
+    # Find progress in given base directory
+    base_progress_vars = find_progress(base_progress_vars)
 
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)
 
     curr_id = base_progress_vars['snapshot']
-    log_dict = {curr_id: base_progress_vars}
-    update_pickle_log(log_dict)
-
-    logging.info(f'New progress file created with uuid: {curr_id}')
 
     return base_progress_vars
 
