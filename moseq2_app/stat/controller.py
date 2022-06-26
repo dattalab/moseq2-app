@@ -142,16 +142,12 @@ class InteractiveSyllableStats(SyllableStatWidgets):
                                     distances='ar[init]')['ar[init]']
 
         # Finding the first syllable where the distance between 2 states is np.nan
-        # If/when that np.nan syllable-pair distance is found,
-        # the nan distances, including the following syllables, will be removed from the matrix X.
-        # The reason why the matrix X is cut off upon finding the first np.nan distance is because the
-        # syllables are already relabeled by usage, therefore if a syllable is reported to be not used, then
-        # the subsequent syllables will also not be used.
+        # Subset matrix X such that it only includes sylls within max_syll
         is_missing = np.isnan(X)
         if is_missing.any():
-            print('Existing model does not have equal amount of requested states.')
+            print(f'Model does not have a total number of {self.max_sylls}.')
             max_states = int(max(np.where(is_missing.any(1), is_missing.argmax(1), np.nan)))
-            print(f'Visualizing max number of available states: {max_states}')
+            print(f'Visualizing max number of available syllables: {max_states}')
             X = X[:max_states, :max_states]
 
         Z = linkage(X, 'complete')
