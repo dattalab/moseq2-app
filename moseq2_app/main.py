@@ -214,32 +214,6 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
                                          select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
     return max_sylls
 
-@filter_warnings
-def show_dendrogram(progress_paths, max_syllable=None, load_parquet=False):
-    """Bokeh object that show the dendrogram
-
-    Args:
-        progress_paths (dict): dictionary of notebook progress paths.
-        max_syllables (int or None): manual maximum number of syllables to label.
-        n_explained (int): Percentage of explained variance to use to compute max_syllables to compute.
-    """
-    # Get proper input parameters
-    index_file = progress_paths['index_file'] # Path to index file.
-    model_path = progress_paths['model_path'] # Path to trained model file.
-    syll_info_path = progress_paths['syll_info'] # Path to syllable information file.
-    syll_info_df_path = progress_paths['df_info_path'] # relavant data frame for plotting and stats
-
-    inputs = ['model_path', 'index_file', 'syll_info']
-
-    error = validate_inputs(inputs, progress_paths)
-
-    if error:
-        print('Set the correct paths to the missing variables and run the function again.')
-        return
-    dendrogram = SyllableDendrogram(index_path=index_file, model_path=model_path, df_path=syll_info_df_path,
-                                     info_path=syll_info_path, max_sylls=max_syllable, load_parquet=load_parquet)
-    show(dendrogram.cladogram)
-    
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
