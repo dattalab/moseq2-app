@@ -10,7 +10,11 @@ import warnings
 import itertools
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import networkx as nx
+from os.path import exists, join
+from os import makedirs
 from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
@@ -21,6 +25,9 @@ from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
+from moseq2_viz.util import get_sorted_index, read_yaml
+from scipy.cluster.hierarchy import linkage, dendrogram
+from moseq2_viz.model.dist import get_behavioral_distance
 
 def graph_dendrogram(obj, syll_info):
     '''
@@ -1445,3 +1452,45 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     # Create Bokeh grid plot object
     gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
     show(gp)
+
+def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllable = 40, color_by_cluster=False):
+    """helper function to plot a static dentrogram
+
+    Args:
+        index_file (str): path to index file
+        model_path (str): path to the model
+        syll_info_path (str): path to syll_info
+        save_dir (str): 
+        max_syllable (int, optional): _description_. Defaults to 40.
+        color_by_cluster (bool, optional): _description_. Defaults to False.
+    """
+    # if there is syll info, load syllable description
+    if exists(syll_info_path):
+        syll_info = read_yaml(syll_info_path)
+        syll_info = pd.DataFrame(syll_info).T.sort_index()
+        labels = (syll_info['label']+"-" +syll_info.index.astype(str)).to_numpy()
+    else:
+        labels = None
+
+    # set color_threshold = None to color the clusters based on threshold
+    # described here: https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.dendrogram.html
+    if color_by_cluster:
+        color_threshold = None
+    else:
+        color_threshold = 0
+    
+    # compute similarity between syllables based on the AR matrix
+    sorted_index = get_sorted_index(index_file)
+    X = get_behavioral_distance(sorted_index, model_path, max_syllable=max_syllable, distances='ar[init]')['ar[init]']
+    Z = linkage(X, 'complete')
+
+    # plot the dendrogram
+    sns.set_style('whitegrid', {'axes.grid' : False})
+    fig, ax = plt.subplots(figsize=(20, 10)) 
+    dendrogram(Z, distance_sort=False, no_plot=False, labels = labels, color_threshold = color_threshold, 
+                     get_leaves=True, leaf_font_size=15, ax = ax)
+
+    # save the fig
+    makedirs(save_dir, exist_ok=True)
+    fig.savefig(join(save_dir, 'syllable_dendrogram.pdf'))
+    fig.savefig(join(save_dir, 'syllable_dendrogram.png'))
