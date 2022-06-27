@@ -1487,8 +1487,7 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
     # plot the dendrogram
     sns.set_style('whitegrid', {'axes.grid' : False})
     fig, ax = plt.subplots(figsize=(20, 10)) 
-    dendrogram(Z, distance_sort=False, no_plot=False, labels = labels, color_threshold = color_threshold, 
-                     get_leaves=True, leaf_font_size=15, ax = ax)
+    dendrogram(Z, distance_sort=False, no_plot=False, labels=labels, color_threshold=color_threshold, leaf_font_size=15, ax=ax)
 
     # save the fig
     makedirs(save_dir, exist_ok=True)
