@@ -14,6 +14,7 @@ from moseq2_app.flip.controller import FlipRangeTool
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
+from moseq2_app.stat.view import plot_dendrogram
 from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
     interactive_syllable_labeler_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
@@ -213,6 +214,18 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
                                          max_syllables=max_syllables, n_explained=n_explained, 
                                          select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
     return max_sylls
+
+@filter_warnings
+def show_dendrogram(progress_paths, max_syllable=None, color_by_cluster=False):
+
+    # get input paths
+    index_file = progress_paths['index_file'] # Path to index file.
+    model_path = progress_paths['model_path'] # Path to trained model file.
+    syll_info_path = progress_paths['syll_info'] # Path to syllable information file.
+    save_dir = progress_paths['plot_path']
+
+    plot_dendrogram(index_file=index_file, model_path=model_path, syll_info_path=syll_info_path, 
+                    save_dir=save_dir, max_syllable=max_syllable, color_by_cluster=color_by_cluster)
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
