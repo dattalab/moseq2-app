@@ -195,10 +195,10 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
     dict_mapping = {
         'usage': 'usage',
         'duration': 'duration',
-        'velocity_2d_mm': 'speed_2d',
-        'velocity_3d_mm': 'speed_3d',
-        'height_ave_mm': 'height',
-        'dist_to_center_px': 'dist_to_center'
+        'velocity_2d_mm_mean': 'speed_2d',
+        'velocity_3d_mm_mean': 'speed_3d',
+        'height_ave_mm_mean': 'height',
+        'dist_to_center_px_mean': 'dist_to_center'
     }
 
     js_condition = '''if((data[thresh_stat][i] >= slider.value[0]) && (data[thresh_stat][i] <= slider.value[1])) {\n'''
@@ -291,7 +291,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     if errorbar == 'CI 95%':
         stat_err = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
         aux_err = {}
-        for s in ['usage', 'duration', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
+        for s in ['usage', 'duration', 'velocity_2d_mm_mean', 'velocity_3d_mm_mean', 'height_ave_mm_mean', 'dist_to_center_px_mean']:
             aux_err[s] = df_group.groupby('syllable')[s].apply(get_ci_vect_vectorized).reindex(sorting)
     elif errorbar == 'SEM':
         stat_err = grouped.sem().reindex(sorting)
@@ -387,10 +387,10 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         y=aux_df[stat].to_numpy(),
         usage=aux_df['usage'].to_numpy(),
         duration=aux_df['duration'].to_numpy(),
-        speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
-        speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
-        height=aux_df['height_ave_mm'].to_numpy(),
-        dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
+        speed_2d=aux_df['velocity_2d_mm_mean'].to_numpy(),
+        speed_3d=aux_df['velocity_3d_mm_mean'].to_numpy(),
+        height=aux_df['height_ave_mm_mean'].to_numpy(),
+        dist_to_center=aux_df['dist_to_center_px_mean'].to_numpy(),
         sem=aux_sem[stat].to_numpy(),
         number=sem.index,
         label=labels,
@@ -405,10 +405,10 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         y=errs_y,
         usage=aux_sem['usage'].to_numpy(),
         duration=aux_sem['duration'].to_numpy(),
-        speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
-        speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
-        height=aux_sem['height_ave_mm'].to_numpy(),
-        dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
+        speed_2d=aux_sem['velocity_2d_mm_mean'].to_numpy(),
+        speed_3d=aux_sem['velocity_3d_mm_mean'].to_numpy(),
+        height=aux_sem['height_ave_mm_mean'].to_numpy(),
+        dist_to_center=aux_sem['dist_to_center_px_mean'].to_numpy(),
         sem=aux_sem[stat].to_numpy(),
         number=sem.index,
         label=labels,

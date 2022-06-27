@@ -97,10 +97,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             'usage': 'usage',
             'duration': 'duration',
             'distance to center': 'dist_to_center_px',
-            '2d velocity': 'velocity_2d_mm',
-            '3d velocity': 'velocity_3d_mm',
-            'height': 'height_ave_mm',
-            'similarity': 'similarity',
+            '2d velocity': 'velocity_2d_mm_mean',
+            '3d velocity': 'velocity_3d_mm_mean',
+            'height': 'height_ave_mm_mean',
+            # 'similarity': 'similarity',
             'difference': 'difference',
             'KW & Dunn\'s': 'kw',
             'Z-Test': 'z_test',
@@ -547,10 +547,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             scalars = defaultdict(list)
             _scalar_map = {
                 'duration': 'duration',
-                'speeds_2d': 'velocity_2d_mm',
-                'speeds_3d': 'velocity_3d_mm',
-                'heights': 'height_ave_mm',
-                'dists': 'dist_to_center_px'
+                'speeds_2d': 'velocity_2d_mm_mean',
+                'speeds_3d': 'velocity_3d_mm_mean',
+                'heights': 'height_ave_mm_mean',
+                'dists': 'dist_to_center_px_mean'
             }
             # loop thru each group and append a syllable -> scalar value mapping to collection above
             for g in self.group:
