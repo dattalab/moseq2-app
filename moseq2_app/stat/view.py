@@ -29,57 +29,6 @@ from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
 from moseq2_viz.model.dist import get_behavioral_distance
 
-def graph_dendrogram(obj, syll_info):
-    '''
-    Graphs the distance sorted dendrogram representing syllable neighborhoods. Distance sorting
-    is computed by processing the respective syllable AR matrices.
-
-    Parameters
-    ----------
-    obj (InteractiveSyllableStats object): Syllable Stats object containing syllable stat information.
-    syll_info (dict): dict object containing syllable numbers paired with dicts of their labels and descriptions.
-
-    Returns
-    -------
-    '''
-
-    ## Cladogram figure
-    cladogram = figure(title='Distance Sorted Syllable Dendrogram',
-                       width=850,
-                       height=500,
-                       output_backend="svg")
-
-    # Get distance sorted label ordering
-    labels = list(map(int, obj.results['ivl']))
-    sources = []
-    # Each (icoord, dcoord) pair represents a single branch in the dendrogram
-    for i, d in zip(obj.icoord, obj.dcoord):
-        tmp = list(zip(i, d))
-        lbls = []
-
-        # Get labels
-        for t in tmp:
-            if t[1] == 0:
-                lbls.append(labels[int(t[0])])
-            else:
-                lbls.append('')
-
-        # Set coordinate DataSource
-        source = ColumnDataSource(dict(x=i, y=d, labels=lbls))
-        sources.append(source)
-
-        # Draw glyphs
-        cladogram.line(x='x', y='y', source=source)
-
-    xtick_labels = [syll_info.get(lbl, {'label': ''})['label'] for lbl in labels]
-    xticks = [f'{lbl} - {num}' if len(lbl) > 0 else f'{num}' for num, lbl in zip(labels, xtick_labels)]
-
-    # Set x-axis ticks
-    cladogram.xaxis.ticker = FixedTicker(ticks=labels)
-    cladogram.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
-    cladogram.xaxis.major_label_orientation = np.pi / 2
-
-    return cladogram
 
 def colorscale(hexstr, scalefactor):
     """
@@ -616,7 +565,6 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     sorting (list): List of the current/selected syllable ordering
     groupby (str): Value to group data by. Either by unique group name, session name, or subject name.
     errorbar (str): Error bar type to display
-    syllable_families (dict): dict containing cladogram figure
     sort_name (str): Syllable sorting name displayed in title.
     thresh (str): Statistic to threshold syllables by using the Range Slider
 
@@ -632,7 +580,6 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
                width=850,
                height=500,
                tools=tools,
-               x_range=syllable_families['cladogram'].x_range,
                x_axis_label='Syllables',
                y_axis_label=f'{stat}',
                output_backend="svg")
@@ -646,12 +593,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
                    stat, errorbar, line_dash='dashed', thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # draw line plots, setup hovertool, thresholding slider and group color pickers
-    if list(sorting) == syllable_families['leaves']:
-        slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
-                                     sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
-    else:
-        slider, searchbox = draw_stats(p, df, groups, colors, sorting,
-                                     groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
+    slider, searchbox = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # Format Bokeh plot with widgets
     graph_n_pickers = format_stat_plot(p, df, searchbox, slider, sorting)

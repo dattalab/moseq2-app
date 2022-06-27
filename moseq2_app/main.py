@@ -262,7 +262,6 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
                                      info_path=syll_info_path, max_sylls=max_syllable, load_parquet=load_parquet)
 
     display(istat.clear_button, istat.stat_widget_box, istat.out)
-    # show(istat.cladogram)
 
 @filter_warnings
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):
