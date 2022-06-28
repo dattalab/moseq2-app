@@ -53,7 +53,7 @@ You can find more information about the MoSeq2 package suite, the acquisition an
 - Please tell us what you think by filling out [this user survey](https://forms.gle/S88jptAEs41mQjff7).
 
 # Versions
-- Current version: Version 1.1.1
+- Current version: Version 1.2.0
 - [Changelog](https://github.com/dattalab/moseq2-app/wiki/Changelog)
 
 # Events & News
