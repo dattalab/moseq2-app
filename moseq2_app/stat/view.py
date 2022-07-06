@@ -27,6 +27,7 @@ from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, Col
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
 from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.spatial.distance import squareform
 from moseq2_viz.model.dist import get_behavioral_distance
 
 
@@ -1423,8 +1424,10 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
     
     # compute similarity between syllables based on the AR matrix
     sorted_index = get_sorted_index(index_file)
+    # X is a (max_syllable, max_syllable) size square matrix
     X = get_behavioral_distance(sorted_index, model_path, max_syllable=max_syllable, distances='ar[init]')['ar[init]']
-    Z = linkage(X, 'complete')
+    # need to run squareform on X because linkage expects a 1-d array
+    Z = linkage(squareform(X), 'complete')
 
     # plot the dendrogram
     sns.set_style('whitegrid', {'axes.grid' : False})
