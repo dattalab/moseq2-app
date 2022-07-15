@@ -1013,7 +1013,8 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     # node size is likely related to node diameters from https://towardsdatascience.com/customizing-networkx-graphs-f80b4e69bedf
     if difference_graph:
         node_color = {s: 'red' if usages[s] > 0 else 'blue' for s in node_indices}
-        node_size = {s: max(15., 10 + abs(usages[s] * 1000)) for s in node_indices}
+        node_size = {s: max(15., 15 + abs(usages[s] * 1000)) for s in node_indices}
+        
     else:
         node_color = {s: 'red' for s in node_indices}
         node_size = {s: max(15., abs(usages[s] * 1000)) for s in node_indices}
