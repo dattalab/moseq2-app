@@ -814,17 +814,17 @@ def get_difference_legend_items(plot, edge_width, group_name):
 
     min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True)
 
-    min_down_line = plot.line(line_color='blue', line_width=min_down_tp * 350)
-    max_down_line = plot.line(line_color='blue', line_width=max_down_tp * 350)
+    min_down_line = plot.line(line_color='red', line_width=min_down_tp * 350)
+    max_down_line = plot.line(line_color='red', line_width=max_down_tp * 350)
 
-    min_up_line = plot.line(line_color='red', line_width=min_up_tp * 350)
-    max_up_line = plot.line(line_color='red', line_width=max_up_tp * 350)
+    min_up_line = plot.line(line_color='blue', line_width=min_up_tp * 350)
+    max_up_line = plot.line(line_color='blue', line_width=max_up_tp * 350)
 
     diff_main_items = [
-        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[r_circle]),
-        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[b_circle]),
-        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[r_line]),
-        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[b_line]),
+        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[b_circle]),
+        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[r_circle]),
+        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[b_line]),
+        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[r_line]),
     ]
 
     diff_width_items = [
@@ -917,7 +917,7 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     '''
     Computes the colors and widths of all the transition edges between nodes. Each individual group
     will always have edges colored black.If difference_graph is true,
-    then the edges will be colored red if the difference is > 0, and blue otherwise.
+    then the edges will be colored blue if the difference is > 0, and red otherwise.
 
     Parameters
     ----------
@@ -935,7 +935,7 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
 
     # edge colors for difference graphs
     if difference_graph:
-        edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
+        edge_color = {e: 'blue' if graph.edges()[e]['weight'] > 0 else 'red' for e in graph.edges()}
         edge_width = {e: abs(graph.edges()[e]['weight'] * 400) for e in graph.edges()}
     else:
         edge_color = {e: 'black' for e in graph.edges()}
@@ -996,7 +996,7 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     '''
     Computes the colors and sizes of all the transition nodes. Each individual group
     will always have edges colored black. If difference_graph is true,
-     then the nodes will be colored red if the difference is > 0, and blue otherwise.
+     then the nodes will be colored blue if the difference is > 0, and red otherwise.
 
     Parameters
     ----------
@@ -1012,8 +1012,9 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     # node colors for difference graphs
     # node size is likely related to node diameters from https://towardsdatascience.com/customizing-networkx-graphs-f80b4e69bedf
     if difference_graph:
-        node_color = {s: 'red' if usages[s] > 0 else 'blue' for s in node_indices}
-        node_size = {s: max(15., 10 + abs(usages[s] * 1000)) for s in node_indices}
+        node_color = {s: 'blue' if usages[s] > 0 else 'red' for s in node_indices}
+        node_size = {s: max(15., 15 + abs(usages[s] * 1000)) for s in node_indices}
+        
     else:
         node_color = {s: 'red' for s in node_indices}
         node_size = {s: max(15., abs(usages[s] * 1000)) for s in node_indices}
