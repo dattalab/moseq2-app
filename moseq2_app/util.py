@@ -188,10 +188,10 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
     for key in ['model_session_path', 'model_path']:
         progress_paths = update_progress(progress_filepath, key, model_dict[desired_model].get(key))
     progress_paths = update_progress(progress_filepath, 'plot_path', join(model_dict[desired_model]['model_session_path'], 'plots/'))
+    progress_paths = update_progress(progress_filepath, 'crowd_dir', join(model_dict[desired_model]['model_session_path'], 'crowd_movies/'))
+    progress_paths = update_progress(progress_filepath, 'syll_info', join(model_dict[desired_model]['model_session_path'], 'syll_info.yaml'))
+    progress_paths = update_progress(progress_filepath, 'df_info_path', join(model_dict[desired_model]['model_session_path'], 'syll_df.parquet'))
 
-    # reset paths in progress_paths
-    for key in ['crowd_dir', 'syll_info', 'df_info_path']:
-        progress_paths = update_progress(progress_filepath, key, '')
     return progress_paths
 
 

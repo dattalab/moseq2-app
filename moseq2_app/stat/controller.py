@@ -449,7 +449,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
 
             # Get groups and matching session uuids
             label_group, _ = get_trans_graph_groups(self.model_fit)
-            self.group = list(set(label_group))
+            self.group = sorted(list(set(label_group)))
 
             labels = relabel_by_usage(labels, count='usage')[0]
 
