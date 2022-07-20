@@ -44,3 +44,4 @@ dependencies:
       - jupyter==1.0.0
       - plotly==4.14.3
       - jupyter_nbextensions_configurator
+      - jinja2==3.0.1

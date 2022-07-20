@@ -10,7 +10,11 @@ import warnings
 import itertools
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import networkx as nx
+from os.path import exists, join
+from os import makedirs
 from collections import deque
 from bokeh.layouts import column
 from bokeh.layouts import gridplot
@@ -21,58 +25,11 @@ from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
+from moseq2_viz.util import get_sorted_index, read_yaml
+from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.spatial.distance import squareform
+from moseq2_viz.model.dist import get_behavioral_distance
 
-def graph_dendrogram(obj, syll_info):
-    '''
-    Graphs the distance sorted dendrogram representing syllable neighborhoods. Distance sorting
-    is computed by processing the respective syllable AR matrices.
-
-    Parameters
-    ----------
-    obj (InteractiveSyllableStats object): Syllable Stats object containing syllable stat information.
-    syll_info (dict): dict object containing syllable numbers paired with dicts of their labels and descriptions.
-
-    Returns
-    -------
-    '''
-
-    ## Cladogram figure
-    cladogram = figure(title='Distance Sorted Syllable Dendrogram',
-                       width=850,
-                       height=500,
-                       output_backend="svg")
-
-    # Get distance sorted label ordering
-    labels = list(map(int, obj.results['ivl']))
-    sources = []
-    # Each (icoord, dcoord) pair represents a single branch in the dendrogram
-    for i, d in zip(obj.icoord, obj.dcoord):
-        tmp = list(zip(i, d))
-        lbls = []
-
-        # Get labels
-        for t in tmp:
-            if t[1] == 0:
-                lbls.append(labels[int(t[0])])
-            else:
-                lbls.append('')
-
-        # Set coordinate DataSource
-        source = ColumnDataSource(dict(x=i, y=d, labels=lbls))
-        sources.append(source)
-
-        # Draw glyphs
-        cladogram.line(x='x', y='y', source=source)
-
-    xtick_labels = [syll_info.get(lbl, {'label': ''})['label'] for lbl in labels]
-    xticks = [f'{lbl} - {num}' if len(lbl) > 0 else f'{num}' for num, lbl in zip(labels, xtick_labels)]
-
-    # Set x-axis ticks
-    cladogram.xaxis.ticker = FixedTicker(ticks=labels)
-    cladogram.xaxis.major_label_overrides = {i: str(l) for i, l in enumerate(list(xticks))}
-    cladogram.xaxis.major_label_orientation = np.pi / 4
-
-    return cladogram
 
 def colorscale(hexstr, scalefactor):
     """
@@ -188,10 +145,10 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
     dict_mapping = {
         'usage': 'usage',
         'duration': 'duration',
-        'velocity_2d_mm': 'speed_2d',
-        'velocity_3d_mm': 'speed_3d',
-        'height_ave_mm': 'height',
-        'dist_to_center_px': 'dist_to_center'
+        'velocity_2d_mm_mean': 'speed_2d',
+        'velocity_3d_mm_mean': 'speed_3d',
+        'height_ave_mm_mean': 'height',
+        'dist_to_center_px_mean': 'dist_to_center'
     }
 
     js_condition = '''if((data[thresh_stat][i] >= slider.value[0]) && (data[thresh_stat][i] <= slider.value[1])) {\n'''
@@ -284,7 +241,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     if errorbar == 'CI 95%':
         stat_err = df_group.groupby('syllable')[stat].apply(get_ci_vect_vectorized).reindex(sorting)
         aux_err = {}
-        for s in ['usage', 'duration', 'velocity_2d_mm', 'velocity_3d_mm', 'height_ave_mm', 'dist_to_center_px']:
+        for s in ['usage', 'duration', 'velocity_2d_mm_mean', 'velocity_3d_mm_mean', 'height_ave_mm_mean', 'dist_to_center_px_mean']:
             aux_err[s] = df_group.groupby('syllable')[s].apply(get_ci_vect_vectorized).reindex(sorting)
     elif errorbar == 'SEM':
         stat_err = grouped.sem().reindex(sorting)
@@ -380,10 +337,10 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         y=aux_df[stat].to_numpy(),
         usage=aux_df['usage'].to_numpy(),
         duration=aux_df['duration'].to_numpy(),
-        speed_2d=aux_df['velocity_2d_mm'].to_numpy(),
-        speed_3d=aux_df['velocity_3d_mm'].to_numpy(),
-        height=aux_df['height_ave_mm'].to_numpy(),
-        dist_to_center=aux_df['dist_to_center_px'].to_numpy(),
+        speed_2d=aux_df['velocity_2d_mm_mean'].to_numpy(),
+        speed_3d=aux_df['velocity_3d_mm_mean'].to_numpy(),
+        height=aux_df['height_ave_mm_mean'].to_numpy(),
+        dist_to_center=aux_df['dist_to_center_px_mean'].to_numpy(),
         sem=aux_sem[stat].to_numpy(),
         number=sem.index,
         label=labels,
@@ -398,10 +355,10 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
         y=errs_y,
         usage=aux_sem['usage'].to_numpy(),
         duration=aux_sem['duration'].to_numpy(),
-        speed_2d=aux_sem['velocity_2d_mm'].to_numpy(),
-        speed_3d=aux_sem['velocity_3d_mm'].to_numpy(),
-        height=aux_sem['height_ave_mm'].to_numpy(),
-        dist_to_center=aux_sem['dist_to_center_px'].to_numpy(),
+        speed_2d=aux_sem['velocity_2d_mm_mean'].to_numpy(),
+        speed_3d=aux_sem['velocity_3d_mm_mean'].to_numpy(),
+        height=aux_sem['height_ave_mm_mean'].to_numpy(),
+        dist_to_center=aux_sem['dist_to_center_px_mean'].to_numpy(),
         sem=aux_sem[stat].to_numpy(),
         number=sem.index,
         label=labels,
@@ -609,7 +566,6 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     sorting (list): List of the current/selected syllable ordering
     groupby (str): Value to group data by. Either by unique group name, session name, or subject name.
     errorbar (str): Error bar type to display
-    syllable_families (dict): dict containing cladogram figure
     sort_name (str): Syllable sorting name displayed in title.
     thresh (str): Statistic to threshold syllables by using the Range Slider
 
@@ -625,7 +581,6 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
                width=850,
                height=500,
                tools=tools,
-               x_range=syllable_families['cladogram'].x_range,
                x_axis_label='Syllables',
                y_axis_label=f'{stat}',
                output_backend="svg")
@@ -639,12 +594,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
                    stat, errorbar, line_dash='dashed', thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # draw line plots, setup hovertool, thresholding slider and group color pickers
-    if list(sorting) == syllable_families['leaves']:
-        slider, searchbox = draw_stats(p, df, list(df.group.unique()), group_colors,
-                                     sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
-    else:
-        slider, searchbox = draw_stats(p, df, groups, colors, sorting,
-                                     groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
+    slider, searchbox = draw_stats(p, df, groups, colors, sorting, groupby, stat, errorbar, thresh_stat=thresh, sig_sylls=sig_sylls)
 
     # Format Bokeh plot with widgets
     graph_n_pickers = format_stat_plot(p, df, searchbox, slider, sorting)
@@ -864,17 +814,17 @@ def get_difference_legend_items(plot, edge_width, group_name):
 
     min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True)
 
-    min_down_line = plot.line(line_color='blue', line_width=min_down_tp * 350)
-    max_down_line = plot.line(line_color='blue', line_width=max_down_tp * 350)
+    min_down_line = plot.line(line_color='red', line_width=min_down_tp * 350)
+    max_down_line = plot.line(line_color='red', line_width=max_down_tp * 350)
 
-    min_up_line = plot.line(line_color='red', line_width=min_up_tp * 350)
-    max_up_line = plot.line(line_color='red', line_width=max_up_tp * 350)
+    min_up_line = plot.line(line_color='blue', line_width=min_up_tp * 350)
+    max_up_line = plot.line(line_color='blue', line_width=max_up_tp * 350)
 
     diff_main_items = [
-        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[r_circle]),
-        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[b_circle]),
-        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[r_line]),
-        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[b_line]),
+        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[b_circle]),
+        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[r_circle]),
+        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[b_line]),
+        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[r_line]),
     ]
 
     diff_width_items = [
@@ -967,7 +917,7 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     '''
     Computes the colors and widths of all the transition edges between nodes. Each individual group
     will always have edges colored black.If difference_graph is true,
-    then the edges will be colored red if the difference is > 0, and blue otherwise.
+    then the edges will be colored blue if the difference is > 0, and red otherwise.
 
     Parameters
     ----------
@@ -985,7 +935,7 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
 
     # edge colors for difference graphs
     if difference_graph:
-        edge_color = {e: 'red' if graph.edges()[e]['weight'] > 0 else 'blue' for e in graph.edges()}
+        edge_color = {e: 'blue' if graph.edges()[e]['weight'] > 0 else 'red' for e in graph.edges()}
         edge_width = {e: abs(graph.edges()[e]['weight'] * 400) for e in graph.edges()}
     else:
         edge_color = {e: 'black' for e in graph.edges()}
@@ -1046,7 +996,7 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     '''
     Computes the colors and sizes of all the transition nodes. Each individual group
     will always have edges colored black. If difference_graph is true,
-     then the nodes will be colored red if the difference is > 0, and blue otherwise.
+     then the nodes will be colored blue if the difference is > 0, and red otherwise.
 
     Parameters
     ----------
@@ -1062,8 +1012,9 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     # node colors for difference graphs
     # node size is likely related to node diameters from https://towardsdatascience.com/customizing-networkx-graphs-f80b4e69bedf
     if difference_graph:
-        node_color = {s: 'red' if usages[s] > 0 else 'blue' for s in node_indices}
-        node_size = {s: max(15., 10 + abs(usages[s] * 1000)) for s in node_indices}
+        node_color = {s: 'blue' if usages[s] > 0 else 'red' for s in node_indices}
+        node_size = {s: max(15., 15 + abs(usages[s] * 1000)) for s in node_indices}
+        
     else:
         node_color = {s: 'red' for s in node_indices}
         node_size = {s: max(15., abs(usages[s] * 1000)) for s in node_indices}
@@ -1445,3 +1396,46 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     # Create Bokeh grid plot object
     gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
     show(gp)
+
+def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllable = 40, color_by_cluster=False):
+    """helper function to plot a static dentrogram
+
+    Args:
+        index_file (str): path to index file
+        model_path (str): path to the model
+        syll_info_path (str): path to syll_info
+        save_dir (str): 
+        max_syllable (int, optional): _description_. Defaults to 40.
+        color_by_cluster (bool, optional): _description_. Defaults to False.
+    """
+    # if there is syll info, load syllable description
+    if exists(syll_info_path):
+        syll_info = read_yaml(syll_info_path)
+        syll_info = pd.DataFrame(syll_info).T.sort_index()
+        labels = (syll_info['label']+"-" +syll_info.index.astype(str)).to_numpy()
+    else:
+        labels = None
+
+    # set color_threshold = None to color the clusters based on threshold
+    # described here: https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.dendrogram.html
+    if color_by_cluster:
+        color_threshold = None
+    else:
+        color_threshold = 0
+    
+    # compute similarity between syllables based on the AR matrix
+    sorted_index = get_sorted_index(index_file)
+    # X is a (max_syllable, max_syllable) size square matrix
+    X = get_behavioral_distance(sorted_index, model_path, max_syllable=max_syllable, distances='ar[init]')['ar[init]']
+    # need to run squareform on X because linkage expects a 1-d array
+    Z = linkage(squareform(X), 'complete')
+
+    # plot the dendrogram
+    sns.set_style('whitegrid', {'axes.grid' : False})
+    fig, ax = plt.subplots(figsize=(20, 10)) 
+    dendrogram(Z, distance_sort=False, no_plot=False, labels=labels, color_threshold=color_threshold, leaf_font_size=15, leaf_rotation=90, ax=ax)
+
+    # save the fig
+    makedirs(save_dir, exist_ok=True)
+    fig.savefig(join(save_dir, 'syllable_dendrogram.pdf'))
+    fig.savefig(join(save_dir, 'syllable_dendrogram.png'))
