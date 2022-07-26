@@ -456,7 +456,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             self.compute_entropies(labels, label_group)
 
             # Compute usages and transition matrices
-            self.trans_mats, self.usages = get_group_trans_mats(labels, label_group, self.group, self.max_sylls)
+            self.trans_mats, self.usages = get_group_trans_mats(labels, label_group, sorted(self.group), self.max_sylls)
             self.df = self.df[self.df['syllable'] < self.max_sylls]
             self.df = self.df.groupby(['group', 'syllable'], as_index=False).mean()
 
