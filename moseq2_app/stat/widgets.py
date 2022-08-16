@@ -9,6 +9,7 @@ import numpy as np
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 from IPython.display import clear_output
+from moseq2_viz.model.util import normalize_usages
 
 class SyllableStatWidgets:
 
@@ -292,10 +293,11 @@ class TransitionGraphWidgets:
         Returns
         -------
         '''
-
+        from math import ceil
         # Update threshold range values
         self.edge_thresholder.max = np.max(self.trans_mats)
         self.edge_thresholder.value = (0, np.max(self.trans_mats))
-
-        self.usage_thresholder.max = self.df['usage'].max()
-        self.usage_thresholder.value = (0, self.df['usage'].max())
+        # find max normalized usage threshold and round up
+        usages_max = ceil(max([max(normalize_usages(u).values()) for u in self.usages])*1000)/1000.
+        self.usage_thresholder.max = usages_max
+        self.usage_thresholder.value = (0, usages_max)

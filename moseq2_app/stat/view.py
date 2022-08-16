@@ -1209,7 +1209,10 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
         if len(plots) == 0:
             x, y = zip(*graph_renderer.layout_provider.graph_layout.values())
             # find the nodes and cast the labels to a string
-            syllable = [str(n) for n in list(graph.nodes._nodes.keys())]
+            # sort labels
+            syllable = sorted([n for n in list(graph.nodes._nodes.keys())])
+            # turn label into string
+            syllable = [str(a) for a in syllable]
         else:
             new_layout = {k: rendered_graphs[0].layout_provider.graph_layout[k] for k in
                           graph_renderer.layout_provider.graph_layout}
