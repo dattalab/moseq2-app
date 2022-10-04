@@ -172,6 +172,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
             print('Syllable DataFrame not found. Computing syllable statistics...')
             df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
+        df = df.loc[:, ~df.columns.str.contains('min|max|std')].copy()
+        print(df.columns)
+
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
