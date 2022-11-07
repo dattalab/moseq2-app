@@ -6,13 +6,13 @@ dependencies:
   - python=3.7
   - pip
   - jupyter
-  - qgrid
   - conda-forge::ffmpeg=4.2.0
   - conda-forge::opencv
   - jupyter_nbextensions_configurator
   - scikit-image=0.16.2
   - fastparquet=0.4.1
   - pip:
+      - qgrid
       - numpy==1.18.3
       - pandas==1.0.5
       - ipython==7.14.0
