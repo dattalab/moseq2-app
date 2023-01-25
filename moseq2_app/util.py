@@ -1,8 +1,8 @@
-'''
+"""
 
 General utility functions.
 
-'''
+"""
 import pandas as pd
 import ruamel.yaml as yaml
 from copy import deepcopy
@@ -42,7 +42,7 @@ def write_yaml(data, file):
 
 
 def merge_labels_with_scalars(sorted_index, model_path):
-    '''
+    """
     Computes all the syllable statistics to plot, including syllable scalars.
 
     Parameters
@@ -56,7 +56,7 @@ def merge_labels_with_scalars(sorted_index, model_path):
     -------
     df (pd.DataFrame): Dataframe containing all of the mean syllable statistics
     scalar_df (pd.DataFrame): Dataframe containing the frame-by-frame scalar and label data
-    '''
+    """
 
     # Load scalar Dataframe to compute syllable speeds
     scalar_df = scalars_to_dataframe(sorted_index, model_path=model_path)
@@ -67,7 +67,7 @@ def merge_labels_with_scalars(sorted_index, model_path):
     return df, scalar_df
 
 def index_to_dataframe(index_path):
-    '''
+    """
     Reads the index file into a dictionary and converts it into an editable DataFrame.
 
     Parameters
@@ -78,7 +78,7 @@ def index_to_dataframe(index_path):
     -------
     index_data (dict): Dict object containing all parsed index file contents
     df (pd.DataFrame): Formatted dict in DataFrame form including each session's metadata
-    '''
+    """
 
     index_data = read_yaml(index_path)
 
@@ -98,9 +98,9 @@ def index_to_dataframe(index_path):
     return index_data, df
 
 class bcolors:
-    '''
+    """
     Class containing color UNICODE values used to color printed output.
-    '''
+    """
 
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'

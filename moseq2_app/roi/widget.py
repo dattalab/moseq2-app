@@ -1,7 +1,7 @@
-'''
+"""
 Constructs a jupyter notebook viewable widget users can use to identify the arena floor
 and to validate extractions performed on a small chunk of data. 
-'''
+"""
 
 import param
 import numpy as np
@@ -195,7 +195,7 @@ class ArenaMaskWidget:
         return extraction['depth_frames'], frames
 
     def get_background(self, folder=None):
-        '''Assuming this will be called by an event-triggered function'''
+        """Assuming this will be called by an event-triggered function"""
         if folder is None:
             folder = self.session_data.path
         if folder not in self.backgrounds:
@@ -211,7 +211,7 @@ class ArenaMaskWidget:
 
 # define data class first
 class ArenaMaskData(param.Parameterized):
-    '''The link between the widget view and the underlying data'''
+    """The link between the widget view and the underlying data"""
     ### data ###
     path = param.ObjectSelector()  # stores the currently selected path and all others
     # defines the range of depth values needed to compute mask for floor

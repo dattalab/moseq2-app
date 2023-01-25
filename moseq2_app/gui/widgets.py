@@ -1,9 +1,9 @@
-'''
+"""
 
 This module contains the widget components that comprise the group setting table functionality.
 These widgets will work in tandem with the qgrid functionality to facilitate the real time updates.
 
-'''
+"""
 
 import qgrid
 import pandas as pd
@@ -15,14 +15,14 @@ from moseq2_app.util import index_to_dataframe
 class GroupSettingWidgets:
 
     def __init__(self, index_filepath):
-        '''
+        """
         Initializes all the Group Setting widgets, parses the index yaml file into a pandas DataFrame that is
          compatible to be displayed using QGrid.
 
         Parameters
         ----------
         index_filepath (str): Path to index file (moseq2-index.yaml) containing session metadata and grouping info.
-        '''
+        """
 
         self.index_filepath = index_filepath
         style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
@@ -67,7 +67,7 @@ class GroupSettingWidgets:
         self.save_button.on_click(self.update_table)
 
     def update_table(self, b=None):
-        '''
+        """
         Updates table upon "Set Button" click
 
         Parameters
@@ -76,7 +76,7 @@ class GroupSettingWidgets:
 
         Returns
         -------
-        '''
+        """
 
         self.update_index_button.button_style = 'info'
         self.update_index_button.icon = 'none'
@@ -88,7 +88,7 @@ class GroupSettingWidgets:
             self.qgrid_widget.edit_cell(i, 'group', self.group_input.value)
 
     def update_clicked(self, b=None):
-        '''
+        """
         Updates the index file with the current table state upon Save button click.
 
         Parameters
@@ -97,7 +97,7 @@ class GroupSettingWidgets:
 
         Returns
         -------
-        '''
+        """
 
         files = self.index_dict['files']
         meta = [f['metadata'] for f in files]
@@ -117,7 +117,7 @@ class GroupSettingWidgets:
         self.update_index_button.icon = 'check'
 
     def clear_clicked(self, b=None):
-        '''
+        """
         Clear the display.
 
         Parameters
@@ -126,5 +126,5 @@ class GroupSettingWidgets:
 
         Returns
         -------
-        '''
+        """
         clear_output()

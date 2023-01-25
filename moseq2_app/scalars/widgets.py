@@ -1,8 +1,8 @@
-'''
+"""
 
 Ipywidgets used to facilitate interactive scalar summary viewer tool.
 
-'''
+"""
 from ipywidgets import VBox
 import ipywidgets as widgets
 from IPython.display import display, clear_output
@@ -10,9 +10,9 @@ from IPython.display import display, clear_output
 class InteractiveScalarWidgets:
 
     def __init__(self):
-        '''
+        """
         Initializing all the ipywidgets widgets in a new context.
-        '''
+        """
 
         style = {'description_width': 'initial'}
 
@@ -37,7 +37,7 @@ class InteractiveScalarWidgets:
         self.clear_button.on_click(self.on_clear)
 
     def on_clear(self, b=None):
-        '''
+        """
         Clears the display and memory.
 
         Parameters
@@ -46,13 +46,13 @@ class InteractiveScalarWidgets:
 
         Returns
         -------
-        '''
+        """
 
         clear_output()
         del self
 
     def on_column_select(self, event=None):
-        '''
+        """
         Updates the view once the user selects a new set of scalars to plot.
 
         Parameters
@@ -61,7 +61,7 @@ class InteractiveScalarWidgets:
 
         Returns
         -------
-        '''
+        """
 
         clear_output()
         display(self.ui_tools)

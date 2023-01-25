@@ -1,9 +1,9 @@
-'''
+"""
 
 Widgets module containing classes with components for each of the interactive syllable
  visualization tools: Syllable Labeler, and Crowd Movie Comparison.
 
-'''
+"""
 
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
@@ -80,7 +80,7 @@ class SyllableLabelerWidgets:
         self.button_box = HBox([self.prev_button, self.set_button, self.next_button], layout=self.ui_layout)
 
     def clear_on_click(self, b=None):
-        '''
+        """
         Clears the cell output
 
         Parameters
@@ -89,13 +89,13 @@ class SyllableLabelerWidgets:
 
         Returns
         -------
-        '''
+        """
 
         clear_output()
         del self
 
     def on_next(self, event=None):
-        '''
+        """
         Callback function to trigger an view update when the user clicks the "Next" button.
 
         Parameters
@@ -104,7 +104,7 @@ class SyllableLabelerWidgets:
 
         Returns
         -------
-        '''
+        """
 
         # Updating dict
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
@@ -124,7 +124,7 @@ class SyllableLabelerWidgets:
         self.write_syll_info(curr_syll=self.syll_select.index)
 
     def on_prev(self, event=None):
-        '''
+        """
         Callback function to trigger an view update when the user clicks the "Previous" button.
 
         Parameters
@@ -133,7 +133,7 @@ class SyllableLabelerWidgets:
 
         Returns
         -------
-        '''
+        """
 
         # Update syllable information dict
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
@@ -153,7 +153,7 @@ class SyllableLabelerWidgets:
         self.write_syll_info(curr_syll=self.syll_select.index)
 
     def on_set(self, event=None):
-        '''
+        """
         Callback function to save the dict to syllable information file.
 
         Parameters
@@ -162,7 +162,7 @@ class SyllableLabelerWidgets:
 
         Returns
         -------
-        '''
+        """
 
         # Update dict
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
@@ -211,7 +211,7 @@ class CrowdMovieCompareWidgets:
                                                      justify_content='space-around'))
 
     def clear_on_click(self, b=None):
-        '''
+        """
         Clears the cell output
 
         Parameters
@@ -220,12 +220,12 @@ class CrowdMovieCompareWidgets:
 
         Returns
         -------
-        '''
+        """
 
         clear_output()
 
     def select_session(self, event=None):
-        '''
+        """
         Callback function to save the list of selected sessions to config_data,
          and get session syllable info to pass to crowd_movie_wrapper and create the
          accompanying syllable scalar metadata table.
@@ -236,7 +236,7 @@ class CrowdMovieCompareWidgets:
 
         Returns
         -------
-        '''
+        """
 
         # Set currently selected sessions
         self.config_data['session_names'] = list(self.cm_session_sel.value)
@@ -245,7 +245,7 @@ class CrowdMovieCompareWidgets:
         self.get_selected_session_syllable_info(self.config_data['session_names'])
 
     def show_session_select(self, change):
-        '''
+        """
         Callback function to change current view to show session selector when user switches
         DropDownMenu selection to 'SessionName', and hides it if the user
         selects 'groups'.
@@ -256,7 +256,7 @@ class CrowdMovieCompareWidgets:
 
         Returns
         -------
-        '''
+        """
 
         # Handle display syllable selection and update config_data crowd movie generation
         # source selector.
@@ -280,7 +280,7 @@ class CrowdMovieCompareWidgets:
             self.config_data['separate_by'] = 'groups'
 
     def on_click_trigger_button(self, b=None):
-        '''
+        """
         Generates crowd movies and displays them when the user clicks the trigger button
 
         Parameters
@@ -289,7 +289,7 @@ class CrowdMovieCompareWidgets:
 
         Returns
         -------
-        '''
+        """
 
         syll_number = int(self.cm_syll_select.value.split(' - ')[0])
 

@@ -1,9 +1,9 @@
-'''
+"""
 
 Main syllable crowd movie viewing, comparing, and labeling functionality.
  Included tools are the Syllable labeler, and the crowd movie/position pdf comparison tool.
 
-'''
+"""
 
 import re
 import os
@@ -38,15 +38,15 @@ def _initialize_syll_info_dict(max_sylls):
     return {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in range(max_sylls)}
 
 class SyllableLabeler(SyllableLabelerWidgets):
-    '''
+    """
 
     Class that contains functionality for previewing syllable crowd movies and
      user interactions with buttons and menus.
 
-    '''
+    """
 
     def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, select_median_duration_instances, max_examples, crowd_movie_dir, save_path):
-        '''
+        """
         Initializes class context parameters, reads and creates the syllable information dict.
 
         Parameters
@@ -56,7 +56,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         max_sylls (int): Maximum number of syllables to preview and label.
         select_median_duration_instances (bool): if true, select examples with syallable duration closer to median.
         save_path (str): Path to save syllable label information dictionary.
-        '''
+        """
 
         super().__init__()
         self.save_path = save_path
@@ -126,12 +126,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.syll_select.options = self.option_dict
 
     def write_syll_info(self, curr_syll=None):
-        '''
+        """
         Writes current syllable info data to a YAML file.
 
         Returns
         -------
-        '''
+        """
 
         # Dropping sub-dictionaries from the syll_info dict that contain
         # the syllable statistics information plotted in the info table in the Syllable Labeler GUI.
@@ -155,7 +155,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             self.syll_select._initializing_traits_ = False
 
     def get_mean_group_dict(self, group_df):
-        '''
+        """
         Creates a dict object to convert to a displayed table containing syllable scalars.
 
         Parameters
@@ -164,7 +164,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Returns
         -------
-        '''
+        """
 
         # Get array of grouped syllable info
         group_dicts = []
@@ -188,12 +188,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
                 }
 
     def get_mean_syllable_info(self):
-        '''
+        """
         Populates syllable information dict with usage and scalar information.
 
         Returns
         -------
-        '''
+        """
 
         if not os.path.exists(self.df_output_file):
             # Compute a syllable summary Dataframe containing usage-based
@@ -217,7 +217,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.get_mean_group_dict(group_df)
 
     def set_group_info_widgets(self, group_info):
-        '''
+        """
         Display function that reads the syllable information into a pandas DataFrame, converts it
         to an HTML table and displays it in a Bokeh Div facilitated via the Output() widget.
 
@@ -227,7 +227,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Returns
         -------
-        '''
+        """
 
         full_df = pd.DataFrame(group_info)
         columns = full_df.columns
@@ -253,7 +253,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.info_boxes.children = [self.syll_info_lbl, ipy_output, ]
 
     def interactive_syllable_labeler(self, syllables):
-        '''
+        """
         Helper function that facilitates the interactive view. Function will create a Bokeh Div object
         that will display the current video path.
 
@@ -263,7 +263,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Returns
         -------
-        '''
+        """
 
         self.set_button.button_style = 'primary'
 
@@ -291,14 +291,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
         encoded = base64.b64encode(video)
 
         # Create syllable crowd movie HTML div to embed
-        video_div = f'''
+        video_div = f"""
                         <h2>{self.syll_select.index}: {syllables['label']}</h2>
                         <video
                             src="data:video/mp4;base64,{encoded.decode("ascii")}"; alt="data:{cm_path}"; height="{video_dims[1]}"; width="{video_dims[0]}"; preload="true";
                             style="float: left; type: "video/mp4"; margin: 0px 10px 10px 0px;
                             border="2"; autoplay controls loop>
                         </video>
-                    '''
+                    """
 
         # Create embedded HTML Div and view layout
         div = Div(text=video_div, style={'width': '100%'})
@@ -331,7 +331,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         display(grid, self.button_box)
 
     def set_default_cm_parameters(self, config_data):
-        '''
+        """
         Sets default crowd movie generation parameters that may be manually updated.
 
         Parameters
@@ -342,7 +342,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         -------
         config_data (dict): Updated dict of main moseq configuration parameters
          with default crowd movie generation parameters.
-        '''
+        """
 
         config_data['separate_by'] = ''
         config_data['specific_syllable'] = None
@@ -364,7 +364,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         return config_data
 
     def get_crowd_movie_paths(self, index_path, model_path, config_data, crowd_movie_dir):
-        '''
+        """
         Populates the syllable information dict with the respective crowd movie paths.
 
         Parameters
@@ -373,7 +373,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         Returns
         -------
-        '''
+        """
 
         if not os.path.exists(crowd_movie_dir):
             print('Crowd movies not found. Generating movies...')
@@ -411,14 +411,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
             yml.dump(self.syll_info, f)
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
-    '''
+    """
     Crowd Movie Comparison application class. Contains all the user inputted parameters
     within its context.
 
-    '''
+    """
 
     def __init__(self, config_data, index_path, df_path, model_path, syll_info, output_dir, get_pdfs, load_parquet):
-        '''
+        """
         Initializes class object context parameters.
 
         Parameters
@@ -431,7 +431,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         output_dir (str): Path to directory to store crowd movies.
         get_pdfs (bool): Generate position heatmaps for the corresponding crowd movie grouping
         load_parquet (bool): Indicates to load previously saved syllable data.
-        '''
+        """
 
         super().__init__()
 
@@ -513,7 +513,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data['count'] = 'usage'
 
     def get_mean_group_dict(self, group_df):
-        '''
+        """
         Creates a dict object to convert to a displayed table containing syllable scalars.
 
         Parameters
@@ -522,7 +522,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         Returns
         -------
-        '''
+        """
 
         # Get array of grouped syllable info
         group_dicts = []
@@ -559,7 +559,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                         print(f'Warning: syllable #{syll} is not in group:{group_name}')
 
     def get_session_mean_syllable_info_df(self):
-        '''
+        """
 
         Populates session-based syllable information dict with usage and scalar information.
 
@@ -568,7 +568,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         Returns
         -------
-        '''
+        """
         if self.df_path is not None and os.path.exists(self.df_path):
             print('Loading parquet files')
             df = pd.read_parquet(self.df_path, engine='fastparquet')
@@ -603,7 +603,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.get_mean_group_dict(self.group_df)
 
     def get_selected_session_syllable_info(self, sel_sessions):
-        '''
+        """
         Prepares dict of session-based syllable information to display.
 
         Parameters
@@ -612,7 +612,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         Returns
         -------
-        '''
+        """
 
         if self.cm_sources_dropdown.value == 'SubjectName':
             use_df = self.subject_df
@@ -645,7 +645,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     print(f'Warning: syllable #{syll} is not in group:{session_name}')
 
     def get_pdf_plot(self, group_syllable_pdf, group_name):
-        '''
+        """
         Helper function that creates a bokeh plot with the given PDF heatmap and figure title.
 
         Parameters
@@ -656,7 +656,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         Returns
         -------
         pdf_fig (bokeh.figure): Create bokeh figure.
-        '''
+        """
 
         pdf_fig = figure(height=350, width=350, title=f'{group_name}')
         pdf_fig.x_range.range_padding = pdf_fig.y_range.range_padding = 0
@@ -670,7 +670,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         return pdf_fig
 
     def generate_crowd_movie_divs(self, grouped_syll_dict):
-        '''
+        """
         Generates HTML divs containing crowd movies and syllable metadata tables
          from the given syllable dict file.
 
@@ -678,7 +678,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         -------
         divs (list of Bokeh.models.Div): Divs of HTML videos and metadata tables.
         bk_plots (list): list of corresponding position heatmap figures.
-        '''
+        """
 
         cm_source = self.cm_sources_dropdown.value
 
@@ -753,7 +753,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             encoded = base64.b64encode(video)
 
             # Insert paths and table into HTML div
-            group_txt = '''
+            group_txt = """
                 {group_info}
                 <video
                     src="data:video/mp4;base64,{src}"; alt="data:video/mp4;base64,{alt}"; 
@@ -761,7 +761,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                     style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                     border="2"; autoplay controls loop>
                 </video>
-            '''.format(group_info=group_info, src=encoded.decode('ascii'), alt=encoded.decode('ascii'), height=int(video_dims[1] * 0.8),
+            """.format(group_info=group_info, src=encoded.decode('ascii'), alt=encoded.decode('ascii'), height=int(video_dims[1] * 0.8),
                        width=int(video_dims[0] * 0.8))
 
             divs.append(group_txt)
@@ -769,7 +769,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         return divs, bk_plots
 
     def crowd_movie_preview(self, syllable, groupby, nexamples):
-        '''
+        """
         Helper function that triggers the crowd_movie_wrapper function and creates the HTML
         divs containing the generated crowd movies.
         Function is triggered whenever any of the widget function inputs are changed.
@@ -781,7 +781,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         Returns
         -------
-        '''
+        """
         syll_number = int(syllable.split(' - ')[0])
 
         # Update current config data with widget values

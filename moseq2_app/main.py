@@ -1,9 +1,9 @@
-'''
+"""
 
 Main functions that facilitate all jupyter notebook functionality. All functions will call a wrapper function
  to handle any non front-end settings.
 
-'''
+"""
 from os.path import exists
 import ipywidgets as widgets
 from IPython.display import display
@@ -40,7 +40,7 @@ def flip_classifier_tool(input_dir,
                          space_filter_size=3,
                          continuous_slider_update=True,
                          launch_gui=True):
-    '''
+    """
 
     Flip Classifier Notebook main functionality access point.
 
@@ -58,7 +58,7 @@ def flip_classifier_tool(input_dir,
     -------
     flip_obj (FlipRangeTool): Flip Classifier Training object that will be used throughout the notebook to
      hold the labeled accepted frame ranges and selected paths/info.
-    '''
+    """
 
     flip_finder = FlipRangeTool(input_dir=input_dir,
                                 max_frames=max_frames,
@@ -72,7 +72,7 @@ def flip_classifier_tool(input_dir,
 
 @filter_warnings
 def view_extraction(extractions, default=0):
-    '''
+    """
     Prompts user to select which extracted video(s) to preview.
 
     Parameters
@@ -83,7 +83,7 @@ def view_extraction(extractions, default=0):
     Returns
     -------
     extractions (list): list of selected extractions.
-    '''
+    """
 
     if len(extractions) == 0:
         print('no sessions to view')
@@ -101,7 +101,7 @@ def view_extraction(extractions, default=0):
 
 @filter_warnings
 def preview_extractions(input_dir, flipped=False):
-    '''
+    """
     Function to launch a dynamic video loader that displays extraction session mp4s.
     Upon extracted session selection, function automatically displays the extraction mp4 video file.
 
@@ -112,7 +112,7 @@ def preview_extractions(input_dir, flipped=False):
 
     Returns
     -------
-    '''
+    """
     output_notebook()
     viewer = InteractiveExtractionViewer(data_path=input_dir, flipped=flipped)
 
@@ -123,7 +123,7 @@ def preview_extractions(input_dir, flipped=False):
 
 @filter_warnings
 def validate_extractions(input_dir):
-    '''
+    """
     Wrapper function that facilitates the extraction validation step from `main.py`.
      Prints all the flagged session outlier details.
 
@@ -133,13 +133,13 @@ def validate_extractions(input_dir):
 
     Returns
     -------
-    '''
+    """
 
     validate_extractions_wrapper(input_dir)
 
 @filter_warnings
 def interactive_group_setting(index_file):
-    '''
+    """
 
     Interactive group setting wrapper function that displays a excel-like table to update
     the current group selection
@@ -150,7 +150,7 @@ def interactive_group_setting(index_file):
 
     Returns
     -------
-    '''
+    """
 
     index_grid = GroupSettingWidgets(index_file)
 
@@ -162,7 +162,7 @@ def interactive_group_setting(index_file):
 
 @filter_warnings
 def interactive_scalar_summary(index_file):
-    '''
+    """
     Interactive Scalar summary visualization tool accessible from jupyter notebook.
 
     Parameters
@@ -171,7 +171,7 @@ def interactive_scalar_summary(index_file):
 
     Returns
     -------
-    '''
+    """
 
     if not exists(index_file):
         print('Index file does not exist. Input path to an existing file and run the function again.')
@@ -182,7 +182,7 @@ def interactive_scalar_summary(index_file):
 
 @filter_warnings
 def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
-    '''
+    """
     Interactive syllable labeling tool accessible from the jupyter notebook.
 
     Parameters
@@ -193,7 +193,7 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
 
     Returns
     -------
-    '''
+    """
 
     # Get proper input paths
     model_path = progress_paths['model_path']
@@ -230,7 +230,7 @@ def show_dendrogram(progress_paths, max_syllable=None, color_by_cluster=False):
 
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
-    '''
+    """
     Generates the interactive syllable statistics viewer, consisting of a dot-line plot and a dendrogram.
 
     Parameters
@@ -241,7 +241,7 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
 
     Returns
     -------
-    '''
+    """
 
     # Get proper input parameters
     index_file = progress_paths['index_file'] # Path to index file.
@@ -265,7 +265,7 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
 
 @filter_warnings
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):
-    '''
+    """
     Interactive crowd movie/position heatmap comparison function. Launched via the notebook.
 
     Parameters
@@ -277,7 +277,7 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
 
     Returns
     -------
-    '''
+    """
 
     # Get proper input paths
     model_path = progress_paths['model_path']
@@ -300,7 +300,7 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
 
 @filter_warnings
 def interactive_transition_graph(progress_paths, max_syllables=None, plot_vertically=False, load_parquet=False):
-    '''
+    """
 
     Displays group transition graphs with a configurable number of syllables. Launched via the
      the jupyter notebook.
@@ -313,7 +313,7 @@ def interactive_transition_graph(progress_paths, max_syllables=None, plot_vertic
 
     Returns
     -------
-    '''
+    """
 
     # Get proper input paths
     model_path = progress_paths['model_path']

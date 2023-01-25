@@ -1,9 +1,9 @@
-'''
+"""
 
 Wrapper functions for all the functionality included in moseq2-app. These functions are executed directly from
 main.py.
 
-'''
+"""
 
 import os
 import shutil
@@ -21,7 +21,7 @@ from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_ano
                                        get_scalar_df, print_validation_results)
 
 def validate_extractions_wrapper(input_dir):
-    '''
+    """
 
     Wrapper function to test the measured scalar values to determine whether some sessions should be
      flagged and diagnosed before aggregating the sessions.
@@ -31,7 +31,7 @@ def validate_extractions_wrapper(input_dir):
     input_dir (str): path to parent directory containing all the extracted session folders
     Returns
     -------
-    '''
+    """
 
     # Get paths to extracted sessions
     paths = get_session_paths(input_dir, extracted=True)
@@ -50,7 +50,7 @@ def validate_extractions_wrapper(input_dir):
 
 def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file, fig_dir,
                                          max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
-    '''
+    """
     Wrapper function to launch a syllable crowd movie preview and interactive labeling application.
 
     Parameters
@@ -62,7 +62,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
     Returns
     -------
-    '''
+    """
 
     # Copy index file to modeling session directory
     modeling_session_dir = os.path.dirname(model_path)
@@ -99,7 +99,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     return max_sylls
 
     def on_syll_change(change):
-        '''
+        """
         Callback function for when user selects a different syllable number
         from the Dropdown menu
 
@@ -109,7 +109,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
         Returns
         -------
-        '''
+        """
 
         clear_output(wait=True)
         display(labeler.syll_select, output)
@@ -119,7 +119,7 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
 
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
                                                df_path=None, get_pdfs=True, load_parquet=False):
-    '''
+    """
     Wrapper function that launches an interactive crowd movie comparison application.
     Uses ipywidgets and Bokeh to facilitate real time user interaction.
 
@@ -136,7 +136,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
 
     Returns
     -------
-    '''
+    """
 
     config_data = read_yaml(config_filepath)
     syll_info = read_yaml(syll_info_path)
@@ -152,7 +152,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
 
 
 def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, max_syllables=None, plot_vertically=False, load_parquet=False):
-    '''
+    """
     Wrapper function that works as a background process that prepares the data
     for the interactive graphing function.
 
@@ -167,7 +167,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 
     Returns
     -------
-    '''
+    """
 
     # Initialize Transition Graph data structure
     i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index_path=index_path,

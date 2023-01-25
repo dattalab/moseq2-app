@@ -1,9 +1,9 @@
-'''
+"""
 
 Interactive Flip classifier frame selection functionality. This module utilizes the widgets from
 the widgets.py file to facilitate the real-time interaction.
 
-'''
+"""
 
 import cv2
 import h5py
@@ -32,7 +32,7 @@ class FlipRangeTool(FlipClassifierWidgets):
     def __init__(self, input_dir, max_frames, output_file,
                  tail_filter_iters, prefilter_kernel_size,
                  launch_gui=True, continuous_slider_update=True):
-        '''
+        """
 
         Initialization for the Flip Classifier Training tool.
          Finds all the extracted sessions within the given input path, and opens their h5
@@ -47,7 +47,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         prefilter_kernel_size (int): Size of the median spatial filter.
         launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
-        '''
+        """
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', FutureWarning)
@@ -87,7 +87,7 @@ class FlipRangeTool(FlipClassifierWidgets):
             }
 
     def load_sessions(self):
-        '''
+        """
         Recursively searches for completed h5 extraction files, and loads total_frames=max_frames to
          include in the total dataset. Additionally applies some image filtering prior to returning the data.
 
@@ -97,7 +97,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         Returns
         -------
         path_dict (dict): dict of session names and paths filtered for sessions missing an h5 or mp4 files.
-        '''
+        """
 
         path_dict = OrderedDict()
 
@@ -117,14 +117,14 @@ class FlipRangeTool(FlipClassifierWidgets):
         return path_dict
 
     def interactive_launch_frame_selector(self):
-        '''
+        """
 
         Interactive tool that displays the frame to display with the selected data box.
         Users will use the start_range button to add frame ranges to the range box list.
 
         Returns
         -------
-        '''
+        """
 
         tools = 'pan, box_zoom, wheel_zoom, reset'
 
@@ -156,13 +156,13 @@ class FlipRangeTool(FlipClassifierWidgets):
         display(self.clear_button, self.session_select_dropdown, output_box, self.button_box)
 
     def get_corrected_data(self):
-        '''
+        """
         Apply the selected flip orientation ranges to the entire dataset to correct the
          incorrectly oriented frames.
 
         Returns
         -------
-        '''
+        """
 
         corrected_dataset = []
         # Get corrected frame ranges
@@ -202,7 +202,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.corrected_dataset = np.concatenate(corrected_dataset, axis=0)
 
     def plot_xy_examples(self, data_xflip, data_yflip, data_xyflip, selected_frame=0):
-        '''
+        """
         Plots 2 columns of examples for the correct and incorrect examples being used to train
          the flip classifier.
 
@@ -216,7 +216,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         Returns
         -------
-        '''
+        """
 
         cols = ['0 - Correctly oriented (Facing Right)', '1- Incorrectly oriented (Facing Left)']
         rows = ['', 'x-flipped']
@@ -243,7 +243,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         fig.tight_layout()
 
     def augment_dataset(self, plot_examples=False):
-        '''
+        """
         Augments the selected correct dataset with 3 rotated versions of the truth values:
          1. xflip -> incorrect case; 2. yflip -> correct case; 3. xyflip -> incorrect case;
          and creates the X and Y train/test sets.
@@ -255,7 +255,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         plot_examples (bool): Indicates whether to display the 2x2 preview grid of dataset examples.
         Returns
         -------
-        '''
+        """
 
         # Get flipped data
         data_xflip = np.flip(self.corrected_dataset, axis=2)
@@ -277,7 +277,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.y = np.concatenate((np.ones((ntrials * 2,)), np.zeros((ntrials * 2,))))
 
     def prepare_datasets(self, test_size, random_state=0, plot_examples=False):
-        '''
+        """
         Correct data after the appropriate flip ranges have been selected, augment and create X,y training sets,
          and split the data to training and testing splits.
 
@@ -288,7 +288,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         plot_examples (bool): Indicates whether to display the 2x2 preview grid of dataset examples
         Returns
         -------
-        '''
+        """
 
         # Correct flips
         self.get_corrected_data()
@@ -313,7 +313,7 @@ class FlipRangeTool(FlipClassifierWidgets):
                                  random_state=0,
                                  verbose=0,
                                  train=True):
-        '''
+        """
 
         Trains the flip classifier the pre-augmented dataset given some optionally adjustable
          model initialization parameters.
@@ -334,7 +334,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         Returns
         -------
-        '''
+        """
 
         if not exists(self.output_file):
             # Flip Classifier Model to train
@@ -391,7 +391,7 @@ class FlipRangeTool(FlipClassifierWidgets):
     def apply_flip_classifier(self, chunk_size=4000, chunk_overlap=0,
                               smoothing=51, frame_path='frames', fps=30,
                               write_movie=False, verbose=True):
-        '''
+        """
         Applies a trained flip classifier on previously extracted data to flip the mice to the correct
          orientation.
 
@@ -404,7 +404,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
         Returns
         -------
-        '''
+        """
 
         if self.clf is None:
             try:

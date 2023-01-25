@@ -1,9 +1,9 @@
-'''
+"""
 
 The module contains extraction validation functions that test extractions' scalar values,
  timestamps, and position heatmaps.
 
-'''
+"""
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -15,7 +15,7 @@ from moseq2_viz.util import h5_to_dict, read_yaml
 
 
 def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
-    '''
+    """
     https://www.mathworks.com/help/imaq/examples/determining-the-rate-of-acquisition.html
 
     Returns the proportion of dropped frames relative to the respective recorded timestamps and frames per second.
@@ -29,7 +29,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     Returns
     -------
     percentError (float): Percentage of frames that were dropped/missed during acquisition.
-    '''
+    """
 
     # Find the time difference between frames.
     diff = np.diff(timestamps)
@@ -52,7 +52,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     return percentError
 
 def count_nan_rows(scalar_df):
-    '''
+    """
 
     Counts the number of rows with NaN scalar values.
 
@@ -63,13 +63,13 @@ def count_nan_rows(scalar_df):
     Returns
     -------
     n_missing_frames (int): Number of frames with NaN computed scalar values.
-    '''
+    """
 
     return scalar_df.isnull().any(1).sum()
 
 
 def count_missing_mouse_frames(scalar_df):
-    '''
+    """
 
     Counts the number of frames where the mouse is not found.
 
@@ -80,13 +80,13 @@ def count_missing_mouse_frames(scalar_df):
     Returns
     -------
     missing_mouse_frames (int): Number of frames with recorded mouse area ~= 0
-    '''
+    """
 
     return (scalar_df["area_px"] == 0).sum()
 
 
 def count_frames_with_small_areas(scalar_df):
-    '''
+    """
 
     Counts the number of frames where the mouse area is smaller than 2 standard deviations of
      all mouse areas.
@@ -98,13 +98,13 @@ def count_frames_with_small_areas(scalar_df):
     Returns
     -------
     corrupt_frames (int): Number of frames where the recorded mouse area is too small
-    '''
+    """
 
     return (scalar_df["area_px"] < 2 * scalar_df["area_px"].std()).sum()
 
 
 def count_stationary_frames(scalar_df):
-    '''
+    """
 
     Counts the number of frames where mouse is not moving.
 
@@ -115,14 +115,14 @@ def count_stationary_frames(scalar_df):
     Returns
     -------
     motionless_frames (int): Number of frames where the mouse is not moving
-    '''
+    """
     
     # subtract 1 because first frame is always 0mm/s
     return (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1
 
 
 def get_scalar_df(path_dict):
-    '''
+    """
     Computes a scalar dataframe that contains all the extracted sessions
     recorded scalar values along with their metadata.
 
@@ -133,7 +133,7 @@ def get_scalar_df(path_dict):
     Returns
     -------
     scalar_df (pd.DataFrame): DataFrame containing loaded scalar info from each h5 extraction file.
-    '''
+    """
 
     scalar_dfs = []
 
@@ -166,7 +166,7 @@ def get_scalar_df(path_dict):
 
 
 def make_session_status_dicts(paths):
-    '''
+    """
     Returns the flag status dicts for all the found completed extracted sessions. Additionally performs
      dropped frames test on all sessions.
 
@@ -177,7 +177,7 @@ def make_session_status_dicts(paths):
     Returns
     -------
     status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
-    '''
+    """
 
     status_dicts = {}
 
@@ -223,7 +223,7 @@ def make_session_status_dicts(paths):
 
 
 def get_scalar_anomaly_sessions(scalar_df, status_dicts):
-    '''
+    """
     Detects outlier sessions using an EllipticEnvelope model based on a subset of their mean scalar values.
 
     Parameters
@@ -234,7 +234,7 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     Returns
     -------
     status_dicts (dict): stacked dictionary object containing updated scalar_anomaly flags.
-    '''
+    """
 
     # Scalar values to measure
     val_keys = ['area_mm', 'length_mm', 'width_mm', 'height_ave_mm', 'velocity_2d_mm', 'velocity_3d_mm']
@@ -256,7 +256,7 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
 
 
 def run_validation_tests(scalar_df, status_dicts):
-    '''
+    """
 
     Main function that runs all the available extraction validation tests and updates the status_dicts
      flags accordingly.
@@ -269,7 +269,7 @@ def run_validation_tests(scalar_df, status_dicts):
     Returns
     -------
     status_dicts (dict): stacked dictionary object containing all the sessions' updated flag status dicts.
-    '''
+    """
 
     sessionNames = list(scalar_df.uuid.unique())
 
@@ -300,7 +300,7 @@ def run_validation_tests(scalar_df, status_dicts):
 
 
 def print_validation_results(scalar_df, status_dicts):
-    '''
+    """
 
     Displays all the outlier sessions flag names and values. Additionally plots the flagged
      position heatmap.
@@ -311,7 +311,7 @@ def print_validation_results(scalar_df, status_dicts):
 
     Returns
     -------
-    '''
+    """
 
     # Run tests
     anomaly_dict = run_validation_tests(scalar_df, status_dicts)
