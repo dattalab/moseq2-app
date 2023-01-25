@@ -15,12 +15,10 @@ def display_crowd_movies(widget_box, curr_name, desc, divs, bk_figs):
     Crowd movie comparison helper function that displays the widgets and
     embedded HTML divs to a running jupyter notebook cell or HTML webpage.
 
-    Parameters
-    ----------
+    Args:
     divs (list of bokeh.models.Div): list of HTML Div objects containing videos to display
 
-    Returns
-    -------
+    Returns:
     """
 
     # Set HTML formats

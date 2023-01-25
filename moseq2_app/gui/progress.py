@@ -25,13 +25,11 @@ def generate_missing_metadata(sess_dir, sess_name):
     """
     Generates default metadata.json file for session that does not already include one.
 
-    Parameters
-    ----------
+    Args:
     sess_dir (str): Path to directory to create metadata.json file in.
     sess_name (str): Name of the directory to set the metadata SessionName.
 
-    Returns
-    -------
+    Returns:
 
     """
 
@@ -87,15 +85,13 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
     Function also generates metadata.json files for un-extracted directories that
      are missing them.
 
-    Parameters
-    ----------
+    Args:
     data_dir (str): path to directory containing all session folders.
     exts (list): list of depth file extensions to search for.
     flipped (bool): indicates whether to show corrected flip videos
     extracted (bool): indicates to return paths to extracted sessions only.
 
-    Returns
-    -------
+    Returns:
     path_dict (dict): session directory name keys pair with their respective absolute paths.
     """
 
@@ -164,14 +160,12 @@ def update_progress(progress_file, varK, varV):
     """
     Updates progress file with new notebook variable
 
-    Parameters
-    ----------
+    Args:
     progress_file (str): path to progress file
     varK (str): key in progress file to update
     varV (str): updated value to write
 
-    Returns
-    -------
+    Returns:
     progress (dict): Loaded path dict from the progress yaml file.
     """
 
@@ -207,12 +201,10 @@ def find_progress(base_progress):
     Searches for paths to all existing MosSeq2-Notebook dependencies
      and updates the progress paths dictionary.
 
-    Parameters
-    ----------
+    Args:
     base_progress (dict): base dictionary of progress variables
 
-    Returns
-    -------
+    Returns:
     base_progress (dict): updated dictionary of progress variables
     """
 
@@ -296,12 +288,10 @@ def generate_intital_progressfile(filename='progress.yaml'):
      It will either load a previous progress file if the progress log and pickle file
      or will scan the given base directory to find all relative paths
 
-    Parameters
-    ----------
+    Args:
     filename  (str): path to file to write progress YAML to
 
-    Returns
-    -------
+    Returns:
     base_progress_vars (dict): Loaded/Found progress variables
     """
 
@@ -342,12 +332,10 @@ def load_progress(progress_file):
     """
     Loads progress file variables
 
-    Parameters
-    ----------
+    Args:
     progress_file (str): path to progress file.
 
-    Returns
-    -------
+    Returns:
     progress_vars (dict): dictionary of loaded progress variables
     """
 
@@ -364,12 +352,10 @@ def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, 
     """
     Restore all saved progress variables to Jupyter Notebook.
 
-    Parameters
-    ----------
+    Args:
     progress_file (str): path to progress file
 
-    Returns
-    -------
+    Returns:
     vars (dict): All progress file variables
     """
 
@@ -395,13 +381,11 @@ def get_pca_progress(progress_vars, pca_progress):
     """
     Updates the PCA progress dict variables and prints the names of the missing keys.
 
-    Parameters
-    ----------
+    Args:
     progress_vars (dict): Notebook progress dict including the relevant PCA paths
     pca_progress (dict): PCA progress boolean dict used to display progress bar
 
-    Returns
-    -------
+    Returns:
     pca_progress (dict): Updated PCA progress boolean dict.
     """
 
@@ -429,12 +413,10 @@ def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
     Counts the number of fully extracted sessions, and prints the session directory names
      of the incomplete or missing extractions.
 
-    Parameters
-    ----------
+    Args:
     base_dir (str): Path to parent directory containing all sessions
 
-    Returns
-    -------
+    Returns:
     path_dict (dict): Dict with paths to all found sessions
     num_extracted (int): Total number of completed extractions
     """
@@ -467,13 +449,11 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
 
     Displays tqdm progress bars checking a users jupyter notebook progress.
 
-    Parameters
-    ----------
+    Args:
     base_dir (str): Path to parent directory containing all sessions
     progress_vars (dict): notebook progress dict
 
-    Returns
-    -------
+    Returns:
     """
 
     pca_progress = {'pca_dirname': False,
@@ -512,13 +492,11 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
     """
     Checks whether progress file exists and prompts user input on whether to overwrite, load old, or generate a new one.
 
-    Parameters
-    ----------
+    Args:
     base_dir (str): path to directory to create/find progress file
     progress_filepath (str): path to progress filename
 
-    Returns
-    -------
+    Returns:
     All restored variables or None.
     """
 

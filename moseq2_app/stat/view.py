@@ -60,16 +60,14 @@ def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, p
     """
     Compute min and max values within a (default) 95th percentile of the inputted syllable statistic.
 
-    Parameters
-    ----------
+    Args:
     x (pandas Series): 1D list of syllable statistics.
     n_boots (int): Number of bootstrapped examples to generate to compute the percentile.
     n_samp (int): Number of inputted syllables.
     function (numpy function): Function to apply to bootstrapped data.
     pct (int): Percentile to compute.
 
-    Returns
-    -------
+    Returns:
     percentile (2d numpy array): an array of min and max values for each syllable's stat value
     """
 
@@ -90,8 +88,7 @@ def setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, lin
      value of the TextInput, a.k.a, Syllable Spotlight/Search widget.
      Will update the interactive bokeh plot to only show syllables with labels that are substrings of the inputted
      search string.
-    Parameters
-    ----------
+    Args:
     src_dict (dict): dict object containing all the stats information contained in the main ColumnDataSource.
     err_dict (dict): dict object containing all the error margins for the src_dict statistics.
     err_source (bokeh.models.ColumnDataSource): data source to update based on slider values.
@@ -101,8 +98,7 @@ def setup_syllable_search(src_dict, err_dict, err_source, searchbox, circle, lin
     line (bokeh.glyph line): drawn line connecting all the circle nodes in the bokeh figure.
      (To be hidden in the callback function if the syllable list is discontinuous)
 
-    Returns
-    -------
+    Returns:
     callback (bokeh.models.CustomJS): javascript callback function to embed to search bar and hover tool objects.
     """
 
@@ -123,8 +119,7 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
      statistic to threshold, and the current range to threshold.
      Once the ColumnDataSource objects are updated, the bokeh plot will automatically be updated.
 
-    Parameters
-    ----------
+    Args:
     src_dict (dict): dict object containing all the stats information contained in the main ColumnDataSource.
     err_dict (dict): dict object containing all the error margins for the src_dict statistics.
     err_source (bokeh.models.ColumnDataSource): data source to update based on slider values.
@@ -136,8 +131,7 @@ def setup_slider(src_dict, err_dict, err_source, slider, circle, line, thresh_st
      (To be hidden in the callback function if the syllable list is discontinuous)
     thresh_stat (str): name of the statistic to threshold by.
 
-    Returns
-    -------
+    Returns:
     callback (bokeh.models.CustomJS): javascript callback function to embed to slider and hover tool objects.
     """
 
@@ -166,13 +160,11 @@ def setup_hovertool(renderers, callback=None):
     Initialize hover tool with tooltips showing all the syllable information and the crowd movies upon
      hovering over a syllable circle glyph.
 
-    Parameters
-    ----------
+    Args:
     renderers (list bokeh.Renderer Instances): drawn bokeh glyph representing syllables, that will be updated in the callback function
     callback (bokeh.models.CustomJS): javascript callback function to embed to hover tool objects to preserve alignment.
 
-    Returns
-    -------
+    Returns:
     hover (bokeh.models.HoverTool): hover tool to embed into the created figure.
     """
     
@@ -212,8 +204,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     Computes the group-specific syllable statistics dataframe, and the selected error values to
      later draw the line plot and error bars.
 
-    Parameters
-    ----------
+    Args:
     df (pd.DataFrame): DataFrame containing all relevant data to plot.
     group (str): group name to get auxiliary statistics dataframe for.
     sorting (1D list): list of syllable index values to resort the dataframe by.
@@ -221,8 +212,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     errorbar (str): name of the error bar type to compute values for.
     stat (str): name of the statistic to plot.
 
-    Returns
-    -------
+    Returns:
     aux_df (pd.DataFrame): dataframe that only contains the selected group's mean statistics.
     stat_err (pd.DataFrame): dataframe that contains the error values for the selected statistic.
     aux_err (pd.DataFrame): dataframe that contains the error values for all the statistics.
@@ -273,13 +263,11 @@ def get_syllable_info(df, sorting):
     Returns the labels, descriptions and crowd movie paths for all the syllables to display in the x-axis,
      and hover tool.
 
-    Parameters
-    ----------
+    Args:
     df (pd.DataFrame): DataFrame containing all relevant data to plot.
     sorting (1D list): list of syllable index values to resort the dataframe by.
 
-    Returns
-    -------
+    Returns:
     labels (1D numpy array): syllable label list sorted by the given sorting order.
     desc (1D numpy array): syllable description list sorted by the given sorting order.
     cm_paths (1D numpy array): syllable crowd movie path list sorted by the given sorting order.
@@ -309,8 +297,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
     Additionally, the data sources will be used by the figure's JS callbacks in order to update the graph in real time
     when users edit the slider or color picker widget values.
 
-    Parameters
-    ----------
+    Args:
     aux_df (pd.DataFrame): DataFrame that only contains the selected group's mean statistics.
     aux_sem (pd.DataFrame): DataFrame that contains the error values for all the statistics.
     sem (pd.DataFrame): DataFrame that contains the error values for the selected statistic.
@@ -321,8 +308,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
     errs_y (list): List of y-indices to plot the error bar lines within.
     stat (str): Statistic to display.
 
-    Returns
-    -------
+    Returns:
     source (bokeh.models.ColumnDataSource): Bokeh data source of mean syllable stats,
      used to plot interactive figure glyphs, hovertools and widgets.
     src_dict (dict): dict version of the ColumnDataSource object that will be passed to the JS Callback.
@@ -375,8 +361,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     data grouped by some user defined column ('group', 'SessionName', 'SubjectName'), with the errorbars of their
     choice.
 
-    Parameters
-    ----------
+    Args:
     fig (bokeh figure): Figure to draw line plot glyphs on
     df (pd.DataFrame): DataFrame containing all relevant data to plot
     groups (list of str): List of group names to iterate by
@@ -386,8 +371,7 @@ def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_d
     stat (str): String that indicates the statistic that is being plotted.
     errorbar (str): String that indicates the type of error bars to be plotted.
 
-    Returns
-    -------
+    Returns:
     pickers (list of ColorPickers): List of interactive color picker widgets to update the graph colors.
     slider (bokeh.models.RangeSlider): RangeSlider object used to threshold/filter the displayed syllables.
     """
@@ -455,13 +439,11 @@ def set_grouping_colors(df, groupby):
     Based on the selected grouping to plot, will return the unique group names,
      and their associated colors to use when plotting the default figure.
 
-    Parameters
-    ----------
+    Args:
     df (pd.DataFrame): DataFrame containing all relevant data to plot.
     groupby (str): column to group the syllable stats by.
 
-    Returns
-    -------
+    Returns:
     groups (list): list of group names to plot line plots for.
     group_colors (list): list of colors corresponding to each plotted group.
     colors (list): list of all the colors used to plot the glyphs
@@ -514,8 +496,7 @@ def format_stat_plot(p, df, searchbox, slider, sorting):
      Sets the legend to be interactive where users can hide line plots by clicking on their legend item.
      Finally creates the bokeh gridplot to hold all of the displayed widgets above the graph to display.
 
-    Parameters
-    ----------
+    Args:
     p (bokeh.Figure): bokeh figure with all the glyphs already drawn.
     df (pd.DataFrame): DataFrame containing all relevant data to plot
     slider (bokeh.models.RangeSlider): slider object with the currently displayed values used to filter
@@ -523,8 +504,7 @@ def format_stat_plot(p, df, searchbox, slider, sorting):
     pickers (list of ColorPickers): List of interactive color picker widgets to insert into a gridplot to display.
     sorting (1D list): list of syllable index values to resort the dataframe by.
 
-    Returns
-    -------
+    Returns:
     graph_n_pickers (bokeh.layout.column): Bokeh Layout object of the widgets and figure to display.
     """
 
@@ -559,8 +539,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     Generates a Bokeh plot with interactive tools such as the HoverTool, which displays
     additional syllable information and the associated crowd movie.
 
-    Parameters
-    ----------
+    Args:
     df (pd.DataFrame): Mean syllable statistic DataFrame.
     stat (str): Statistic to plot
     sorting (list): List of the current/selected syllable ordering
@@ -569,8 +548,7 @@ def bokeh_plotting(df, stat, sorting, mean_df=None, groupby='group', errorbar='S
     sort_name (str): Syllable sorting name displayed in title.
     thresh (str): Statistic to threshold syllables by using the Range Slider
 
-    Returns
-    -------
+    Returns:
     p (bokeh figure): Displayed stat plot with optional color pickers.
     """
 
@@ -614,13 +592,11 @@ def format_graphs(graphs, group):
     [    b   c-b ]
     [        c   ]
 
-    Parameters
-    ----------
+    Args:
     graphs (list): list of generated Bokeh figures.
     group (list): list of unique groups
 
-    Returns
-    -------
+    Returns:
     formatted_plots (2D list): list of lists corresponding to rows of figures being plotted.
     """
 
@@ -664,14 +640,12 @@ def get_neighbors(graph, node_indices, group_name):
     Computes the incoming and outgoing syllable entropies, entropy rates, previous nodes and
      neighboring nodes for all the nodes included in node_indices.
 
-    Parameters
-    ----------
+    Args:
     graph (networkx DiGraph): Generated DiGraph to convert to Bokeh glyph and plot.
     node_indices (list): List of node indices included in the given graph
     group_name (str): Graph's group name.
 
-    Returns
-    -------
+    Returns:
     prev_states (list): List of previous nodes for each node index in the graph.
     next_states (list): List of successor nodes/syllables for each node in the graph
     neighbor_edge_colors (list): List of colors determining whether an edge is incoming or outgoing from each node.
@@ -726,12 +700,10 @@ def format_plot(plot):
     """
     Turns off all major and minor x,y ticks on the transition plot graphs
 
-    Parameters
-    ----------
+    Args:
     plot (bokeh Plot): Current graph being generated
 
-    Returns
-    -------
+    Returns:
     """
 
     plot.xaxis.major_tick_line_color = None  # turn off x-axis major ticks
@@ -748,13 +720,11 @@ def get_minmax_tp(edge_width, diff=False):
     Computes the min and max transition probabilities given the rescaled edge-widths.
     If diff = True, the function will return 4 variables: min/max for down and up-regulated syllables,
 
-    Parameters
-    ----------
+    Args:
     edge_width (dict): dict of syllables paired with drawn edge widths
     diff (bool): indicates whether to compute min/max transition probs. for up and down-regulated syllables.
 
-    Returns
-    -------
+    Returns:
     min_tp (float): min transition probability (min_down_tp if diff=True)
     max_tp (float): max transition probability (max_down_tp if diff=True)
      if diff == True
@@ -793,14 +763,12 @@ def get_difference_legend_items(plot, edge_width, group_name):
     Creates the difference graph legend items with the min and max transition probabilities
      for both the up and down-regulated transition probabilities.
 
-    Parameters
-    ----------
+    Args:
     plot (bokeh.figure): Bokeh plot to add legend to.
     edge_width (dict): Dictionary of edge widths
     group_name (str): Difference graph title.
 
-    Returns
-    -------
+    Returns:
     diff_items (list): List of LegendItem objects to display
     """
 
@@ -841,14 +809,12 @@ def set_fill_color(scalar_color, data_dict):
     Sets the node fill coloring based on the selected scalar value.
     Uses the inputted data_dict to get the key and array for the requested scalar.
 
-    Parameters
-    ----------
+    Args:
     scalar_color (str): name of scalar to color nodes by.
     data_dict (dict): dict containing dicts of scalar_df keys and their corresponding
      values to create the linear color map from.
 
-    Returns
-    -------
+    Returns:
     fill_color (str or list): list of colors per node, or single color (white)
     empty (bool): indicator for whether to display a color bar.
     """
@@ -875,12 +841,10 @@ def setup_trans_graph_tooltips(plot):
     Adds a hover tool, tap tool, and a box select tool to the plot, allowing the user to view a
      displayed preview of all the syllable node information, and highlight transitions coming to or from clicked node.
 
-    Parameters
-    ----------
+    Args:
     plot (bokeh figure): bokeh generated figure to add tools to.
 
-    Returns
-    -------
+    Returns:
     """
 
     tooltips = """
@@ -919,14 +883,12 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     will always have edges colored black.If difference_graph is true,
     then the edges will be colored blue if the difference is > 0, and red otherwise.
 
-    Parameters
-    ----------
+    Args:
     graph (nx.DiGraph): networkx graph to read edge weights from and compute widths and colors with.
     neighbor_edge_colors (dict): dictionary of node transition tuples mapped to corresponding colors (str).
     difference_graph (bool): indicates whether to color the edges based on the transition difference between two groups.
 
-    Returns
-    -------
+    Returns:
     edge_color (dict): dict of edge tuple(node1, node2) object mapped to string values describing edge colors.
     edge_width (dict): dict of edge tuple(node1, node2) object mapped to float values describing edge widths.
     selected_edge_colors (dict): dict of edge tuple(node1, node2) object mapped to
@@ -954,14 +916,12 @@ def get_trans_graph_group_stats(node_indices, usages, scalars):
     """
     Computes and returns all the syllable statistics to display and filter the graph using the GUI.
 
-    Parameters
-    ----------
+    Args:
     node_indices (1d list): list of plotted node indices as serialized from a networkX.Digraph.nodes array
     usages (1d list): list of syllable usages corresponding to the node_indices.
     scalars (dict): dict of syllable scalar values
 
-    Returns
-    -------
+    Returns:
     group_stats (dict): packed dict of syllable scalar strings mapped to
      1d lists of the values corresponding to the node_indices.
      To be reused down the pipeline in plot_interactive_transition_graph().
@@ -998,15 +958,13 @@ def set_node_colors_and_sizes(graph, usages, node_indices, difference_graph=Fals
     will always have edges colored black. If difference_graph is true,
      then the nodes will be colored blue if the difference is > 0, and red otherwise.
 
-    Parameters
-    ----------
+    Args:
     graph (nx.DiGraph): networkx graph to set the new node attributes to.
     usages (1d list): list of syllable usages corresponding to the node_indices.
     node_indices (1d list): list of plotted node indices as serialized from a networkX.Digraph.nodes array
     difference_graph (bool): indicates whether to color the edges based on the transition difference between two groups.
 
-    Returns
-    -------
+    Returns:
     """
 
     # node colors for difference graphs
@@ -1028,13 +986,11 @@ def get_group_node_syllable_info(syll_info, node_indices):
     Reads the given syllable information dict in the ordering provided by the node_indices
      previously computed via nx.DiGraph.nodes
 
-    Parameters
-    ----------
+    Args:
     syll_info (dict): dict of syllable label information to read.
     node_indices (1d list): ordering of syllables to read from the syll info dict
 
-    Returns
-    -------
+    Returns:
     labels (1d list): 1d list of syllable labels corresponding to each node index
     descs (1d list): 1d list of syllable descriptions corresponding to each node index
     cm_paths (1d list): 1d list of syllable crowd movie relpaths corresponding to each node index
@@ -1059,15 +1015,13 @@ def setup_graph_hover_renderers(graph_renderer, group_stats, node_indices):
     Adds all the information enclosed in the group_stats dict to the currently plotted transition graph such that
      they can be viewed in the hover tool.
 
-    Parameters
-    ----------
+    Args:
     graph_renderer (bokeh.plotting.GraphRenderer instance): the canvas of the current group's
      transition graph to add the information to.
     group_stats (dict): packed dict of syllable scalars to add to the hover tool.
     node_indices (1d list): ordering of syllables to read from the syll info dict
 
-    Returns
-    -------
+    Returns:
     graph_renderer (bokeh.plotting.GraphRenderer instance): updated reference of the GraphRenderer instance.
     """
 
@@ -1093,15 +1047,13 @@ def setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color):
     """
     Adds the interactive functionality to hovering and tapping on the nodes and edges of each transition graph.
 
-    Parameters
-    ----------
+    Args:
     graph_renderer (bokeh.plotting.GraphRenderer instance): the canvas of the current group's
      transition graph to add the information to.
     group_stats (dict): packed dict of syllable scalars to add to the hover tool.
     scalar_color (str): name of scalar to color nodes by.
 
-    Returns
-    -------
+    Returns:
     graph_renderer (bokeh.plotting.GraphRenderer instance): updated reference of the GraphRenderer instance.
     color_bar (bokeh.models.ColorBar instance): a color bar Bokeh glyph to add to the current graph
      if the scalar colors are not all white.
@@ -1154,14 +1106,12 @@ def set_node_labels(x, y, syllable):
     Given the x and y coordinates of the nodes in the graph, and the syllable numbers they correspond to,
      the function will create a LabelSet instance to render the syllables numbers on each graphed transition node.
 
-    Parameters
-    ----------
+    Args:
     x (1d list): list of x coordinates corresponding to each node in the current graph
     y (1d list): list of y coordinates corresponding to each node in the current graph
     syllable (1d list): list of syllable numbers corresponding to each node in the current graph
 
-    Returns
-    -------
+    Returns:
     labels (bokeh.models.LabelSet instance): glyph to render on the graph such that the nodes are numbered.
     """
 
@@ -1190,8 +1140,7 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
      to then create a LabelSet instance to display each group's corresponding syllable numbers of the correct
       corresponding nodes on each plot/for each group.
 
-    Parameters
-    ----------
+    Args:
     plots (1d list): list of plots currently generated in the plot_interactive_transition_graph loop.
     graph_renderer (bokeh.plotting.GraphRenderer instance): the canvas of the current group's
      transition graph to add the information to.
@@ -1199,8 +1148,7 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
     graph (nx.DiGraph): networkx graph to read the node coordinates from.
     node_indices (1d list): ordering of syllables to read from the syll info dict
 
-    Returns
-    -------
+    Returns:
     labels (bokeh.models.LabelSet instance): glyph to render on the graph such that the nodes are numbered.
     """
 
@@ -1234,15 +1182,13 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
      and an info_legend containing references to the displayed node widths
      and their corresponding transition probabilities.
 
-    Parameters
-    ----------
+    Args:
     plot (bokeh figure): bokeh generated figure to add legends to.
     edge_width (dict): dict of edge tuple(node1, node2) object mapped to float values describing edge widths.
     group_name (str): name of currently plotted group
     difference_graph (bool): indicator for whether the currently plotted graph is a difference graph between two groups.
 
-    Returns
-    -------
+    Returns:
     main_legend (bokeh Legend instance): Legend containing colors describing incoming and outgoing transitions.
     info_legend (bokeh Legend instance): Legend containing edge widths corresponding
      to min and max transition probabilities.
@@ -1293,8 +1239,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     Converts the computed networkx transition graphs to Bokeh glyph objects that can be interacted with
     and updated throughout run-time.
 
-    Parameters
-    ----------
+    Args:
     graphs (list of nx.DiGraphs): list of created networkx graphs.
     pos (nx.Layout): shared node position coordinates layout object.
     group (list): list of unique group names.
@@ -1303,8 +1248,7 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     syll_info (dict): dict of syllable label information to display with HoverTool
     scalars (dict): dict of syllable scalar information to display with HoverTool
 
-    Returns
-    -------
+    Returns:
     """
 
     if plot_vertically:

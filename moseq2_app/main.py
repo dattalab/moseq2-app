@@ -44,8 +44,7 @@ def flip_classifier_tool(input_dir,
 
     Flip Classifier Notebook main functionality access point.
 
-    Parameters
-    ----------
+    Args:
     input_dir (str): Path to base directory containing extraction session folders
     max_frames (int): Maximum number of frames to include in the dataset.
     output_file (str): Path to save the outputted flip classifier.
@@ -54,8 +53,7 @@ def flip_classifier_tool(input_dir,
     continuous_slider_update (bool): Indicates whether to continuously update the view upon slider widget interactions.
     launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
 
-    Returns
-    -------
+    Returns:
     flip_obj (FlipRangeTool): Flip Classifier Training object that will be used throughout the notebook to
      hold the labeled accepted frame ranges and selected paths/info.
     """
@@ -75,13 +73,11 @@ def view_extraction(extractions, default=0):
     """
     Prompts user to select which extracted video(s) to preview.
 
-    Parameters
-    ----------
+    Args:
     extractions (list): list of paths to all extracted avi videos.
     default (int): index of the default extraction to display
 
-    Returns
-    -------
+    Returns:
     extractions (list): list of selected extractions.
     """
 
@@ -105,13 +101,11 @@ def preview_extractions(input_dir, flipped=False):
     Function to launch a dynamic video loader that displays extraction session mp4s.
     Upon extracted session selection, function automatically displays the extraction mp4 video file.
 
-    Parameters
-    ----------
+    Args:
     input_dir (str): Path to parent directory containing extracted sessions folders
     flipped (bool): indicates whether to show corrected flip videos
 
-    Returns
-    -------
+    Returns:
     """
     output_notebook()
     viewer = InteractiveExtractionViewer(data_path=input_dir, flipped=flipped)
@@ -127,12 +121,10 @@ def validate_extractions(input_dir):
     Wrapper function that facilitates the extraction validation step from `main.py`.
      Prints all the flagged session outlier details.
 
-    Parameters
-    ----------
+    Args:
     input_dir (str): Path to parent directory containing extracted sessions folders
 
-    Returns
-    -------
+    Returns:
     """
 
     validate_extractions_wrapper(input_dir)
@@ -144,12 +136,10 @@ def interactive_group_setting(index_file):
     Interactive group setting wrapper function that displays a excel-like table to update
     the current group selection
 
-    Parameters
-    ----------
+    Args:
     index_file (str): Path to index file to update.
 
-    Returns
-    -------
+    Returns:
     """
 
     index_grid = GroupSettingWidgets(index_file)
@@ -165,12 +155,10 @@ def interactive_scalar_summary(index_file):
     """
     Interactive Scalar summary visualization tool accessible from jupyter notebook.
 
-    Parameters
-    ----------
+    Args:
     index_file (str): Path to index file containing session paths to plot scalars for.
 
-    Returns
-    -------
+    Returns:
     """
 
     if not exists(index_file):
@@ -185,14 +173,12 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
     """
     Interactive syllable labeling tool accessible from the jupyter notebook.
 
-    Parameters
-    ----------
+    Args:
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
     n_explained (int): Percentage of explained variance to use to compute max_syllables to compute.
 
-    Returns
-    -------
+    Returns:
     """
 
     # Get proper input paths
@@ -233,14 +219,12 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
     """
     Generates the interactive syllable statistics viewer, consisting of a dot-line plot and a dendrogram.
 
-    Parameters
-    ----------
+    Args:
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
     load_parquet (bool): Indicates to load previously saved data.
 
-    Returns
-    -------
+    Returns:
     """
 
     # Get proper input parameters
@@ -268,15 +252,13 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
     """
     Interactive crowd movie/position heatmap comparison function. Launched via the notebook.
 
-    Parameters
-    ----------
+    Args:
     progress_paths (dict): dictionary of notebook progress paths.
     group_movie_dir (str): path to generate new grouped crowd movies in.
     get_pdfs (bool): indicates whether to also generate position heatmaps.
     load_parquet (bool): Indicates to load previously saved data.
 
-    Returns
-    -------
+    Returns:
     """
 
     # Get proper input paths
@@ -305,14 +287,12 @@ def interactive_transition_graph(progress_paths, max_syllables=None, plot_vertic
     Displays group transition graphs with a configurable number of syllables. Launched via the
      the jupyter notebook.
 
-    Parameters
-    ----------
+    Args:
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
     load_parquet (bool): Indicates to load previously saved data.
 
-    Returns
-    -------
+    Returns:
     """
 
     # Get proper input paths

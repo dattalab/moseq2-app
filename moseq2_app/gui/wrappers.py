@@ -26,11 +26,9 @@ def validate_extractions_wrapper(input_dir):
     Wrapper function to test the measured scalar values to determine whether some sessions should be
      flagged and diagnosed before aggregating the sessions.
 
-    Parameters
-    ----------
+    Args:
     input_dir (str): path to parent directory containing all the extracted session folders
-    Returns
-    -------
+    Returns:
     """
 
     # Get paths to extracted sessions
@@ -53,15 +51,13 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     """
     Wrapper function to launch a syllable crowd movie preview and interactive labeling application.
 
-    Parameters
-    ----------
+    Args:
     model_path (str): Path to trained model.
     crowd_movie_dir (str): Path to crowd movie directory
     output_file (str): Path to syllable label information file
     max_syllables (int): Maximum number of syllables to preview and label.
 
-    Returns
-    -------
+    Returns:
     """
 
     # Copy index file to modeling session directory
@@ -123,8 +119,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     Wrapper function that launches an interactive crowd movie comparison application.
     Uses ipywidgets and Bokeh to facilitate real time user interaction.
 
-    Parameters
-    ----------
+    Args:
     config_filepath (str): path to config file containing crowd movie generation parameters
     index_path (str): path to index file with paths to all the extracted sessions
     model_path (str): path to trained model containing syllable labels.
@@ -134,8 +129,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     get_pdfs (bool): indicates whether to compute and display position heatmaps
     load_parquet (bool): Indicates to load previously saved syllable data.
 
-    Returns
-    -------
+    Returns:
     """
 
     config_data = read_yaml(config_filepath)
@@ -156,8 +150,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     Wrapper function that works as a background process that prepares the data
     for the interactive graphing function.
 
-    Parameters
-    ----------
+    Args:
     model_path (str): Path to trained model.
     index_path (str): Path to index file containined trained data metadata.
     info_path (str): Path to user-labeled syllable information file.
@@ -165,8 +158,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     max_syllables (int or None): Limit maximum number of displayed syllables.
     load_parquet (bool): Indicates to load previously saved data.
 
-    Returns
-    -------
+    Returns:
     """
 
     # Initialize Transition Graph data structure

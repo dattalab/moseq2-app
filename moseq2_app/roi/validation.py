@@ -20,14 +20,12 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
 
     Returns the proportion of dropped frames relative to the respective recorded timestamps and frames per second.
 
-    Parameters
-    ----------
+    Args:
     timestamps (1D np.array): Session's recorded timestamp array.
     fps (int): Frames per second
     scaling_factor (float): factor to divide timestamps by to convert timestamp milliseconds into seconds.
 
-    Returns
-    -------
+    Returns:
     percentError (float): Percentage of frames that were dropped/missed during acquisition.
     """
 
@@ -56,12 +54,10 @@ def count_nan_rows(scalar_df):
 
     Counts the number of rows with NaN scalar values.
 
-    Parameters
-    ----------
+    Args:
     scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
-    Returns
-    -------
+    Returns:
     n_missing_frames (int): Number of frames with NaN computed scalar values.
     """
 
@@ -73,12 +69,10 @@ def count_missing_mouse_frames(scalar_df):
 
     Counts the number of frames where the mouse is not found.
 
-    Parameters
-    ----------
+    Args:
     scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
-    Returns
-    -------
+    Returns:
     missing_mouse_frames (int): Number of frames with recorded mouse area ~= 0
     """
 
@@ -91,12 +85,10 @@ def count_frames_with_small_areas(scalar_df):
     Counts the number of frames where the mouse area is smaller than 2 standard deviations of
      all mouse areas.
 
-    Parameters
-    ----------
+    Args:
     scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
-    Returns
-    -------
+    Returns:
     corrupt_frames (int): Number of frames where the recorded mouse area is too small
     """
 
@@ -108,12 +100,10 @@ def count_stationary_frames(scalar_df):
 
     Counts the number of frames where mouse is not moving.
 
-    Parameters
-    ----------
+    Args:
     scalar_df (pd.DataFrame): Computed Scalar DataFrame
 
-    Returns
-    -------
+    Returns:
     motionless_frames (int): Number of frames where the mouse is not moving
     """
     
@@ -126,12 +116,10 @@ def get_scalar_df(path_dict):
     Computes a scalar dataframe that contains all the extracted sessions
     recorded scalar values along with their metadata.
 
-    Parameters
-    ----------
+    Args:
     path_dict (dict): dictionary of session folder names paired with their extraction paths
 
-    Returns
-    -------
+    Returns:
     scalar_df (pd.DataFrame): DataFrame containing loaded scalar info from each h5 extraction file.
     """
 
@@ -170,12 +158,10 @@ def make_session_status_dicts(paths):
     Returns the flag status dicts for all the found completed extracted sessions. Additionally performs
      dropped frames test on all sessions.
 
-    Parameters
-    ----------
+    Args:
     paths (dict): path dict of session names paired wit their mp4 paths.
 
-    Returns
-    -------
+    Returns:
     status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
     """
 
@@ -226,13 +212,11 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     """
     Detects outlier sessions using an EllipticEnvelope model based on a subset of their mean scalar values.
 
-    Parameters
-    ----------
+    Args:
     scalar_df (pd.DataFrame): Computed Scalar DataFrame
     status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
 
-    Returns
-    -------
+    Returns:
     status_dicts (dict): stacked dictionary object containing updated scalar_anomaly flags.
     """
 
@@ -261,13 +245,11 @@ def run_validation_tests(scalar_df, status_dicts):
     Main function that runs all the available extraction validation tests and updates the status_dicts
      flags accordingly.
 
-    Parameters
-    ----------
+    Args:
     scalar_df (pd.DataFrame): Computed Scalar DataFrame
     status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
 
-    Returns
-    -------
+    Returns:
     status_dicts (dict): stacked dictionary object containing all the sessions' updated flag status dicts.
     """
 
@@ -305,12 +287,10 @@ def print_validation_results(scalar_df, status_dicts):
     Displays all the outlier sessions flag names and values. Additionally plots the flagged
      position heatmap.
 
-    Parameters
-    ----------
+    Args:
     anomaly_dict (dict): Dict object containing specific session flags to print
 
-    Returns
-    -------
+    Returns:
     """
 
     # Run tests

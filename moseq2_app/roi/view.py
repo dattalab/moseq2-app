@@ -22,13 +22,11 @@ def show_extraction(input_file, video_file):
     Function will facilitate visualization through creating a HTML div to display
     in a jupyter notebook or web page.
 
-    Parameters
-    ----------
+    Args:
     input_file (str): session name to display.
     video_file (str): path to video to display
 
-    Returns
-    -------
+    Returns:
     output (ipywidgets.Output widget): HTML canvas where the video is being displayed.
     """
 
@@ -78,13 +76,11 @@ def bokeh_plot_helper(bk_fig, image):
     Helper function that creates the Bokeh image gylphs in the
     created canvases/figures.
 
-    Parameters
-    ----------
+    Args:
     bk_fig (Bokeh figure): figure canvas to draw image/glyph on
     image (2D np.array): image to draw.
 
-    Returns
-    -------
+    Returns:
     """
 
     bk_fig.x_range.range_padding = bk_fig.y_range.range_padding = 0

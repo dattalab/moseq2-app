@@ -45,15 +45,13 @@ def merge_labels_with_scalars(sorted_index, model_path):
     """
     Computes all the syllable statistics to plot, including syllable scalars.
 
-    Parameters
-    ----------
+    Args:
     sorted_index (dict): Sorted dict of modeled sessions
     model_fit (dict): Trained AR-HMM results dict
     model_path (str): Respective path to the AR-HMM model in use.
     max_sylls (int): Maximum number of syllables to include
 
-    Returns
-    -------
+    Returns:
     df (pd.DataFrame): Dataframe containing all of the mean syllable statistics
     scalar_df (pd.DataFrame): Dataframe containing the frame-by-frame scalar and label data
     """
@@ -70,12 +68,10 @@ def index_to_dataframe(index_path):
     """
     Reads the index file into a dictionary and converts it into an editable DataFrame.
 
-    Parameters
-    ----------
+    Args:
     index_path (str): Path to index file
 
-    Returns
-    -------
+    Returns:
     index_data (dict): Dict object containing all parsed index file contents
     df (pd.DataFrame): Formatted dict in DataFrame form including each session's metadata
     """
@@ -116,8 +112,7 @@ def uuid_lookup(target_uuid, uuid_dict_source):
     """
     Look up session infomtion with full/partial uuid. Helper function for users to look up uuid after running interactive_scalar_summary
 
-    Parameters
-    ----------
+    Args:
     target_uuid (str): full or partial uuid the user wants to look up.
     uuid_dict (dict): dictionary from interactive_scalar_summary widget that has all the session information 
     """
@@ -135,12 +130,10 @@ def uuid_lookup(target_uuid, uuid_dict_source):
 def setup_model_folders(progress_paths):
     """Create model-specific folders
 
-    Parameters
-    ----------
+    Args:
     progress_paths (dict): dictionary of notebook progress paths.
 
-    Returns
-    -------
+    Returns:
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     """
     # find all the models in the model master path
@@ -170,14 +163,12 @@ def setup_model_folders(progress_paths):
 def update_model_paths(desired_model, model_dict, progress_filepath):
     """helper function to update relevant model paths in progress.yaml when specific model is chosen
 
-    Parameters
-    ----------
+    Args:
     desired_model (str): file name of the desired specific model
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     progress_filepath (str): path to progress.yaml
 
-    Returns
-    -------
+    Returns:
     [type]
         [description]
     """
