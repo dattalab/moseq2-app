@@ -1,6 +1,5 @@
 """
-Constructs a jupyter notebook viewable widget users can use to identify the arena floor
-and to validate extractions performed on a small chunk of data. 
+Widget to identify the arena floor and to validate extractions performed on a small chunk of data. 
 """
 
 import param
@@ -34,7 +33,16 @@ _hover_dict = {
 
 
 class ArenaMaskWidget:
+    
     def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False) -> None:
+        """initialize arena mask widget
+
+        Args:
+            data_dir (str): project base directory.
+            config_file (str): path to config.yaml
+            session_config_path (str): path to session_config.yaml.
+            skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
+        """
         self.backgrounds = {}
         self.extracts = {}
         self.data_dir = data_dir
@@ -85,6 +93,9 @@ class ArenaMaskWidget:
 
 
     def set_session_config_vars(self):
+        """
+        get session default config variable.
+        """
         folder = self.session_data.path
         session = self.session_config[folder]
 
@@ -135,11 +146,20 @@ class ArenaMaskWidget:
 
 
     def save_session_parameters(self):
+        """save session paramter to session config file.
+        """
         self.set_session_config_vars()
 
         write_yaml(self.session_config, self.session_config_path)
 
     def compute_arena_mask(self):
+        """compute the arena mask using the paramters in the session config file.
+
+        Returns:
+            background (numpy.ndarray): background of the session
+            rois(numpy.ndarray): roi for arena
+    
+        """
         self.set_session_config_vars()
 
         folder = self.session_data.path
@@ -160,6 +180,12 @@ class ArenaMaskWidget:
         return background, rois
 
     def compute_extraction(self):
+        """compute extraction of the given frames
+
+        Returns:
+            (numpy.ndarray): extracted frames
+            frames (numpy.ndarray): raw frames after background subtraction and roi application
+        """
         self.set_session_config_vars()
 
         folder = self.session_data.path
@@ -211,7 +237,7 @@ class ArenaMaskWidget:
 
 # define data class first
 class ArenaMaskData(param.Parameterized):
-    """The link between the widget view and the underlying data"""
+    """link between the widget view and the underlying data"""
     ### data ###
     path = param.ObjectSelector()  # stores the currently selected path and all others
     # defines the range of depth values needed to compute mask for floor
@@ -346,6 +372,9 @@ class ArenaMaskData(param.Parameterized):
 
 
 class ArenaMaskView(Viewer):
+    """
+    view the arena mask tool
+    """
 
     def __init__(self, session_data: ArenaMaskData, **params):
         super().__init__(**params)

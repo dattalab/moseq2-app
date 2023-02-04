@@ -17,10 +17,7 @@ from moseq2_extract.io.video import get_video_info
 
 def show_extraction(input_file, video_file):
     """
-
-    Visualization helper function to display manually triggered extraction.
-    Function will facilitate visualization through creating a HTML div to display
-    in a jupyter notebook or web page.
+    display manually triggered extraction.s
 
     Args:
     input_file (str): session name to display.
@@ -72,15 +69,11 @@ def show_extraction(input_file, video_file):
 
 def bokeh_plot_helper(bk_fig, image):
     """
-
-    Helper function that creates the Bokeh image gylphs in the
-    created canvases/figures.
+    create the Bokeh image gylphs in the created canvases/figures.
 
     Args:
     bk_fig (Bokeh figure): figure canvas to draw image/glyph on
     image (2D np.array): image to draw.
-
-    Returns:
     """
 
     bk_fig.x_range.range_padding = bk_fig.y_range.range_padding = 0

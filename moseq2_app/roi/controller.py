@@ -1,8 +1,5 @@
 """
-
-Interactive ROI detection and extraction preview functionalities. This module utilizes the widgets from
-the widgets.py file to facilitate the real-time interaction.
-
+Interactive ROI detection and extraction preview functionalities.
 """
 
 import io
@@ -19,9 +16,9 @@ class InteractiveExtractionViewer:
 
     def __init__(self, data_path, flipped=False):
         """
+        initialize the extraction viewer widget.
 
-        Parameters
-        ----------
+        Args:
         data_path (str): Path to base directory containing all sessions to test
         flipped (bool): indicates whether to show corrected flip videos
         """
@@ -36,14 +33,10 @@ class InteractiveExtractionViewer:
 
     def clear_on_click(self, b=None):
         """
-        Clears the cell output
+        Clear the cell output
 
-        Parameters
-        ----------
+        Args:
         b (button click)
-
-        Returns
-        -------
         """
 
         clear_output()
@@ -52,12 +45,8 @@ class InteractiveExtractionViewer:
         """
         Returns a div containing a video object to display.
 
-        Parameters
-        ----------
+        Args:
         input_file (str): Path to session extraction video to view.
-
-        Returns
-        -------
         """
 
         video_dims = get_video_info(input_file)['dims']

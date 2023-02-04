@@ -1,8 +1,5 @@
 """
-
 This module contains the widget components that comprise the group setting table functionality.
-These widgets will work in tandem with the qgrid functionality to facilitate the real time updates.
-
 """
 
 import qgrid
@@ -16,11 +13,9 @@ class GroupSettingWidgets:
 
     def __init__(self, index_filepath):
         """
-        Initializes all the Group Setting widgets, parses the index yaml file into a pandas DataFrame that is
-         compatible to be displayed using QGrid.
+        Initialize all the Group Setting widgets, parses the index yaml file into a pandas DataFrame that is compatible to be displayed using QGrid.
 
-        Parameters
-        ----------
+        Args:
         index_filepath (str): Path to index file (moseq2-index.yaml) containing session metadata and grouping info.
         """
 
@@ -68,14 +63,10 @@ class GroupSettingWidgets:
 
     def update_table(self, b=None):
         """
-        Updates table upon "Set Button" click
+        Update table upon "Set Button" click
 
-        Parameters
-        ----------
+        Args:
         b (button click)
-
-        Returns
-        -------
         """
 
         self.update_index_button.button_style = 'info'
@@ -89,14 +80,10 @@ class GroupSettingWidgets:
 
     def update_clicked(self, b=None):
         """
-        Updates the index file with the current table state upon Save button click.
+        Update the index file with the current table state upon Save button click.
 
-        Parameters
-        ----------
+        Args:
         b (button click)
-
-        Returns
-        -------
         """
 
         files = self.index_dict['files']
@@ -120,11 +107,8 @@ class GroupSettingWidgets:
         """
         Clear the display.
 
-        Parameters
-        ----------
+        Args:
         b (ipywidgets.Button click): callback from button when user clicks the button.
-
-        Returns
-        -------
+        Returns:
         """
         clear_output()

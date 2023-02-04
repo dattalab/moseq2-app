@@ -1,8 +1,5 @@
 """
-
-Main functions that facilitate all jupyter notebook functionality. All functions will call a wrapper function
- to handle any non front-end settings.
-
+Main functions that facilitate all jupyter notebook functionality.
 """
 from os.path import exists
 import ipywidgets as widgets
@@ -23,6 +20,15 @@ from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
 output_notebook()
 
 def validate_inputs(inputs, progress_paths):
+    """validate progress file input.
+
+    Args:
+        inputs (list): list of progress path inputs.
+        progress_paths (dict): dictionary of notebook progress paths.
+
+    Returns:
+        error (bool): boolean flag for whether there is any error.
+    """
 
     error = False
     for i in inputs:
@@ -42,7 +48,7 @@ def flip_classifier_tool(input_dir,
                          launch_gui=True):
     """
 
-    Flip Classifier Notebook main functionality access point.
+    start flip classifier tool.
 
     Args:
     input_dir (str): Path to base directory containing extraction session folders
@@ -54,8 +60,7 @@ def flip_classifier_tool(input_dir,
     launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
 
     Returns:
-    flip_obj (FlipRangeTool): Flip Classifier Training object that will be used throughout the notebook to
-     hold the labeled accepted frame ranges and selected paths/info.
+    flip_obj (FlipRangeTool): Flip Classifier training widget.
     """
 
     flip_finder = FlipRangeTool(input_dir=input_dir,
@@ -71,7 +76,7 @@ def flip_classifier_tool(input_dir,
 @filter_warnings
 def view_extraction(extractions, default=0):
     """
-    Prompts user to select which extracted video(s) to preview.
+    Prompt user to select which extracted video(s) to preview.
 
     Args:
     extractions (list): list of paths to all extracted avi videos.
@@ -98,14 +103,11 @@ def view_extraction(extractions, default=0):
 @filter_warnings
 def preview_extractions(input_dir, flipped=False):
     """
-    Function to launch a dynamic video loader that displays extraction session mp4s.
-    Upon extracted session selection, function automatically displays the extraction mp4 video file.
+    launch a dynamic video loader that displays extraction session mp4s.
 
     Args:
     input_dir (str): Path to parent directory containing extracted sessions folders
     flipped (bool): indicates whether to show corrected flip videos
-
-    Returns:
     """
     output_notebook()
     viewer = InteractiveExtractionViewer(data_path=input_dir, flipped=flipped)
@@ -118,13 +120,10 @@ def preview_extractions(input_dir, flipped=False):
 @filter_warnings
 def validate_extractions(input_dir):
     """
-    Wrapper function that facilitates the extraction validation step from `main.py`.
-     Prints all the flagged session outlier details.
+    validate extracted sessions and print validation results.
 
     Args:
     input_dir (str): Path to parent directory containing extracted sessions folders
-
-    Returns:
     """
 
     validate_extractions_wrapper(input_dir)
@@ -132,14 +131,10 @@ def validate_extractions(input_dir):
 @filter_warnings
 def interactive_group_setting(index_file):
     """
-
-    Interactive group setting wrapper function that displays a excel-like table to update
-    the current group selection
+    display a excel-like table to update the current group selection
 
     Args:
     index_file (str): Path to index file to update.
-
-    Returns:
     """
 
     index_grid = GroupSettingWidgets(index_file)
@@ -153,12 +148,10 @@ def interactive_group_setting(index_file):
 @filter_warnings
 def interactive_scalar_summary(index_file):
     """
-    Interactive Scalar summary visualization tool accessible from jupyter notebook.
+    launch Interactive Scalar summary visualization tool.
 
     Args:
     index_file (str): Path to index file containing session paths to plot scalars for.
-
-    Returns:
     """
 
     if not exists(index_file):
@@ -171,14 +164,12 @@ def interactive_scalar_summary(index_file):
 @filter_warnings
 def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
     """
-    Interactive syllable labeling tool accessible from the jupyter notebook.
+    launch Interactive syllable labeling tool.
 
     Args:
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
     n_explained (int): Percentage of explained variance to use to compute max_syllables to compute.
-
-    Returns:
     """
 
     # Get proper input paths
@@ -204,6 +195,14 @@ def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_m
 
 @filter_warnings
 def show_dendrogram(progress_paths, max_syllable=None, color_by_cluster=False):
+    """
+    show syllable similarity dendrogram.
+
+    Args:
+        progress_paths (dict): dictionary of notebook progress paths.
+        max_syllable (_type_, optional): _description_. Defaults to None.
+        color_by_cluster (bool, optional): _description_. Defaults to False.
+    """
 
     # get input paths
     index_file = progress_paths['index_file'] # Path to index file.
@@ -217,14 +216,12 @@ def show_dendrogram(progress_paths, max_syllable=None, color_by_cluster=False):
 @filter_warnings
 def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
     """
-    Generates the interactive syllable statistics viewer, consisting of a dot-line plot and a dendrogram.
+    launch the interactive syllable statistics viewer.
 
     Args:
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
     load_parquet (bool): Indicates to load previously saved data.
-
-    Returns:
     """
 
     # Get proper input parameters
@@ -250,15 +247,13 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
 @filter_warnings
 def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):
     """
-    Interactive crowd movie/position heatmap comparison function. Launched via the notebook.
+    launch interactive crowd movie/position heatmap comparison function
 
     Args:
     progress_paths (dict): dictionary of notebook progress paths.
     group_movie_dir (str): path to generate new grouped crowd movies in.
     get_pdfs (bool): indicates whether to also generate position heatmaps.
     load_parquet (bool): Indicates to load previously saved data.
-
-    Returns:
     """
 
     # Get proper input paths
@@ -283,16 +278,12 @@ def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs
 @filter_warnings
 def interactive_transition_graph(progress_paths, max_syllables=None, plot_vertically=False, load_parquet=False):
     """
-
-    Displays group transition graphs with a configurable number of syllables. Launched via the
-     the jupyter notebook.
+    Display group transition graphs with a configurable number of syllables.
 
     Args:
     progress_paths (dict): dictionary of notebook progress paths.
     max_syllables (int or None): manual maximum number of syllables to label.
     load_parquet (bool): Indicates to load previously saved data.
-
-    Returns:
     """
 
     # Get proper input paths

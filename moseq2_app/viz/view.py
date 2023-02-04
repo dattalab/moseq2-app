@@ -1,7 +1,5 @@
 """
-
-Helper function that displays a grid of crowd movies and plotted bokeh figures of position heatmaps.
-
+Function that displays a grid of crowd movies and plotted bokeh figures of position heatmaps.
 """
 
 from bokeh.io import show
@@ -12,8 +10,7 @@ from IPython.display import display
 
 def display_crowd_movies(widget_box, curr_name, desc, divs, bk_figs):
     """
-    Crowd movie comparison helper function that displays the widgets and
-    embedded HTML divs to a running jupyter notebook cell or HTML webpage.
+    display the crowd movies in jupyter notebook.
 
     Args:
     divs (list of bokeh.models.Div): list of HTML Div objects containing videos to display
