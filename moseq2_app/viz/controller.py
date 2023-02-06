@@ -36,7 +36,8 @@ def _initialize_syll_info_dict(max_sylls):
 
 class SyllableLabeler(SyllableLabelerWidgets):
 
-    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, select_median_duration_instances, max_examples, crowd_movie_dir, save_path):
+    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, 
+                 select_median_duration_instances, max_examples, crowd_movie_dir, save_path):
         """
         Initialize syllable labeler widget with class context parameters, and create the syllable information dict.
 
@@ -44,7 +45,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         model_fit (dict): Loaded trained model dict.
         index_file (str): Path to saved index file.
         max_sylls (int): Maximum number of syllables to preview and label.
-        select_median_duration_instances (bool): if true, select examples with syallable duration closer to median.
+        select_median_duration_instances (bool): boolean flag to select examples with syallable duration closer to median.
         save_path (str): Path to save syllable label information dictionary.
         """
 

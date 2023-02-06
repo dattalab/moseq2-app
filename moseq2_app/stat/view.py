@@ -30,7 +30,7 @@ from moseq2_viz.model.dist import get_behavioral_distance
 
 def colorscale(hexstr, scalefactor):
     """
-    Scale a hex string by ``scalefactor``. Returns scaled hex string.
+    Scale a hex string by scalefactor. Returns scaled hex string.
 
     To darken the color, use a float value between 0 and 1.
     To brighten the color, use a float value greater than 1.
@@ -771,8 +771,7 @@ def set_fill_color(scalar_color, data_dict):
 
     Args:
     scalar_color (str): name of scalar to color nodes by.
-    data_dict (dict): dict containing dicts of scalar_df keys and their corresponding
-     values to create the linear color map from.
+    data_dict (dict): dict containing dicts of scalar_df keys and their corresponding values to create the linear color map from.
 
     Returns:
     fill_color (str or list): list of colors per node, or single color (white)

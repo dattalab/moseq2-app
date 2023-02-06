@@ -287,7 +287,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         Args:
         n_estimators (int): The number of trees in the forest.
         criterion (str): The function to measure the quality of a split. ['gini', mse', 'mae']
-        n_jobs (int): The number of jobs to run in parallel for both `fit` and `predict`.
+        n_jobs (int): The number of jobs to run in parallel for both fit and predict.
         max_depth (int): The maximum depth of the tree. If None, then nodes are expanded until all leaves are pure.
         min_samples_split (int): The minimum number of samples required to split an internal node.
         min_samples_leaf (int): The minimum number of samples required to be at a leaf node.

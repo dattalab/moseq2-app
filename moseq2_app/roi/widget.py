@@ -237,7 +237,6 @@ class ArenaMaskWidget:
 
 # define data class first
 class ArenaMaskData(param.Parameterized):
-    """link between the widget view and the underlying data"""
     ### data ###
     path = param.ObjectSelector()  # stores the currently selected path and all others
     # defines the range of depth values needed to compute mask for floor
@@ -307,10 +306,14 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('save_session_btn', 'save_session_and_move_btn', watch=True)
     def save_session(self):
+        """save session parameters
+        """
         self.controller.save_session_parameters()
 
     @param.depends('save_session_and_move_btn', watch=True)
     def next_session(self):
+        """go to next session
+        """
         cur_path = self.path
         paths = self.param.path.objects
         try:
@@ -321,6 +324,8 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('compute_arena_mask', 'next_session', watch=True)
     def get_arena_mask(self):
+        """render the arena mask
+        """
         self.computing_arena = True
         background, mask = self.controller.compute_arena_mask()
         self.images['Arena mask'] = mask
@@ -331,6 +336,8 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('compute_extraction', 'next_session', watch=True)
     def get_extraction(self):
+        """get the extraction results
+        """
         self.computing_extraction = True
         mouse, frame = self.controller.compute_extraction()
         self.images['Extracted mouse'] = mouse
@@ -340,10 +347,17 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('get_extraction', watch=True)
     def change_frame_slider(self):
+        """change the randge for the number of frames slider
+        """
         self.param.frame_num.bounds = (0, min(self.frames_to_extract - 1, len(self.images['Extracted mouse']) - 1))
 
     @param.depends('get_arena_mask', 'get_extraction', 'frame_num', 'mask_index')
     def display(self):
+        """show interactive arena mask widget
+
+        Returns:
+            panels (panel object): interactive widget for arena mask
+        """
         panels = []
         for k, v in self.images.items():
             if not isinstance(v, (np.ndarray, list)):
@@ -372,11 +386,10 @@ class ArenaMaskData(param.Parameterized):
 
 
 class ArenaMaskView(Viewer):
-    """
-    view the arena mask tool
-    """
 
     def __init__(self, session_data: ArenaMaskData, **params):
+        """view the arena mask tool
+        """
         super().__init__(**params)
 
         def _link_data(widget, param, **kwargs):
