@@ -475,8 +475,7 @@ def format_stat_plot(p, df, searchbox, slider, sorting):
     Args:
     p (bokeh.Figure): bokeh figure with all the glyphs already drawn.
     df (pd.DataFrame): DataFrame containing all relevant data to plot
-    slider (bokeh.models.RangeSlider): slider object with the currently displayed values used to filter
-     out syllables in the callback function.
+    slider (bokeh.models.RangeSlider): slider object with the currently displayed values used to filter out syllables in the callback function.
     pickers (list of ColorPickers): List of interactive color picker widgets to insert into a gridplot to display.
     sorting (list): list of syllable index values to resort the dataframe by.
 

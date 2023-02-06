@@ -25,7 +25,7 @@ from moseq2_app.flip.widgets import FlipClassifierWidgets
 from moseq2_extract.extract.proc import clean_frames, get_flips
 
 class FlipRangeTool(FlipClassifierWidgets):
-    
+
     def __init__(self, input_dir, max_frames, output_file,
                  tail_filter_iters, prefilter_kernel_size,
                  launch_gui=True, continuous_slider_update=True):
@@ -40,6 +40,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         prefilter_kernel_size (int): Size of the median spatial filter.
         launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
+        
         """
 
         with warnings.catch_warnings():
@@ -287,8 +288,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         n_estimators (int): The number of trees in the forest.
         criterion (str): The function to measure the quality of a split. ['gini', mse', 'mae']
         n_jobs (int): The number of jobs to run in parallel for both `fit` and `predict`.
-        max_depth (int): The maximum depth of the tree. If None, then nodes are expanded until
-         all leaves are pure. (This will use a lot of memory, and may take a while.)
+        max_depth (int): The maximum depth of the tree. If None, then nodes are expanded until all leaves are pure.
         min_samples_split (int): The minimum number of samples required to split an internal node.
         min_samples_leaf (int): The minimum number of samples required to be at a leaf node.
         oob_score (bool): whether to use out-of-bag samples to estimate the R^2 on unseen data.
