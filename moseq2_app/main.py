@@ -35,9 +35,8 @@ def validate_inputs(inputs, progress_paths):
 @filter_warnings
 def flip_classifier_tool(input_dir,
                          output_file,
+                         clean_parameters,
                          max_frames=1e6,
-                         tail_filter_iters=1,
-                         space_filter_size=3,
                          continuous_slider_update=True,
                          launch_gui=True):
     '''
@@ -49,8 +48,7 @@ def flip_classifier_tool(input_dir,
     input_dir (str): Path to base directory containing extraction session folders
     max_frames (int): Maximum number of frames to include in the dataset.
     output_file (str): Path to save the outputted flip classifier.
-    tail_filter_iters (int): Number of tail filtering iterations
-    prefilter_kernel_size (int): Size of the median spatial filter.
+    clean_parameters (dict): Parameters passed to moseq2_extract.extract.proc.clean_frames 
     continuous_slider_update (bool): Indicates whether to continuously update the view upon slider widget interactions.
     launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
 
@@ -63,8 +61,7 @@ def flip_classifier_tool(input_dir,
     flip_finder = FlipRangeTool(input_dir=input_dir,
                                 max_frames=max_frames,
                                 output_file=output_file,
-                                tail_filter_iters=tail_filter_iters,
-                                prefilter_kernel_size=space_filter_size,
+                                clean_parameters=clean_parameters,
                                 launch_gui=launch_gui,
                                 continuous_slider_update=continuous_slider_update)
 
