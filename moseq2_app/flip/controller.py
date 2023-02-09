@@ -29,8 +29,7 @@ from moseq2_extract.extract.proc import clean_frames, get_flips
 
 class FlipRangeTool(FlipClassifierWidgets):
 
-    def __init__(self, input_dir, max_frames, output_file,
-                 tail_filter_iters, prefilter_kernel_size,
+    def __init__(self, input_dir, max_frames, output_file, clean_parameters,
                  launch_gui=True, continuous_slider_update=True):
         '''
 
@@ -43,8 +42,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         input_dir (str): Path to base directory containing extraction session folders
         max_frames (int): Maximum number of frames to include in the dataset.
         output_file (str): Path to save the outputted flip classifier.
-        tail_filter_iters (int): Number of tail filtering iterations
-        prefilter_kernel_size (int): Size of the median spatial filter.
+        clean_parameters (dict): Parameters passed to moseq2_extract.extract.proc.clean_frames 
         launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
         '''
@@ -80,11 +78,7 @@ class FlipRangeTool(FlipClassifierWidgets):
                              launch_gui=launch_gui)
 
             # initialize frame cleaning parameter dict
-            self.clean_parameters = {
-                'iters_tail': tail_filter_iters,
-                'strel_tail': cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
-                'prefilter_space': (prefilter_kernel_size,)
-            }
+            self.clean_parameters = clean_parameters
 
     def load_sessions(self):
         '''
