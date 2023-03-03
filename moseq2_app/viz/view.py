@@ -1,8 +1,6 @@
-'''
-
-Helper function that displays a grid of crowd movies and plotted bokeh figures of position heatmaps.
-
-'''
+"""
+Function that displays a grid of crowd movies and plotted bokeh figures of position heatmaps.
+"""
 
 from bokeh.io import show
 from bokeh.models import Div
@@ -11,20 +9,17 @@ from bokeh.layouts import gridplot
 from IPython.display import display
 
 def display_crowd_movies(widget_box, curr_name, desc, divs, bk_figs):
-    '''
-    Crowd movie comparison helper function that displays the widgets and
-    embedded HTML divs to a running jupyter notebook cell or HTML webpage.
+    """
+    display the crowd movies in jupyter notebook.
 
-    Parameters
-    ----------
+    Args:
     divs (list of bokeh.models.Div): list of HTML Div objects containing videos to display
 
-    Returns
-    -------
-    '''
+    Returns:
+    """
 
     # Set HTML formats
-    movie_table = '''
+    movie_table = """
                     <html>
                     <head>
                     <style>
@@ -57,33 +52,33 @@ def display_crowd_movies(widget_box, curr_name, desc, divs, bk_figs):
                             text-align: center;
                         }
                     </style>
-                    </head>''' + \
-                  f'''
+                    </head>""" + \
+                  f"""
                     <body>
                     <h3>Name: {curr_name}</h3>
                     <h3>Description: {desc}</h3>
                     <br>
                     <div class="row"; style="background-color:#ffffff; height:auto;">
-                  '''
+                  """
 
     # Create div grid
     for i, div in enumerate(divs):
         if (i % 2 == 0) and i > 0:
             # make a new row
             movie_table += '</div>'
-            col = f'''
+            col = f"""
                       <div class="row"; style="background-color:#ffffff; height:auto;">
                           <div class="column">
                               {div}
                           </div>
-                    '''
+                    """
         else:
             # put movie in column
-            col = f'''
+            col = f"""
                       <div class="column">
                           {div}
                       </div>
-                    '''
+                    """
         movie_table += col
 
     # Close last div

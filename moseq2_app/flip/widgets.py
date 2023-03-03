@@ -1,8 +1,6 @@
-'''
-
+"""
 Widgets module containing all the interactive components of the frame selection GUI.
-
-'''
+"""
 
 import re
 import h5py
@@ -13,16 +11,15 @@ from IPython.display import clear_output
 class FlipClassifierWidgets:
 
     def __init__(self, path_dict, max_frames, continuous_update=True, launch_gui=True):
-        '''
-        Initializes all flip classifier widgets, their callback functionality, their event listeners,
-         and the associated variables being edited by the callbacks.
-        Parameters
-        ----------
+        """
+        Initialize all flip classifier widgets
+
+        Args:
         path_dict (dict): dict of sessionName-keys pointing to each session's results_00.h5 file (extraction output).
         max_frames (int): max number of frames to include in a dataset.
         continuous_update (bool): indicates whether to asynchronously reload the display as the user scrolls the slider.
         launch_gui (bool): indicates to callbacks to display the GUI using a FlipRangeTool function in flip.controller.py
-        '''
+        """
 
         style = {'description_width': 'initial'}
         layout = widgets.Layout(width='90%')
@@ -104,43 +101,32 @@ class FlipClassifierWidgets:
         self.session_select_dropdown.observe(self.changed_selected_session, names='value')
 
     def clear_on_click(self, b=None):
-        '''
-        Clears the output.
+        """
+        Clear the output.
 
-        Parameters
-        ----------
-        b (button click)
-
-        Returns
-        -------
-        '''
+        Args:
+        b (button click): user click the button
+        """
 
         clear_output()
 
     def on_selected_range_value(self, event=None):
-        '''
-        Callback function to make the delete button visible once the user selects one of the frame ranges.
-
-        Returns
-        -------
-        '''
+        """
+        make the delete button visible once the user selects one of the frame ranges.
+        """
 
         self.delete_selection_button.layout.visibility = 'visible'
 
     def start_stop_frame_range(self, b=None):
-        '''
-        Callback function that triggers the "Add Range" functionality.
-         If user clicks the button == 'Start Range', then the function will start including frames
-         in the correct flip set. After it is clicked, the button will function as a "Cancel Selection"
-         button, hiding the direction selection buttons.
+        """
+        start and stop the "Add Range" functionality.
 
-        Parameters
-        ----------
+        Args:
         b (button click): User clicks on "Start or Stop" Range button.
 
-        Returns
-        -------
-        '''
+        """
+        # If user clicks the button == 'Start Range', then the function will start including frames in the correct flip set. 
+        # After it is clicked, the button will function as a "Cancel Selection" button, hiding the direction selection buttons.
 
         if self.start_button.description == 'Start Range':
             self.start = self.frame_num_slider.value
@@ -155,16 +141,10 @@ class FlipClassifierWidgets:
             self.face_right_button.layout.visibility = 'hidden'
 
     def facing_range_callback(self, event):
-        '''
-        Callback function to handle when a user clicks either of the left or right facing buttons
-         after selecting a frame range. It will call a helper function: update_state_on_selected_range() if
-         the stop frame num. > start.
-        It will also hide the buttons after a successful selection, and redisplay the start range selection button.
-
-        Returns
-        -------
-        '''
-
+        """
+        handle when a user clicks either of the left or right facing buttons after selecting a frame range.
+        """
+        
         self.stop = self.frame_num_slider.value
 
         left = False
@@ -183,19 +163,12 @@ class FlipClassifierWidgets:
             self.start_button.button_style = 'info'
 
     def update_state_on_selected_range(self, left):
-        '''
-        Helper function that updates the view upon a correct frame range addition (stop > start).
-         Callback function to update the table of selected frame ranges upon
-         button click. Function will will add the selected ranges to the table
-          and session dict to train the model downstream.
+        """
+        Update the view upon a correct frame range addition (stop > start).
 
-        Parameters
-        ----------
+        Args:
         left (bool): Indicates which direction the mouse is facing the selected range. if True, facing left, else right.
-
-        Returns
-        -------
-        '''
+        """
 
         # Updating list of displayed session + selected frame ranges
         selected_range = range(self.start, self.stop)
@@ -231,17 +204,12 @@ class FlipClassifierWidgets:
         self.selected_ranges.options = self.display_frame_ranges
 
     def on_delete_selection_clicked(self, b=None):
-        '''
-        Button callback function that deletes the currently selected frame range from the list upon
-         clicking the Delete button.
+        """
+        delete the currently selected frame range from the list upon clicking the Delete button.
 
-        Parameters
-        ----------
+        Args:
         b (ipywidgets.Event): Button click event.
-
-        Returns
-        -------
-        '''
+        """
 
         new_list = list(self.selected_ranges.options)
 
@@ -278,17 +246,12 @@ class FlipClassifierWidgets:
             self.selected_ranges.options = new_list
 
     def changed_selected_session(self, event=None):
-        '''
-        Callback function to load newly selected session.
-        Note: self.interactive_launch_frame_selector() is function that lives in the flip.controller.FlipRangeTool class
+        """
+        load newly selected session.
 
-        Parameters
-        ----------
+        Args:
         event (ipywidgets Event): self.session_select_dropdown.value is changed
-
-        Returns
-        -------
-        '''
+        """
 
         # check if button is in middle range selection
         if self.start_button.description == 'End Range':
@@ -307,18 +270,12 @@ class FlipClassifierWidgets:
             self.interactive_launch_frame_selector()
 
     def curr_frame_update(self, event):
-        '''
-        Updates the currently displayed frame when the slider is moved.
-        Note: self.interactive_launch_frame_selector() is function that lives in the flip.controller.FlipRangeTool class
+        """
+        Update the currently displayed frame when the slider is moved.
 
-        Parameters
-        ----------
+        Args:
         event (ipywidgets Event): self.frame_num_slider.value is changed.
-
-        Returns
-        -------
-        '''
-
+        """
         self.frame_num_slider.value = event['new']
         clear_output(wait=True)
         self.interactive_launch_frame_selector()

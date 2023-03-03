@@ -1,9 +1,6 @@
-'''
-
-Interactive Flip classifier frame selection functionality. This module utilizes the widgets from
-the widgets.py file to facilitate the real-time interaction.
-
-'''
+"""
+Interactive Flip classifier frame selection functionality.
+"""
 
 import cv2
 import h5py
@@ -32,14 +29,10 @@ class FlipRangeTool(FlipClassifierWidgets):
     def __init__(self, input_dir, max_frames, output_file,
                  tail_filter_iters, prefilter_kernel_size,
                  launch_gui=True, continuous_slider_update=True):
-        '''
+        """
+        Find all the extracted sessions within the given input path, and prepare for GUI display.
 
-        Initialization for the Flip Classifier Training tool.
-         Finds all the extracted sessions within the given input path, and opens their h5
-         files, storing their references to read frames from one by one at display time.
-
-        Parameters
-        ----------
+        Args:
         input_dir (str): Path to base directory containing extraction session folders
         max_frames (int): Maximum number of frames to include in the dataset.
         output_file (str): Path to save the outputted flip classifier.
@@ -47,7 +40,8 @@ class FlipRangeTool(FlipClassifierWidgets):
         prefilter_kernel_size (int): Size of the median spatial filter.
         launch_gui (bool): Indicates whether to launch the labeling gui or just create the FlipClassifier instance.
         continuous_slider_update (bool): Indicates whether to continuously update the view upon slider edits.
-        '''
+        
+        """
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', FutureWarning)
@@ -87,17 +81,14 @@ class FlipRangeTool(FlipClassifierWidgets):
             }
 
     def load_sessions(self):
-        '''
-        Recursively searches for completed h5 extraction files, and loads total_frames=max_frames to
-         include in the total dataset. Additionally applies some image filtering prior to returning the data.
+        """
+        Recursively searche for completed h5 extraction files, and loads total_frames=max_frames to include in the total dataset.
 
-        Parameters
-        ----------
+        Args:
 
-        Returns
-        -------
+        Returns:
         path_dict (dict): dict of session names and paths filtered for sessions missing an h5 or mp4 files.
-        '''
+        """
 
         path_dict = OrderedDict()
 
@@ -117,14 +108,9 @@ class FlipRangeTool(FlipClassifierWidgets):
         return path_dict
 
     def interactive_launch_frame_selector(self):
-        '''
-
-        Interactive tool that displays the frame to display with the selected data box.
-        Users will use the start_range button to add frame ranges to the range box list.
-
-        Returns
-        -------
-        '''
+        """
+        display the frame to display with the selected data box.
+        """
 
         tools = 'pan, box_zoom, wheel_zoom, reset'
 
@@ -156,13 +142,9 @@ class FlipRangeTool(FlipClassifierWidgets):
         display(self.clear_button, self.session_select_dropdown, output_box, self.button_box)
 
     def get_corrected_data(self):
-        '''
-        Apply the selected flip orientation ranges to the entire dataset to correct the
-         incorrectly oriented frames.
-
-        Returns
-        -------
-        '''
+        """
+        Apply the selected flip orientation ranges to the entire dataset to correct the incorrectly oriented frames.
+        """
 
         corrected_dataset = []
         # Get corrected frame ranges
@@ -202,21 +184,16 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.corrected_dataset = np.concatenate(corrected_dataset, axis=0)
 
     def plot_xy_examples(self, data_xflip, data_yflip, data_xyflip, selected_frame=0):
-        '''
-        Plots 2 columns of examples for the correct and incorrect examples being used to train
-         the flip classifier.
+        """
+        Plots 2 columns of examples for the correct and incorrect examples being used to train the flip classifier.
 
-         Inputted 3D array shapes are all as follows: (nframes x nrows x ncols)
+        Args:
+        data_xflip (np.ndarray): Single frame of the corrected dataset flipped on the x-axis (class 1)
+        data_yflip (np.ndarray): Single frame of the corrected dataset flipped on the x-axis (class 0)
+        data_xyflip (np.ndarray): Single frame of the corrected dataset flipped on the x and y-axis (class 1)
 
-        Parameters
-        ----------
-        data_xflip (3D np.ndarray): Single frame of the corrected dataset flipped on the x-axis (class 1)
-        data_yflip (3D np.ndarray): Single frame of the corrected dataset flipped on the x-axis (class 0)
-        data_xyflip (3D np.ndarray): Single frame of the corrected dataset flipped on the x and y-axis (class 1)
-
-        Returns
-        -------
-        '''
+        Returns:
+        """
 
         cols = ['0 - Correctly oriented (Facing Right)', '1- Incorrectly oriented (Facing Left)']
         rows = ['', 'x-flipped']
@@ -243,21 +220,16 @@ class FlipRangeTool(FlipClassifierWidgets):
         fig.tight_layout()
 
     def augment_dataset(self, plot_examples=False):
-        '''
-        Augments the selected correct dataset with 3 rotated versions of the truth values:
-         1. xflip -> incorrect case; 2. yflip -> correct case; 3. xyflip -> incorrect case;
-         and creates the X and Y train/test sets.
-          The first half of X contains the incorrect cases (1), and the second half contains the correct cases (0).
-          Equivalently, the first half of the y variable is composed of 1s, and the latter half is composed of 0s.
+        """
+        Augment the selected correct dataset with 3 rotated versions of the truth values.
 
-        Parameters
-        ----------
+        Args:
         plot_examples (bool): Indicates whether to display the 2x2 preview grid of dataset examples.
-        Returns
-        -------
-        '''
+        Returns:
+        """
 
         # Get flipped data
+        # 1. xflip -> incorrect case; 2. yflip -> correct case; 3. xyflip -> incorrect case;
         data_xflip = np.flip(self.corrected_dataset, axis=2)
         data_yflip = np.flip(self.corrected_dataset, axis=1)
         data_xyflip = np.flip(data_yflip, axis=2)
@@ -277,18 +249,14 @@ class FlipRangeTool(FlipClassifierWidgets):
         self.y = np.concatenate((np.ones((ntrials * 2,)), np.zeros((ntrials * 2,))))
 
     def prepare_datasets(self, test_size, random_state=0, plot_examples=False):
-        '''
-        Correct data after the appropriate flip ranges have been selected, augment and create X,y training sets,
-         and split the data to training and testing splits.
+        """
+        correct data with user input, augment and create X,y training sets, and split the data to training and testing splits.
 
-        Parameters
-        ----------
+        Args:
         test_size (int): Test dataset percent split size
         random_state (int): Seed value to randomly sort the split data
         plot_examples (bool): Indicates whether to display the 2x2 preview grid of dataset examples
-        Returns
-        -------
-        '''
+        """
 
         # Correct flips
         self.get_corrected_data()
@@ -313,28 +281,21 @@ class FlipRangeTool(FlipClassifierWidgets):
                                  random_state=0,
                                  verbose=0,
                                  train=True):
-        '''
+        """
+        Train the flip classifier the pre-augmented dataset given some optionally adjustable model initialization parameters.
 
-        Trains the flip classifier the pre-augmented dataset given some optionally adjustable
-         model initialization parameters.
-
-        Parameters
-        ----------
+        Args:
         n_estimators (int): The number of trees in the forest.
         criterion (str): The function to measure the quality of a split. ['gini', mse', 'mae']
-        n_jobs (int): The number of jobs to run in parallel for both `fit` and `predict`.
-        max_depth (int): The maximum depth of the tree. If None, then nodes are expanded until
-         all leaves are pure. (This will use a lot of memory, and may take a while.)
+        n_jobs (int): The number of jobs to run in parallel for both fit and predict.
+        max_depth (int): The maximum depth of the tree. If None, then nodes are expanded until all leaves are pure.
         min_samples_split (int): The minimum number of samples required to split an internal node.
         min_samples_leaf (int): The minimum number of samples required to be at a leaf node.
         oob_score (bool): whether to use out-of-bag samples to estimate the R^2 on unseen data.
         random_state (int): The seed used by the random number generator.
         verbose (int): Controls the verbosity when fitting and predicting.
         train (bool): If True, trains or retrains a model, if False only tests the model on the test set.
-
-        Returns
-        -------
-        '''
+        """
 
         if not exists(self.output_file):
             # Flip Classifier Model to train
@@ -391,20 +352,15 @@ class FlipRangeTool(FlipClassifierWidgets):
     def apply_flip_classifier(self, chunk_size=4000, chunk_overlap=0,
                               smoothing=51, frame_path='frames', fps=30,
                               write_movie=False, verbose=True):
-        '''
-        Applies a trained flip classifier on previously extracted data to flip the mice to the correct
-         orientation.
+        """
+        Apply a trained flip classifier on previously extracted data to flip the mice to the correct orientation.
 
-        Parameters
-        ----------
+        Args:
         chunk_size (int): size of frame chunks to process in batches.
         chunk_overlap (int): number of frames to overlap between chunks to improve classification precision between chunks.
         smoothing (int): kernel size of the applied median filter on the flip classifier results
         verbose (bool): displays the tqdm progress bars for each session.
-
-        Returns
-        -------
-        '''
+        """
 
         if self.clf is None:
             try:

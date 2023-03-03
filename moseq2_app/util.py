@@ -1,8 +1,6 @@
-'''
-
+"""
 General utility functions.
-
-'''
+"""
 import pandas as pd
 import ruamel.yaml as yaml
 from copy import deepcopy
@@ -21,6 +19,14 @@ from moseq2_viz.model.util import compute_behavioral_statistics
 
 
 def read_and_clean_config(config_file):
+    """read config files and reset incorrect parameters
+
+    Args:
+        config_file (dict): path to the config file
+
+    Returns:
+        config_data (dict): dictionary of config data.
+    """
     config_data = read_yaml(config_file)
     config_data = check_filter_sizes(config_data)
     config_data['threads'] = max(1, config_data.get('threads', 8))
@@ -37,26 +43,30 @@ def read_and_clean_config(config_file):
 
 
 def write_yaml(data, file):
+    """write dictionary to yaml
+
+    Args:
+        data (dict): dictionary of data to be written to yaml
+        file (str): string of yaml file name.
+    """
     with open(file, 'w') as yaml_f:
         yaml.safe_dump(data, yaml_f)
 
 
 def merge_labels_with_scalars(sorted_index, model_path):
-    '''
-    Computes all the syllable statistics to plot, including syllable scalars.
+    """
+    Compute all the syllable statistics to plot, including syllable scalars.
 
-    Parameters
-    ----------
+    Args:
     sorted_index (dict): Sorted dict of modeled sessions
     model_fit (dict): Trained AR-HMM results dict
     model_path (str): Respective path to the AR-HMM model in use.
     max_sylls (int): Maximum number of syllables to include
 
-    Returns
-    -------
+    Returns:
     df (pd.DataFrame): Dataframe containing all of the mean syllable statistics
     scalar_df (pd.DataFrame): Dataframe containing the frame-by-frame scalar and label data
-    '''
+    """
 
     # Load scalar Dataframe to compute syllable speeds
     scalar_df = scalars_to_dataframe(sorted_index, model_path=model_path)
@@ -67,18 +77,16 @@ def merge_labels_with_scalars(sorted_index, model_path):
     return df, scalar_df
 
 def index_to_dataframe(index_path):
-    '''
-    Reads the index file into a dictionary and converts it into an editable DataFrame.
+    """
+    Read the index file into a dictionary and converts it into an editable DataFrame.
 
-    Parameters
-    ----------
+    Args:
     index_path (str): Path to index file
 
-    Returns
-    -------
+    Returns:
     index_data (dict): Dict object containing all parsed index file contents
     df (pd.DataFrame): Formatted dict in DataFrame form including each session's metadata
-    '''
+    """
 
     index_data = read_yaml(index_path)
 
@@ -98,9 +106,9 @@ def index_to_dataframe(index_path):
     return index_data, df
 
 class bcolors:
-    '''
-    Class containing color UNICODE values used to color printed output.
-    '''
+    """
+    color UNICODE values used to color printed output.
+    """
 
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -116,8 +124,7 @@ def uuid_lookup(target_uuid, uuid_dict_source):
     """
     Look up session infomtion with full/partial uuid. Helper function for users to look up uuid after running interactive_scalar_summary
 
-    Parameters
-    ----------
+    Args:
     target_uuid (str): full or partial uuid the user wants to look up.
     uuid_dict (dict): dictionary from interactive_scalar_summary widget that has all the session information 
     """
@@ -135,12 +142,10 @@ def uuid_lookup(target_uuid, uuid_dict_source):
 def setup_model_folders(progress_paths):
     """Create model-specific folders
 
-    Parameters
-    ----------
+    Args:
     progress_paths (dict): dictionary of notebook progress paths.
 
-    Returns
-    -------
+    Returns:
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     """
     # find all the models in the model master path
@@ -168,18 +173,15 @@ def setup_model_folders(progress_paths):
     return dict(model_dict)  # remove defaultdict class
 
 def update_model_paths(desired_model, model_dict, progress_filepath):
-    """helper function to update relevant model paths in progress.yaml when specific model is chosen
+    """Update relevant model paths in progress.yaml when specific model is chosen
 
-    Parameters
-    ----------
+    Args:
     desired_model (str): file name of the desired specific model
     model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
     progress_filepath (str): path to progress.yaml
 
-    Returns
-    -------
-    [type]
-        [description]
+    Returns:
+    progress_paths (dict): dictionary of paths in the analysis
     """
 
     assert desired_model in model_dict, '{} not found in model_dict. Make sure desired_model is one of the keys in model_dict. \nPossible keys: \n{}'.format(desired_model, "\n".join(map(str, model_dict)))
@@ -197,6 +199,11 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
 
 @contextmanager
 def update_config(path: str) -> dict:
+    """update config.yaml with new paramters used.
+
+    Args:
+        path (str): path to config file.
+    """
     config = read_yaml(path)
     try:
         yield config

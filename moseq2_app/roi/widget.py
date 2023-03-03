@@ -1,7 +1,6 @@
-'''
-Constructs a jupyter notebook viewable widget users can use to identify the arena floor
-and to validate extractions performed on a small chunk of data. 
-'''
+"""
+Widget to identify the arena floor and to validate extractions performed on a small chunk of data. 
+"""
 
 import param
 import numpy as np
@@ -34,7 +33,16 @@ _hover_dict = {
 
 
 class ArenaMaskWidget:
+    
     def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False) -> None:
+        """initialize arena mask widget
+
+        Args:
+            data_dir (str): project base directory.
+            config_file (str): path to config.yaml
+            session_config_path (str): path to session_config.yaml.
+            skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
+        """
         self.backgrounds = {}
         self.extracts = {}
         self.data_dir = data_dir
@@ -85,6 +93,9 @@ class ArenaMaskWidget:
 
 
     def set_session_config_vars(self):
+        """
+        get session default config variable.
+        """
         folder = self.session_data.path
         session = self.session_config[folder]
 
@@ -135,11 +146,20 @@ class ArenaMaskWidget:
 
 
     def save_session_parameters(self):
+        """save session paramter to session config file.
+        """
         self.set_session_config_vars()
 
         write_yaml(self.session_config, self.session_config_path)
 
     def compute_arena_mask(self):
+        """compute the arena mask using the paramters in the session config file.
+
+        Returns:
+            background (numpy.ndarray): background of the session
+            rois(numpy.ndarray): roi for arena
+    
+        """
         self.set_session_config_vars()
 
         folder = self.session_data.path
@@ -160,6 +180,12 @@ class ArenaMaskWidget:
         return background, rois
 
     def compute_extraction(self):
+        """compute extraction of the given frames
+
+        Returns:
+            (numpy.ndarray): extracted frames
+            frames (numpy.ndarray): raw frames after background subtraction and roi application
+        """
         self.set_session_config_vars()
 
         folder = self.session_data.path
@@ -195,7 +221,7 @@ class ArenaMaskWidget:
         return extraction['depth_frames'], frames
 
     def get_background(self, folder=None):
-        '''Assuming this will be called by an event-triggered function'''
+        """Assuming this will be called by an event-triggered function"""
         if folder is None:
             folder = self.session_data.path
         if folder not in self.backgrounds:
@@ -211,7 +237,6 @@ class ArenaMaskWidget:
 
 # define data class first
 class ArenaMaskData(param.Parameterized):
-    '''The link between the widget view and the underlying data'''
     ### data ###
     path = param.ObjectSelector()  # stores the currently selected path and all others
     # defines the range of depth values needed to compute mask for floor
@@ -281,10 +306,14 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('save_session_btn', 'save_session_and_move_btn', watch=True)
     def save_session(self):
+        """save session parameters
+        """
         self.controller.save_session_parameters()
 
     @param.depends('save_session_and_move_btn', watch=True)
     def next_session(self):
+        """go to next session
+        """
         cur_path = self.path
         paths = self.param.path.objects
         try:
@@ -295,6 +324,8 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('compute_arena_mask', 'next_session', watch=True)
     def get_arena_mask(self):
+        """render the arena mask
+        """
         self.computing_arena = True
         background, mask = self.controller.compute_arena_mask()
         self.images['Arena mask'] = mask
@@ -305,6 +336,8 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('compute_extraction', 'next_session', watch=True)
     def get_extraction(self):
+        """get the extraction results
+        """
         self.computing_extraction = True
         mouse, frame = self.controller.compute_extraction()
         self.images['Extracted mouse'] = mouse
@@ -314,10 +347,17 @@ class ArenaMaskData(param.Parameterized):
 
     @param.depends('get_extraction', watch=True)
     def change_frame_slider(self):
+        """change the randge for the number of frames slider
+        """
         self.param.frame_num.bounds = (0, min(self.frames_to_extract - 1, len(self.images['Extracted mouse']) - 1))
 
     @param.depends('get_arena_mask', 'get_extraction', 'frame_num', 'mask_index')
     def display(self):
+        """show interactive arena mask widget
+
+        Returns:
+            panels (panel object): interactive widget for arena mask
+        """
         panels = []
         for k, v in self.images.items():
             if not isinstance(v, (np.ndarray, list)):
@@ -348,6 +388,8 @@ class ArenaMaskData(param.Parameterized):
 class ArenaMaskView(Viewer):
 
     def __init__(self, session_data: ArenaMaskData, **params):
+        """view the arena mask tool
+        """
         super().__init__(**params)
 
         def _link_data(widget, param, **kwargs):

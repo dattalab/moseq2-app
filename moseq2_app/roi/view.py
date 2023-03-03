@@ -1,6 +1,6 @@
-'''
+"""
 Interactive ROI/Extraction Bokeh visualization functions.
-'''
+"""
 import os
 import io
 import base64
@@ -16,21 +16,16 @@ from moseq2_extract.io.video import get_video_info
 
 
 def show_extraction(input_file, video_file):
-    '''
+    """
+    display manually triggered extraction.s
 
-    Visualization helper function to display manually triggered extraction.
-    Function will facilitate visualization through creating a HTML div to display
-    in a jupyter notebook or web page.
-
-    Parameters
-    ----------
+    Args:
     input_file (str): session name to display.
     video_file (str): path to video to display
 
-    Returns
-    -------
+    Returns:
     output (ipywidgets.Output widget): HTML canvas where the video is being displayed.
-    '''
+    """
 
     # Copy generated movie to temporary directory
     vid_dir = dirname(video_file)
@@ -51,7 +46,7 @@ def show_extraction(input_file, video_file):
     encoded = base64.b64encode(vid)
     tmp_path = encoded.decode('ascii')
 
-    video_div = f'''
+    video_div = f"""
                     <h2>{input_file}</h2>
                     <video
                         src="data:video/mp4;base64, {tmp_path}"; alt="data:video/mp4;base64, {tmp_path}"; 
@@ -59,7 +54,7 @@ def show_extraction(input_file, video_file):
                         style="float: center; type: "video/mp4"; margin: 0px 10px 10px 0px;
                         border="2"; autoplay controls loop>
                     </video>
-                '''
+                """
 
     div = Div(text=video_div, style={'width': '100%', 'align-items': 'center', 'display': 'contents'})
 
@@ -73,19 +68,13 @@ def show_extraction(input_file, video_file):
     return output
 
 def bokeh_plot_helper(bk_fig, image):
-    '''
+    """
+    create the Bokeh image gylphs in the created canvases/figures.
 
-    Helper function that creates the Bokeh image gylphs in the
-    created canvases/figures.
-
-    Parameters
-    ----------
+    Args:
     bk_fig (Bokeh figure): figure canvas to draw image/glyph on
     image (2D np.array): image to draw.
-
-    Returns
-    -------
-    '''
+    """
 
     bk_fig.x_range.range_padding = bk_fig.y_range.range_padding = 0
     if isinstance(image, dict):

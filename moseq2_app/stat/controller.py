@@ -1,10 +1,6 @@
-'''
-
+"""
 Main interactive model syllable statistics results application functionality.
-This module facilitates the interactive functionality for the statistics plotting, and
- transition graph features.
-
-'''
+"""
 
 import os
 import io
@@ -28,25 +24,18 @@ from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_tran
                                          convert_ebunch_to_graph, make_transition_graphs, get_pos)
 
 class InteractiveSyllableStats(SyllableStatWidgets):
-    '''
-
-    Interactive Syllable Statistics grapher class that holds the context for the current
-     inputted session.
-
-    '''
 
     def __init__(self, index_path, model_path, df_path, info_path, max_sylls, load_parquet):
-        '''
+        """
         Initialize the main data inputted into the current context
 
-        Parameters
-        ----------
+        Args:
         index_path (str): Path to index file.
         model_path (str): Path to trained model file.
         info_path (str): Path to syllable information file.
         max_sylls (int): Maximum number of syllables to plot.
         load_parquet (bool): Indicates to load previously loaded data
-        '''
+        """
 
         super().__init__()
 
@@ -120,13 +109,9 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
 
     def interactive_stat_helper(self):
-        '''
+        """
         Computes and saves the all the relevant syllable information to be displayed.
-         Loads the syllable information dict and merges it with the syllable statistics DataFrame.
-
-        Returns
-        -------
-        '''
+        """
         # Read syllable information dict
         syll_info = read_yaml(self.info_path)
 
@@ -180,21 +165,18 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df.fillna(0, inplace=True)
 
     def run_selected_hypothesis_test(self, hyp_test_name, stat, ctrl_group, exp_group):
-        '''
-        Helper function that computes the significant syllables for a given pair of groups given
-         a name for the type of hypothesis test to run, and the statistic to run the test on.
+        """
+        compute the significant syllables for a given pair of groups given the hypothesis test on the data.
 
-        Parameters
-        ----------
+        Args:
         hyp_test_name (str): Name of hypothesis test to run. options=['KW & Dunn\s', 'Z-Test', 'T-Test', 'Mann-Whitney']
         stat (str): Syllable statistic to compute hypothesis test on. options=['usage', 'distance to center', 'similarity', 'difference']
         ctrl_group (str): Name of control group to compute group difference sorting with.
         exp_group (str): Name of comparative group to compute group difference sorting with.
 
-        Returns
-        -------
+        Returns:
         sig_sylls (list): list of significant syllables to mark on plotted statistics figure
-        '''
+        """
 
         if self.dropdown_mapping[hyp_test_name] == 'kw':
             # run KW and Dunn's Test
@@ -228,15 +210,12 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
 
     def interactive_syll_stats_grapher(self, stat, sort, groupby, errorbar, sessions, ctrl_group, exp_group, hyp_test='KW & Dunn\'s', thresh='usage'):
-        '''
-        Helper function that is responsible for handling ipywidgets interactions and updating the currently
-         displayed Bokeh plot.
+        """
+        handle ipywidgets interactions and update the currently displayed Bokeh plot.
 
-        Parameters
-        ----------
+        Args:
         stat (str or ipywidgets.DropDown): Statistic to plot: ['usage', 'distance to center']
         sort (str or ipywidgets.DropDown): Statistic to sort syllables by (in descending order).
-            ['usage', 'distance to center', 'similarity', 'difference'].
         groupby (str or ipywidgets.DropDown): Data to plot; either group averages, or individual session data.
         errorbar (str or ipywidgets.DropDown): Error bar to display. ['None', 'CI 95%' ,'SEM', 'STD']
         sessions (list or ipywidgets.MultiSelect): List of selected sessions to display data from.
@@ -244,9 +223,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         exp_group (str or ipywidgets.DropDown): Name of comparative group to compute group difference sorting with.
         hyp_test (str or ipywidgets.DropDown): Name of hypothesis testing method to use to compute significant syllables.
         thresh (str or ipywidgets.DropDown): Name of statistic to threshold the graph by using the Bokeh Slider
-        Returns
-        -------
-        '''
+        """
 
         # initialize sig_sylls list variable to prevent UnboundLocalError
         sig_sylls = []
@@ -298,24 +275,16 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
-    '''
-
-    Interactive transition graph class used to facilitate interactive graph generation
-    and thresholding functionality.
-
-    '''
-
     def __init__(self, model_path, index_path, info_path, df_path, max_sylls, plot_vertically, load_parquet):
-        '''
-        Initializes context variables
+        """
+        Initialize variables for interactive transition graph.
 
-        Parameters
-        ----------
+        Args:
         model_path (str): Path to trained model file
         index_path (str): Path to index file containing trained session metadata.
         info_path (str): Path to labeled syllable info file
         max_sylls (int): Maximum number of syllables to plot.
-        '''
+        """
 
         super().__init__()
 
@@ -364,17 +333,13 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         }
 
     def compute_entropies(self, labels, label_group):
-        '''
+        """
         Compute individual syllable entropy and transition entropy rates for all sessions with in a label_group.
 
-        Parameters
-        ----------
+        Args:
         labels (2d list): list of session syllable labels over time.
         label_group (list): list of groups computing entropies for.
-
-        Returns
-        -------
-        '''
+        """
 
         self.incoming_transition_entropy, self.outgoing_transition_entropy = [], []
 
@@ -394,13 +359,9 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                                                     relabel_by='usage'), axis=0))
 
     def compute_entropy_differences(self):
-        '''
-        Computes cross group entropy/entropy-rate differences
-         and casts them to OrderedDict objects
-
-        Returns
-        -------
-        '''
+        """
+        Compute cross group entropy/entropy-rate differences and cast them to OrderedDict objects
+        """
 
         # Compute entropy + entropy rate differences
         for i in range(len(self.group)):
@@ -409,15 +370,9 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                 self.outgoing_transition_entropy.append(self.outgoing_transition_entropy[j] - self.outgoing_transition_entropy[i])
 
     def initialize_transition_data(self):
-        '''
-        Performs all necessary pre-processing to compute the transition graph data and
-         syllable metadata to display via HoverTool.
-        Stores the syll_info dict, groups to explore, maximum number of syllables, and
-         the respective transition graphs and syllable scalars associated.
-
-        Returns
-        -------
-        '''
+        """
+        Perform all necessary pre-processing to compute the transition graph data and syllable metadata to display via HoverTool.
+        """
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
 
@@ -463,22 +418,16 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             self.compute_entropy_differences()
 
     def interactive_transition_graph_helper(self, layout, edge_threshold, usage_threshold):
-        '''
+        """
+        generate all the transition graphs given the currently selected thresholding values, then display them in a Jupyter notebook or web page.
 
-        Helper function that generates all the transition graphs given the currently selected
-        thresholding values, then displays them in a Jupyter notebook or web page.
-
-        Parameters
-        ----------
+        Args:
         layout (string)
         scalar_color (string)
         edge_threshold (tuple or ipywidgets.FloatRangeSlider): Transition probability range to include in graphs.
         usage_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable usage range to include in graphs.
         speed_threshold (tuple or ipywidgets.FloatRangeSlider): Syllable speed range to include in graphs.
-
-        Returns
-        -------
-        '''
+        """
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
 
