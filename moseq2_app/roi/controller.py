@@ -1,9 +1,6 @@
-'''
-
-Interactive ROI detection and extraction preview functionalities. This module utilizes the widgets from
-the widgets.py file to facilitate the real-time interaction.
-
-'''
+"""
+Interactive ROI detection and extraction preview functionalities.
+"""
 
 import io
 import base64
@@ -18,13 +15,13 @@ from moseq2_extract.io.video import get_video_info
 class InteractiveExtractionViewer:
 
     def __init__(self, data_path, flipped=False):
-        '''
+        """
+        initialize the extraction viewer widget.
 
-        Parameters
-        ----------
+        Args:
         data_path (str): Path to base directory containing all sessions to test
         flipped (bool): indicates whether to show corrected flip videos
-        '''
+        """
 
         self.sess_select = widgets.Dropdown(options=get_session_paths(data_path, extracted=True, flipped=flipped),
                                             description='Session:', disabled=False, continuous_update=True)
@@ -35,30 +32,22 @@ class InteractiveExtractionViewer:
         self.clear_button.on_click(self.clear_on_click)
 
     def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
+        """
+        Clear the cell output
 
-        Parameters
-        ----------
+        Args:
         b (button click)
-
-        Returns
-        -------
-        '''
+        """
 
         clear_output()
 
     def get_extraction(self, input_file):
-        '''
+        """
         Returns a div containing a video object to display.
 
-        Parameters
-        ----------
+        Args:
         input_file (str): Path to session extraction video to view.
-
-        Returns
-        -------
-        '''
+        """
 
         video_dims = get_video_info(input_file)['dims']
         # input_file goes through encode and decode so it won't carry semantic meanings anymore
@@ -70,7 +59,7 @@ class InteractiveExtractionViewer:
         encoded = base64.b64encode(vid)
         input_file = encoded.decode('ascii')
 
-        video_div = f'''
+        video_div = f"""
                         <h2>{file_name}</h2>
                         <video
                             src="data:video/mp4;base64, {input_file}"; alt="data:video/mp4;base64, {input_file}"; id="preview";
@@ -81,7 +70,7 @@ class InteractiveExtractionViewer:
                         <script>
                             document.querySelector('video').playbackRate = 0.1;
                         </script>
-                     '''
+                     """
 
         div = Div(text=video_div, style={
                   'width': '100%', 'align-items': 'center', 'display': 'contents'})

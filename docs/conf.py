@@ -22,29 +22,13 @@ author = 'Datta Lab'
 
 
 # -- General configuration ---------------------------------------------------
-
-on_rtd = input('Generating a pdf? (y/[n])')
-if on_rtd == 'y':
-    on_rtd = False
-else:
-    on_rtd = True
-
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-if on_rtd:
-    extensions = [
-        'sphinx.ext.napoleon',
-        'sphinx.ext.autodoc',
-        'sphinx.ext.autosummary',
-        'sphinx_click.ext'
-    ]
-else:
-    extensions = [
+extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
-    'rst2pdf.pdfbuilder',
     'sphinx_click.ext'
 ]
 
@@ -79,4 +63,33 @@ html_theme = 'sphinx_rtd_theme'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
+
+latex_elements = {
+    # The paper size ('letterpaper' or 'a4paper').
+    #
+    # 'papersize': 'letterpaper',
+    # 'fontpkg': '\\usepackage{euler}'
+
+    # The font size ('10pt', '11pt' or '12pt').
+    
+    # 'pointsize': '12pt',
+
+    # fontpkg': r'''
+    # \setmainfont{Arial Regular}
+    # \setsansfont{Arial Regular}
+    # \setmonofont{Menlo Regular}
+    # ''',
+
+    # Additional stuff for the LaTeX preamble.
+    #
+    # 'preamble': '',
+
+    # Latex figure (float) alignment
+    #
+    # 'figure_align': 'htbp',
+}
+
+latex_documents = [
+    ('index', u'moseq2-app.tex', u'moseq2-app Documentation', u'Datta Lab', 'manual'),
+]

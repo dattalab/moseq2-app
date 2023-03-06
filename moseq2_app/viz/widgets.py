@@ -1,9 +1,6 @@
-'''
-
-Widgets module containing classes with components for each of the interactive syllable
- visualization tools: Syllable Labeler, and Crowd Movie Comparison.
-
-'''
+"""
+Widgets module containing classes with components for each of the interactive syllable visualization tools
+"""
 
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
@@ -14,7 +11,9 @@ from moseq2_app.viz.view import display_crowd_movies
 class SyllableLabelerWidgets:
 
     def __init__(self):
-
+        """
+        launch the widget for labelling syllables with name and descriptions using the crowd movies.
+        """
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
 
         self.syll_select = widgets.Dropdown(options={}, description='Syllable #:', disabled=False)
@@ -80,31 +79,23 @@ class SyllableLabelerWidgets:
         self.button_box = HBox([self.prev_button, self.set_button, self.next_button], layout=self.ui_layout)
 
     def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
+        """
+        Clear the cell output
 
-        Parameters
-        ----------
+        Args:
         b (button click)
-
-        Returns
-        -------
-        '''
+        """
 
         clear_output()
         del self
 
     def on_next(self, event=None):
-        '''
-        Callback function to trigger an view update when the user clicks the "Next" button.
+        """
+        trigger an view update when the user clicks the "Next" button.
 
-        Parameters
-        ----------
+        Args:
         event (ipywidgets.ButtonClick): User clicks next button.
-
-        Returns
-        -------
-        '''
+        """
 
         # Updating dict
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
@@ -124,16 +115,12 @@ class SyllableLabelerWidgets:
         self.write_syll_info(curr_syll=self.syll_select.index)
 
     def on_prev(self, event=None):
-        '''
-        Callback function to trigger an view update when the user clicks the "Previous" button.
+        """
+        trigger an view update when the user clicks the "Previous" button.
 
-        Parameters
-        ----------
+        Args:
         event (ipywidgets.ButtonClick): User clicks 'previous' button.
-
-        Returns
-        -------
-        '''
+        """
 
         # Update syllable information dict
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
@@ -153,16 +140,12 @@ class SyllableLabelerWidgets:
         self.write_syll_info(curr_syll=self.syll_select.index)
 
     def on_set(self, event=None):
-        '''
-        Callback function to save the dict to syllable information file.
+        """
+        save the dict to syllable information file.
 
-        Parameters
-        ----------
+        Args:
         event (ipywidgets.ButtonClick): User clicks the 'Save' button.
-
-        Returns
-        -------
-        '''
+        """
 
         # Update dict
         self.syll_info[self.syll_select.index]['label'] = self.lbl_name_input.value
@@ -176,6 +159,9 @@ class SyllableLabelerWidgets:
 class CrowdMovieCompareWidgets:
 
     def __init__(self):
+        """
+        initialize crowd movie compare widget
+        """
         style = {'description_width': 'initial'}
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
@@ -211,32 +197,22 @@ class CrowdMovieCompareWidgets:
                                                      justify_content='space-around'))
 
     def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
+        """
+        Clear the cell output
 
-        Parameters
-        ----------
-        b
-
-        Returns
-        -------
-        '''
+        Args:
+        b (buttion click)
+        """
 
         clear_output()
 
     def select_session(self, event=None):
-        '''
-        Callback function to save the list of selected sessions to config_data,
-         and get session syllable info to pass to crowd_movie_wrapper and create the
-         accompanying syllable scalar metadata table.
+        """
+        get the session scalar information.
 
-        Parameters
-        ----------
+        Args:
         event (event): User clicks on multiple sessions in the SelectMultiple widget
-
-        Returns
-        -------
-        '''
+        """
 
         # Set currently selected sessions
         self.config_data['session_names'] = list(self.cm_session_sel.value)
@@ -245,18 +221,12 @@ class CrowdMovieCompareWidgets:
         self.get_selected_session_syllable_info(self.config_data['session_names'])
 
     def show_session_select(self, change):
-        '''
-        Callback function to change current view to show session selector when user switches
-        DropDownMenu selection to 'SessionName', and hides it if the user
-        selects 'groups'.
+        """
+        change current view to show session selector.
 
-        Parameters
-        ----------
+        Args:
         change (event): User switches their DropDownMenu selection
-
-        Returns
-        -------
-        '''
+        """
 
         # Handle display syllable selection and update config_data crowd movie generation
         # source selector.
@@ -280,16 +250,12 @@ class CrowdMovieCompareWidgets:
             self.config_data['separate_by'] = 'groups'
 
     def on_click_trigger_button(self, b=None):
-        '''
-        Generates crowd movies and displays them when the user clicks the trigger button
+        """
+        Generate crowd movies and displays them when the user clicks the trigger button
 
-        Parameters
-        ----------
+        Args:
         b (ipywidgets.Button click event): User clicks "Generate Movies" button
-
-        Returns
-        -------
-        '''
+        """
 
         syll_number = int(self.cm_syll_select.value.split(' - ')[0])
 

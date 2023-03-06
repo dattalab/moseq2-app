@@ -1,9 +1,7 @@
-'''
+"""
+Widgets module containing classes with components for each of the interactive syllable statistics tools.
 
-Widgets module containing classes with components for each of the interactive syllable
- statistics tools: Syllable Stats plot, and Transition Graph plot.
-
-'''
+"""
 
 import numpy as np
 import ipywidgets as widgets
@@ -14,6 +12,9 @@ from moseq2_viz.model.util import normalize_usages
 class SyllableStatWidgets:
 
     def __init__(self):
+        """
+        initialize interactive syllable satistics widget.
+        """
         style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
@@ -53,32 +54,23 @@ class SyllableStatWidgets:
         self.stat_widget_box = VBox([HBox([VBox([self.stat_box, self.error_box]), self.sorting_box, self.session_box])])
     
     def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
+        """
+        Clear the cell output
 
-        Parameters
-        ----------
+        Args:
         b (button click)
-
-        Returns
-        -------
-        '''
+        """
 
         clear_output()
         del self
 
     def on_grouping_update(self, event):
-        '''
-        Updates the MultipleSelect widget upon selecting groupby == SubjectName or SessionName.
-        Hides it if groupby == group.
+        """
+        Update the MultipleSelect widget upon selecting groupby == SubjectName or SessionName. Hides it if groupby == group.
 
-        Parameters
-        ----------
+        Args:
         event (user clicks new grouping)
-
-        Returns
-        -------
-        '''
+        """
 
         if event.new == 'SessionName':
             self.session_sel.layout.display = "flex"
@@ -93,38 +85,20 @@ class SyllableStatWidgets:
 
         self.session_sel.value = [self.session_sel.options[0]]
 class SyllableStatBokehCallbacks:
-    def __init__(self, condition=''):
-        '''
-        Initializes JS string elements containing different code chunks. The code chunk list is as follows:
-         1. js_variables: The first step of the Bokeh-CustomJS callback function initializing all of the
-          Bokeh ColumnDataSource variables that will be dynamically updated during user interaction.
-         2. js_for_loop: The second step of the callback which is used to iterate through all of the
-          indices on the x-axis of the syllable statistics plot. The contents of the for-loop will decide what gets
-          plotted on the Bokeh.figure using a js_condition.
-         3. js_condition: An if-statement that resides directly after opening a for-loop; it is used to filter out
-          syllables that do not pass the given condition. E.g. Syllable "label" not in Syllable SearchBox.
-         4. js_condition_pass: The code block that runs upon passing the js_condition. Upon passing,
-          the syllable variables will be append to all of the list variables in js_variables.
-         5. js_condition_fail: The code block that runs if the js_condition fails. It is mainly used to hide the
-          line from the stat plot if the points are disjointed.
-          Note: the js_for_loop is also closed in this code block. Therefore, no other operations are being run.
-         6. js_update: The final step in the CustomJS Callback; there is an inputted variable "source" that has an
-          attribute named "data" (source.data), which contains attribute references
-          to all of the variables in js_variables. If source.data.xyz is updated in this section with a corresponding
-          variable "xyz", and the change is "emitted" using "source.change.emit();", only then will the Bokeh figure be
-          updated. The "source" variable is what controls the dynamic setting of variables in Bokeh.
-         7. code: The concatenation of all the previous variables to create a
-          complete asynchronous JS callback function. This is the code that is passed to the CustomJS object.
 
-        Parameters
-        ----------
+    def __init__(self, condition=''):
+        """
+        Initialize JS string elements containing different code chunks. 
+        
+        Args:
         condition (str): string code block that contains a condition to dynamically filter/edit a Bokeh figure using
          bokeh widgets.
-        '''
+        """
 
+        # filter out syllables that do not pass the given condition
         self.js_condition = condition
-
-        self.js_variables = '''
+        # initializing all of the Bokeh ColumnDataSource variables that will be dynamically updated during user interaction.
+        self.js_variables = """
                         // All of these arrays will always end up to be the same length
                     
                         // initialize all the variables that appear in the HoverTool
@@ -141,12 +115,14 @@ class SyllableStatBokehCallbacks:
                         var err_speed_2d = [], err_speed_3d = [], err_sem = [];
                         var err_height = [], err_dist = [], err_label = [];
                         var err_desc = [], err_movies = [];\n
-                       '''
+                       """
 
         # iterating through the total number of syllables in the set.
-        self.js_for_loop = '''for (var i = 0; i < data['x'].length; i++) {\n'''
-
-        self.js_condition_pass = '''
+        # iterate through all of the indices on the x-axis of the syllable statistics plot
+        self.js_for_loop = """for (var i = 0; i < data['x'].length; i++) {\n"""
+        
+        # runs upon passing the js_condition. Upon passing,
+        self.js_condition_pass = """
                             // append accepted syllables to all the js_variables
                             index.push(i);
                             x.push(data['x'][i]);
@@ -177,18 +153,23 @@ class SyllableStatBokehCallbacks:
                             err_label.push(err_data['label'][i]);
                             err_desc.push(err_data['desc'][i]);
                             err_movies.push(err_data['movies'][i]);\n
-                            '''
+                            """
 
-        self.js_condition_fail = '''
+        self.js_condition_fail = """
                                 } else {
                                     // hide the joining line-plot in the syllable statistics if the included
                                     // syllable set is not contiguous.
                                     line.visible = false;
                                 }\n
                             }
-                            '''
-
-        self.js_update = '''
+                            """
+        
+        # The final step in the CustomJS Callback; there is an inputted variable "source" that has an
+        #   attribute named "data" (source.data), which contains attribute references
+        #   to all of the variables in js_variables. If source.data.xyz is updated in this section with a corresponding
+        #   variable "xyz", and the change is "emitted" using "source.change.emit();", only then will the Bokeh figure be
+        #   updated. The "source" variable is what controls the dynamic setting of variables in Bokeh.
+        self.js_update = """
                     // reload the line if all the data points are present
                     if (x.length == data['x'].length) {
                         line.visible = true;
@@ -231,13 +212,16 @@ class SyllableStatBokehCallbacks:
                     
                     // update the plotted error bars
                     err_source.change.emit();\n
-                    '''
+                    """
 
         self.code = self.js_variables + self.js_for_loop + self.js_condition + \
                self.js_condition_pass + self.js_condition_fail + self.js_update
 
 class TransitionGraphWidgets:
+
     def __init__(self):
+        """initialize the transition graph widget.
+        """
         style = {'description_width': 'initial', 'display': 'flex-grow', 'align_items': 'stretch'}
 
         self.clear_button = widgets.Button(description='Clear Output', disabled=False, tooltip='Close Cell Output')
@@ -272,27 +256,21 @@ class TransitionGraphWidgets:
                                            layout=ui_layout)
 
     def clear_on_click(self, b=None):
-        '''
-        Clears the cell output
+        """
+        Clear the cell output
 
-        Parameters
-        ----------
+        Args:
         b (button click)
 
-        Returns
-        -------
-        '''
+        Returns:
+        """
 
         clear_output()
 
     def set_range_widget_values(self):
-        '''
-        After the dataset is initialized, the threshold range sliders' values will be set
-         according to the standard deviations of the dataset.
-
-        Returns
-        -------
-        '''
+        """
+        set the threshold range sliders' values according to the standard deviations of the dataset.
+        """
         from math import ceil
         # Update threshold range values
         self.edge_thresholder.max = np.max(self.trans_mats)
