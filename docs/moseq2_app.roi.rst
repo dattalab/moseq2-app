@@ -28,15 +28,6 @@ ROI - View Module
    :undoc-members:
    :show-inheritance:
 
-ROI - Widgets Module
-------------------------------
-
-.. automodule:: moseq2_app.roi.widgets
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
 Module contents
 ---------------
 
