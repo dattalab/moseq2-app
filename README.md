@@ -33,7 +33,6 @@ We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to
 You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) on our test data or your data on Google Drive.
 
 # Getting Started
-If you are new to MoSeq and interested to know if it suits your needs, you can try our [Google Colab Notebook](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing).
 
 If you like MoSeq and you are interested in installing it in your environment, you can install the MoSeq2 pakage suite with either Conda or Docker. 
 
@@ -68,3 +67,7 @@ by March 2nd to register for the workshop and receive the Zoom link and password
 - [Q&A: Understanding the composition of behavior](http://datta.hms.harvard.edu/wp-content/uploads/2019/06/Datta-QA.pdf)
 - [Computational Neuroethology: A Call to Action]("http://datta.hms.harvard.edu/wp-content/uploads/2020/01/AC2A.pdf")
 - [Revealing the structure of pharmacobehavioral space through motion sequencing](https://www.nature.com/articles/s41593-020-00706-3)
+
+# License
+
+MoSeq is freely available for academic use under a license provided by Harvard University. Please refer to the license file for details. If you are interested in using MoSeq for commercial purposes please contact Bob Datta directly at srdatta@hms.harvard.edu, who will put you in touch with the appropriate people in the Harvard Technology Transfer office.

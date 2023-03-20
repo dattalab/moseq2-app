@@ -21,9 +21,9 @@ Subpackages
 -----------
 
 .. toctree::
-
    moseq2_app.flip
-   moseq2_app.roi
    moseq2_app.gui
+   moseq2_app.roi
+   moseq2_app.scalars
    moseq2_app.stat
    moseq2_app.viz

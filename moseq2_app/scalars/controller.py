@@ -1,9 +1,6 @@
-'''
-
-Interactive Scalar Summary Viewing tool. This module contains the functionality to facilitate selecting
- scalar columns to plot the mean and standard deviations for all detected groups.
-
-'''
+"""
+Interactive Scalar Summary Viewing tool. 
+"""
 import plotly.express as px
 import plotly.graph_objects as go
 from moseq2_viz.util import parse_index
@@ -14,14 +11,12 @@ from moseq2_app.scalars.widgets import InteractiveScalarWidgets
 class InteractiveScalarViewer(InteractiveScalarWidgets):
 
     def __init__(self, index_filepath):
-        '''
-        Initialization function that will compute the scalar dataframe, the mean and standard deviation
-         in preparation to plot the default interactive plotly scalar summary.
+        """
+        Initialize function that will compute the scalar dataframe, the mean and standard deviation for interactive scalar summary.
 
-        Parameters
-        ----------
+        Args:
         index_filepath (str): Path to index file
-        '''
+        """
 
         super().__init__()
 
@@ -45,16 +40,9 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         self.checked_list.value = ['area_mm', 'velocity_2d_mm']
 
     def make_graphs(self):
-        '''
-        Creates a 2 column plotly figure where the left column corresponds to the mean of the selected scalar,
-         and the right column corresponds to the standard deviation of the scalars.
-
-         Each selected scalar will be plotted in a new row containing violin + swarm plots for all the groups
-          found in the scalar dataframe. Users can click on the legend items to hide selected groups from the display.
-
-        Returns
-        -------
-        '''
+        """
+        create interactive scalar plots.
+        """
 
         selected_cols = self.checked_list.value
         unique_groups = self.scalar_df.group.unique()
@@ -117,12 +105,11 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         return self.fig
 
     def interactive_view(self):
-        '''
-        Displays the interactive plotly graph. Regularly called from self.on_column_select().
+        """
+        Display the interactive plotly graph. Regularly called from self.on_column_select().
 
-        Returns
-        -------
-        '''
+        Returns:
+        """
         
         # https://plotly.com/python/configuration-options/#customizing-download-plot-options
         plotly_config = {
