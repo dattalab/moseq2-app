@@ -5,16 +5,42 @@ channels:
 dependencies:
   - python=3.7
   - pip
-  - jupyter
   - conda-forge::ffmpeg=4.2.0
-  - conda-forge::opencv
-  - jupyter_nbextensions_configurator
-  - scikit-image=0.16.2
-  - fastparquet=0.4.1
+  - fastparquet==0.4.1
   - pip:
       - qgrid
+      - requests
       - numpy==1.18.3
       - pandas==1.0.5
       - ipython==7.14.0
       - ipywidgets==7.5.1
+      - scikit-image==0.16.2
+      - matplotlib==3.1.2
+      - click==7.0
+      - dtaidistance==1.2.3
+      - scikit-learn==0.20.3
+      - ruamel.yaml==0.16.5
+      - seaborn==0.11.0
+      - opencv-python==4.1.2.30
+      - psutil==5.6.7
+      - networkx==2.4
+      - h5py==2.10.0
+      - cytoolz==0.10.1
+      - scipy==1.3.2
+      - pathspec==0.5.3
+      - dask==2.30.0
+      - distributed==2.30.1
+      - chest==0.2.3
+      - dask-jobqueue==0.7.3
+      - six==1.15.0
+      - click==7.0
+      - cython==0.29.14
+      - future==0.18.2
+      - joblib==0.15.1
+      - setuptools
+      - statsmodels==0.10.2
+      - jupyter-bokeh==2.0.3
+      - jupyter==1.0.0
+      - plotly==4.14.3
+      - jupyter_nbextensions_configurator
       - jinja2==3.0.1
