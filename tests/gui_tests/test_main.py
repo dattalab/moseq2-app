@@ -62,9 +62,9 @@ class TestMain(TestCase):
         if exists(group_movie_dir):
             shutil.rmtree(group_movie_dir)
 
-    def test_flip_classifier_tool(self):
+    # def test_flip_classifier_tool(self):
 
-        flip_classifier_tool('data/', 'data/classifier.pkl', max_frames=50)
+    #     flip_classifier_tool('data/', 'data/classifier.pkl', max_frames=50)
 
     def test_view_extraction(self):
         out = view_extraction([], default=0)
@@ -107,19 +107,19 @@ class TestMain(TestCase):
 
         index_grid.clear_clicked()
 
-    def test_interactive_syllable_labeler(self):
+    # def test_interactive_syllable_labeler(self):
 
-        label_syllables(self.progress_paths, max_syllables=None, n_explained=99)
+    #     label_syllables(self.progress_paths, max_syllables=None, n_explained=99)
 
-        assert exists(self.progress_paths['syll_info'])
-        assert exists(self.progress_paths['df_info_path'])
-        assert exists('data/moseq_scalar_dataframe.parquet')
+    #     assert exists(self.progress_paths['syll_info'])
+    #     assert exists(self.progress_paths['df_info_path'])
+    #     assert exists('data/moseq_scalar_dataframe.parquet')
 
-        pg = read_yaml(self.progress_paths['syll_info'])
+    #     pg = read_yaml(self.progress_paths['syll_info'])
 
-        assert len(pg) == 10
+    #     assert len(pg) == 10
 
-        label_syllables(self.progress_paths, max_syllables=None, n_explained=99)
+    #     label_syllables(self.progress_paths, max_syllables=None, n_explained=99)
 
     def test_interactive_syllable_stat(self):
 

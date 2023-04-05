@@ -181,9 +181,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
             # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
             df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
             df = df.astype(dict(SubjectName=str, SessionName=str))
-            print('Writing main syllable info to parquet')
-            df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
-            scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
+            # print('Writing main syllable info to parquet')
+            # df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
+            # scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
         else:
             print('Loading parquet files')
             df = pd.read_parquet(self.df_output_file, engine='fastparquet')
@@ -524,13 +524,13 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             df = pd.read_parquet(self.df_path, engine='fastparquet')
             if not os.path.exists(self.scalar_df_path):
                 self.scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
-                self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
+                # self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
             else:
                 self.scalar_df = pd.read_parquet(self.scalar_df_path)
         else:
             print('Syllable DataFrame not found. Computing and saving syllable statistics...')
             df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
+            # self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
 
         if self.get_pdfs:
             # Compute syllable position PDFs

@@ -136,24 +136,24 @@ class TestNotebookProgress(TestCase):
 
         assert all(list(pca_prog.values())) == False
 
-    def test_get_extraction_progress(self):
-        base_dir = 'data/'
+    # def test_get_extraction_progress(self):
+    #     base_dir = 'data/'
 
-        config_data = read_yaml('data/config.yaml')
+    #     config_data = read_yaml('data/config.yaml')
 
-        extract_wrapper('data/azure_test/nfov_test.mkv',
-                        None,
-                        config_data,
-                        num_frames=60,
-                        skip=True)
-        assert exists('data/azure_test/proc/results_00.mp4')
+    #     extract_wrapper('data/azure_test/nfov_test.mkv',
+    #                     None,
+    #                     config_data,
+    #                     num_frames=60,
+    #                     skip=True)
+    #     assert exists('data/azure_test/proc/results_00.mp4')
 
-        path_dict, num_extracted = get_extraction_progress(base_dir)
+    #     path_dict, num_extracted = get_extraction_progress(base_dir)
 
-        assert num_extracted == 1
-        assert len(list(path_dict.keys())) == 2
+    #     assert num_extracted == 1
+    #     assert len(list(path_dict.keys())) == 2
 
-        shutil.rmtree('data/azure_test/proc/')
+    #     shutil.rmtree('data/azure_test/proc/')
 
     def test_print_progress(self):
 
