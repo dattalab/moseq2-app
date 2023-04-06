@@ -11,6 +11,8 @@ Welcome to the `moseq2-app` repository. Motion Sequencing (MoSeq) is an unsuperv
 [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
+[![DOI](https://zenodo.org/badge/204555901.svg)](https://zenodo.org/badge/latestdoi/204555901)
+
 
 Last Updated: 12/23/2021
 
