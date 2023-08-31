@@ -513,7 +513,7 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
 
 def progress_path_sanity_check(progress_paths, progress_filepath='./progress.yaml'):
     """
-    check whether all relavent paths are correct in the progress file.
+    check whether all relevant paths are correct in the progress file.
 
     Args:
         progress_paths (dict): dictionary of the progress paths.

@@ -69,7 +69,7 @@ def show_extraction(input_file, video_file):
 
 def bokeh_plot_helper(bk_fig, image):
     """
-    create the Bokeh image gylphs in the created canvases/figures.
+    create the Bokeh image glyphs in the created canvases/figures.
 
     Args:
     bk_fig (Bokeh figure): figure canvas to draw image/glyph on

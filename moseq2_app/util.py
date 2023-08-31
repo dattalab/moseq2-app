@@ -199,7 +199,7 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
 
 @contextmanager
 def update_config(path: str) -> dict:
-    """update config.yaml with new paramters used.
+    """update config.yaml with new parameters used.
 
     Args:
         path (str): path to config file.

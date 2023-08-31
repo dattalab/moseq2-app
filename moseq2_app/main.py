@@ -225,7 +225,7 @@ def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=F
     index_file = progress_paths['index_file'] # Path to index file.
     model_path = progress_paths['model_path'] # Path to trained model file.
     syll_info_path = progress_paths['syll_info'] # Path to syllable information file.
-    syll_info_df_path = progress_paths['df_info_path'] # relavant data frame for plotting and stats
+    syll_info_df_path = progress_paths['df_info_path'] # relevant data frame for plotting and stats
 
     inputs = ['model_path', 'index_file', 'syll_info']
 

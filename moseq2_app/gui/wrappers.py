@@ -136,7 +136,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 
     Args:
     model_path (str): Path to trained model.
-    index_path (str): Path to index file containined trained data metadata.
+    index_path (str): Path to index file contained trained data metadata.
     info_path (str): Path to user-labeled syllable information file.
     df_path (str): Path to pre-saved syllable information.
     max_syllables (int or None): Limit maximum number of displayed syllables.
