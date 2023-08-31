@@ -460,7 +460,7 @@ def set_grouping_colors(df, groupby):
             # handle index error when the number of groups is greater than the number of colors in the palette
             except IndexError:
                 print('Not enough color groups in the pallette')
-                # set color index to the last item in palette to resue color
+                # set color index to the last item in palette to reuse color
                 color_map[group] = palette[-1]
         group_colors = list(color_map.values())
         colors = [colorscale(color_map[sg], random.uniform(0, 2)) for sg in sess_groups]

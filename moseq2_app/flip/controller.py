@@ -76,7 +76,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def load_sessions(self):
         """
-        Recursively searche for completed h5 extraction files, and loads total_frames=max_frames to include in the total dataset.
+        Recursively search for completed h5 extraction files, and loads total_frames=max_frames to include in the total dataset.
 
         Args:
 
