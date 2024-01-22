@@ -336,7 +336,7 @@ def get_datasources(aux_df, aux_sem, sem, labels, desc, cm_paths, errs_x, errs_y
 
 def draw_stats(fig, df, groups, colors, sorting, groupby, stat, errorbar, line_dash='solid', thresh_stat='usage', sig_sylls=[]):
     """
-    iterate through the given DataFrame and plots the data grouped by sepecified column ('group', 'SessionName', 'SubjectName'), with the errorbars
+    iterate through the given DataFrame and plots the data grouped by specified column ('group', 'SessionName', 'SubjectName'), with the errorbars
 
     Args:
     fig (bokeh figure): Figure to draw line plot glyphs on
@@ -425,7 +425,7 @@ def set_grouping_colors(df, groupby):
     colors (list): list of all the colors used to plot the glyphs
     """
 
-    # Use a bigger pallette
+    # Use a bigger palette
     palette = Set1_9 + Set2_8 + Set3_12 + Colorblind8
     colors = itertools.cycle(palette)
 
@@ -457,10 +457,10 @@ def set_grouping_colors(df, groupby):
         for group, index in color_map.items():
             try:
                 color_map[group] = palette[index]
-            # handle index error when the number of groups is greater than the nubmer of colors in the palette
+            # handle index error when the number of groups is greater than the number of colors in the palette
             except IndexError:
                 print('Not enough color groups in the pallette')
-                # set color index to the last item in pallette to resue color
+                # set color index to the last item in palette to reuse color
                 color_map[group] = palette[-1]
         group_colors = list(color_map.values())
         colors = [colorscale(color_map[sg], random.uniform(0, 2)) for sg in sess_groups]

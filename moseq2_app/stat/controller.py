@@ -263,7 +263,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if groupby == 'SessionName' or groupby == 'SubjectName':
             mean_df = df.copy()
             df = df[df[groupby].isin(self.session_sel.value)]
-            # set error bar to None because error bars are not implemented corectly in SessionName and SubjectName
+            # set error bar to None because error bars are not implemented correctly in SessionName and SubjectName
             errorbar = "None"
             self.error_box.layout.display = "none"
         else:

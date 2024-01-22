@@ -76,7 +76,7 @@ class FlipRangeTool(FlipClassifierWidgets):
 
     def load_sessions(self):
         """
-        Recursively searche for completed h5 extraction files, and loads total_frames=max_frames to include in the total dataset.
+        Recursively search for completed h5 extraction files, and loads total_frames=max_frames to include in the total dataset.
 
         Args:
 
@@ -326,7 +326,7 @@ class FlipRangeTool(FlipClassifierWidgets):
         # get model test set predictions
         y_predict = self.clf.predict(self.x_test)
 
-        # compute performace
+        # compute performance
         percent_correct = np.mean(self.y_test == y_predict) * 1e2
         print('Performance: {0:3f}% correct'.format(percent_correct))
 

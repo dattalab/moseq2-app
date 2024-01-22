@@ -146,14 +146,14 @@ class ArenaMaskWidget:
 
 
     def save_session_parameters(self):
-        """save session paramter to session config file.
+        """save session parameter to session config file.
         """
         self.set_session_config_vars()
 
         write_yaml(self.session_config, self.session_config_path)
 
     def compute_arena_mask(self):
-        """compute the arena mask using the paramters in the session config file.
+        """compute the arena mask using the parameters in the session config file.
 
         Returns:
             background (numpy.ndarray): background of the session

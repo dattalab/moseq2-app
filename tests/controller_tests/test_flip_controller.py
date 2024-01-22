@@ -21,7 +21,7 @@
 #         config_data = read_yaml('data/config.yaml')
 #         clean_parameters = {'prefilter_space': config_data['spatial_filter_size'], # median filter kernel sizes 
 #                             'prefilter_time': config_data['temporal_filter_size'], # temporal filter kernel sizes
-#                             'strel_tail': strels['strel_tail'], # struc. element for filtering tail
+#                             'strel_tail': strels['strel_tail'], # struct. element for filtering tail
 #                             'iters_tail': config_data['tail_filter_iters'], # number of iters for morph. opening to filter tail
 #                             'frame_dtype': config_data['frame_dtype'], # frame dtype
 #                             'strel_min':strels['strel_min'], # structuring element for erosion

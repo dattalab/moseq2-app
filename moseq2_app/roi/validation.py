@@ -149,7 +149,7 @@ def make_session_status_dicts(paths):
     Return the flag status dicts for all the found completed extracted sessions. Additionally performs dropped frames test on all sessions.
 
     Args:
-    paths (dict): path dict of session names paired wit their mp4 paths.
+    paths (dict): path dict of session names paired with their mp4 paths.
 
     Returns:
     status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.
