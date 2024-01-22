@@ -1,4 +1,0 @@
-[codespell]
-skip = .git,*.pdf,*.svg,LICENSE.md
-# ot - variable
-ignore-words-list = ot
