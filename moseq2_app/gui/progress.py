@@ -117,13 +117,13 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
 
     # Get list of sessions ending in the given extensions
     for ext in exts:
+        files = []
         if len(data_dir) == 0:
             data_dir = os.getcwd()
             if flipped:
                 files = sorted(glob(path + ext))
             else:
                 files = [f for f in sorted(glob(path + ext)) if 'flipped' not in f]
-            sessions += files
         else:
             data_dir = data_dir.strip()
             if os.path.isdir(data_dir):
@@ -131,9 +131,11 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
                     files = sorted(glob(os.path.join(data_dir, path + ext)))
                 else:
                     files = [f for f in sorted(glob(os.path.join(data_dir, path + ext))) if 'flipped' not in f]
-                sessions += files
             else:
                 print('directory not found, try again.')
+        if ext in ("dat", "avi"):
+            files = [f for f in files if "ir.avi" != f and "depth" in f]
+        sessions += files
 
     if len(sessions) == 0:
         if extracted:
@@ -331,8 +333,6 @@ def generate_intital_progressfile(filename='progress.yaml'):
     with open(filename, 'w') as f:
         yml.dump(base_progress_vars, f)
 
-    curr_id = base_progress_vars['snapshot']
-
     return base_progress_vars
 
 def load_progress(progress_file):
@@ -366,21 +366,16 @@ def restore_progress_vars(progress_file=abspath('./progress.yaml'), init=False, 
     vars (dict): All progress file variables
     """
 
-    # overwrite the progress file is overwrite is True
     if overwrite:
         print('Overwriting progress file with initial progress.')
+        # overwrite progress file with initial progress
+        progress_vars = generate_intital_progressfile(progress_file)
+    elif init and not exists(progress_file):
+        # generate progress file if it does not exist
         progress_vars = generate_intital_progressfile(progress_file)
     else:
-        if init:
-            # restore progress file if it exists
-            if exists(progress_file):
-                progress_vars = load_progress(progress_file)
-            # generate new progress file if it doesn't exists
-            else:
-                progress_vars = generate_intital_progressfile(progress_file)
-        # restore progress file if it is not init
-        else:
-            progress_vars = load_progress(progress_file)
+        # restore progress file if it exists
+        progress_vars = load_progress(progress_file)
 
     return progress_vars
 
