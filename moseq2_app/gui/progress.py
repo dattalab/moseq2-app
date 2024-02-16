@@ -5,15 +5,11 @@ This module handles all jupyter notebook progress related functionalities.
 import os
 import uuid
 import json
-import pickle
 from glob import glob
-from time import sleep
 import ruamel.yaml as yaml
 from operator import add
 from toolz import compose
-from tqdm.auto import tqdm
 from functools import reduce
-from datetime import datetime
 from moseq2_viz.util import read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
