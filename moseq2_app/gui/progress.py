@@ -8,8 +8,8 @@ import json
 from glob import glob
 import ruamel.yaml as yaml
 from operator import add
-from toolz import compose
 from functools import reduce
+from toolz import compose, complement
 from moseq2_viz.util import read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
@@ -80,6 +80,12 @@ def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi',
     files = [glob(join(data_dir, '**', f'*.{ext}'), recursive=True) for ext in extensions]
     # concatenate all files of different extensions
     files = sorted(reduce(add, files))
+
+    def is_ir_file(f):
+        return 'ir.avi' in basename(f) or 'ir.dat' in basename(f)
+
+    # remove IR videos
+    files = filter(complement(is_ir_file), files)
 
     # remove any folder that doesn't have a metadata.json file
     files = list(filter(compose(_has_metadata, dirname), files))
