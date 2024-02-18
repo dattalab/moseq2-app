@@ -34,7 +34,7 @@ _hover_dict = {
 
 class ArenaMaskWidget:
     
-    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False) -> None:
+    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=True) -> None:
         """initialize arena mask widget
 
         Args:
@@ -42,6 +42,7 @@ class ArenaMaskWidget:
             config_file (str): path to config.yaml
             session_config_path (str): path to session_config.yaml.
             skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
+            overwrite_session_configs (bool, optional): boolean flag for overwriting session config files using the default config file. Defaults to True.
         """
         self.backgrounds = {}
         self.extracts = {}
@@ -58,8 +59,11 @@ class ArenaMaskWidget:
 
         # creates session-specific configurations
         if exists(session_config_path):
+            # this config contains session names as keys and a dict of config parameters as values
             session_parameters = read_yaml(session_config_path)
-            new_sessions = set(map(lambda f: basename(dirname(f)), sessions)) - set(session_parameters)
+            new_sessions = set(map(lambda f: basename(dirname(f)), sessions))
+            if not overwrite_session_configs:
+                new_sessions = new_sessions - set(session_parameters)
             if len(new_sessions) > 0:
                 for _session in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
                     full_path = [x for x in sessions if _session in x][0]
@@ -82,15 +86,15 @@ class ArenaMaskWidget:
         self.sessions = {basename(dirname(f)): f for f in sessions}
 
         # instantiate ArenaMaskData with the first session in this list
-        self.session_data = ArenaMaskData(path=list(self.sessions)[0], controller=self)
+        self.session_data = ArenaMaskData(path=list(self.sessions)[0], controller=self, configs=self.session_config)
         self.session_data.param.path.objects = list(self.sessions)  # generates object selector in gui
+        self.session_data.set_config_data(list(self.sessions)[0])
 
         self.view = ArenaMaskView(self.session_data)
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         if self.view is not None:
             return self.view._repr_mimebundle_(include, exclude)
-
 
     def set_session_config_vars(self):
         """
@@ -253,6 +257,7 @@ class ArenaMaskData(param.Parameterized):
                         'Extracted mouse': None, 'Frame (background subtracted)': None})
     # stores class object that holds the underlying data
     controller: ArenaMaskWidget = param.Parameter()
+    configs = param.Dict(default={})
 
     ### advanced arena mask parameters ###
     adv_arena_msk_flag = param.Boolean(label="Show advanced arena mask parameters")
@@ -304,6 +309,42 @@ class ArenaMaskData(param.Parameterized):
     save_session_and_move_btn = param.Action(lambda x: x.param.trigger('save_session_and_move_btn'), label="Save session parameters and move to next")
     save_session_btn = param.Action(lambda x: x.param.trigger('save_session_btn'), label="Save session parameters")
 
+    def set_config_data(self, session_path: str):
+        """Initialize parameters of the widget with the session-specific config data"""
+        session_config = self.configs[session_path]
+        self.depth_range = tuple(session_config['bg_roi_depth_range'])
+        self.mask_dilations = session_config["dilate_iterations"]
+        self.mouse_height = session_config['min_height'], session_config['max_height']
+        self.mask_shape = session_config['bg_roi_shape']
+        self.dilation_kernel = session_config['bg_roi_dilate'][0]
+        self.mask_weight1, self.mask_weight2, self.mask_weight3 = session_config['bg_roi_weights']
+        self.mask_index = session_config['bg_roi_index']
+        self.noise_tolerance = session_config['noise_tolerance']
+        self.crop_size = session_config['crop_size'][0]
+
+        self.flip_classifier = session_config['flip_classifier']
+        self.flip_classifier_smoothing = session_config['flip_classifier_smoothing']
+
+        self.tracking_model_flag = session_config['use_tracking_model']
+        self.tracking_model_mask_thresh = session_config['tracking_model_mask_threshold']
+
+        self.cable_filters = session_config['cable_filter_iters']
+        self.cable_filter_shape = session_config['cable_filter_shape']
+        self.cable_filter_size = session_config['cable_filter_size'][0]
+
+        self.tail_filters = session_config['tail_filter_iters']
+        self.tail_filter_shape = session_config['tail_filter_shape']
+        self.tail_filter_size = session_config['tail_filter_size'][0]
+
+        self.spatial_filter = str(session_config['spatial_filter_size'])
+        self.temporal_filter = str(session_config['temporal_filter_size'])
+
+        self.chunk_overlap = session_config['chunk_overlap']
+        self.frame_dtype = session_config['frame_dtype']
+
+        self.movie_dtype = session_config['movie_dtype']
+        self.pixel_format = session_config['pixel_format']
+
     @param.depends('save_session_btn', 'save_session_and_move_btn', watch=True)
     def save_session(self):
         """save session parameters
@@ -321,6 +362,7 @@ class ArenaMaskData(param.Parameterized):
             self.path = paths[next_path_index]
         except ValueError:
             self.path = paths[0]
+        self.set_config_data(self.path)
 
     @param.depends('compute_arena_mask', 'next_session', watch=True)
     def get_arena_mask(self):
