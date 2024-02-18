@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from os.path import exists
-import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml

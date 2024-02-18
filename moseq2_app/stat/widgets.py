@@ -2,7 +2,6 @@
 Widgets module containing classes with components for each of the interactive syllable statistics tools.
 
 """
-
 import numpy as np
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
