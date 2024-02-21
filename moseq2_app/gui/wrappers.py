@@ -4,7 +4,6 @@ Wrapper functions for all the functionality included in moseq2-app.
 
 import os
 import shutil
-from bokeh.io import show
 import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
@@ -13,7 +12,7 @@ from moseq2_app.gui.progress import get_session_paths
 from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
                                    compute_syllable_explained_variance)
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
-from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
+from moseq2_app.stat.controller import InteractiveTransitionGraph
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
 

@@ -8,10 +8,9 @@ import shutil
 import numpy as np
 import ipywidgets as widgets
 from bokeh.models import Div
-from bokeh.layouts import gridplot
 from IPython.display import display
-from bokeh.plotting import figure, show
-from os.path import dirname, join, relpath, exists
+from bokeh.plotting import show
+from os.path import dirname, join, exists
 from moseq2_extract.io.video import get_video_info
 
 
