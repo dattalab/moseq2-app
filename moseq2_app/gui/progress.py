@@ -140,7 +140,7 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
             else:
                 print('directory not found, try again.')
         if ext in ("dat", "avi"):
-            files = [f for f in files if "ir.avi" != f and "depth" in f]
+            files = [f for f in files if f"ir.{ext}" != f and "depth" in f]
         sessions += files
 
     if len(sessions) == 0:
