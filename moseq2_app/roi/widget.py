@@ -228,13 +228,12 @@ class ArenaMaskWidget:
         """Assuming this will be called by an event-triggered function"""
         if folder is None:
             folder = self.session_data.path
-        if folder not in self.backgrounds:
-            # get full path
-            file = self.sessions[folder]
-            # compute background
-            bground = get_bground_im_file(file, frame_stride=1000)
-            # save for recall later
-            self.backgrounds[folder] = bground
+        # get full path
+        file = self.sessions[folder]
+        # compute background
+        bground = get_bground_im_file(file, frame_stride=1000)
+        # save for recall later
+        self.backgrounds[folder] = bground
 
         return self.backgrounds[folder]
 
