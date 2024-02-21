@@ -2,7 +2,6 @@
 Widgets module containing classes with components for each of the interactive syllable statistics tools.
 
 """
-
 import numpy as np
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
@@ -102,7 +101,7 @@ class SyllableStatBokehCallbacks:
                         // All of these arrays will always end up to be the same length
                     
                         // initialize all the variables that appear in the HoverTool
-                        // these same variables represent all the attributes that are held by Bokeh Gylph objects.
+                        // these same variables represent all the attributes that are held by Bokeh Glyph objects.
                         var index = [], number = [], sem = [];
                         var x = [], y = [], usage = [], duration = [], speed_2d = []; 
                         var speed_3d = [], height = [], dist = []; 

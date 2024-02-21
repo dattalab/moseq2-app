@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from os.path import exists
-import matplotlib.pyplot as plt
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_viz.util import h5_to_dict, read_yaml
@@ -149,7 +148,7 @@ def make_session_status_dicts(paths):
     Return the flag status dicts for all the found completed extracted sessions. Additionally performs dropped frames test on all sessions.
 
     Args:
-    paths (dict): path dict of session names paired wit their mp4 paths.
+    paths (dict): path dict of session names paired with their mp4 paths.
 
     Returns:
     status_dicts (dict): stacked dictionary object containing all the sessions' flag status dicts.

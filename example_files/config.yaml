@@ -134,7 +134,7 @@ timeout: 5
 verbose: false
 wall_time: 06:00:00
 
-# moseq2-model paramters
+# moseq2-model parameters
 alpha: 5.7
 checkpoint_freq: 10
 gamma: 1000.0

@@ -8,10 +8,9 @@ import shutil
 import numpy as np
 import ipywidgets as widgets
 from bokeh.models import Div
-from bokeh.layouts import gridplot
 from IPython.display import display
-from bokeh.plotting import figure, show
-from os.path import dirname, join, relpath, exists
+from bokeh.plotting import show
+from os.path import dirname, join, exists
 from moseq2_extract.io.video import get_video_info
 
 
@@ -69,7 +68,7 @@ def show_extraction(input_file, video_file):
 
 def bokeh_plot_helper(bk_fig, image):
     """
-    create the Bokeh image gylphs in the created canvases/figures.
+    create the Bokeh image glyphs in the created canvases/figures.
 
     Args:
     bk_fig (Bokeh figure): figure canvas to draw image/glyph on

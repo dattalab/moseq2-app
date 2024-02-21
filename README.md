@@ -36,7 +36,7 @@ You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV9
 
 # Getting Started
 
-If you like MoSeq and you are interested in installing it in your environment, you can install the MoSeq2 pakage suite with either Conda or Docker. 
+If you like MoSeq and you are interested in installing it in your environment, you can install the MoSeq2 package suite with either Conda or Docker. 
 
 - If you are familiar with Conda/terminal, and you enjoy more control over the packages and virtual environment, we recommend installing the MoSeq2 package suite with Conda.
 
@@ -44,7 +44,7 @@ If you like MoSeq and you are interested in installing it in your environment, y
 
 ### **We provide step-by-step guides for installing the MoSeq2 package suite in the [installation documentation](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).**
 
-You can find more information about the MoSeq2 package suite, the acquisition and analysis pipleline, documentation for Command Line Interface (CLI), tutorials, etc. in the [wiki](https://github.com/dattalab/moseq2-app/wiki). If you want to explore MoSeq functionalities, check out the guide for [downloading test data](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data).
+You can find more information about the MoSeq2 package suite, the acquisition and analysis pipeline, documentation for Command Line Interface (CLI), tutorials, etc. in the [wiki](https://github.com/dattalab/moseq2-app/wiki). If you want to explore MoSeq functionalities, check out the guide for [downloading test data](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data).
 
 # Community Support and Contributing
 - Please join [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com) to post questions and interactive with MoSeq developers and users.

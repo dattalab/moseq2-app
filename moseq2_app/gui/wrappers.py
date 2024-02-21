@@ -4,7 +4,6 @@ Wrapper functions for all the functionality included in moseq2-app.
 
 import os
 import shutil
-from bokeh.io import show
 import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
@@ -13,7 +12,7 @@ from moseq2_app.gui.progress import get_session_paths
 from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
                                    compute_syllable_explained_variance)
 from moseq2_app.viz.controller import SyllableLabeler, CrowdMovieComparison
-from moseq2_app.stat.controller import InteractiveSyllableStats, InteractiveTransitionGraph
+from moseq2_app.stat.controller import InteractiveTransitionGraph
 from moseq2_app.roi.validation import (make_session_status_dicts, get_scalar_anomaly_sessions,
                                        get_scalar_df, print_validation_results)
 
@@ -136,7 +135,7 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
 
     Args:
     model_path (str): Path to trained model.
-    index_path (str): Path to index file containined trained data metadata.
+    index_path (str): Path to index file contained trained data metadata.
     info_path (str): Path to user-labeled syllable information file.
     df_path (str): Path to pre-saved syllable information.
     max_syllables (int or None): Limit maximum number of displayed syllables.
