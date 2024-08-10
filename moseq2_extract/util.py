@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 from glob import glob
 from copy import deepcopy
-import ruamel.yaml as yaml
+from ruamel.yaml import YAML
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -35,7 +35,6 @@ def filter_warnings(func):
     """
     def apply_warning_filters(*args, **kwargs):
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore', yaml.error.UnsafeLoaderWarning)
             warnings.simplefilter(action='ignore', category=FutureWarning)
             warnings.simplefilter(action='ignore', category=UserWarning)
             return func(*args, **kwargs)
@@ -760,9 +759,10 @@ def read_yaml(yaml_file):
     Returns:
     return_dict (dict): dict of yaml contents
     """
-
-    with open(yaml_file, 'r') as f:
-        return yaml.safe_load(f)
+    yaml = YAML(typ='safe')
+    with open(yaml_file, 'r') as yfile:
+        data = yaml.load(yfile)
+    return data
 
 def mouse_threshold_filter(h5file, thresh=0):
     """
