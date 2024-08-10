@@ -6,7 +6,7 @@ import os
 import ast
 import json
 import numpy as np
-from skimage.external import tifffile
+import tifffile
 from os.path import join, dirname, exists
 
 
@@ -76,7 +76,7 @@ def write_image(
     if not exists(directory):
         os.makedirs(directory)
 
-    tifffile.imsave(
+    tifffile.imwrite(
         file, image.astype(frame_dtype), compress=compress, metadata=metadata
     )
 
