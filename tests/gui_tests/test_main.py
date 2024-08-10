@@ -11,7 +11,7 @@ from moseq2_app.gui.progress import generate_missing_metadata
 from moseq2_app.main import (preview_extractions, validate_extractions,
                              interactive_group_setting, label_syllables, interactive_syllable_stats,
                              interactive_crowd_movie_comparison, interactive_transition_graph,
-                             view_extraction, flip_classifier_tool)
+                             view_extraction)
 
 # Source: https://bugs.python.org/issue33725#msg329923
 mp.set_start_method('forkserver')

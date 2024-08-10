@@ -5,6 +5,7 @@ import panel as pn
 import holoviews as hv
 from tqdm import tqdm
 import numpy as np
+from ruamel.yaml import YAML
 from pathlib import Path
 import ruamel.yaml as yaml
 from collections import defaultdict
@@ -45,7 +46,8 @@ _patch_holoviews_stream_update()
 
 
 def _extraction_complete(file_path: Path):
-    config = yaml.safe_load(file_path.read_text())
+    yaml = YAML(typ="safe", pure=True)
+    config = yaml.load(file_path.read_text())
     return config['complete']
 
 
