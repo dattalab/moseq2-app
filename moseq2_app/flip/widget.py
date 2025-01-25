@@ -1,11 +1,16 @@
 import h5py
 import pickle
+import warnings
 import panel as pn
 import holoviews as hv
-import ruamel.yaml as yaml
+from tqdm import tqdm
+import numpy as np
 from pathlib import Path
+import ruamel.yaml as yaml
 from collections import defaultdict
-
+from moseq2_extract.extract.proc import get_flips
+from moseq2_extract.util import gen_batch_sequence
+from moseq2_extract.io.video import write_frames_preview
 
 def _extraction_complete(file_path: Path):
     config = yaml.safe_load(file_path.read_text())
@@ -179,6 +184,65 @@ class FlipClassifierWidget:
     def save_frame_ranges(self):
         with open(self.training_data_path, 'wb') as f:
             pickle.dump((self.sessions, dict(self.selected_frame_ranges_dict)), f)
+            
+    def apply_flip_classifier(self, clf_path, chunk_size=4000, chunk_overlap=0,
+                              smoothing=51, frame_path='frames', fps=30,
+                              write_movie=False, verbose=True):
+        """
+        Apply a trained flip classifier on previously extracted data to flip the mice to the correct orientation.
+    
+        Args:
+        chunk_size (int): size of frame chunks to process in batches.
+        chunk_overlap (int): number of frames to overlap between chunks to improve classification precision between chunks.
+        smoothing (int): kernel size of the applied median filter on the flip classifier results
+        verbose (bool): displays the tqdm progress bars for each session.
+        """
+        video_pipe = None
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            for key, path in tqdm(self.sessions.items(), desc='Flipping extracted sessions...'):
+                # Open h5 file to stream and correct/update stored frames and scalar angles.
+                path = str(path)
+                with h5py.File(path, mode='a') as f:
+                    output_movie = path.replace('.h5', '_flipped.mp4')
+    
+                    frames = f[frame_path]
+                    frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
+    
+                    for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
+                        frame_batch = frames[batch]
+    
+                        # apply flip classifier on each batch to find which frames to flip
+                        flips = get_flips(frame_batch.copy(), flip_file=clf_path, smoothing=smoothing)
+                        flip_indices = np.where(flips)
+    
+                        # rewrite the frames with the newly classified orientation
+                        frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
+                        f[frame_path][batch] = frame_batch
+    
+                        # augment recorded scalar value to reflect orientation switches
+                        f['scalars/angle'][flip_indices] += np.pi
+    
+                        if write_movie:
+                            try:
+                                # Writing frame batch to mp4 file
+                                video_pipe = write_frames_preview(output_movie,
+                                                                  frame_batch,
+                                                                  pipe=video_pipe,
+                                                                  close_pipe=False,
+                                                                  depth_min=0,
+                                                                  depth_max=100,
+                                                                  fps=fps,
+                                                                  progress_bar=verbose)
+                            except AttributeError as e:
+                                warnings.warn(f'Could not generate flipped movie for {key}:{path}. Skipping...')
+                                print(e)
+                                print(e.__traceback__)
+                                break
+                    # Check if video is done writing. If not, wait.
+                    if video_pipe is not None:
+                        video_pipe.communicate()
+                        video_pipe = None
 
     @property
     def training_data_path(self):
