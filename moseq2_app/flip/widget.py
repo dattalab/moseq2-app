@@ -12,6 +12,38 @@ from moseq2_extract.extract.proc import get_flips
 from moseq2_extract.util import gen_batch_sequence
 from moseq2_extract.io.video import write_frames_preview
 
+
+# Workaround for HoloViews/Bokeh _buffers parameter issue
+# Bokeh 2.4.2 includes '_buffers' in messages but HoloViews 1.14.7 
+# doesn't filter it before passing to Param, causing ValueError
+def _patch_holoviews_stream_update():
+    """Patch HoloViews Stream._set_stream_parameters to handle _buffers error."""
+    from holoviews.streams import Stream
+    
+    # Store original method
+    _original_set_stream_parameters = Stream._set_stream_parameters
+    
+    def _patched_set_stream_parameters(self, **kwargs):
+        """Wrapper that catches and handles _buffers parameter error."""
+        try:
+            # Try with all parameters first (might work in some version combos)
+            return _original_set_stream_parameters(self, **kwargs)
+        except ValueError as e:
+            # Only intervene if the error is specifically about _buffers
+            if '_buffers' in str(e) and 'is not a parameter' in str(e):
+                # Remove _buffers and retry
+                filtered_kwargs = {k: v for k, v in kwargs.items() if k != '_buffers'}
+                return _original_set_stream_parameters(self, **filtered_kwargs)
+            # Re-raise any other ValueError
+            raise
+    
+    # Replace the method with our patched version
+    Stream._set_stream_parameters = _patched_set_stream_parameters
+
+# Apply the patch when this module is imported
+_patch_holoviews_stream_update()
+
+
 def _extraction_complete(file_path: Path):
     config = yaml.safe_load(file_path.read_text())
     return config['complete']
