@@ -39,6 +39,7 @@ test_run/
 
 .vscode
 __pycache__
+*.code-workspace
 
 *.eggs
 *.log
