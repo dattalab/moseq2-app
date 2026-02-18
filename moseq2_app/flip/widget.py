@@ -63,11 +63,19 @@ class FlipClassifierWidget:
     def __init__(self, data_path: str):
         self.data_path = Path(data_path)
         self.sessions = _find_extractions(data_path)
+        if len(self.sessions) == 0:
+            raise ValueError(
+                f"No completed extractions found in '{data_path}'. "
+                "Make sure you have run the 'aggregate results' step in the "
+                "extraction notebook and that input_dir points to the folder "
+                "containing your extracted .h5 files (e.g. the "
+                "aggregate_results/ directory)."
+            )
         # self.selected_frame_ranges_dict = {k: [] for k in self.path_dict}
         self.selected_frame_ranges_dict = defaultdict(list)
         self.curr_total_selected_frames = 0
 
-        self.session_select_dropdown = pn.widgets.Select(options=list(self.sessions), name='Session', value=list(self.sessions)[1])
+        self.session_select_dropdown = pn.widgets.Select(options=list(self.sessions), name='Session', value=list(self.sessions)[0])
         self.frame_num_slider = pn.widgets.IntSlider(name='Current Frame', start=0, end=1000, step=1, value=1)
         self.start_button = pn.widgets.Button(name='Start Range', button_type='primary')
         self.face_left_button = pn.widgets.Button(name='Facing Left', button_type='success', width=140, visible=False)
