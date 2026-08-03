@@ -1,0 +1,27 @@
+name: MoSeq2 installed-package tests
+
+on:
+  pull_request:
+  push:
+    branches: [release]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  moseq2-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the pull-request source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build the candidate wheel and run its affected MoSeq2 tests
+        uses: dattalab/moseq2-test@b23eb6c2cb84f4d37868b24abc8fb2b02f9d3ebe
+        with:
+          package: moseq2-app
+          source: ${{ github.workspace }}
+          tier: pull-request
