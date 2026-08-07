@@ -206,8 +206,10 @@ def get_behavioral_distance(
                 dist_dict["pca[dtw] (syllables)"] = lens
             else:
                 print("Computing DTW matrix (this may take a minute)...")
-                full_dist_mat = dtw_ndim.distance_matrix(
-                    pc_mat, parallel=parallel, show_progress=True
+                full_dist_mat = _pairwise_dtw_matrix(
+                    dtw_ndim.distance_matrix(
+                        pc_mat, parallel=parallel, show_progress=True
+                    )
                 )
                 reduced_mat = reformat_dtw_distances(full_dist_mat, len(pc_slices))
                 dist_dict["pca[dtw]"] = reduced_mat
@@ -257,8 +259,10 @@ def get_behavioral_distance(
 
             pc_mat = np.concatenate(pc_slices, axis=0)
 
-            full_dist_mat = dtw_ndim.distance_matrix(
-                pc_mat, parallel=parallel, show_progress=True
+            full_dist_mat = _pairwise_dtw_matrix(
+                dtw_ndim.distance_matrix(
+                    pc_mat, parallel=parallel, show_progress=True
+                )
             )
             reduced_mat = reformat_dtw_distances(full_dist_mat, len(pc_slices))
             dist_dict["combined"] = reduced_mat
@@ -311,8 +315,10 @@ def get_behavioral_distance_ar(
         )
     elif dist.lower() == "dtw":
         print("Computing DTW matrix (this may take a minute)...")
-        ar_dist = dtw_ndim.distance_matrix(
-            ar_traj, parallel=parallel, show_progress=True
+        ar_dist = _pairwise_dtw_matrix(
+            dtw_ndim.distance_matrix(
+                ar_traj, parallel=parallel, show_progress=True
+            )
         )
         ar_dist = reformat_dtw_distances(
             ar_dist, nsyllables=ar_dist.shape[0], rescale=False
@@ -380,6 +386,29 @@ def get_init_points(pca_scores, model_labels, max_syllable=40, nlags=3, npcs=10)
         syll_average[i] /= count[i].astype("float")
 
     return syll_average
+
+
+def _pairwise_dtw_matrix(mat):
+    """
+    Put a dtaidistance distance matrix into the layout the reformatting expects.
+
+    `reformat_dtw_distances` reads its input as strictly upper triangular, with
+    a non-finite entry wherever no distance was computed: it zeroes the
+    non-finite entries and symmetrizes with `rmat += rmat.T`, and reads the
+    diagonal as the per-syllable scale used to rescale. dtaidistance returns a
+    full symmetric matrix with a zero diagonal, which would double every
+    distance and collapse that scale to zero.
+
+    Args:
+    mat (2D numpy array): square distance matrix from dtaidistance.
+
+    Returns:
+    (2D numpy array): the same distances, strictly above the diagonal.
+    """
+
+    out = np.array(mat, dtype="float64")
+    out[np.tril_indices(out.shape[0])] = np.inf
+    return out
 
 
 def reformat_dtw_distances(full_mat, nsyllables, rescale=True):

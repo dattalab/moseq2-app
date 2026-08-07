@@ -648,7 +648,7 @@ def get_syllable_statistics(data, fill_value=-5, max_syllable=100, count='usage'
         usages[s] = 0
         durations[s] = []
 
-    if isinstance(data, list) or (isinstance(data, np.ndarray) and data.dtype == np.object):
+    if isinstance(data, list) or (isinstance(data, np.ndarray) and data.dtype == object):
 
         for v in data:
             seq_array, locs = get_transitions(v)
@@ -974,7 +974,7 @@ def sort_batch_results(data, averaging=True, filenames=None, **kwargs):
     new_shape = tuple([len(v) for v in param_list])
 
     if filenames is not None:
-        filename_index = np.empty(new_shape, dtype=np.object)
+        filename_index = np.empty(new_shape, dtype=object)
         for i, v in np.ndenumerate(filename_index):
             filename_index[i] = []
     else:
@@ -1106,7 +1106,11 @@ def _gen_to_arr(generator: Iterator[Any]) -> np.ndarray:
     arr (np.ndarray): numpy array of generated list.
     """
 
-    return np.array(list(generator))
+    # The slices this is called on are ragged -- each is a (start, stop) pair
+    # alongside a uuid -- so the result is an object array. numpy built one
+    # implicitly until 1.24 and raises without an explicit dtype from 2.0, so
+    # the dtype is stated rather than inferred.
+    return np.array(list(generator), dtype=object)
 
 
 def retrieve_pcs_from_slices(slices, pca_scores, max_dur=60, min_dur=3,
@@ -1222,7 +1226,9 @@ def sort_syllables_by_stat_difference(complete_df, ctrl_group, exp_group, max_sy
         complete_df = complete_df[complete_df.syllable < max_sylls]
 
     # Prepare DataFrame
-    mutation_df = complete_df.groupby(['group', 'syllable']).mean()
+    mutation_df = complete_df.groupby(['group', 'syllable']).mean(
+        numeric_only=True
+    )
 
     # Get groups to measure mutation by
     control_df = mutation_df.loc[ctrl_group]
@@ -1250,7 +1256,12 @@ def sort_syllables_by_stat(complete_df, stat='usage', max_sylls=None):
     if max_sylls is not None:
         complete_df = complete_df[complete_df.syllable < max_sylls]
 
-    tmp = complete_df.groupby('syllable').mean().sort_values(by=stat, ascending=False).index
+    tmp = (
+        complete_df.groupby('syllable')
+        .mean(numeric_only=True)
+        .sort_values(by=stat, ascending=False)
+        .index
+    )
 
     # Get sorted ordering
     ordering = list(tmp)

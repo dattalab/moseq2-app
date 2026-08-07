@@ -6,7 +6,6 @@ import os
 import shutil
 import matplotlib as mpl
 from glob import glob
-from ruamel import yaml
 from tqdm.auto import tqdm
 from cytoolz import keyfilter, groupby
 from os.path import exists, join, dirname, basename
@@ -41,6 +40,7 @@ from moseq2_viz.model.util import (
     make_separate_crowd_movies,
     labels_to_changepoints,
 )
+from moseq2_viz._yaml import write_yaml
 
 
 def _make_directories(crowd_movie_path, plot_path):
@@ -122,7 +122,7 @@ def add_group_wrapper(index_file, config_data):
 
     # Atomically write updated index file
     with open(new_index_path, "w+") as f:
-        yaml.safe_dump(index, f)
+        write_yaml(index, f)
     shutil.move(new_index_path, index_file)
 
     print("Group(s) added successfully.")
@@ -613,7 +613,7 @@ def copy_h5_metadata_to_yaml_wrapper(input_dir):
         # Atomically write updated yaml
         new_file = f"{basename(_yml)}_update.yaml"
         with open(new_file, "w+") as f:
-            yaml.safe_dump(_dict, f)
+            write_yaml(_dict, f)
         shutil.move(new_file, _yml)
 
 

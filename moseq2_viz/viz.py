@@ -203,7 +203,12 @@ def make_crowd_matrix(slices, nexamples=50, pad=30, raw_size=(512, 424), outmovi
             selection_end = selction_begin + nexamples
             use_slices = [_slice for i, _slice in enumerate(use_slices) if i in dur_order[selction_begin:selection_end]]
         else:
-            use_slices = rng.permutation(use_slices)[:nexamples]
+            # Permute positions rather than the list itself: the slices are
+            # ragged, so numpy 2 will not build an array from them. Drawing the
+            # permutation over len(use_slices) consumes the generator
+            # identically, so the selected order is unchanged.
+            order = rng.permutation(len(use_slices))[:nexamples]
+            use_slices = [use_slices[i] for i in order]
 
     if len(use_slices) == 0 or max_dur < 0:
         return None
@@ -420,7 +425,15 @@ def scalar_plot(scalar_df, sort_vars=['group', 'uuid'], group_var='group',
 
     # sort scalars into a neat summary using group_vars
     summary = scalar_df.groupby(sort_vars)[show_scalars].aggregate(['mean', 'std']).reset_index()
-    summary = summary.melt(id_vars=group_var, value_vars=show_scalars)
+    # aggregate() leaves MultiIndex columns, so the names here are tuples such
+    # as ('velocity_2d_mm', 'mean'). pandas 1.x matched bare strings against
+    # the first level; pandas 2 requires the full label. Selecting the tuples
+    # and renaming the id column back reproduces the 1.x result exactly:
+    # columns group, variable_0, variable_1, value.
+    id_cols = [c for c in summary.columns if c[0] == group_var]
+    value_cols = [c for c in summary.columns if c[0] in show_scalars]
+    summary = summary.melt(id_vars=id_cols, value_vars=value_cols)
+    summary = summary.rename(columns={id_cols[0]: group_var})
     groups = summary[group_var].unique()
     
     g = sns.FacetGrid(data=summary, row='variable_0', col='variable_1', sharey=False,
@@ -481,8 +494,16 @@ def plot_syll_stats_with_sem(scalar_df, syll_info=None, sig_sylls=None, stat='us
 
     # plot each group's stat data separately, computes groupwise SEM, and orders data based on the stat/ordering parameters
     hue = 'group' if groups is not None else None
+    # dodge offsets the hue levels by dodge/(n_levels - 1), so asking for it
+    # with a single group divides by zero from seaborn 0.12 onward. With one
+    # group there is nothing to offset, which is what older seaborn did here.
+    dodge = len(groups) > 1
+    # errorbar=('ci', 68) is seaborn's own stated replacement for ci=68, and
+    # join=False corresponds to suppressing the connecting line. Both spellings
+    # still work at 0.13 but are removed in 0.15.
     ax = sns.pointplot(data=scalar_df, x='syllable', y=stat, hue=hue, order=ordering,
-                       join=join, dodge=True, ci=68, ax=ax, hue_order=groups,
+                       linestyle='-' if join else 'none', dodge=dodge,
+                       errorbar=('ci', 68), ax=ax, hue_order=groups,
                        palette=colors)
 
     # where some data has already been plotted to ax
@@ -633,15 +654,15 @@ def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, b
 
     # Plot best model description
     s = f'Best Model CP Stats: Mean, median, mode (s) = {np.nanmean(model_cps):.4f},' \
-        f' {np.nanmedian(model_cps):.4f}, {mode(model_cps)[0][0]:.4f}'
+        f' {np.nanmedian(model_cps):.4f}, {mode(model_cps, keepdims=True)[0][0]:.4f}'
     # Plot PC CP description
     t = f'PC CP Stats: Mean, median, mode (s) = {np.nanmean(pc_cps):.4f}, ' \
-        f'{np.nanmedian(pc_cps):.4f}, {mode(pc_cps)[0][0]:.4f}'
+        f'{np.nanmedian(pc_cps):.4f}, {mode(pc_cps, keepdims=True)[0][0]:.4f}'
     
     # saving model kappa scan stats
     model_stats = None
     # record changepoint stats
-    changepoint_stats = [np.nanmean(pc_cps), np.nanmedian(pc_cps), mode(pc_cps)[0][0]]
+    changepoint_stats = [np.nanmean(pc_cps), np.nanmedian(pc_cps), mode(pc_cps, keepdims=True)[0][0]]
 
     if not plot_all and best_model is not None:
         # clipping the changepoints at 10 seconds
@@ -658,7 +679,7 @@ def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, b
             kappa = v['model_parameters']['kappa']
             model_cps = v['changepoints']
             # append model stats
-            model_stats.append([k, kappa, np.nanmean(model_cps), np.nanmedian(model_cps), mode(model_cps)[0][0]]+ changepoint_stats)
+            model_stats.append([k, kappa, np.nanmean(model_cps), np.nanmedian(model_cps), mode(model_cps, keepdims=True)[0][0]]+ changepoint_stats)
             # clipping the changepoints at 10 seconds
             ax = sns.kdeplot(model_cps[model_cps<10], ax=ax, linestyle=ls, alpha=alpha, bw_adjust=bw_adjust,
                         color=palette[i], label=f'Model Changepoints Kappa={kappa:1.02E}')

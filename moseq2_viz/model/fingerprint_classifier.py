@@ -109,9 +109,12 @@ def create_fingerprint_dataframe(
     min_p = syll_summary.min().min()
     max_p = syll_summary.max().max()
 
+    # The aggregate is widened to double: the scalar columns are float32, and
+    # the ranges are carried alongside the syllable range appended below, which
+    # is a Python float.
     ranges = scalar_df.reset_index(drop=True)[scalars].agg(
         ["min", "max", robust_min, robust_max]
-    )
+    ).astype("float64")
     # add syllable ranges to this df
     ranges["MoSeq"] = [min_p, max_p, min_p, max_p]
     range_idx = ["min", "max"] if range_type == "full" else ["robust_min", "robust_max"]
@@ -242,8 +245,8 @@ def plotting_fingerprint(
     # compile data to plot while recording vmin and vmax in the data
     plot_dict = {}
     # initialize vmin and vmax
-    temp_vmin = np.Inf
-    temp_vmax = -np.Inf
+    temp_vmin = np.inf
+    temp_vmax = -np.inf
 
     for col in plot_columns:
         data = summary[col].to_numpy()

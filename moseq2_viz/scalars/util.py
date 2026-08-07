@@ -375,11 +375,15 @@ def compute_mouse_dist_to_center(roi, centroid_x_px, centroid_y_px):
     dist_to_center (np.array): array of distance to the arena center in pixels.
     """
 
-    # Get (x,y) bucket center coordinate
-    ymin, xmin = np.min(np.where(roi), axis = 1)
-    ymax, xmax = np.max(np.where(roi), axis = 1)
-    center_x = np.mean([xmin, xmax])
-    center_y = np.mean([ymin, ymax])
+    # Get (x,y) bucket center coordinate.
+    # The bounds and centers are kept as Python scalars so that the arithmetic
+    # below stays in the centroids' own dtype -- a numpy scalar would promote
+    # the float32 centroid arrays to float64 and change the dtype of the
+    # dist_to_center_px column.
+    ymin, xmin = (int(v) for v in np.min(np.where(roi), axis=1))
+    ymax, xmax = (int(v) for v in np.max(np.where(roi), axis=1))
+    center_x = float(np.mean([xmin, xmax]))
+    center_y = float(np.mean([ymin, ymax]))
 
     # Get (x,y) distances to bucket center throughout the session recording.
     # add back bounding box offset
