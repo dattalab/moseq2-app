@@ -567,6 +567,59 @@ def compute_mean_syll_scalar(scalar_df, scalar='velocity_3d_mm', max_sylls=40, s
     return mean_df
 
 
+def _column_mean(series):
+    """
+    Average one column the way ``DataFrame.mean()`` used to.
+
+    Args:
+    series (pandas.Series): a single column.
+
+    Returns:
+    the column's mean, raising TypeError when it has none.
+
+    An object column is summed and then coerced, which is what makes a column of
+    2-D arrays average elementwise, and what lets a column of digit strings
+    average into a number. pandas stopped coercing strings and stopped reducing
+    object columns at all, so both have to be done here.
+    """
+
+    values = series.to_numpy()
+    if values.dtype != object:
+        return series.mean()
+
+    missing = pd.isna(values)
+    if missing.any():
+        values = values.copy()
+        np.putmask(values, missing, 0)
+    total = values.sum(axis=0)
+    if isinstance(total, str):
+        total = float(total)
+    return total / float((~missing).sum())
+
+
+def _frame_mean(frame):
+    """
+    Average every column that can be averaged, and drop the rest.
+
+    Args:
+    frame (pandas.DataFrame): the group being reduced.
+
+    Returns:
+    (pandas.Series): one entry per column that reduced.
+
+    Silently dropping the columns that raise is what ``DataFrame.mean()`` did
+    before it started refusing the whole frame over any one bad column.
+    """
+
+    means = {}
+    for column in frame.columns:
+        try:
+            means[column] = _column_mean(frame[column])
+        except (TypeError, ValueError):
+            continue
+    return pd.Series(means)
+
+
 def get_syllable_pdfs(pdf_df, normalize=True, syllables=range(40), groupby='group',
                       syllable_key='labels (usage sort)'):
     """
@@ -587,7 +640,10 @@ def get_syllable_pdfs(pdf_df, normalize=True, syllables=range(40), groupby='grou
 
     # Get unique groups to iterate by
     groups = pdf_df[groupby].unique()
-    mean_pdfs = pdf_df.groupby([groupby, syllable_key]).apply(np.mean)
+    # Selecting every column keeps the grouping columns in the result, which is
+    # where the consumer reads the syllable label back from.
+    mean_pdfs = (pdf_df.groupby([groupby, syllable_key])[list(pdf_df.columns)]
+                 .apply(_frame_mean))
 
     if normalize:
         mean_pdfs['pdf'] = mean_pdfs['pdf'].apply(lambda x: x / np.nanmax(x))

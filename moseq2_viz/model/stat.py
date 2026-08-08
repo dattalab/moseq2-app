@@ -6,6 +6,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy import stats
+from collections import namedtuple
 from itertools import combinations
 from statsmodels.stats.multitest import multipletests
 
@@ -324,7 +325,16 @@ def run_kruskal(
     # combine Dunn's test results into single DataFrame
     df_z = pd.DataFrame(real_zs_within_group)
     df_z.index = df_z.index.set_names("syllable")
-    dunn_results_df = df_z.reset_index().melt(id_vars="syllable")
+    # The keys are group pairs, so the columns are a MultiIndex and reset_index
+    # labels the syllable column ('syllable', ''). Selecting that full label and
+    # renaming it back gives the same frame the bare string used to select:
+    # columns syllable, variable_0, variable_1, value.
+    flattened = df_z.reset_index()
+    id_columns = [column for column in flattened.columns
+                  if (column[0] if isinstance(column, tuple) else column)
+                  == "syllable"]
+    dunn_results_df = flattened.melt(id_vars=id_columns)
+    dunn_results_df = dunn_results_df.rename(columns={id_columns[0]: "syllable"})
 
     if verbose:
         # take the intersection of KW and Dunn's tests
@@ -470,6 +480,48 @@ def run_pairwise_stats(df, group1, group2, test_type="mw", verbose=False, **kwar
         return ttest(df, group1, group2, verbose=verbose, **kwargs)
 
 
+MannwhitneyuResult = namedtuple("MannwhitneyuResult", ("statistic", "pvalue"))
+
+
+def mannwhitneyu(x, y):
+    """
+    Run a Mann-Whitney U test, returning the smaller U and a one-sided p-value.
+
+    Args:
+    x (1D array): observations from the first sample.
+    y (1D array): observations from the second sample.
+
+    Returns:
+    (MannwhitneyuResult): the smaller of the two U statistics, and the p-value
+    for the larger one under a normal approximation with a continuity correction
+    and a correction for ties. Named so that a frame built from a column of
+    these results carries the `statistic` and `pvalue` names its readers use.
+
+    The p-value is one-sided, and which side is decided by the data rather than
+    by the caller: it is always computed for whichever sample ranks higher. That
+    makes it half the two-sided value, so a result is twice as easy to call
+    significant as the two-sided test everyone assumes is running. This
+    reproduces the statistic every published moseq2 syllable comparison was made
+    with, and changing it is a decision about the science rather than about
+    which version of scipy is installed.
+    """
+
+    x, y = np.asarray(x), np.asarray(y)
+    n1, n2 = len(x), len(y)
+    ranked = stats.rankdata(np.concatenate((x, y)))
+    u1 = n1 * n2 + (n1 * (n1 + 1)) / 2.0 - np.sum(ranked[:n1], axis=0)
+    u2 = n1 * n2 - u1
+    tie_correction = stats.tiecorrect(ranked)
+    if tie_correction == 0:
+        raise ValueError("All numbers are identical in mannwhitneyu")
+    sd = np.sqrt(tie_correction * n1 * n2 * (n1 + n2 + 1) / 12.0)
+    # The continuity correction is applied unconditionally, including where the
+    # two U statistics are equal; scipy scales it by the sign of z instead,
+    # which drops it exactly at that point.
+    z = (max(u1, u2) - (n1 * n2 / 2.0 + 0.5)) / sd
+    return MannwhitneyuResult(min(u1, u2), stats.norm.sf(abs(z)))
+
+
 def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose=False, **kwargs):
     """
     Runs a Mann-Whitney hypothesis test with multiple test corrections on two given groups to find significant syllables.
@@ -500,7 +552,7 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
 
     df_mw_real = pd.DataFrame(
         [
-            stats.mannwhitneyu(
+            mannwhitneyu(
                 *np.array_split(merged_usages_all[:, s_i], np.cumsum(n_per_group[:-1]))
             )
             for s_i in range(N_s)

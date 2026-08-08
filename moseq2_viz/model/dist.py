@@ -207,9 +207,7 @@ def get_behavioral_distance(
             else:
                 print("Computing DTW matrix (this may take a minute)...")
                 full_dist_mat = _pairwise_dtw_matrix(
-                    dtw_ndim.distance_matrix(
-                        pc_mat, parallel=parallel, show_progress=True
-                    )
+                    _dtw_distance_matrix(pc_mat, parallel=parallel)
                 )
                 reduced_mat = reformat_dtw_distances(full_dist_mat, len(pc_slices))
                 dist_dict["pca[dtw]"] = reduced_mat
@@ -260,9 +258,7 @@ def get_behavioral_distance(
             pc_mat = np.concatenate(pc_slices, axis=0)
 
             full_dist_mat = _pairwise_dtw_matrix(
-                dtw_ndim.distance_matrix(
-                    pc_mat, parallel=parallel, show_progress=True
-                )
+                _dtw_distance_matrix(pc_mat, parallel=parallel)
             )
             reduced_mat = reformat_dtw_distances(full_dist_mat, len(pc_slices))
             dist_dict["combined"] = reduced_mat
@@ -316,9 +312,7 @@ def get_behavioral_distance_ar(
     elif dist.lower() == "dtw":
         print("Computing DTW matrix (this may take a minute)...")
         ar_dist = _pairwise_dtw_matrix(
-            dtw_ndim.distance_matrix(
-                ar_traj, parallel=parallel, show_progress=True
-            )
+            _dtw_distance_matrix(ar_traj, parallel=parallel)
         )
         ar_dist = reformat_dtw_distances(
             ar_dist, nsyllables=ar_dist.shape[0], rescale=False
@@ -386,6 +380,33 @@ def get_init_points(pca_scores, model_labels, max_syllable=40, nlags=3, npcs=10)
         syll_average[i] /= count[i].astype("float")
 
     return syll_average
+
+
+def _dtw_distance_matrix(sequences, parallel=False):
+    """
+    Compute pairwise DTW distances between multi-dimensional sequences.
+
+    Args:
+    sequences (3D array): the trajectories to compare.
+    parallel (bool): request the multiprocessing path.
+
+    Returns:
+    (2D array): the pairwise distance matrix.
+
+    The multiprocessing path is asked for and not used. dtaidistance's
+    n-dimensional entry point forwards `use_ndim` into an options dict that its
+    worker then supplies again, so every parallel n-dimensional call raises
+    `TypeError`; its compiled alternatives are no help either, since one needs
+    float64 input and the other fails to load. Serial and parallel produce
+    bitwise identical matrices, so the only thing lost by ignoring the request
+    is the speedup.
+    """
+
+    if parallel:
+        warnings.warn("dtaidistance cannot compute n-dimensional distances in "
+                      "parallel; computing them serially instead.")
+    return dtw_ndim.distance_matrix(sequences, parallel=False,
+                                    show_progress=True)
 
 
 def _pairwise_dtw_matrix(mat):

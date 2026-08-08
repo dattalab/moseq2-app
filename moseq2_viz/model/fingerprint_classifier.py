@@ -365,7 +365,12 @@ def classifier_fingerprint(
 
     # set up model type
     Model = LogisticRegression if model_type == "lr" else LinearSVC
-    clf = Model(multi_class="ovr")
+    # scikit-learn's logistic regression chose liblinear until 0.22 and lbfgs
+    # after, and the two land on visibly different coefficients: naming the
+    # solver keeps the weights this reports comparable with the ones it has
+    # always reported. LinearSVC has no such parameter.
+    solver = {"solver": "liblinear"} if model_type == "lr" else {}
+    clf = Model(multi_class="ovr", **solver)
 
     if param_search:
         if C_list is None:

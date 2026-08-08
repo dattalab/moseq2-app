@@ -12,7 +12,6 @@ import seaborn as sns
 import matplotlib as mpl
 from tqdm.auto import tqdm
 from os.path import dirname
-from scipy.stats import mode
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from moseq2_viz.model.util import sort_syllables_by_stat, sort_syllables_by_stat_difference
@@ -628,6 +627,34 @@ def plot_verbose_heatmap(pdfs, sessions, groups, subjectNames, normalize=False, 
     return fig
 
 
+def mode(a):
+    """
+    Compute the modal value of a 1-D array, and how many times it occurs.
+
+    Args:
+    a (1D array): values to find the most common of.
+
+    Returns:
+    (tuple): a one-element array holding the modal value, and one holding its
+    count. Both are empty when the input is.
+
+    NaN is not a value here: it is counted once per occurrence rather than
+    pooled, so it can only come out as the mode when there is nothing else to
+    choose. The callers below compute a modal duration next to `np.nanmean` and
+    `np.nanmedian` of the same array, and a pooled NaN would win outright in any
+    distribution where missing frames outnumbered the commonest duration. Ties
+    resolve to the smallest value, and an empty input yields empty arrays, so
+    indexing the result raises.
+    """
+
+    a = np.asarray(a)
+    if a.size == 0:
+        return np.array([]), np.array([])
+    values, counts = np.unique(a, return_counts=True, equal_nan=False)
+    most = counts.argmax()
+    return np.array([values[most]]), np.array([counts[most]])
+
+
 def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, bw_adjust=0.4):
     """
     Plot the duration distributions for model labels and model free changepoints.
@@ -654,15 +681,15 @@ def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, b
 
     # Plot best model description
     s = f'Best Model CP Stats: Mean, median, mode (s) = {np.nanmean(model_cps):.4f},' \
-        f' {np.nanmedian(model_cps):.4f}, {mode(model_cps, keepdims=True)[0][0]:.4f}'
+        f' {np.nanmedian(model_cps):.4f}, {mode(model_cps)[0][0]:.4f}'
     # Plot PC CP description
     t = f'PC CP Stats: Mean, median, mode (s) = {np.nanmean(pc_cps):.4f}, ' \
-        f'{np.nanmedian(pc_cps):.4f}, {mode(pc_cps, keepdims=True)[0][0]:.4f}'
+        f'{np.nanmedian(pc_cps):.4f}, {mode(pc_cps)[0][0]:.4f}'
     
     # saving model kappa scan stats
     model_stats = None
     # record changepoint stats
-    changepoint_stats = [np.nanmean(pc_cps), np.nanmedian(pc_cps), mode(pc_cps, keepdims=True)[0][0]]
+    changepoint_stats = [np.nanmean(pc_cps), np.nanmedian(pc_cps), mode(pc_cps)[0][0]]
 
     if not plot_all and best_model is not None:
         # clipping the changepoints at 10 seconds
@@ -679,11 +706,17 @@ def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, b
             kappa = v['model_parameters']['kappa']
             model_cps = v['changepoints']
             # append model stats
-            model_stats.append([k, kappa, np.nanmean(model_cps), np.nanmedian(model_cps), mode(model_cps, keepdims=True)[0][0]]+ changepoint_stats)
+            model_stats.append([k, kappa, np.nanmean(model_cps), np.nanmedian(model_cps), mode(model_cps)[0][0]]+ changepoint_stats)
             # clipping the changepoints at 10 seconds
             ax = sns.kdeplot(model_cps[model_cps<10], ax=ax, linestyle=ls, alpha=alpha, bw_adjust=bw_adjust,
                         color=palette[i], label=f'Model Changepoints Kappa={kappa:1.02E}')
         model_stats = pd.DataFrame(model_stats, columns=['file_name', 'model_kappa', 'model_mean', 'model_median', 'model_mode', 'pc_mean', 'pc_median', 'pc_mode'])
+        # The statistics inherit their width from the changepoint arrays, which
+        # are float32 when they come off a PCA changepoint file. Widening them
+        # keeps this table, and the CSV written from it, at the precision it has
+        # always been written with.
+        model_stats = model_stats.astype(
+            {column: 'float64' for column in model_stats.columns[1:]})
 
     # Format plot
     ax.set_xlim(0, 2)
