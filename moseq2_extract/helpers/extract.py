@@ -3,7 +3,7 @@ Extraction-helper utility functions.
 """
 
 import numpy as np
-import ruamel.yaml as yaml
+from moseq2_extract._yaml import write_yaml
 from os.path import exists, basename, dirname, join, abspath
 from os import makedirs, system
 from tqdm.auto import tqdm
@@ -243,7 +243,7 @@ def run_slurm_extract(input_dir, to_extract, config_data, skip_extracted=False):
             session_key = basename(dirname(depth_file))
 
             with open(output_file, "w") as f:
-                yaml.safe_dump(session_configs.get(session_key, config_data), f)
+                write_yaml(session_configs.get(session_key, config_data), f)
 
     # Construct sbatch command for slurm
     commands = ""

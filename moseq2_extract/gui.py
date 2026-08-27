@@ -3,7 +3,7 @@ GUI front-end operations accessible from a jupyter notebook.
 """
 
 import os
-import ruamel.yaml as yaml
+from moseq2_extract._yaml import write_yaml
 from ast import literal_eval
 from os.path import dirname, basename, exists, join
 from moseq2_extract.util import read_yaml
@@ -141,13 +141,13 @@ def generate_config_command(output_file, camera_type="k2"):
         if ow.lower() == "y":
             # Updating config file
             with open(output_file, "w") as f:
-                yaml.safe_dump(params, f)
+                write_yaml(params, f)
         else:
             return "Configuration file has been retained"
     else:
         print("Creating configuration file.")
         with open(output_file, "w") as f:
-            yaml.safe_dump(params, f)
+            write_yaml(params, f)
 
     return "Configuration file has been successfully generated."
 
@@ -310,7 +310,7 @@ def find_roi_command(
     get_roi_wrapper(input_file, config_data, output_dir)
 
     with open(config_file, "w") as g:
-        yaml.safe_dump(config_data, g)
+        write_yaml(config_data, g)
 
     images, filenames = read_tiff_files(output_dir)
 

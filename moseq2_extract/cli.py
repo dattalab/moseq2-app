@@ -4,7 +4,7 @@ CLI for extracting the depth data.
 
 import os
 import click
-import ruamel.yaml as yaml
+from moseq2_extract._yaml import write_yaml
 from tqdm.auto import tqdm
 from copy import deepcopy
 from moseq2_extract.util import (
@@ -637,7 +637,7 @@ def generate_config(output_file, camera_type):
         params["camera_type"] = "azure"
 
     with open(output_file, "w") as f:
-        yaml.safe_dump(params, f)
+        write_yaml(params, f)
 
     print("Successfully generated config file in base directory.")
 

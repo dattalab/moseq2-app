@@ -13,7 +13,8 @@ import warnings
 import numpy as np
 from glob import glob
 from copy import deepcopy
-from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedSeq
+from moseq2_extract._yaml import read_yaml as _read_yaml
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -75,7 +76,7 @@ def command_with_config(config_file_param_name):
                 config_data['output_file'] = None
 
                 # modified to only use keys that are actually defined in options and the value is not not none
-                config_data = {k: tuple(v) if isinstance(v, yaml.comments.CommentedSeq) else v
+                config_data = {k: tuple(v) if isinstance(v, CommentedSeq) else v
                                for k, v in config_data.items() if k in param_defaults.keys() and v is not None}
 
                 # find differences btw config and param defaults
@@ -759,10 +760,7 @@ def read_yaml(yaml_file):
     Returns:
     return_dict (dict): dict of yaml contents
     """
-    yaml = YAML(typ='safe')
-    with open(yaml_file, 'r') as yfile:
-        data = yaml.load(yfile)
-    return data
+    return _read_yaml(yaml_file)
 
 def mouse_threshold_filter(h5file, thresh=0):
     """
