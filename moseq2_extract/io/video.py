@@ -566,6 +566,19 @@ def write_frames_preview(
         disp_img[disp_img < 0] = 0
         disp_img[disp_img > 1] = 1
         disp_img = np.delete(use_cmap(disp_img), 3, 2) * 255
+        # OpenCV 5 asserts img.depth() == CV_8U in putText, where 4.x drew onto
+        # a float image without complaint. The colormap hands back float64 in
+        # 0-255, so the cast to uint8 that used to happen at the pipe write
+        # below now happens here, before the frame number is drawn.
+        #
+        # This is not pixel-identical, and the difference is confined to the
+        # text. It is drawn with LINE_AA, so its antialiased edges blend against
+        # whatever precision the image carries, and blending in uint8 rather
+        # than in float64 moves the boundary pixels of the digits. Every other
+        # pixel is unchanged: the cast is the same truncation wherever it runs.
+        # The artifact is the preview movie's frame-number overlay, which is for
+        # looking at rather than measuring.
+        disp_img = disp_img.astype("uint8")
         if frame_range is not None:
             try:
                 cv2.putText(
@@ -583,7 +596,7 @@ def write_frames_preview(
                 # txt_pos is outside of the frame dimensions
                 print("Could not overlay frame number on preview on video.")
 
-        pipe.stdin.write(disp_img.astype("uint8").tostring())
+        pipe.stdin.write(disp_img.tostring())
 
     if close_pipe:
         pipe.communicate()

@@ -166,7 +166,9 @@ def common_roi_options(function):
         default=False,
         help="Overwrite previously computed background image",
     )(function)
-    function = click.option("--config-file", type=click.Path())(function)
+    function = click.option(
+        "--config-file", type=click.Path(), default=None
+    )(function)
     function = click.option(
         "--progress-bar", "-p", is_flag=True, help="Show verbose progress bars."
     )(function)

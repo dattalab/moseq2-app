@@ -76,8 +76,18 @@ def write_image(
     if not exists(directory):
         os.makedirs(directory)
 
+    # skimage's bundled tifffile took ``compress`` as a zlib level from 0 to 9,
+    # where 0 meant uncompressed. Standalone tifffile renamed the argument to
+    # ``compression`` and changed what it carries: a scheme name, with the level
+    # moved to ``compressionargs``. Nothing in this package passes a level, so
+    # every file it writes is uncompressed under either spelling.
+    if compress:
+        compression = {"compression": "deflate", "compressionargs": {"level": compress}}
+    else:
+        compression = {}
+
     tifffile.imwrite(
-        file, image.astype(frame_dtype), compress=compress, metadata=metadata
+        file, image.astype(frame_dtype), metadata=metadata, **compression
     )
 
 
@@ -94,13 +104,22 @@ def read_image(filename, scale=True, scale_key="scale_factor"):
     image (numpy.ndarray): loaded image
     """
 
+    # Both reads happen inside the ``with``. tifffile decodes lazily, so the
+    # handle has to be open for them; the original bound a second name to the
+    # TiffFile and read after the block closed it, which worked only because
+    # skimage's bundled copy had already decoded everything on open.
+    #
+    # The tag is reached differently too. Its key was ``image_description`` and
+    # is now ``ImageDescription``, and ``as_str()`` is gone in favour of
+    # ``value``. The two return different things: ``as_str()`` gave the repr of
+    # a bytes object, so the old ``[2:-1]`` was stripping the ``b'`` and the
+    # closing quote off it. ``value`` is the string itself, so the slice goes.
     with tifffile.TiffFile(filename) as tif:
-        tmp = tif
-
-    image = tmp.asarray()
+        image = tif.asarray()
+        description = tif.pages[0].tags["ImageDescription"].value if scale else None
 
     if scale:
-        image_desc = json.loads(tmp.pages[0].tags["image_description"].as_str()[2:-1])
+        image_desc = json.loads(description)
 
         try:
             scale_factor = int(image_desc[scale_key])

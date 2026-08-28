@@ -153,7 +153,7 @@ def build_manifest(loaded, format, snake_case=True):
         {
             "filename": "feedback_ts.txt",
             "var_name": "realtime_feedback",
-            "dtype": np.bool,
+            "dtype": bool,
         }
     )
 
@@ -162,7 +162,7 @@ def build_manifest(loaded, format, snake_case=True):
         {
             "filename": "predictions.txt",
             "var_name": "realtime_predictions",
-            "dtype": np.int,
+            "dtype": int,
         }
     )
 
@@ -463,7 +463,7 @@ def create_extract_h5(
     ] = "Computed background image"
 
     # Extract Version
-    extract_version = np.string_(version("moseq2-extract"))
+    extract_version = np.bytes_(version("moseq2-extract"))
     h5_file.create_dataset("metadata/extraction/extract_version", data=extract_version)
     h5_file["metadata/extraction/extract_version"].attrs[
         "description"

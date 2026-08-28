@@ -708,7 +708,7 @@ def load_textdata(data_file, dtype=np.float32):
             data.append(clean_data)
 
     data = np.stack(data, axis=0).squeeze()
-    timestamps = np.array(timestamps, dtype=np.int)
+    timestamps = np.array(timestamps, dtype=int)
 
     return data, timestamps
 
@@ -779,6 +779,40 @@ def mouse_threshold_filter(h5file, thresh=0):
         frames = f['frames'][:min(f['frames'].shape[0], 1000)]
     return np.nanmean(frames) > thresh
 
+def _read_dataset(dataset):
+    """A dataset's value, as h5py 2.10 handed it back.
+
+    HDF5 stores a character set and a length, not a Python type, and the two
+    h5py versions decide differently what to build from that. h5py 2.10 decoded
+    a variable-length UTF-8 string to ``str``; h5py 3 returns the undecoded
+    ``bytes``. Fixed-width ``|S`` datasets were ``bytes`` under both, so
+    decoding everything would move that class in the other direction.
+
+    The distinction only survives in the dtype. Once a ``bytes`` is in hand
+    there is no way to tell which kind of dataset produced it, which is why the
+    test is ``check_string_dtype`` on the dataset rather than ``isinstance`` on
+    the value. That call exists in both versions and answers the same way in
+    both.
+
+    The type of the value is then checked as well, because on h5py 2 the
+    decoding has already happened and there is nothing left to do. That makes
+    this inert on the stack the reference was recorded against.
+
+    Applied per element rather than to the whole result, since a dataset may
+    hold an array of strings.
+    """
+    value = dataset[()]
+    info = h5py.check_string_dtype(dataset.dtype)
+    if info is None or info.length is not None or info.encoding != "utf-8":
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, np.ndarray) and value.dtype == object:
+        return np.array([v.decode("utf-8") if isinstance(v, bytes) else v
+                         for v in value.ravel()], dtype=object).reshape(value.shape)
+    return value
+
+
 def _load_h5_to_dict(file: h5py.File, path) -> dict:
     """
     Loads h5 contents to dictionary object.
@@ -794,7 +828,7 @@ def _load_h5_to_dict(file: h5py.File, path) -> dict:
     ans = {}
     for key, item in file[path].items():
         if isinstance(item, h5py._hl.dataset.Dataset):
-            ans[key] = item[()]
+            ans[key] = _read_dataset(item)
         elif isinstance(item, h5py._hl.group.Group):
             ans[key] = _load_h5_to_dict(file, '/'.join([path, key]))
     return ans
@@ -838,7 +872,7 @@ def clean_dict(dct):
         elif isinstance(e, np.ndarray):
             out = e.tolist()
         elif isinstance(e, np.generic):
-            out = np.asscalar(e)
+            out = e.item()
         else:
             out = e
         return out
