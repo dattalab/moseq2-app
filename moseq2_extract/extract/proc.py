@@ -3,7 +3,6 @@ Video pre-processing utilities for detecting ROIs and extracting raw data.
 """
 
 import cv2
-import joblib
 import tarfile
 import scipy.stats
 import numpy as np
@@ -18,6 +17,10 @@ import moseq2_extract.extract.roi
 from os.path import exists, join, dirname
 from moseq2_extract.io.image import read_image, write_image
 from moseq2_extract.util import convert_pxs_to_mm, strided_app
+from moseq2_extract.extract.flip_classifier import (
+    load_flip_classifier,
+    is_legacy_pickle_failure,
+)
 
 
 def get_flips(frames, flip_file=None, smoothing=None):
@@ -34,10 +37,24 @@ def get_flips(frames, flip_file=None, smoothing=None):
     """
 
     try:
-        clf = joblib.load(flip_file)
+        clf = load_flip_classifier(flip_file)
     except IOError:
         print(f"Could not open file {flip_file}")
         raise
+    except Exception as exc:
+        # Only the failure this port introduces is reported differently. A file
+        # that is not a classifier failed the same way before the port and has
+        # to keep failing the same way, or the port has changed behaviour on an
+        # input that never needed changing.
+        if not is_legacy_pickle_failure(exc):
+            raise
+        raise ValueError(
+            f"Could not read the flip classifier {flip_file}: "
+            f"{type(exc).__name__}: {exc}\n"
+            "Classifiers published before 2026 are scikit-learn 0.19 pickles, "
+            "which this version cannot read. Download the converted classifier "
+            "with: moseq2-extract download-flip-file"
+        )
 
     flip_class = np.where(clf.classes_ == 1)[0]
 

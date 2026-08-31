@@ -8,7 +8,6 @@ import math
 import uuid
 import h5py
 import shutil
-import joblib
 import warnings
 from glob import glob
 import numpy as np
@@ -22,6 +21,7 @@ from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from os.path import join, exists, dirname, basename, abspath, splitext
 from moseq2_extract.io.video import load_movie_data, get_movie_info, write_frames
+from moseq2_extract.extract.flip_classifier import load_flip_classifier
 from moseq2_extract.util import mouse_threshold_filter, filter_warnings, read_yaml
 from moseq2_extract.helpers.data import (
     handle_extract_metadata,
@@ -352,8 +352,21 @@ def validate_flip_classifier(config_data):
 
     crop_size = config_data.get("crop_size", (80, 80))
 
+    # load_flip_classifier rather than joblib.load, for two reasons that each
+    # disable this check on their own. joblib cannot read the pickle-free npz
+    # the package now publishes, and the bare except below turns that into a
+    # silent return, so the guard stops running for every classifier a current
+    # install downloads. And scikit-learn removed n_features_ in 1.2, so even a
+    # classifier that loaded would fall through the getattr; the FlipClassifier
+    # this loader returns defines the attribute itself, which is what brings the
+    # comparison back.
+    #
+    # The except stays as broad as it was. A file that is not a classifier
+    # skipped this check before the port and has to keep skipping it: a config
+    # naming a corrupt classifier should still reach extraction the way it
+    # always did, rather than being stopped here for a new reason.
     try:
-        clf = joblib.load(flip_classifier)
+        clf = load_flip_classifier(flip_classifier)
     except Exception:
         return
 
@@ -617,11 +630,25 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
     None
     """
 
+    # The classifiers published before 2026 are scikit-learn 0.20 pickles, and a
+    # pickle records the module path of the class it was made from --
+    # sklearn.ensemble.forest, renamed to sklearn.ensemble._forest in 0.22. No
+    # modern scikit-learn can unpickle them, and no amount of care at this end
+    # changes that, because the incompatibility is inside the file.
+    #
+    # These are the same four forests transcribed into pickle-free .npz archives
+    # of plain arrays, read by moseq2_extract.extract.flip_classifier. Nothing
+    # about them names a class or a library version, so they cannot rot the same
+    # way, and the package no longer imports scikit-learn at all.
+    #
+    # The originals are still served at the URLs they always were; these were
+    # published beside them under new names rather than replacing them, so an
+    # older moseq2-extract keeps downloading exactly what it downloaded before.
     flip_files = {
-        "large mice with fibers (K2)": "https://storage.googleapis.com/flip-classifiers/flip_classifier_k2_largemicewithfiber.pkl",
-        "adult male c57s (K2)": "https://storage.googleapis.com/flip-classifiers/flip_classifier_k2_c57_10to13weeks.pkl",
-        "mice with Inscopix cables (K2)": "https://storage.googleapis.com/flip-classifiers/flip_classifier_k2_inscopix.pkl",
-        "adult male c57s (Azure)": "https://moseq-data.s3.amazonaws.com/flip-classifier-azure-temp.pkl",
+        "large mice with fibers (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_largemicewithfiber.npz",
+        "adult male c57s (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_c57_10to13weeks.npz",
+        "mice with Inscopix cables (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_inscopix.npz",
+        "adult male c57s (Azure)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_azure_temp.npz",
     }
 
     key_list = list(flip_files)

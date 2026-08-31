@@ -13,17 +13,32 @@ dependencies = [
     "click>=7.0",
     "cytoolz>=0.10.1",
     "h5py>=2.10.0",
+    # Only for reading a classifier saved before 2026: those are pickles,
+    # and flip_classifier.py hands one to joblib rather than refusing it
+    # outright. The classifiers this package downloads are pickle-free npz
+    # archives read with numpy, and nothing here imports scikit-learn.
     "joblib>=0.15.1",
     "matplotlib>=3.1.2",
     "numpy>=1.18.3",
     "opencv-python>=4.1.2.30",
     "ruamel.yaml>=0.16.5",
     "scikit-image>=0.16.2",
-    "scikit-learn>=0.20.3",
     "scipy>=1.3.2",
     "statsmodels>=0.10.2",
     "tqdm>=4.48.0",
     "tifffile>=2024.7.24",
+]
+
+# ffmpeg is not a Python package and cannot go in `dependencies`: the package
+# invokes `ffmpeg` and `ffprobe` as subprocesses and takes whatever is on PATH.
+# PEP 725 is the declaration for that, and nothing consumes it yet -- pip
+# ignores this table -- so the enforcement is the check at the CLI entry point
+# in moseq2_extract/cli.py and the note in README.md. This is the machine
+# readable record of the same requirement.
+[external]
+dependencies = [
+    "virtual:executable/ffmpeg",
+    "virtual:executable/ffprobe",
 ]
 
 [project.optional-dependencies]

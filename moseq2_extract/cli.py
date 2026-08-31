@@ -3,6 +3,8 @@ CLI for extracting the depth data.
 """
 
 import os
+import shutil
+import sys
 import click
 from moseq2_extract._yaml import write_yaml
 from tqdm.auto import tqdm
@@ -35,10 +37,63 @@ def new_init(self, *args, **kwargs):
 click.core.Option.__init__ = new_init
 
 
+#: The two programs this package runs as subprocesses. Neither is a Python
+#: package, so neither can be declared in pyproject.toml's `dependencies` and
+#: neither arrives with an install.
+_REQUIRED_EXECUTABLES = ("ffmpeg", "ffprobe")
+
+#: The commands that reach io/video.py, which is the only module that spawns
+#: either program. The rest -- generate-config, generate-index,
+#: aggregate-results, download-flip-file -- read and write yaml, h5 and files on
+#: disk, and work perfectly well with no ffmpeg installed at all. Requiring it
+#: from them would refuse to write a config file over a video decoder that
+#: writing a config file does not use.
+_NEEDS_EXECUTABLES = frozenset((
+    "extract",
+    "batch-extract",
+    "find-roi",
+    "convert-raw-to-avi",
+    "copy-slice",
+))
+
+
+def _check_executables(subcommand):
+    """Refuse to start rather than fail partway through a recording.
+
+    Every video read and every video write shells out by bare name. Without this
+    the first sign of a missing ffmpeg is a FileNotFoundError raised inside a
+    pipe, which on a batch of sessions arrives after the first one has already
+    been read and can look like a corrupt recording rather than a missing
+    program.
+
+    Asking for help is exempt. A user who cannot run a command should still be
+    able to read what it would have done, and refusing that is how a missing
+    dependency turns into a user who cannot find out what they are missing.
+    """
+    if subcommand not in _NEEDS_EXECUTABLES:
+        return
+    if "--help" in sys.argv:
+        return
+    missing = [name for name in _REQUIRED_EXECUTABLES
+               if shutil.which(name) is None]
+    if not missing:
+        return
+    raise click.ClickException(
+        "moseq2-extract needs %s on your PATH, and cannot find %s.\n\n"
+        "These are not Python packages and installing moseq2-extract does not\n"
+        "provide them. Install them with one of:\n\n"
+        "    conda install -c conda-forge ffmpeg\n"
+        "    sudo apt install ffmpeg\n"
+        "    brew install ffmpeg\n"
+        % (" and ".join(_REQUIRED_EXECUTABLES), " and ".join(missing)))
+
+
 @click.group()
 @click.version_option()
-def cli():
-    pass
+@click.pass_context
+def cli(ctx):
+    _check_executables(ctx.invoked_subcommand)
+
 
 
 def common_roi_options(function):
@@ -85,7 +140,7 @@ def common_roi_options(function):
     )(function)
     function = click.option(
         "--manual-set-depth-range",
-        is_flag=True,
+        is_flag=True, default=False,
         help="Flag to deactivate auto depth range setting.",
     )(function)
     function = click.option(
@@ -158,7 +213,7 @@ def common_roi_options(function):
     )(function)
     function = click.option(
         "--use-plane-bground",
-        is_flag=True,
+        is_flag=True, default=False,
         help="Use a plane fit for the background. Useful when mice don't move much",
     )(function)
     function = click.option(
@@ -170,7 +225,7 @@ def common_roi_options(function):
         "--config-file", type=click.Path(), default=None
     )(function)
     function = click.option(
-        "--progress-bar", "-p", is_flag=True, help="Show verbose progress bars."
+        "--progress-bar", "-p", is_flag=True, default=False, help="Show verbose progress bars."
     )(function)
     return function
 
@@ -198,7 +253,7 @@ def common_avi_options(function):
     )(function)
     function = click.option("--fps", type=float, default=30, help="Video FPS")(function)
     function = click.option(
-        "--delete", is_flag=True, help="Delete raw file if encoding is sucessful"
+        "--delete", is_flag=True, default=False, help="Delete raw file if encoding is sucessful"
     )(function)
     function = click.option(
         "-t", "--threads", type=int, default=8, help="Number of threads for encoding"
@@ -260,7 +315,7 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
     )(function)
     function = click.option(
         "--compute-raw-scalars",
-        is_flag=True,
+        is_flag=True, default=False,
         help="Compute scalar values from raw cropped frames.",
     )(function)
     function = click.option(
@@ -444,7 +499,7 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
     )(function)
     function = click.option(
         "--skip-completed",
-        is_flag=True,
+        is_flag=True, default=False,
         help="Will skip the extraction if it is already completed.",
     )(function)
 
@@ -504,7 +559,7 @@ def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 )
 @click.option(
     "--skip-checks",
-    is_flag=True,
+    is_flag=True, default=False,
     help="Flag: skip checks for the existance of a metadata file",
 )
 @click.option(
@@ -536,7 +591,7 @@ def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 @click.option(
     "--get-cmd", is_flag=True, default=True, help="Print scan command strings."
 )
-@click.option("--run-cmd", is_flag=True, help="Run scan command strings.")
+@click.option("--run-cmd", is_flag=True, default=False, help="Run scan command strings.")
 def batch_extract(
     input_folder,
     output_dir,
