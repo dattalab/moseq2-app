@@ -140,7 +140,12 @@ def changepoint_dist(cps, headless=False):
         ax.set_xlim((0, 2))
         ax.set_xticks(np.linspace(0, 2, 11))
 
-        s = f'Mean, median, mode (s) = {np.mean(cps):.4f} {np.median(cps):.4f}, {mode(cps)[0][0][0]:.4f}'
+        # `mode` reduces away the axis it works over, and how many dimensions
+        # survive that depends on the scipy version, so the modal value is
+        # flattened out rather than reached through a fixed number of
+        # subscripts. `cps` is (n, 1), so the reduction leaves one value.
+        modal = np.ravel(mode(cps)[0])[0]
+        s = f'Mean, median, mode (s) = {np.mean(cps):.4f} {np.median(cps):.4f}, {modal:.4f}'
         plt.text(.5, 2, s, fontsize=12)
         plt.ylabel('P(block duration)')
         plt.xlabel('Block duration (s)')

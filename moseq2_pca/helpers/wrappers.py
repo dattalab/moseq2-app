@@ -10,7 +10,7 @@ import datetime
 import warnings
 import numpy as np
 import dask.array as da
-import ruamel.yaml as yaml
+from moseq2_pca._yaml import write_yaml
 from tqdm.auto import tqdm
 from moseq2_pca.viz import plot_pca_results, changepoint_dist
 from os.path import abspath, join, exists, splitext, basename, dirname
@@ -155,8 +155,7 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
 
     # Update PCA config yaml file
     config_store = f'{save_file}.yaml'
-    with open(config_store, 'w') as f:
-        yaml.safe_dump(params, f)
+    write_yaml(params, config_store)
 
     # Compute Principal Components
     try:

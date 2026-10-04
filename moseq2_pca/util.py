@@ -8,6 +8,7 @@ import h5py
 import time
 import dask
 import click
+from click.core import ParameterSource
 import psutil
 import warnings
 import platform
@@ -16,7 +17,7 @@ import numpy as np
 import scipy.signal
 from glob import glob
 from copy import deepcopy
-import ruamel.yaml as yaml
+from moseq2_pca._yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
 from dask_jobqueue import SLURMCluster
@@ -41,12 +42,6 @@ def command_with_config(config_file_param_name):
 
         def invoke(self, ctx):
             config_file = ctx.params[config_file_param_name]
-            param_defaults = {}
-            
-            # put default parameters in param_defaults dictionary
-            for param in self.params:
-                if type(param) is click.core.Option:
-                    param_defaults[param.human_readable_name] = param.default
 
             if config_file is not None:
                 # read params from config_file
@@ -67,8 +62,12 @@ def command_with_config(config_file_param_name):
                         else:
                             ctx.params[param] = config_data[param]
 
-                        # overwrite the parameter if users specify params with cli options
-                        if param_defaults[param] != value:
+                        # a value the user typed on the command line outranks the
+                        # config file. click records where each value came from, which
+                        # answers that directly; comparing the resolved value against
+                        # the declared default cannot, because the two coincide
+                        # whenever someone passes an option at its default value.
+                        if ctx.get_parameter_source(param) is ParameterSource.COMMANDLINE:
                             ctx.params[param] = value
 
                 # removed flags
@@ -77,8 +76,7 @@ def command_with_config(config_file_param_name):
                 # combine params with config_params
                 config_data = {**config_data, **combined}
                 # write parameters to config_file
-                with open(config_file, 'w') as f:
-                    yaml.safe_dump(config_data, f)
+                write_yaml(config_data, config_file)
             return super(custom_command_class, self).invoke(ctx)
 
     return custom_command_class
@@ -311,8 +309,7 @@ def read_yaml(yaml_file):
     """
 
     try:
-        with open(yaml_file, 'r') as f:
-            return_dict = yaml.safe_load(f)
+        return_dict = _read_yaml(yaml_file)
     except IOError:
         return_dict = {}
 
@@ -409,10 +406,35 @@ def h5_to_dict(h5file, path):
 
     for key, item in h5file[path].items():
         if isinstance(item, h5py._hl.dataset.Dataset):
-            ans[key] = item[()]
+            ans[key] = _read_dataset(item)
         elif isinstance(item, h5py._hl.group.Group):
             ans[key] = h5_to_dict(h5file, path + key + '/')
     return ans
+
+
+def _read_dataset(dataset):
+    """Read one dataset, decoding variable-length UTF-8 strings to `str`.
+
+    h5py 3 returns the stored bytes for a string dataset and supplies
+    `asstr()` to decode them; h5py 2 decodes variable-length UTF-8 on read and
+    has no `asstr()`. Decoding here keeps a session's uuid, subject name and
+    acquisition timestamps coming back as `str` on either, which matters
+    because callers compare those against strings read from YAML indexes and
+    use them as dictionary keys, where `b'...'` and `'...'` do not match.
+
+    Only variable-length UTF-8 is decoded. Fixed-length and ASCII string
+    datasets come back as `bytes` under h5py 2 as well, so decoding those would
+    introduce a difference rather than remove one.
+
+    A dataset with a null dataspace, which has `shape` of None and is how an
+    extraction records a parameter left unset, is read directly. It holds no
+    value to decode, and `asstr()` raises on one.
+    """
+    info = h5py.check_string_dtype(dataset.dtype)
+    if (info is not None and info.length is None and info.encoding == 'utf-8'
+            and dataset.shape is not None and hasattr(dataset, 'asstr')):
+        return dataset.asstr()[()]
+    return dataset[()]
 
 
 def set_dask_config(memory={'target': 0.85, 'spill': False, 'pause': False, 'terminate': 0.95}):
@@ -692,11 +714,9 @@ def combine_new_config(config_file, config_data):
         config_data (dict): dictionary of config data
     """
     # open the config file
-    with open (config_file, 'r') as f:
-        temp_config = yaml.safe_load(f)
+    temp_config = _read_yaml(config_file)
     # combining config data with the existing config file
     config_data = {**temp_config, **config_data}
     # ensure output_file and output_dir are not in config_data or reusing config for extraction will fail
     config_data = {k:v for k, v in config_data.items() if k not in ('output_dir', 'output_file')}
-    with open(config_file, 'w') as f:
-        yaml.safe_dump(config_data, f)
+    write_yaml(config_data, config_file)

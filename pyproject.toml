@@ -12,7 +12,7 @@ requires-python = ">=3.9,<3.13"
 dependencies = [
     "bokeh>=2.4.2",
     "chest>=0.2.3",
-    "click>=7.0",
+    "click>=8.0",
     "dask-jobqueue>=0.7.3",
     "dask>=2.30.0",
     "distributed>=2.30.1",
@@ -20,6 +20,7 @@ dependencies = [
     "joblib>=0.15.1",
     "matplotlib>=3.1.2",
     "numpy>=1.18.3",
+    "opencv-python>=4.1.2.30",
     "pathspec>=0.5.3",
     "psutil>=5.6.7",
     "ruamel.yaml>=0.16.5",

@@ -4,7 +4,6 @@ CLI for PCA and model-free changepoint analysis.
 
 import os
 import click
-import ruamel.yaml as yaml
 from os.path import join, exists, expanduser
 from moseq2_pca.util import command_with_config, combine_new_config
 from moseq2_pca.helpers.wrappers import (train_pca_wrapper, apply_pca_wrapper,
@@ -41,7 +40,7 @@ def common_pca_options(function):
                   default='local', help='Compute enviornment the command runs in')(function)
     function = click.option('--input-dir', '-i', type=click.Path(), default=os.getcwd(), help='Directory to find extracted h5 files')(function)
     function = click.option('--output-dir', '-o', default=join(os.getcwd(), '_pca'), type=click.Path(), help='Directory to store PCA results')(function)
-    function = click.option('--config-file', type=click.Path(), help="Path to configuration file")(function)
+    function = click.option('--config-file', type=click.Path(), default=None, help="Path to configuration file")(function)
 
     function = click.option('--h5-path', default='/frames', type=str, help='Path to data in h5 files')(function)
     function = click.option('--h5-mask-path', default='/frames_mask', type=str, help="Path to log-likelihood mask in h5 files")(function)
@@ -85,7 +84,7 @@ def common_dask_parameters(function):
 @click.option('--gaussfilter-time', default=0, type=float, help="sigma for temporal filter for data (Gaussian)")
 @click.option('--medfilter-space', default=[0], type=int, help="kernel size for median spatial filter", multiple=True)
 @click.option('--medfilter-time', default=[0], type=int, help="kernel size for median temporal filter", multiple=True)
-@click.option('--missing-data', is_flag=True, type=bool, help="Use missing data PCA; will be automatically set to True if cable-filter-iters > 1 from the extract step.")
+@click.option('--missing-data', is_flag=True, default=False, type=bool, help="Use missing data PCA; will be automatically set to True if cable-filter-iters > 1 from the extract step.")
 @click.option('--missing-data-iters', default=10, type=int, help="number of missing data PCA iterations")
 @click.option('--mask-threshold', default=-16, type=float, help="Threshold for mask (missing data PCA only)")
 @click.option('--mask-height-threshold', default=5, type=float, help="Threshold for mask based on floor height")
@@ -93,7 +92,7 @@ def common_dask_parameters(function):
 @click.option('--max-height', default=120, type=int, help='Max mouse height from floor (mm)')
 @click.option('--tailfilter-size', default=(9, 9), type=(int, int), help='Tail filter size')
 @click.option('--tailfilter-shape', default='ellipse', type=str, help='Tail filter shape')
-@click.option('--use-fft', type=bool, is_flag=True, help='Use 2D fft')
+@click.option('--use-fft', type=bool, is_flag=True, default=False, help='Use 2D fft')
 @click.option('--train-on-subset', default=1, type=float, help="The fraction of the total frames the PCA is trained on; default PCA is trained on all frames")
 @click.option('--recon-pcs', type=int, default=10, help='Number of PCs to use for missing data reconstruction')
 @click.option('--rank', default=25, type=int, help="Rank for compressed SVD")
@@ -127,7 +126,7 @@ def train_pca(input_dir, output_dir, output_file, **cli_args):
 @click.option('--fill-gaps', default=True, type=bool, help='Fill dropped frames with nans')
 @click.option('--fps', default=30, type=int, help='Frames per second (frame rate)')
 @click.option('--detrend-window', default=0, type=float, help="Length of detrend window (in seconds, 0 for no detrending)")
-@click.option('--verbose', '-v', is_flag=True, help='Print sessions as they are being loaded.')
+@click.option('--verbose', '-v', is_flag=True, default=False, help='Print sessions as they are being loaded.')
 @click.option('--overwrite-pca-apply', default=False, type=bool, help='Used to bypass the pca overwrite question. If True: skip question, run automatically')
 def apply_pca(input_dir, output_dir, output_file, **cli_args):
     # function writes output pc score path to config_data
@@ -151,7 +150,7 @@ def apply_pca(input_dir, output_dir, output_file, **cli_args):
 @click.option('-s', '--sigma', type=float, default=3.5, help="Standard deviation of gaussian smoothing filter")
 @click.option('-d', '--dims', type=int, default=300, help="Number of random projections to use")
 @click.option('--fps', default=30, type=int, help="Frames per second (frame rate)")
-@click.option('--verbose', '-v', is_flag=True, help="Print sessions as they are being loaded.")
+@click.option('--verbose', '-v', is_flag=True, default=False, help="Print sessions as they are being loaded.")
 def compute_changepoints(input_dir, output_dir, output_file, **cli_args):
     # function writes output changepoint path to config_data
     config_data = compute_changepoints_wrapper(input_dir, cli_args, output_dir, output_file)
@@ -164,7 +163,7 @@ def compute_changepoints(input_dir, output_dir, output_file, **cli_args):
 @cli.command('clip-scores',  help='Clip specified number of frames from PCA scores at the beginning or end')
 @click.argument('pca_file', type=click.Path(exists=True, resolve_path=True))
 @click.argument('clip_samples', type=int)
-@click.option('--from-end', type=bool, is_flag=True, help="if true clip from end rather than beginning")
+@click.option('--from-end', type=bool, is_flag=True, default=False, help="if true clip from end rather than beginning")
 def clip_scores(pca_file, clip_samples, from_end):
     clip_scores_wrapper(pca_file, clip_samples, from_end)
 

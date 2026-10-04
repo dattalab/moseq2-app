@@ -3,7 +3,7 @@ Helper functions for reading and loading PCA data.
 """
 
 import h5py
-import ruamel.yaml as yaml
+from moseq2_pca._yaml import read_yaml as _read_yaml
 from os.path import join, exists, splitext
 from moseq2_pca.util import select_strel, read_yaml
 
@@ -63,7 +63,7 @@ def load_pcs_for_cp(pca_file, config_data):
 
     if exists(pca_yaml):
         with open(pca_yaml, 'r') as f:
-            pca_config = yaml.safe_load(f.read())
+            pca_config = _read_yaml(f)
 
             missing_data = pca_config.get('missing_data', False)
             if missing_data:
