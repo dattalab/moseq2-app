@@ -2,13 +2,24 @@
 
 [project]
 name = "moseq2-pca"
-version = "1.2.0"
+version = "1.4.0"
 description = "To boldly go where no mouse has gone before"
 readme = "README.md"
 authors = [
     {name = "Jeff Markowitz"},
 ]
-requires-python = ">=3.9,<3.13"
+license = "LicenseRef-Harvard-Academic-Non-Commercial"
+license-files = ["LICENSE.md"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "bokeh>=2.4.2",
     "chest>=0.2.3",
