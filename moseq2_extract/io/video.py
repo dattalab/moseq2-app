@@ -545,6 +545,14 @@ def write_frames_preview(
         str(slicecrc),
         "-r",
         str(fps),
+        # The output pixel format, which is what decides whether a browser can
+        # play the result. Left unset, ffmpeg chooses from the formats libx264
+        # advertises and lands on yuv444p for an rgb24 input, giving a High
+        # 4:4:4 Predictive stream; browser H.264 is 8-bit 4:2:0 only, so the
+        # movie is undecodable in the preview widget that displays it. The
+        # crowd movie writer in moseq2-viz sets the same pair.
+        "-pix_fmt",
+        "yuv420p",
         filename,
     ]
 
