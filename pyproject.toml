@@ -1,6 +1,6 @@
 [project]
 name = "moseq2-app"
-version = "1.4.0"
+dynamic = ["version"]
 description = "Interactive data exploration tools for the MoSeq2 pipeline."
 readme = "README.md"
 authors = [
@@ -58,5 +58,9 @@ tests = [
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
+
+[tool.pdm.version]
+source = "file"
+path = "moseq2_app/__init__.py"
 
 [tool.pdm]
