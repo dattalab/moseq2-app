@@ -2,7 +2,6 @@ import os
 import sys
 import h5py
 import numpy as np
-import ruamel.yaml as yaml
 from unittest import TestCase
 from tests.unit_tests.test_train_utils import get_model
 from moseq2_model.train.util import whiten_all, train_model
@@ -22,6 +21,7 @@ from moseq2_model.util import (
     create_command_strings,
     get_scan_range_kappas,
 )
+from moseq2_model._yaml import read_yaml
 
 
 class TestUtils(TestCase):
@@ -294,7 +294,7 @@ class TestUtils(TestCase):
             "int-test": 1,
             "float": 1.12432,
             "list": [1, 2, 3, 4],
-            "np": np.array([[[1], [2], [3]], [[4], [5], [6]]]).astype(np.object),
+            "np": np.array([[[1], [2], [3]], [[4], [5], [6]]]).astype(object),
             "dict": {"test": 12},
             12: "int key test",
             (1, 2): "tuple key test",
@@ -322,7 +322,7 @@ class TestUtils(TestCase):
         config_file = "data/config.yaml"
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         X, whitening_parameters = whiten_all(data_dict)
         training_data, validation_data = get_training_data_splits(
@@ -351,7 +351,7 @@ class TestUtils(TestCase):
         config_file = "data/config.yaml"
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         X, whitening_parameters = whiten_all(data_dict)
         training_data, validation_data = get_training_data_splits(

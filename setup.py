@@ -1,33 +1,7 @@
-import os
-import sys
 import codecs
-import subprocess
-from setuptools import setup, find_packages
+import os
 
-
-def install(package):
-    subprocess.call([sys.executable, "-m", "pip", "install", package])
-
-
-try:
-    import numpy
-except ImportError:
-    install("numpy")
-
-try:
-    import future
-except ImportError:
-    install("future")
-
-try:
-    import six
-except ImportError:
-    install("six")
-
-try:
-    import cython
-except ImportError:
-    install("cython")
+from setuptools import find_packages, setup
 
 
 def read(rel_path):
@@ -50,31 +24,41 @@ setup(
     version=get_version("moseq2_model/__init__.py"),
     author="Datta Lab",
     description="Modeling for the best",
-    packages=find_packages(exclude="docs"),
+    # "tests" is a top-level package here, so it has to be excluded explicitly
+    # or it installs into site-packages under that name.
+    packages=find_packages(exclude=["docs", "tests", "tests.*"]),
     include_package_data=True,
     platforms="any",
-    python_requires=">=3.6,<3.8",
+    # jax, and therefore jax-moseq, sets the floor. The former ceiling of <3.8
+    # existed for the pyhsmm/pybasicbayes/autoregressive wheels, which are no
+    # longer dependencies.
+    python_requires=">=3.10",
     install_requires=[
-        "six==1.15.0",
-        "h5py==2.10.0",
-        "scipy==1.3.2",
-        "numpy==1.18.3",
-        "click==7.0",
-        "cython==0.29.14",
-        "pandas==1.0.5",
-        "future==0.18.2",
-        "joblib==0.15.1",
-        "scikit-image==0.16.2",
-        "setuptools",
-        "cytoolz==0.10.1",
+        # The model itself. jax-moseq is not on PyPI, so it is pinned to the
+        # branch carrying the robust AR-HMM work this package depends on
+        # (robust x separate_trans, the robust evaluation surface,
+        # stateseq_marginals, stateseq_mode).
+        #
+        # This is temporary and has to go before the package can be published:
+        # PyPI rejects distributions carrying a direct URL reference. When
+        # jax-moseq cuts a release including those additions, replace this line
+        # with a version specifier.
+        "jax-moseq @ git+https://github.com/dattalab/jax-moseq.git@feature/robust-arhmm",
+        "jax",
+        # Runtime dependencies, floors rather than pins. The previous "=="
+        # pins were contemporaneous with Python 3.7 and none of them has a
+        # wheel for the interpreters this now supports.
+        "numpy",
+        "scipy",
+        "h5py>=3",
+        "click>=8",
+        "joblib",
+        "cytoolz",
         "tqdm>=4.48.0",
-        "matplotlib==3.1.2",
-        "statsmodels==0.10.2",
-        "ruamel.yaml==0.16.5",
-        "opencv-python==4.1.2.30",
-        "pyhsmm @ git+https://github.com/mattjj/pyhsmm.git@master",
-        "pybasicbayes @ git+https://github.com/mattjj/pybasicbayes.git@master",
-        "autoregressive @ git+https://github.com/dattalab/pyhsmm-autoregressive.git@master",
+        "matplotlib",
+        # 0.18 removed the module-level safe_load; moseq2_model._yaml uses the
+        # YAML() interface, which is available from 0.17 onward.
+        "ruamel.yaml>=0.17",
     ],
     entry_points={"console_scripts": ["moseq2-model = moseq2_model.cli:cli"]},
 )

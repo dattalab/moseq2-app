@@ -14,7 +14,6 @@ from copy import deepcopy
 from cytoolz import first
 from collections import OrderedDict
 from moseq2_model.train.models import ARHMM
-from autoregressive.util import AR_striding
 from os.path import basename, getctime, join, exists
 
 
@@ -293,7 +292,7 @@ def dict_to_h5(h5file, export_dict, path="/"):
             item = item.encode("utf8")
 
         # Write dict item to h5 based on its data-type
-        if isinstance(item, np.ndarray) and item.dtype == np.object:
+        if isinstance(item, np.ndarray) and item.dtype == object:
             dt = h5py.special_dtype(vlen=np.array(item.flat[0]).dtype)
             h5file.create_dataset(path + key, item.shape, dtype=dt, compression="gzip")
             for tup, _ in np.ndenumerate(item):
@@ -301,7 +300,7 @@ def dict_to_h5(h5file, export_dict, path="/"):
                     h5file[path + key][tup] = np.array(item[tup]).ravel()
         elif isinstance(item, (np.ndarray, list)):
             h5file.create_dataset(path + key, data=item, compression="gzip")
-        elif isinstance(item, (np.int, np.float, str, bytes)):
+        elif isinstance(item, (int, float, str, bytes)):
             h5file.create_dataset(path + key, data=item)
         elif isinstance(item, dict):
             dict_to_h5(h5file, item, path + key + "/")
@@ -321,13 +320,11 @@ def load_arhmm_checkpoint(filename: str, train_data: dict) -> dict:
     mdl_dict (dict): a dict containing the model with reloaded data, and associated training data
     """
 
-    # Loading model and its respective number of lags
+    # The checkpoint was written through copy_model, which strips the training
+    # data, so the model can report its parameters but cannot resample until
+    # the sessions are put back.
     mdl_dict = joblib.load(filename)
-    nlags = mdl_dict["model"].nlags
-
-    for s, t in zip(mdl_dict["model"].states_list, train_data.values()):
-        # Loading model AR-strided data
-        s.data = AR_striding(t.astype("float32"), nlags)
+    mdl_dict["model"].attach_data(train_data)
 
     return mdl_dict
 
@@ -447,7 +444,7 @@ def load_cell_string_from_matlab(filename, var_name="uuids"):
             # change unichr to chr for python 3
             for i in range(len(tmp)):
                 tmp2 = f[tmp[i][0]]
-                uni_list = ["".join(chr(c)) for c in tmp2]
+                uni_list = ["".join(chr(c.item())) for c in tmp2]
                 return_list.append("".join(uni_list))
 
     return return_list

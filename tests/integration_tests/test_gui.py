@@ -2,9 +2,9 @@ import os
 import sys
 import shutil
 import joblib
-import ruamel.yaml as yaml
 from unittest import TestCase
 from moseq2_model.gui import learn_model_command
+from moseq2_model._yaml import read_yaml, write_yaml
 
 
 class TestGUI(TestCase):
@@ -38,7 +38,7 @@ class TestGUI(TestCase):
         shutil.copyfile("data/config.yaml", config_file)
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         # adding required run parameters to config file
         config_data["hold_out"] = True
@@ -55,7 +55,7 @@ class TestGUI(TestCase):
         config_data["out_script"] = "train_out.sh"
 
         with open(config_file, "w") as f:
-            yaml.safe_dump(config_data, f)
+            write_yaml(config_data, f)
 
         _ = learn_model_command(progress_paths, verbose=True, get_cmd=True)
 
@@ -77,13 +77,13 @@ class TestGUI(TestCase):
         sys.stdin = open(stdin)
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         config_data["hold_out_seed"] = 1000
         config_data["ncpus"] = 100
 
         with open(config_file, "w") as f:
-            yaml.safe_dump(config_data, f)
+            write_yaml(config_data, f)
 
         _ = learn_model_command(progress_paths, verbose=True, get_cmd=True)
 
@@ -132,7 +132,7 @@ class TestGUI(TestCase):
         shutil.copyfile("data/config.yaml", config_file)
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         # adding required run parameters to config file
         config_data["hold_out"] = True
@@ -153,7 +153,7 @@ class TestGUI(TestCase):
         config_data["run_cmd"] = False
 
         with open(config_file, "w") as f:
-            yaml.safe_dump(config_data, f)
+            write_yaml(config_data, f)
 
         _ = learn_model_command(progress_paths, verbose=True, get_cmd=True)
 
