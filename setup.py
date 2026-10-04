@@ -27,9 +27,22 @@ setup(
     # into site-packages under that name.
     packages=find_packages(exclude=['docs', 'tests', 'tests.*']),
     platforms=['mac', 'unix'],
+    license='LicenseRef-Harvard-Academic-Non-Commercial',
+    license_files=['LICENSE.md'],
+    long_description=open('README.md', encoding='utf-8').read(),
+    long_description_content_type='text/markdown',
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Science/Research',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
+    ],
     # The former ceiling of <3.8 came from the pinned dependencies below, none
     # of which had a wheel past 3.7. Nothing in the source needs it.
-    python_requires='>=3.10',
+    python_requires='>=3.10,<3.13',
     install_requires=[
         # Floors, not pins. A version is named only where the code calls an API
         # that requires it; the rest are left to the resolver, since every
