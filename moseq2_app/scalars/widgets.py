@@ -3,7 +3,6 @@ Ipywidgets used to facilitate interactive scalar summary viewer tool.
 """
 from ipywidgets import VBox
 import ipywidgets as widgets
-from IPython.display import display, clear_output
 
 class InteractiveScalarWidgets:
 
@@ -28,7 +27,13 @@ class InteractiveScalarWidgets:
         self.checked_list = widgets.SelectMultiple(options=[], description='Scalar Columns to Plot', style=style,
                                                    continuous_update=False, disabled=False, layout=self.label_layout)
 
-        self.ui_tools = VBox([self.clear_button, self.checked_list], layout=self.box_layout)
+        # The figure is drawn into an Output widget rather than straight into
+        # the cell. A selection change reaches the kernel as a comm message,
+        # which carries no current output cell, so a bare display() from the
+        # callback has nowhere to render and the plot is silently discarded.
+        self.out = widgets.Output()
+
+        self.ui_tools = VBox([self.clear_button, self.checked_list, self.out], layout=self.box_layout)
 
         # initialize event listeners
         self.checked_list.observe(self.on_column_select, names='value')
@@ -44,7 +49,7 @@ class InteractiveScalarWidgets:
         Returns:
         """
 
-        clear_output()
+        self.out.clear_output()
         del self
 
     def on_column_select(self, event=None):
@@ -57,6 +62,8 @@ class InteractiveScalarWidgets:
         Returns:
         """
 
-        clear_output()
-        display(self.ui_tools)
-        self.interactive_view()
+        # wait=True holds the current figure until the replacement is ready,
+        # so the view does not blink empty between selections.
+        self.out.clear_output(wait=True)
+        with self.out:
+            self.interactive_view()

@@ -93,7 +93,7 @@ def display_crowd_movies(widget_box, curr_name, desc, divs, bk_figs):
     show(div2)
 
     if len(bk_figs) > 0:
-        gp = gridplot(bk_figs, ncols=2, plot_width=250, plot_height=250)
+        gp = gridplot(bk_figs, ncols=2, width=250, height=250)
 
         # Create Output widget object to center grid plot in view
         output = widgets.Output(layout=widgets.Layout(align_items='center'))

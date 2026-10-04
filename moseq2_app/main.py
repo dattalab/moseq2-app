@@ -124,6 +124,7 @@ def interactive_scalar_summary(index_file):
         return
 
     viewer = InteractiveScalarViewer(index_file)
+    display(viewer.ui_tools)
     return viewer
 
 @filter_warnings

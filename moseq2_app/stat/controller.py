@@ -74,6 +74,13 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
         self.ctrl_dropdown.options = list(self.df.group.unique())
         self.exp_dropdown.options = list(self.df.group.unique())
+        # Both selections are assigned rather than left to the widget. Group 2
+        # takes the last group and Group 1 the first; assigning options to a
+        # dropdown that has no selection used to choose the first option on its
+        # own, and now leaves the selection empty. `ctrl_dropdown.value` is
+        # passed on as `ctrl_group` to the hypothesis tests and the difference
+        # sort, which have no group under `None`.
+        self.ctrl_dropdown.value = self.ctrl_dropdown.options[0]
         self.exp_dropdown.value = self.ctrl_dropdown.options[-1]
 
         self.dropdown_mapping = {
@@ -413,7 +420,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             # Compute usages and transition matrices
             self.trans_mats, self.usages = get_group_trans_mats(labels, label_group, sorted(self.group), self.max_sylls)
             self.df = self.df[self.df['syllable'] < self.max_sylls]
-            self.df = self.df.groupby(['group', 'syllable'], as_index=False).mean()
+            self.df = self.df.groupby(['group', 'syllable'], as_index=False).mean(numeric_only=True)
 
             # self.compute_entropy_differences()
 

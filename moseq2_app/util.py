@@ -2,7 +2,7 @@
 General utility functions.
 """
 import pandas as pd
-import ruamel.yaml as yaml
+from moseq2_app._yaml import write_yaml as _write_yaml
 from copy import deepcopy
 from pprint import pprint
 from os.path import basename, join, exists, splitext
@@ -49,8 +49,7 @@ def write_yaml(data, file):
         data (dict): dictionary of data to be written to yaml
         file (str): string of yaml file name.
     """
-    with open(file, 'w') as yaml_f:
-        yaml.safe_dump(data, yaml_f)
+    _write_yaml(data, file)
 
 
 def merge_labels_with_scalars(sorted_index, model_path):
@@ -208,5 +207,4 @@ def update_config(path: str) -> dict:
     try:
         yield config
     finally:
-        with open(path, 'w') as config_path:
-            yaml.safe_dump(config, config_path)
+        _write_yaml(config, path)

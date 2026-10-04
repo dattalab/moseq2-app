@@ -7,6 +7,7 @@ import uuid
 import json
 from glob import glob
 import ruamel.yaml as yaml
+from moseq2_app._yaml import write_yaml as _write_yaml
 from operator import add
 from functools import reduce
 from toolz import compose, complement
@@ -269,8 +270,7 @@ def find_progress(base_progress):
         index_params = read_yaml(base_progress.get('index_file'))
         if base_progress.get('scores_path') and exists(base_progress.get('scores_path')):
             index_params['pca_path'] = base_progress.get('scores_path')
-            with open(base_progress.get('index_file'), 'w') as f:
-                yaml.safe_dump(index_params, f)
+            _write_yaml(index_params, base_progress.get('index_file'))
         else:
             print('Please ensure "pca_path" in moseq2-index.yaml is the path to pc_score h5 file before running interactive model analysis')
     

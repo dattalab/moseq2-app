@@ -55,7 +55,7 @@ def show_extraction(input_file, video_file):
                     </video>
                 """
 
-    div = Div(text=video_div, style={'width': '100%', 'align-items': 'center', 'display': 'contents'})
+    div = Div(text=video_div, styles={'width': '100%', 'align-items': 'center', 'display': 'contents'})
 
     output = widgets.Output(layout=widgets.Layout(align_items='center', display='inline-block',
                                                   height='100%', width='100%'))
