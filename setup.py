@@ -20,7 +20,7 @@ def get_version(rel_path):
 
 
 setup(
-    name="moseq2_model",
+    name="moseq2-model",
     version=get_version("moseq2_model/__init__.py"),
     author="Datta Lab",
     description="Modeling for the best",
@@ -29,21 +29,28 @@ setup(
     packages=find_packages(exclude=["docs", "tests", "tests.*"]),
     include_package_data=True,
     platforms="any",
+    license="LicenseRef-Harvard-Academic-Non-Commercial",
+    license_files=["LICENSE.md"],
+    long_description=read("README.md"),
+    long_description_content_type="text/markdown",
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Science/Research",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
+    ],
     # jax, and therefore jax-moseq, sets the floor. The former ceiling of <3.8
     # existed for the pyhsmm/pybasicbayes/autoregressive wheels, which are no
     # longer dependencies.
-    python_requires=">=3.10",
+    python_requires=">=3.10,<3.13",
     install_requires=[
-        # The model itself. jax-moseq is not on PyPI, so it is pinned to the
-        # branch carrying the robust AR-HMM work this package depends on
-        # (robust x separate_trans, the robust evaluation surface,
-        # stateseq_marginals, stateseq_mode).
-        #
-        # This is temporary and has to go before the package can be published:
-        # PyPI rejects distributions carrying a direct URL reference. When
-        # jax-moseq cuts a release including those additions, replace this line
-        # with a version specifier.
-        "jax-moseq @ git+https://github.com/dattalab/jax-moseq.git@feature/robust-arhmm",
+        # The model itself. 0.3.5 is the first release carrying the robust
+        # AR-HMM work this package fits through: robust x separate_trans, the
+        # robust evaluation surface, stateseq_marginals and stateseq_mode.
+        "jax-moseq>=0.3.5",
         "jax",
         # Runtime dependencies, floors rather than pins. The previous "=="
         # pins were contemporaneous with Python 3.7 and none of them has a
