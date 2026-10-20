@@ -23,7 +23,11 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
-requires-python = ">=3.10,<3.13"
+# The floor is 3.10 because jax-moseq declares it and keypoint-moseq
+# depends on jax-moseq. There is no ceiling: what the upper bound should
+# be is what the version matrix measures, and a ceiling here would refuse
+# the columns that produce the answer.
+requires-python = ">=3.10"
 dependencies = [
     "click>=7.0",
     "cytoolz>=0.10.1",
