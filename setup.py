@@ -42,10 +42,14 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
-    # jax, and therefore jax-moseq, sets the floor. The former ceiling of <3.8
-    # existed for the pyhsmm/pybasicbayes/autoregressive wheels, which are no
-    # longer dependencies.
-    python_requires=">=3.10,<3.13",
+    # The former ceiling of <3.8 existed for the pyhsmm/pybasicbayes/
+    # autoregressive wheels, which are no longer dependencies.
+    #
+    # The floor is 3.10 because jax-moseq declares it and keypoint-moseq depends
+    # on jax-moseq. There is no ceiling: what the upper bound should be is what
+    # the version matrix measures, and a ceiling here would refuse the columns
+    # that produce the answer.
+    python_requires=">=3.10",
     install_requires=[
         # The model itself. 0.3.5 is the first release carrying the robust
         # AR-HMM work this package fits through: robust x separate_trans, the
