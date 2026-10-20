@@ -42,7 +42,12 @@ setup(
     ],
     # The former ceiling of <3.8 came from the pinned dependencies below, none
     # of which had a wheel past 3.7. Nothing in the source needs it.
-    python_requires='>=3.10,<3.13',
+    #
+    # The floor is 3.10 because jax-moseq declares it and keypoint-moseq depends
+    # on jax-moseq. There is no ceiling: what the upper bound should be is what
+    # the version matrix measures, and a ceiling here would refuse the columns
+    # that produce the answer.
+    python_requires='>=3.10',
     install_requires=[
         # Floors, not pins. A version is named only where the code calls an API
         # that requires it; the rest are left to the resolver, since every
