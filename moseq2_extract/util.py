@@ -704,7 +704,17 @@ def load_textdata(data_file, dtype=np.float32):
             timestamps.append(int(float(tmp[0])))
 
             # append data indicator value
-            clean_data = np.fromstring(tmp[1].replace(" ", "").strip(), sep=',', dtype=dtype)
+            #
+            # Parsed as float and then cast, rather than parsed at `dtype`.
+            # numpy 2.4 stopped accepting a decimal string for an integer
+            # dtype -- `np.fromstring("0.000000", sep=",", dtype=int)` raises
+            # ValueError where 2.2 returned 0 -- and these files hold decimals
+            # whatever the column means, so `predictions.txt` stopped loading.
+            # build_manifest catches that and drops the entry, so the data went
+            # missing with nothing raised.
+            clean_data = np.array(
+                [piece for piece in tmp[1].strip().split(',') if piece],
+                dtype=float).astype(dtype)
             data.append(clean_data)
 
     data = np.stack(data, axis=0).squeeze()
