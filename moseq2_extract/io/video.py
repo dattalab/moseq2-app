@@ -251,7 +251,7 @@ def write_frames(
     for i in tqdm(
         range(frames.shape[0]), disable=True, desc=f"Writing frames to {filename}"
     ):
-        pipe.stdin.write(frames[i].astype(frame_dtype).tostring())
+        pipe.stdin.write(frames[i].astype(frame_dtype).tobytes())
 
     if close_pipe:
         pipe.communicate()
@@ -604,7 +604,7 @@ def write_frames_preview(
                 # txt_pos is outside of the frame dimensions
                 print("Could not overlay frame number on preview on video.")
 
-        pipe.stdin.write(disp_img.tostring())
+        pipe.stdin.write(disp_img.tobytes())
 
     if close_pipe:
         pipe.communicate()
