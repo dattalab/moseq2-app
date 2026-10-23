@@ -15,6 +15,7 @@ from sklearn.model_selection import (
 )
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import confusion_matrix, accuracy_score, f1_score
 from sklearn.base import clone
@@ -370,21 +371,26 @@ def classifier_fingerprint(
     # solver keeps the weights this reports comparable with the ones it has
     # always reported. LinearSVC has no such parameter.
     solver = {"solver": "liblinear"} if model_type == "lr" else {}
-    # `multi_class="ovr"` is gone: scikit-learn removed it from
-    # LogisticRegression in 1.9, which the resolver serves from Python 3.11.
-    # It was never doing anything here. The parameter chose one-vs-rest over
-    # multinomial, and one-vs-rest is what both of these estimators already
-    # did -- liblinear has no multinomial mode, and LinearSVC is one-vs-rest
-    # by default. Measured under scikit-learn 1.7.2, where both spellings
-    # still work: with and without it, LogisticRegression returns identical
-    # coefficients and identical predictions, and so does LinearSVC.
+    # One-vs-rest around liblinear, which is what this call has always done.
+    # scikit-learn used to apply the scheme itself when asked for it with
+    # `multi_class="ovr"`, then deprecated both the parameter and liblinear's
+    # implicit multiclass handling, and removed them in 1.9 -- served from
+    # Python 3.11. Wrapping is the replacement scikit-learn's own deprecation
+    # message prescribes, and it reproduces what the parameter produced:
+    # measured under 1.7.2, where the old spelling still works, the two agree
+    # to 4.4e-16 on three classes and exactly on two, with identical
+    # predictions, and 1.9.1 returns the same coefficients as 1.7.2 does.
+    # LinearSVC needs none of this: it is one-vs-rest natively.
     clf = Model(**solver)
+    if model_type == "lr":
+        clf = OneVsRestClassifier(clf)
 
     if param_search:
         if C_list is None:
             C_list = np.logspace(-6, 3, 50)
 
-        parameters = {"C": C_list}
+        # The regularization parameter now sits on the wrapped estimator.
+        parameters = {"estimator__C": C_list} if model_type == "lr" else {"C": C_list}
         grid_search = GridSearchCV(
             clf,
             parameters,
@@ -428,7 +434,7 @@ def classifier_fingerprint(
         y_hat = clf.predict(X_test)
         out["y_pred"].append(y_hat)
 
-        out["coefs"].append(clf.coef_[0])
+        out["coefs"].append(_first_class_coefs(clf))
 
     for i in range(100):
         y_shuffle = np.random.permutation(y)
@@ -449,7 +455,7 @@ def classifier_fingerprint(
             out["shuff_y_true"].append(y_shuffle_test)
             y_hat = clf.predict(X_test)
             out["shuff_y_pred"].append(y_hat)
-            out["shuff_coefs"].append(clf.coef_[0])
+            out["shuff_coefs"].append(_first_class_coefs(clf))
             out["shuff_split"].append(split)
 
     out = {k: np.concatenate(v) if "y" in k else np.array(v) for k, v in out.items()}
@@ -457,6 +463,18 @@ def classifier_fingerprint(
     out["shuff_accuracy"] = accuracy_score(out["shuff_y_true"], out["shuff_y_pred"])
 
     return out
+
+
+def _first_class_coefs(clf):
+    """The first class's weights, whether or not the estimator is wrapped.
+
+    `OneVsRestClassifier` holds one fitted estimator per class and exposes no
+    `coef_` of its own, where a bare `LogisticRegression` or `LinearSVC` gives
+    one row per class. Both spellings mean the same row.
+    """
+    if hasattr(clf, "estimators_"):
+        return clf.estimators_[0].coef_[0]
+    return clf.coef_[0]
 
 
 def _plot_cm(y_true, y_pred, ax, ax_labels, title):
