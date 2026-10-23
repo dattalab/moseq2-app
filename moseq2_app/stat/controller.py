@@ -176,7 +176,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         compute the significant syllables for a given pair of groups given the hypothesis test on the data.
 
         Args:
-        hyp_test_name (str): Name of hypothesis test to run. options=['KW & Dunn\s', 'Z-Test', 'T-Test', 'Mann-Whitney']
+        hyp_test_name (str): Name of hypothesis test to run. options=["KW & Dunn's", 'Z-Test', 'T-Test', 'Mann-Whitney']
         stat (str): Syllable statistic to compute hypothesis test on. options=['usage', 'distance to center', 'similarity', 'difference']
         ctrl_group (str): Name of control group to compute group difference sorting with.
         exp_group (str): Name of comparative group to compute group difference sorting with.
