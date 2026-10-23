@@ -662,7 +662,7 @@ def escape_path(path):
     path (str): path to original base_dir
     """
 
-    return re.sub(r'\s', '\ ', path)
+    return re.sub(r'\s', r'\ ', path)
 
 
 def clean_file_str(file_str: str, replace_with: str = '-') -> str:
@@ -1028,7 +1028,7 @@ def make_gradient(width, height, h, k, a, b, theta=0):
 
 
 def graduate_dilated_wall_area(bground_im, config_data, strel_dilate, output_dir):
-    """
+    r"""
     Creates a gradient to represent the dilated (now visible) bucket wall regions.
     Only is used if background is dilated to capture larger rodents in convex shaped buckets (\_/).
     
