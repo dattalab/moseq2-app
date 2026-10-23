@@ -1008,7 +1008,12 @@ def sort_batch_results(data, averaging=True, filenames=None, **kwargs):
             continue
 
         for i, p in enumerate(param):
-            idx[i] = int(np.where(param_list[i] == p)[0])
+            # `np.where(...)[0]` is an array, and converting one to a
+            # scalar was deprecated in numpy 2.2 and removed in 2.4, which
+            # the resolver serves from Python 3.11. Taking the element says
+            # what this already meant: the parameter appears once in its own
+            # unique list, so there is exactly one index to take.
+            idx[i] = int(np.where(param_list[i] == p)[0][0])
 
         for i, row in enumerate(row_matches):
             if dims == 2:

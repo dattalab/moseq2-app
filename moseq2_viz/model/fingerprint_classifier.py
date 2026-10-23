@@ -370,7 +370,15 @@ def classifier_fingerprint(
     # solver keeps the weights this reports comparable with the ones it has
     # always reported. LinearSVC has no such parameter.
     solver = {"solver": "liblinear"} if model_type == "lr" else {}
-    clf = Model(multi_class="ovr", **solver)
+    # `multi_class="ovr"` is gone: scikit-learn removed it from
+    # LogisticRegression in 1.9, which the resolver serves from Python 3.11.
+    # It was never doing anything here. The parameter chose one-vs-rest over
+    # multinomial, and one-vs-rest is what both of these estimators already
+    # did -- liblinear has no multinomial mode, and LinearSVC is one-vs-rest
+    # by default. Measured under scikit-learn 1.7.2, where both spellings
+    # still work: with and without it, LogisticRegression returns identical
+    # coefficients and identical predictions, and so does LinearSVC.
+    clf = Model(**solver)
 
     if param_search:
         if C_list is None:
