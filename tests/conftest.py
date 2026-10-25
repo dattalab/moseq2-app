@@ -46,6 +46,23 @@ def analysis_bundle():
 
 
 @pytest.fixture(scope="session")
+def flipped(project, configured, raw_sessions):
+    """Cell 4's effect, without the download.
+
+    The cell fetches a flip classifier and writes its path into the config.
+    The classifier it fetches by default ships in the fixture bundle already,
+    so the chain points the config at that copy and reaches the same state
+    offline. Whether the download itself works is cell 4's own network test.
+    """
+    from moseq2_app.util import update_config
+
+    classifier = raw_sessions / "flip_classifier_k2_c57_10to13weeks.npz"
+    with update_config(str(configured)) as config:
+        config["flip_classifier"] = str(classifier)
+    return classifier
+
+
+@pytest.fixture(scope="session")
 def configured(project, progress_file):
     """Cell 3: the config file every later step reads its parameters from."""
     from moseq2_app.gui.progress import update_progress
