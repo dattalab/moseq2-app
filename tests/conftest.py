@@ -46,6 +46,44 @@ def analysis_bundle():
 
 
 @pytest.fixture(scope="session")
+def arena(project, progress_file, configured, flipped):
+    """Cell 5: the per-recording parameters extraction reads.
+
+    The cell registers a session config path, names the subdirectory
+    extractions are written to, and opens the arena mask widget. Opening it is
+    what writes the file: the widget detects each recording's camera
+    parameters and saves a copy of the configuration per recording.
+
+    Clicking "save session parameters and move to next" once per recording is
+    what the walkthrough did. It keeps the detected parameters as they are and
+    records them, which is the state the walkthrough's own session config is
+    in. Advancing also computes each recording's arena mask and a short test
+    extraction, so the chain reaches cell 6 having already exercised both.
+    """
+    import panel as pn
+
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_app.roi.widget import ArenaMaskWidget
+    from moseq2_app.util import update_config
+
+    from tests.widgets import buttons_of, click
+
+    pn.extension()
+
+    session_config = project / "session_config.yaml"
+    update_progress(str(progress_file), "session_config", str(session_config))
+    with update_config(str(configured)) as config:
+        config["camera_type"] = "auto"
+        config["output_dir"] = "proc"
+
+    widget = ArenaMaskWidget(str(project), str(configured), str(session_config))
+    buttons = buttons_of(widget.view)
+    for _ in widget.sessions:
+        click(buttons["Save session parameters and move to next"])
+    return session_config
+
+
+@pytest.fixture(scope="session")
 def flipped(project, configured, raw_sessions):
     """Cell 4's effect, without the download.
 

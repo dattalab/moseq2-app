@@ -76,3 +76,31 @@ def capture_display(monkeypatch, modules=DISPLAY_IMPORTERS):
             "no module in DISPLAY_IMPORTERS exposed `display`; the import sites moved"
         )
     return recorder
+
+
+def layout_of(view):
+    """The Panel layout a ``Viewer`` renders as."""
+    import panel as pn
+
+    if isinstance(view, pn.viewable.Viewer):
+        return view.__panel__()
+    return view
+
+
+def buttons_of(view):
+    """Every button in a layout, indexed by the label it shows the user."""
+    import panel as pn
+
+    return {b.name: b for b in layout_of(view).select(pn.widgets.Button)}
+
+
+def click(button):
+    """Press a button the way the browser does.
+
+    moseq2-app builds its buttons from ``param.Action`` parameters with
+    ``Button.from_param``, which links the button's ``value`` to the action.
+    Assigning ``value`` runs the callback. Bumping ``clicks``, which is the
+    count the browser keeps, does not run anything, so a test written that way
+    passes while pressing nothing.
+    """
+    button.value = True
