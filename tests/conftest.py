@@ -46,6 +46,18 @@ def analysis_bundle():
 
 
 @pytest.fixture(scope="session")
+def configured(project, progress_file):
+    """Cell 3: the config file every later step reads its parameters from."""
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_extract.gui import generate_config_command
+
+    config = project / "config.yaml"
+    generate_config_command(str(config), camera_type="k2")
+    update_progress(str(progress_file), "config_file", str(config))
+    return config
+
+
+@pytest.fixture(scope="session")
 def progress_file(project):
     """Cell 2: the state file every later cell writes its output paths into.
 
