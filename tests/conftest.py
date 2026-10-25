@@ -46,6 +46,20 @@ def analysis_bundle():
 
 
 @pytest.fixture(scope="session")
+def progress_file(project):
+    """Cell 2: the state file every later cell writes its output paths into.
+
+    Created in a project that holds nothing but recordings, which is where a
+    user starts.
+    """
+    from moseq2_app.gui.progress import restore_progress_vars
+
+    path = project / "progress.yaml"
+    restore_progress_vars(str(path), init=True, overwrite=False)
+    return path
+
+
+@pytest.fixture(scope="session")
 def project(tmp_path_factory, raw_sessions):
     """A writable project directory holding the four recordings.
 
