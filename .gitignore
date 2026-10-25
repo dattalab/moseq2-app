@@ -45,3 +45,6 @@ __pycache__
 *.log
 build
 .pdm-python
+
+# nox session environments
+.nox/
