@@ -91,6 +91,27 @@ def analysis_project(tmp_path_factory, analysis_bundle):
 
 
 @pytest.fixture(scope="session")
+def analysis_progress(analysis_project):
+    """Cell 1: read the finished project's paths back out of its progress file.
+
+    Every later cell in the analysis notebook addresses the project through
+    this dictionary rather than through the directory, so this is the only
+    cell that knows where the project is.
+
+    ``from_CLI`` stays False, which is the path a user arriving from the
+    extraction and modeling notebook takes and the one the notebook ships
+    with. The other branch is cell 1's own test.
+    """
+    from moseq2_app.gui.progress import restore_progress_vars
+
+    return restore_progress_vars(
+        progress_file=str(analysis_project / "progress.yaml"),
+        init=False,
+        overwrite=False,
+    )
+
+
+@pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
 
