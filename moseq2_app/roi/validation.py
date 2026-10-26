@@ -120,8 +120,8 @@ def get_scalar_df(path_dict):
         if not v.endswith('.mp4'):
             continue
         # Get relevant extraction paths
-        h5path = v.replace('mp4', 'h5')
-        yamlpath = v.replace('mp4', 'yaml')
+        h5path = v[:-4] + '.h5'
+        yamlpath = v[:-4] + '.yaml'
 
         if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')

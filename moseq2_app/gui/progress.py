@@ -438,7 +438,7 @@ def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
         extracted_path = e_path_dict.get(k, v)
         extracted = False
         if '.mp4' in extracted_path:
-            yaml_path = extracted_path.replace('mp4', 'yaml')
+            yaml_path = extracted_path[:-4] + '.yaml'
             if check_completion_status(yaml_path):
                 extracted = True
                 num_extracted += 1
