@@ -544,19 +544,13 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
     # get mean grouped data
     grouped_data = get_session_mean_df(df, statistic, max_syllable).reset_index()
 
-    vc = grouped_data.group.value_counts().loc[[group1, group2]]
-    n_per_group = vc.values
-
-    merged_usages_all = grouped_data[range(max_syllable)].values
-    _, N_s = merged_usages_all.shape
-
+    values = {
+        group: grouped_data.loc[grouped_data.group == group, range(max_syllable)].values
+        for group in (group1, group2)
+    }
     df_mw_real = pd.DataFrame(
-        [
-            mannwhitneyu(
-                *np.array_split(merged_usages_all[:, s_i], np.cumsum(n_per_group[:-1]))
-            )
-            for s_i in range(N_s)
-        ]
+        [mannwhitneyu(values[group1][:, i], values[group2][:, i])
+         for i in range(max_syllable)]
     )
     return get_sig_syllables(df_mw_real, verbose=verbose, **kwargs)
 
