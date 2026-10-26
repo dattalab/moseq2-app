@@ -265,6 +265,55 @@ def changepoints(project, progress_file, configured, scores):
     return Path(paths["pca_dirname"]) / "changepoints.h5"
 
 
+#: What cell 17 sets before the model is fit.
+MODEL_SETTINGS = {
+    "checkpoint_freq": -1,
+    "use_checkpoint": False,
+    "npcs": 10,
+    "max_states": 100,
+    "robust": True,
+    "save_model": True,
+    "separate_trans": False,
+    "num_iter": 100,
+    "select_groups": False,
+    "kappa": None,
+    "hold_out": False,
+    "nfolds": 2,
+    "cluster_type": "local",
+    "ncpus": 0,
+}
+
+
+@pytest.fixture(scope="session")
+def model_settings(project, progress_file, configured, changepoints):
+    """Cell 17: choose how the model is fit, and where it goes.
+
+    Nothing is computed here. The cell records the model's paths and writes
+    the modelling parameters into the configuration cell 18 reads.
+    """
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_app.util import update_config
+
+    models = project / "models"
+    update_progress(str(progress_file), "model_path", str(models / "model.p"))
+    paths = update_progress(str(progress_file), "base_model_path", str(models) + "/")
+    with update_config(str(configured)) as config:
+        config.update(MODEL_SETTINGS)
+    return paths
+
+
+@pytest.fixture(scope="session")
+def model(model_settings):
+    """Cell 18: fit the AR-HMM.
+
+    The heaviest cell in the notebook. One fit, shared by the whole suite.
+    """
+    from moseq2_model.gui import learn_model_command
+
+    learn_model_command(model_settings)
+    return Path(model_settings["model_path"])
+
+
 @pytest.fixture(scope="session")
 def configured(project, progress_file):
     """Cell 3: the config file every later step reads its parameters from."""
