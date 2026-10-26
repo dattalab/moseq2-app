@@ -58,7 +58,7 @@ def get_num_syllables_for_coverage(labels, n_explained=99):
     syllable_usages = list(get_syllable_usages(labels, count='usage').values())
     cumulative_explanation = np.cumsum(syllable_usages / sum(syllable_usages))
     cumulative_explanation = 100 * cumulative_explanation / np.max(cumulative_explanation)
-    return int(np.argwhere(cumulative_explanation >= n_explained)[0][0])
+    return int(np.argwhere(cumulative_explanation >= n_explained)[0][0]) + 1
 
 
 def compute_syllable_explained_variance(model, save_dir=os.getcwd(), n_explained=99):
