@@ -263,7 +263,8 @@ class FlipClassifierWidget:
                         f[frame_path][batch] = frame_batch
     
                         # augment recorded scalar value to reflect orientation switches
-                        f['scalars/angle'][flip_indices] += np.pi
+                        flip_absolute = np.asarray(list(batch))[flip_indices]
+                        f['scalars/angle'][flip_absolute] += np.pi
     
                         if write_movie:
                             try:
