@@ -1,12 +1,12 @@
 import os
 import shutil
-import ruamel.yaml as yaml
 from unittest import TestCase
 from moseq2_viz.util import read_yaml
 from moseq2_viz.gui import get_groups_command, add_group, plot_stats_command, \
                 plot_scalar_summary_command, plot_transition_graph_command, \
                 plot_mean_group_position_heatmaps_command, \
                 plot_verbose_position_heatmaps, get_best_fit_model, make_crowd_movies_command
+from moseq2_viz._yaml import read_yaml, write_yaml
 
 class TestGUI(TestCase):
 
@@ -35,7 +35,7 @@ class TestGUI(TestCase):
         index_data = read_yaml(index_path)
 
         with open(tmp_yaml, 'w') as g:
-            yaml.safe_dump(index_data, g)
+            write_yaml(index_data, g)
 
         key = 'SubjectName'
         value = '012517'

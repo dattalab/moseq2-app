@@ -48,7 +48,9 @@ def run_2d_embedding(
         print('Unsupported input. Only input embedding="lda" or "pca".')
         return None, None
 
-    syllable_df = mean_df.groupby(["syllable", "uuid", "group"], as_index=False).mean()
+    syllable_df = mean_df.groupby(
+        ["syllable", "uuid", "group"], as_index=False
+    ).mean(numeric_only=True)
 
     unique_groups = sorted(syllable_df.group.unique())
 
@@ -109,7 +111,9 @@ def run_2d_scalar_embedding(
         return None, None
 
     # Get group mean scalar values
-    scalar_mean_df = scalar_df.groupby(["uuid", "group"], as_index=False).mean()
+    scalar_mean_df = scalar_df.groupby(
+        ["uuid", "group"], as_index=False
+    ).mean(numeric_only=True)
 
     # Get unique list of groups
     unique_groups = sorted(scalar_mean_df.group.unique())
@@ -197,7 +201,10 @@ def plot_embedding(
     # plot each group's embedding
     for i in range(len(mapping)):
         # get embedding indices
-        idx = [y == i]
+        # A bare boolean mask. numpy read the list wrapper as a sequence
+        # of indices until it started rejecting it in 1.23; the mask is
+        # what was always meant.
+        idx = y == i
 
         # plotting individual subject data points
         if plot_all_subjects:

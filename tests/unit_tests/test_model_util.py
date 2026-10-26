@@ -173,7 +173,9 @@ class TestModelUtils(TestCase):
         ret = syllable_slices_from_dict(2, lbl_dict, index_data)
         syllable_slices = get_syllable_slices(2, labels, label_uuids, index_data)
 
-        assert np.asarray(syllable_slices).shape == (2*len(list(ret.values())[0]), 3)
+        # The slices are ragged, so this is an object array. numpy built one
+        # implicitly until 1.24 and needs the dtype stated from 2.0.
+        assert np.asarray(syllable_slices, dtype=object).shape == (2*len(list(ret.values())[0]), 3)
         assert len(syllable_slices) == 2*len(list(ret.values())[0])
         assert len(list(ret.values())[0]) == len(list(ret.values())[1])
 

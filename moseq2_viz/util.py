@@ -8,12 +8,12 @@ import h5py
 import numpy as np
 from glob import glob
 from typing import Union
-import ruamel.yaml as yaml
 from cytoolz import curry, compose
 from cytoolz.curried import valmap
 from cytoolz.dicttoolz import dissoc, assoc
 from cytoolz.itertoolz import first, groupby
 from os.path import join, exists, dirname, splitext
+from moseq2_viz._yaml import read_yaml as _read_yaml
 
 
 def camel_to_snake(s):
@@ -81,12 +81,47 @@ def clean_dict(dct):
         elif isinstance(e, np.ndarray):
             out = e.tolist()
         elif isinstance(e, np.generic):
-            out = np.asscalar(e)
+            # np.asscalar was removed in numpy 1.23; .item() is what it called.
+            out = e.item()
         else:
             out = e
         return out
 
     return valmap(clean_entry, dct)
+
+
+def _read_dataset(dset: h5py.Dataset):
+    """
+    Read an h5 dataset, returning variable-length text as str.
+
+    h5py hands variable-length string data back as bytes, and the consumers of
+    this module treat those values as str: the acquisition metadata and the
+    extraction parameters are written straight into YAML, compared against
+    index-file entries, and used as DataFrame column values.
+
+    Only variable-length utf-8 datasets are decoded, because those are the only
+    ones whose type changed. Fixed-width datasets (``|S5``, holding the
+    extraction version here) and variable-length ascii datasets were byte
+    strings before as well, and their consumers already treat them that way.
+
+    Args:
+    dset (h5py.Dataset): dataset to read.
+
+    Returns:
+    the dataset contents, decoded to str where the dataset holds vlen utf-8.
+    """
+
+    value = dset[()]
+    info = h5py.check_string_dtype(dset.dtype)
+    if info is None or info.length is not None or info.encoding != "utf-8":
+        return value
+    if isinstance(value, bytes):
+        return value.decode(info.encoding)
+    if isinstance(value, np.ndarray):
+        decoded = [v.decode(info.encoding) if isinstance(v, bytes) else v
+                   for v in value.ravel()]
+        return np.array(decoded, dtype=object).reshape(value.shape)
+    return value
 
 
 def _load_h5_to_dict(file: h5py.File, path: str) -> dict:
@@ -104,11 +139,11 @@ def _load_h5_to_dict(file: h5py.File, path: str) -> dict:
     ans = {}
     if isinstance(file[path], h5py.Dataset):
         # only use the final path key to add to `ans`
-        ans[path.split("/")[-1]] = file[path][()]
+        ans[path.split("/")[-1]] = _read_dataset(file[path])
     else:
         for key, item in file[path].items():
             if isinstance(item, h5py.Dataset):
-                ans[key] = item[()]
+                ans[key] = _read_dataset(item)
             elif isinstance(item, h5py.Group):
                 ans[key] = _load_h5_to_dict(file, "/".join([path, key]))
     return ans
@@ -345,9 +380,7 @@ def read_yaml(yaml_path: str):
     loaded (dict): loaded yaml file contents.
 
     """
-    with open(yaml_path, "r") as f:
-        loaded = yaml.safe_load(f)
-    return loaded
+    return _read_yaml(yaml_path)
 
 
 # from https://stackoverflow.com/questions/40084931/taking-subarrays-from-numpy-array-with-given-stride-stepsize/40085052#40085052

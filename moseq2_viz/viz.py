@@ -12,7 +12,6 @@ import seaborn as sns
 import matplotlib as mpl
 from tqdm.auto import tqdm
 from os.path import dirname
-from scipy.stats import mode
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from moseq2_viz.model.util import sort_syllables_by_stat, sort_syllables_by_stat_difference
@@ -203,7 +202,12 @@ def make_crowd_matrix(slices, nexamples=50, pad=30, raw_size=(512, 424), outmovi
             selection_end = selction_begin + nexamples
             use_slices = [_slice for i, _slice in enumerate(use_slices) if i in dur_order[selction_begin:selection_end]]
         else:
-            use_slices = rng.permutation(use_slices)[:nexamples]
+            # Permute positions rather than the list itself: the slices are
+            # ragged, so numpy 2 will not build an array from them. Drawing the
+            # permutation over len(use_slices) consumes the generator
+            # identically, so the selected order is unchanged.
+            order = rng.permutation(len(use_slices))[:nexamples]
+            use_slices = [use_slices[i] for i in order]
 
     if len(use_slices) == 0 or max_dur < 0:
         return None
@@ -420,7 +424,15 @@ def scalar_plot(scalar_df, sort_vars=['group', 'uuid'], group_var='group',
 
     # sort scalars into a neat summary using group_vars
     summary = scalar_df.groupby(sort_vars)[show_scalars].aggregate(['mean', 'std']).reset_index()
-    summary = summary.melt(id_vars=group_var, value_vars=show_scalars)
+    # aggregate() leaves MultiIndex columns, so the names here are tuples such
+    # as ('velocity_2d_mm', 'mean'). pandas 1.x matched bare strings against
+    # the first level; pandas 2 requires the full label. Selecting the tuples
+    # and renaming the id column back reproduces the 1.x result exactly:
+    # columns group, variable_0, variable_1, value.
+    id_cols = [c for c in summary.columns if c[0] == group_var]
+    value_cols = [c for c in summary.columns if c[0] in show_scalars]
+    summary = summary.melt(id_vars=id_cols, value_vars=value_cols)
+    summary = summary.rename(columns={id_cols[0]: group_var})
     groups = summary[group_var].unique()
     
     g = sns.FacetGrid(data=summary, row='variable_0', col='variable_1', sharey=False,
@@ -481,8 +493,16 @@ def plot_syll_stats_with_sem(scalar_df, syll_info=None, sig_sylls=None, stat='us
 
     # plot each group's stat data separately, computes groupwise SEM, and orders data based on the stat/ordering parameters
     hue = 'group' if groups is not None else None
+    # dodge offsets the hue levels by dodge/(n_levels - 1), so asking for it
+    # with a single group divides by zero from seaborn 0.12 onward. With one
+    # group there is nothing to offset, which is what older seaborn did here.
+    dodge = len(groups) > 1
+    # errorbar=('ci', 68) is seaborn's own stated replacement for ci=68, and
+    # join=False corresponds to suppressing the connecting line. Both spellings
+    # still work at 0.13 but are removed in 0.15.
     ax = sns.pointplot(data=scalar_df, x='syllable', y=stat, hue=hue, order=ordering,
-                       join=join, dodge=True, ci=68, ax=ax, hue_order=groups,
+                       linestyle='-' if join else 'none', dodge=dodge,
+                       errorbar=('ci', 68), ax=ax, hue_order=groups,
                        palette=colors)
 
     # where some data has already been plotted to ax
@@ -607,6 +627,34 @@ def plot_verbose_heatmap(pdfs, sessions, groups, subjectNames, normalize=False, 
     return fig
 
 
+def mode(a):
+    """
+    Compute the modal value of a 1-D array, and how many times it occurs.
+
+    Args:
+    a (1D array): values to find the most common of.
+
+    Returns:
+    (tuple): a one-element array holding the modal value, and one holding its
+    count. Both are empty when the input is.
+
+    NaN is not a value here: it is counted once per occurrence rather than
+    pooled, so it can only come out as the mode when there is nothing else to
+    choose. The callers below compute a modal duration next to `np.nanmean` and
+    `np.nanmedian` of the same array, and a pooled NaN would win outright in any
+    distribution where missing frames outnumbered the commonest duration. Ties
+    resolve to the smallest value, and an empty input yields empty arrays, so
+    indexing the result raises.
+    """
+
+    a = np.asarray(a)
+    if a.size == 0:
+        return np.array([]), np.array([])
+    values, counts = np.unique(a, return_counts=True, equal_nan=False)
+    most = counts.argmax()
+    return np.array([values[most]]), np.array([counts[most]])
+
+
 def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, bw_adjust=0.4):
     """
     Plot the duration distributions for model labels and model free changepoints.
@@ -663,6 +711,12 @@ def plot_cp_comparison(model_results, pc_cps, plot_all=False, best_model=None, b
             ax = sns.kdeplot(model_cps[model_cps<10], ax=ax, linestyle=ls, alpha=alpha, bw_adjust=bw_adjust,
                         color=palette[i], label=f'Model Changepoints Kappa={kappa:1.02E}')
         model_stats = pd.DataFrame(model_stats, columns=['file_name', 'model_kappa', 'model_mean', 'model_median', 'model_mode', 'pc_mean', 'pc_median', 'pc_mode'])
+        # The statistics inherit their width from the changepoint arrays, which
+        # are float32 when they come off a PCA changepoint file. Widening them
+        # keeps this table, and the CSV written from it, at the precision it has
+        # always been written with.
+        model_stats = model_stats.astype(
+            {column: 'float64' for column in model_stats.columns[1:]})
 
     # Format plot
     ax.set_xlim(0, 2)
