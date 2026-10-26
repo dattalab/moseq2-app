@@ -1,7 +1,6 @@
 import numpy as np
 from scipy import stats
 from copy import deepcopy
-import ruamel.yaml as yaml
 from unittest import TestCase
 from moseq2_model.util import load_pcs
 from moseq2_model.train.models import ARHMM
@@ -16,10 +15,11 @@ from moseq2_model.train.util import (
     zscore_each,
     get_crosslikes,
 )
-from autoregressive.models import (
-    FastARWeakLimitStickyHDPHMM,
-    FastARWeakLimitStickyHDPHMMSeparateTrans,
+from moseq2_model.train.backend import (
+    CorrectedFastARHMM,
+    CorrectedFastARHMMSeparateTrans,
 )
+from moseq2_model._yaml import read_yaml
 
 
 def get_model(separate_trans=False, robust=False, groups=[]):
@@ -27,7 +27,7 @@ def get_model(separate_trans=False, robust=False, groups=[]):
     config_file = "data/config.yaml"
 
     with open(config_file, "r") as f:
-        config_data = yaml.safe_load(f)
+        config_data = read_yaml(f)
 
     config_data["separate_trans"] = separate_trans
     config_data["robust"] = robust
@@ -53,7 +53,7 @@ class TestTrainUtils(TestCase):
     def test_train_model(self):
         config_file = "data/config.yaml"
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
             config_data["percent_split"] = 1
 
         model, data_dict = get_model()
@@ -66,7 +66,7 @@ class TestTrainUtils(TestCase):
         model, lls, labels, iter_lls, iter_holls, _ = train_model(
             model, num_iter=5, train_data=training_data, val_data=validation_data
         )
-        assert isinstance(model, FastARWeakLimitStickyHDPHMM)
+        assert isinstance(model, CorrectedFastARHMM)
         assert isinstance(lls, float)
         assert len(labels) == 2
         assert len(labels[0]) == 906
@@ -80,7 +80,7 @@ class TestTrainUtils(TestCase):
             val_data=validation_data,
             verbose=True,
         )
-        assert isinstance(model, FastARWeakLimitStickyHDPHMM)
+        assert isinstance(model, CorrectedFastARHMM)
         assert isinstance(lls, float)
         assert len(labels) == 2
         assert len(labels[0]) == 906
@@ -104,7 +104,7 @@ class TestTrainUtils(TestCase):
             check_every=1,
             verbose=True,
         )
-        assert isinstance(model, FastARWeakLimitStickyHDPHMMSeparateTrans)
+        assert isinstance(model, CorrectedFastARHMMSeparateTrans)
         assert isinstance(lls, float)
         assert len(labels) == 2
         assert len(labels[0]) == 906
@@ -116,7 +116,7 @@ class TestTrainUtils(TestCase):
         config_file = "data/config.yaml"
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         model, data_dict = get_model()
 

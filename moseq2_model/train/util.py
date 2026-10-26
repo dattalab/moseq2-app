@@ -3,136 +3,11 @@ ARHMM utility functions
 """
 
 import numpy as np
-from pybasicbayes.util.general import inv_psd
 from tqdm.auto import tqdm
 from functools import partial
 from cytoolz import valmap, itemmap
 from collections import OrderedDict, defaultdict
 from moseq2_model.util import save_arhmm_checkpoint, get_loglikelihoods
-
-def minimum_regularization_coefficient(A, B, C):
-    """
-    Find minimum ridge regularization coefficient to ensure positive definite residual covariance.
-    
-    For a multivariate linear model Y = X * β + ε, computes the minimum regularization 
-    needed for the design matrix Gram matrix C to make the residual covariance 
-    S = A - B * C^(-1) * B^T positive definite. Uses ridge regularization: C_reg = C + λ * I.
-    
-    Parameters
-    ----------
-    A : ndarray, shape (n_outputs, n_outputs)
-        Total output covariance matrix (Y^T Y). Represents total variance/covariance 
-        structure in the response variables.
-        
-    B : ndarray, shape (n_outputs, n_predictors)
-        Cross-covariance between outputs and inputs (Y^T X). Captures how response 
-        variables relate to predictor variables.
-        
-    C : ndarray, shape (n_predictors, n_predictors)
-        Design matrix Gram matrix (X^T X). Represents covariance structure of predictor 
-        variables. Can become ill-conditioned with multicollinear predictors.
-        
-    Returns
-    -------
-    dict
-        Dictionary containing:
-        - 'regularization' : float
-            Minimum ridge regularization coefficient λ needed
-        - 'final_min_eigenvalue_S' : float
-            Smallest eigenvalue of regularized residual covariance matrix
-        - 'final_min_eigenvalue_C' : float
-            Smallest eigenvalue of regularized Gram matrix C
-        - 'final_min_eigenvalue_inv_C' : float
-            Smallest eigenvalue of inverse of regularized Gram matrix C
-            
-    Notes
-    -----
-    The residual covariance S represents unexplained variance after linear regression. 
-    Regularization prevents numerical instability when C is ill-conditioned due to 
-    multicollinearity among predictors or insufficient data relative to model complexity.
-    """
-    initial_regularization_factor = 1e-4
-    
-    regularization = initial_regularization_factor
-    while True:
-        C_reg = C + regularization * np.eye(C.shape[0])
-        S = A - np.linalg.solve(C_reg, B.T).T.dot(B.T)
-        min_eigenvalue_S = min(np.linalg.eigvalsh(S))
-        min_eigenvalue_C = min(np.linalg.eigvalsh(C_reg))
-
-        # Can't calculate inverse of C if C is not positive definite
-        if min_eigenvalue_C > 0:
-            min_eigenvalue_inv_C = min(np.linalg.eigvalsh(inv_psd(C_reg)))
-        else:
-            min_eigenvalue_inv_C = 0
-        
-        if (min_eigenvalue_S > 0) and (min_eigenvalue_C > 0) and (min_eigenvalue_inv_C > 0):
-            return {
-                'regularization': regularization,
-                'final_min_eigenvalue_S': min_eigenvalue_S,
-                'final_min_eigenvalue_C': min_eigenvalue_C,
-                'final_min_eigenvalue_inv_C': min_eigenvalue_inv_C
-            }
-            
-        regularization *= 1.05
-
-def regularize_for_stability(obs_distns, obs_stats):
-    """
-    Regularize natural parameters to ensure positive definite residual covariance matrices.
-    
-    Iterates through observation distributions and their sufficient statistics, checking 
-    whether the resulting residual covariance matrix would be positive definite. If not,
-    applies ridge regularization to the Gram matrix (C component) to ensure numerical 
-    stability during model resampling.
-    
-    This prevents crashes in downstream Bayesian inference when natural parameters
-    plus sufficient statistics lead to non-positive-definite covariance matrices.
-    
-    Parameters
-    ----------
-    obs_distns : list of AutoRegression objects
-        Observation distribution objects for each state in the HMM. Each contains
-        natural_hypparam attribute that will be modified in-place if regularization
-        is needed.
-    obs_stats : list of ndarray
-        Sufficient statistics for each state, typically computed from data assigned
-        to that state. Combined with natural_hypparam to form posterior parameters.
-        
-    Notes
-    -----
-    Modifies obs_distns[i].natural_hypparam[2] in-place by adding ridge regularization
-    λ * I to the Gram matrix component when the residual covariance matrix has 
-    non-positive eigenvalues.
-    
-    Prints regularization information for each state that requires adjustment, showing
-    the improvement in minimum eigenvalue and the regularization coefficient used.
-    """
-    for i, (obs, statmat) in enumerate(zip(obs_distns, obs_stats)):
-        natparam = obs.natural_hypparam + statmat
-        A, B, C, _ = natparam
-
-        S = A - np.linalg.solve(C, B.T).T.dot(B.T)
-        min_eigenvalue_S = min(np.linalg.eigvalsh(S))
-        min_eigenvalue_C = min(np.linalg.eigvalsh(C))
-
-        if min_eigenvalue_C > 0:
-            min_eigenvalue_inv_C = min(np.linalg.eigvalsh(inv_psd(C)))
-        else:
-            min_eigenvalue_inv_C = 0
-
-        if (min_eigenvalue_S > 0) and (min_eigenvalue_C > 0) and (min_eigenvalue_inv_C > 0):
-            continue 
-
-        result = minimum_regularization_coefficient(A, B, C)
-        regularization = result['regularization']
-        final_min_eigenvalue_S = result['final_min_eigenvalue_S']
-        final_min_eigenvalue_C = result['final_min_eigenvalue_C']
-        final_min_eigenvalue_inv_C = result['final_min_eigenvalue_inv_C']
-
-        print(f'Regularized S params for state {i}: {min_eigenvalue_S:.2e} → {final_min_eigenvalue_S:.2e} (ridge regression coeff = {regularization:.2e})')
-        print(f'Regularized C params for state {i}: {min_eigenvalue_C:.2e} → {final_min_eigenvalue_C:.2e}')
-        print(f'Regularized inv_C (K) params for state {i}: {min_eigenvalue_inv_C:.2e} → {final_min_eigenvalue_inv_C:.2e}')
-        obs.natural_hypparam[2] = C + regularization * np.eye(C.shape[0])
 
 def train_model(
     model,
@@ -184,8 +59,10 @@ def train_model(
     for itr in tqdm(range(start, num_iter), **progress_kwargs, desc="Training ARHMM"):
         # Resample states, and gracefully return in case of a keyboard interrupt
         try:
-            if hasattr(model, '_obs_stats') and model._obs_stats is not None:
-                regularize_for_stability(model.obs_distns, model._obs_stats)
+            # Positive-definiteness of the residual covariance is maintained by
+            # boosting the diagonal before inversion inside the observation
+            # distribution, rather than by writing a data-dependent ridge back
+            # into the prior term between iterations.
             model.resample_model(num_procs=ncpus)
         except KeyboardInterrupt:
             print("Training manually interrupted.")

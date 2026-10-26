@@ -1,33 +1,7 @@
-import os
-import sys
 import codecs
-import subprocess
-from setuptools import setup, find_packages
+import os
 
-
-def install(package):
-    subprocess.call([sys.executable, "-m", "pip", "install", package])
-
-
-try:
-    import numpy
-except ImportError:
-    install("numpy")
-
-try:
-    import future
-except ImportError:
-    install("future")
-
-try:
-    import six
-except ImportError:
-    install("six")
-
-try:
-    import cython
-except ImportError:
-    install("cython")
+from setuptools import find_packages, setup
 
 
 def read(rel_path):
@@ -46,35 +20,58 @@ def get_version(rel_path):
 
 
 setup(
-    name="moseq2_model",
+    name="moseq2-model",
     version=get_version("moseq2_model/__init__.py"),
     author="Datta Lab",
     description="Modeling for the best",
-    packages=find_packages(exclude="docs"),
+    # "tests" is a top-level package here, so it has to be excluded explicitly
+    # or it installs into site-packages under that name.
+    packages=find_packages(exclude=["docs", "tests", "tests.*"]),
     include_package_data=True,
     platforms="any",
-    python_requires=">=3.6,<3.8",
+    license="LicenseRef-Harvard-Academic-Non-Commercial",
+    license_files=["LICENSE.md"],
+    long_description=read("README.md"),
+    long_description_content_type="text/markdown",
+    classifiers=[
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Science/Research",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
+    ],
+    # The former ceiling of <3.8 existed for the pyhsmm/pybasicbayes/
+    # autoregressive wheels, which are no longer dependencies.
+    #
+    # The floor is 3.10 because jax-moseq declares it and keypoint-moseq depends
+    # on jax-moseq. There is no ceiling: what the upper bound should be is what
+    # the version matrix measures, and a ceiling here would refuse the columns
+    # that produce the answer.
+    python_requires=">=3.10",
     install_requires=[
-        "six==1.15.0",
-        "h5py==2.10.0",
-        "scipy==1.3.2",
-        "numpy==1.18.3",
-        "click==7.0",
-        "cython==0.29.14",
-        "pandas==1.0.5",
-        "future==0.18.2",
-        "joblib==0.15.1",
-        "scikit-image==0.16.2",
-        "setuptools",
-        "cytoolz==0.10.1",
+        # The model itself. 0.3.5 is the first release carrying the robust
+        # AR-HMM work this package fits through: robust x separate_trans, the
+        # robust evaluation surface, stateseq_marginals and stateseq_mode.
+        "jax-moseq>=0.3.5",
+        "jax",
+        # Runtime dependencies, floors rather than pins. The previous "=="
+        # pins were contemporaneous with Python 3.7 and none of them has a
+        # wheel for the interpreters this now supports.
+        "numpy",
+        "scipy",
+        "h5py>=3",
+        "click>=8",
+        "joblib",
+        "cytoolz",
         "tqdm>=4.48.0",
-        "matplotlib==3.1.2",
-        "statsmodels==0.10.2",
-        "ruamel.yaml==0.16.5",
-        "opencv-python==4.1.2.30",
-        "pyhsmm @ git+https://github.com/mattjj/pyhsmm.git@master",
-        "pybasicbayes @ git+https://github.com/mattjj/pybasicbayes.git@master",
-        "autoregressive @ git+https://github.com/dattalab/pyhsmm-autoregressive.git@master",
+        "matplotlib",
+        # 0.18 removed the module-level safe_load; moseq2_model._yaml uses the
+        # YAML() interface, which is available from 0.17 onward.
+        "ruamel.yaml>=0.17",
     ],
     entry_points={"console_scripts": ["moseq2-model = moseq2_model.cli:cli"]},
 )

@@ -1,15 +1,15 @@
 import numpy as np
-import ruamel.yaml as yaml
 from unittest import TestCase
 from moseq2_model.util import load_pcs
 from moseq2_model.helpers.data import prepare_model_metadata
 from moseq2_model.train.models import ARHMM, _get_empirical_ar_params
-from autoregressive.models import (
-    FastARWeakLimitStickyHDPHMM,
-    FastARWeakLimitStickyHDPHMMSeparateTrans,
-    ARWeakLimitStickyHDPHMM,
-    ARWeakLimitStickyHDPHMMSeparateTrans,
+from moseq2_model.train.backend import (
+    CorrectedFastARHMM,
+    CorrectedFastARHMMSeparateTrans,
+    CorrectedRobustARHMM,
+    CorrectedRobustARHMMSeparateTrans,
 )
+from moseq2_model._yaml import read_yaml
 
 
 class TestTrainModels(TestCase):
@@ -49,7 +49,7 @@ class TestTrainModels(TestCase):
             affine=params["affine"],
         )
 
-        new_params = _get_empirical_ar_params(list(data_dict.values()), obs_params)
+        new_params = _get_empirical_ar_params(list(data_dict.values()), obs_params, nlags)
         assert len(new_params["S_0"]) == 10  # npcs
         assert len(new_params["K_0"]) == len(params["K_0"])
         assert len(new_params["M_0"]) == len(params["M_0"])
@@ -60,7 +60,7 @@ class TestTrainModels(TestCase):
         config_file = "data/config.yaml"
 
         with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
+            config_data = read_yaml(f)
 
         data_dict, data_metadata = load_pcs(
             filename=input_file, var_name="scores", npcs=10, load_groups=True
@@ -76,26 +76,26 @@ class TestTrainModels(TestCase):
         model_parameters["separate_trans"] = False
         model_parameters["robust"] = False
         arhmm = ARHMM(data_dict=data_dict, **model_parameters)
-        assert isinstance(arhmm, FastARWeakLimitStickyHDPHMM)
+        assert isinstance(arhmm, CorrectedFastARHMM)
 
         model_parameters["sticky_init"] = True
         arhmm = ARHMM(data_dict=data_dict, **model_parameters)
-        assert isinstance(arhmm, FastARWeakLimitStickyHDPHMM)
+        assert isinstance(arhmm, CorrectedFastARHMM)
         model_parameters["sticky_init"] = False
 
         model_parameters["separate_trans"] = True
         model_parameters["robust"] = False
         model_parameters["groups"] = {k: f"group{i}" for i, k in enumerate(data_dict)}
         arhmm = ARHMM(data_dict=data_dict, **model_parameters)
-        assert isinstance(arhmm, FastARWeakLimitStickyHDPHMMSeparateTrans)
+        assert isinstance(arhmm, CorrectedFastARHMMSeparateTrans)
 
         model_parameters["separate_trans"] = False
         model_parameters["robust"] = True
         arhmm = ARHMM(data_dict=data_dict, **model_parameters)
-        assert isinstance(arhmm, ARWeakLimitStickyHDPHMM)
+        assert isinstance(arhmm, CorrectedRobustARHMM)
 
         model_parameters["separate_trans"] = True
         model_parameters["robust"] = True
         model_parameters["groups"] = {k: f"group{i}" for i, k in enumerate(data_dict)}
         arhmm = ARHMM(data_dict=data_dict, **model_parameters)
-        assert isinstance(arhmm, ARWeakLimitStickyHDPHMMSeparateTrans)
+        assert isinstance(arhmm, CorrectedRobustARHMMSeparateTrans)

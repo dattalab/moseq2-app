@@ -7,7 +7,6 @@ import random
 import warnings
 import itertools
 import numpy as np
-import ruamel.yaml as yaml
 import matplotlib.pyplot as plt
 from cytoolz import pluck, curried
 from collections import OrderedDict
@@ -15,6 +14,7 @@ from os.path import join, exists, dirname
 from moseq2_model.util import count_frames
 from moseq2_model.train.models import flush_print
 from moseq2_model.train.util import whiten_all, whiten_each
+from moseq2_model._yaml import read_yaml
 
 
 def process_indexfile(index, data_metadata, default_group="n/a", select_groups=False):
@@ -36,7 +36,7 @@ def process_indexfile(index, data_metadata, default_group="n/a", select_groups=F
     if index is not None and exists(index):
         with open(index, "r") as f:
             # reading in array of files
-            index_data = yaml.safe_load(f)
+            index_data = read_yaml(f)
             yml_metadata = index_data["files"]
 
         # reading corresponding groups and uuids
