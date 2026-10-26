@@ -31,7 +31,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     # Check if the timestamps are in milliseconds based on the mean difference amount
     if np.mean(diff) > 10:
         # rescale the timestamps to seconds
-        diff /= scaling_factor
+        diff = diff / scaling_factor
 
     # Find the average time difference between frames.
     avgTime = np.mean(diff)
