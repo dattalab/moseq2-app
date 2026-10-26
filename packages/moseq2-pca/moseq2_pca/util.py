@@ -155,7 +155,7 @@ def gaussian_kernel1d(n=None, sig=3):
     if n is None:
         n = np.ceil(sig * 4)
 
-    points = np.arange(-n, n)
+    points = np.arange(-n, n + 1)
 
     kernel = np.exp(-(points**2.0) / (2.0 * sig**2.0))
     kernel /= np.sum(kernel)
