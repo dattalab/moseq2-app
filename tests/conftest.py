@@ -230,6 +230,42 @@ def pca(project, progress_file, configured, grouped):
 
 
 @pytest.fixture(scope="session")
+def scores(project, progress_file, pca):
+    """Cell 15: express every frame in the basis cell 13 learned.
+
+    The decomposition describes how a mouse's shape varies; this projects
+    each recording's frames onto it, turning 6400 pixels per frame into a
+    couple of dozen coordinates. The model is fit on these.
+    """
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_pca.gui import apply_pca_command
+
+    scores_file = str(pca / "pca_scores.h5")
+    paths = update_progress(str(progress_file), "scores_path", scores_file)
+    apply_pca_command(paths, "pca_scores")
+    return Path(scores_file)
+
+
+@pytest.fixture(scope="session")
+def changepoints(project, progress_file, configured, scores):
+    """Cell 16: find where the mouse's pose changes, without a model.
+
+    A model-free estimate of how long a behavioural unit lasts, computed from
+    the PC scores alone. Cell 19 scores a fitted model against it, which is
+    how a kappa is chosen, so this is the yardstick rather than an output.
+    """
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_app.util import update_config
+    from moseq2_pca.gui import compute_changepoints_command
+
+    with update_config(str(configured)) as config:
+        config["dims"] = 300
+    paths = update_progress(str(progress_file), "changepoints_path", "changepoints")
+    compute_changepoints_command(paths["train_data_dir"], paths, "changepoints")
+    return Path(paths["pca_dirname"]) / "changepoints.h5"
+
+
+@pytest.fixture(scope="session")
 def configured(project, progress_file):
     """Cell 3: the config file every later step reads its parameters from."""
     from moseq2_app.gui.progress import update_progress
