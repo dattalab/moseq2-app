@@ -189,6 +189,47 @@ def grouped(aggregated):
 
 
 @pytest.fixture(scope="session")
+def scalar_viewer(grouped):
+    """Cell 11: the scalar summary, and the viewer cell 12 reads out of it.
+
+    Reading every recording's scalars takes a moment, and the viewer is
+    immutable once built, so the whole suite shares one.
+    """
+    from moseq2_app.main import interactive_scalar_summary
+
+    return interactive_scalar_summary(str(grouped))
+
+
+@pytest.fixture(scope="session")
+def pca(project, progress_file, configured, grouped):
+    """Cell 13: learn the pose basis every later step works in.
+
+    Eighty by eighty pixels of mouse is too much to model directly, so the
+    aggregated frames are reduced to a handful of components describing how a
+    mouse's shape varies. Everything from here on is expressed in that basis
+    rather than in pixels.
+
+    Runs under dask, which is why the cell configures workers.
+    """
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_app.util import update_config
+    from moseq2_pca.gui import train_pca_command
+
+    pca_dirname = str(project / "_pca") + "/"
+    paths = update_progress(str(progress_file), "pca_dirname", pca_dirname)
+    with update_config(str(configured)) as config:
+        config["camera_type"] = "k2"
+        config["overwrite_pca"] = False
+        config["gaussfilter_space"] = (1.5, 1)
+        config["medfilter_space"] = [0]
+        config["medfilter_time"] = [0]
+        config["nworkers"] = 1
+
+    train_pca_command(paths, pca_dirname, "pca")
+    return Path(pca_dirname)
+
+
+@pytest.fixture(scope="session")
 def configured(project, progress_file):
     """Cell 3: the config file every later step reads its parameters from."""
     from moseq2_app.gui.progress import update_progress
