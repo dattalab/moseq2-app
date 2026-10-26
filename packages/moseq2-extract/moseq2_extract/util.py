@@ -474,7 +474,7 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     fw = resolution[0] / (2 * np.deg2rad(field_of_view[0] / 2))
     fh = resolution[1] / (2 * np.deg2rad(field_of_view[1] / 2))
 
-    new_coords = np.zeros_like(coords)
+    new_coords = np.zeros_like(coords, dtype=np.float64)
     new_coords[:, 0] = true_depth * xhat / fw
     new_coords[:, 1] = true_depth * yhat / fh
 
