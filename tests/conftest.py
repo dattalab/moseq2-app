@@ -59,6 +59,37 @@ def analysis_bundle():
     return fetch_analysis_bundle()
 
 
+#: What the bundle's progress file carries where the project root belongs. A
+#: real progress file holds absolute paths into the directory it was written
+#: in, so the bundle cannot ship one until it knows where it landed.
+ROOT_SENTINEL = "__PROJECT_ROOT__"
+
+
+@pytest.fixture(scope="session")
+def analysis_project(tmp_path_factory, analysis_bundle):
+    """A writable copy of the finished project the analysis notebook opens.
+
+    This is where the analysis notebook's user starts, and it is a different
+    starting point from ``project``: twenty sessions aggregated, decomposed
+    and modeled, rather than four recordings and nothing else. The extraction
+    and modeling notebook produced it, so the suite reads it rather than
+    building it. Eighty seconds of mouse yields syllables that are noise, and
+    the dendrogram, the transition matrix and the group comparisons are only
+    worth testing against syllables that are not.
+
+    The index relocates on its own, holding paths relative to itself, which is
+    what ``parse_index`` joins them against. The progress file cannot: every
+    cell reads absolute paths out of it. Substituting the sentinel for the
+    directory the copy landed in is what turns it into a real one.
+    """
+    root = tmp_path_factory.mktemp("analysis")
+    shutil.copytree(analysis_bundle, root, dirs_exist_ok=True)
+
+    progress = root / "progress.yaml"
+    progress.write_text(progress.read_text().replace(ROOT_SENTINEL, str(root)))
+    return root
+
+
 @pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.

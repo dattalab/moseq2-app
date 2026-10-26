@@ -16,8 +16,15 @@ transition matrix built on noise says nothing about whether those functions
 work.
 
 Both are fetched with pooch into the platform cache directory and are only
-downloaded once. Point ``MOSEQ2_APP_FIXTURE_URL`` somewhere else to serve
-them from a mirror or a local directory.
+downloaded once. ``MOSEQ2_APP_FIXTURE_URL`` points at an http mirror; pooch
+speaks http, https, ftp, sftp and doi, so a path on disk is not a mirror.
+To run against a bundle that is not served anywhere yet, drop the tarball
+into the cache directory under its registered name and pooch will verify its
+hash and unpack it rather than reaching for the network.
+
+``analysis-bundle`` carries no preview movies. The index names each session's
+h5 and its yaml sidecar, crowd movies are composited out of the h5 frames,
+and the twenty extraction mp4s are 200 MB that nothing in the notebook opens.
 """
 
 from __future__ import annotations
