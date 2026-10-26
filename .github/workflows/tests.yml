@@ -1,0 +1,158 @@
+name: tests
+
+# The suite is the cross-platform equivalence check for the MoSeq2 pipeline.
+# A run answers one question: does a user on this operating system, with this
+# Python, get the same results as a user on any other?
+
+on:
+  push:
+    branches: [release]
+  pull_request:
+    branches: [release]
+  schedule:
+    # Nightly, including the tests that reach the network.
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # Git Bash on the Windows runners, so every step below is one script.
+    shell: bash
+
+jobs:
+  # The fixtures are 642 MB and every job in the matrix wants the same two
+  # bundles. One job per operating system fills the cache; the matrix restores
+  # it. Without this, each cold run pulls the bundles once per Python version.
+  fixtures:
+    name: fixtures / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          # Only the archives. pooch unpacks them again when the extracted
+          # directory is absent, which is faster than carrying it through
+          # the cache and keeps the repository under its 10 GB ceiling.
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Fetch the bundles
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python -c "import sys; sys.path.insert(0, 'tests'); import fixtures; fixtures.fetch_raw_sessions(); fixtures.fetch_analysis_bundle()"
+
+  tests:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    needs: fixtures
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      # Every cell reports. A red cell is the finding, not a reason to cancel
+      # the cells that would have told us whether it is platform-specific.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # The ends of the range pyproject.toml declares. The suite has never
+        # run on macOS or Windows, so the first question a run has to answer
+        # is whether the platform works at all, not which Python version does.
+        python: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install ffmpeg
+        run: |
+          case "$RUNNER_OS" in
+            Linux)   sudo apt-get update && sudo apt-get install -y ffmpeg ;;
+            macOS)   brew install ffmpeg ;;
+            Windows) choco install ffmpeg -y --no-progress ;;
+          esac
+
+      # ffmpeg is not a Python dependency and no install provides it, so which
+      # version the runner offers is part of what the run measures.
+      - name: Record the ffmpeg version
+        run: ffmpeg -version | head -1
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Install the package as a user would
+        run: python -m pip install ".[tests]"
+
+      # What the resolver actually gave us, so a green run is re-runnable and
+      # a red one can be read against the versions that produced it.
+      - name: Record the resolution
+        run: python -m pip freeze
+
+      - name: Run the suite
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q
+
+  # The flip-classifier cell downloads a trained classifier. Those tests sit
+  # out of pull requests so a remote outage cannot redden one.
+  network:
+    name: network tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Install the package as a user would
+        run: python -m pip install ".[tests]"
+
+      - name: Run the tests that reach the network
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q -m network
