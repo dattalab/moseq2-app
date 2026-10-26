@@ -156,7 +156,7 @@ def convert_legacy_scalars(old_features, force: bool = False, true_depth: float 
     copy_keys = ('width', 'length', 'area')
     for key in copy_keys:
         # first try to grab _px key, then default to old version name
-        features[f'{key}_px'] = get(f'{key}_px', old_features, old_features[key])
+        features[f'{key}_px'] = old_features[f'{key}_px'] if f'{key}_px' in old_features else old_features[key]
 
     if 'height_ave_mm' in old_features.keys():
         features['height_ave_mm'] = old_features['height_ave_mm']
