@@ -249,7 +249,7 @@ class FlipClassifierWidget:
                     output_movie = path.replace('.h5', '_flipped.mp4')
     
                     frames = f[frame_path]
-                    frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
+                    frame_batches = gen_batch_sequence(len(frames), chunk_size, chunk_overlap)
     
                     for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
                         frame_batch = frames[batch]
