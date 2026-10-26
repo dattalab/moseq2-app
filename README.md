@@ -6,7 +6,17 @@
 
 This is a library for computing PCA components and scores from extracted mouse movies.  Use this to compute features for modeling.
 
-Latest version is `0.4.0`
+# Installation
+
+```bash
+pip install moseq2-pca
+```
+
+Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
+
+Most people install the whole pipeline in one step with `pip install
+moseq2-app`, which brings this package with it. See [the installation
+guide](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).
 
 # [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
 You can find more information about MoSeq Pipeline, installation, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
