@@ -688,8 +688,11 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
     normed_df[:, k // 2:-k // 2] = (normed_df[:, k:] - normed_df[:, :-k])**2
 
     normed_df[nanidx] = np.nan
-    normed_df[:, :int(6 * sigma)] = np.nan
-    normed_df[:, -int(6 * sigma):] = np.nan
+    if sigma is not None and sigma > 0:
+        edge = int(6 * sigma)
+        if edge > 0:
+            normed_df[:, :edge] = np.nan
+            normed_df[:, -edge:] = np.nan
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
