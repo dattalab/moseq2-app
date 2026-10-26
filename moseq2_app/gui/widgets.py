@@ -94,7 +94,7 @@ class GroupSettingWidgets:
         meta_cols = pd.DataFrame(meta).columns
 
         latest_df = self.qgrid_widget.get_changed_df()
-        self.df.drop('filename', axis=1)
+        self.df = self.df.drop('filename', axis=1, errors='ignore')
         self.df.update(latest_df)
 
         updated_index = {'files': list(self.df.drop(meta_cols, axis=1).to_dict(orient='index').values()),

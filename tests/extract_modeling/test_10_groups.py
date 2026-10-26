@@ -200,10 +200,6 @@ def test_the_save_button_tracks_unsaved_changes(scratch_index):
     )
 
 
-@pytest.mark.xfail(
-    reason="update_clicked calls self.df.drop('filename', axis=1) and discards "
-    "the result, so the column it meant to remove is written out with the rest"
-)
 def test_saving_does_not_add_a_key_to_the_index(scratch_index):
     """9. The index should hold what it held, with the groups changed.
 
