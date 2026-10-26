@@ -3,6 +3,18 @@
 [![codecov](https://codecov.io/gh/dattalab/moseq2_model/branch/master/graph/badge.svg?token=q9xxVhps5o)](https://codecov.io/gh/dattalab/moseq2_model)
 [![DOI](https://zenodo.org/badge/81390468.svg)](https://zenodo.org/badge/latestdoi/81390468)
 
+# Installation
+
+```bash
+pip install moseq2-model
+```
+
+Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
+
+Most people install the whole pipeline in one step with `pip install
+moseq2-app`, which brings this package with it. See [the installation
+guide](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).
+
 # [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
 You can find more information about MoSeq Pipeline, installation, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
 
