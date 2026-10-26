@@ -249,14 +249,20 @@ class FlipClassifierWidget:
                     output_movie = path.replace('.h5', '_flipped.mp4')
     
                     frames = f[frame_path]
-                    frame_batches = gen_batch_sequence(len(frames), chunk_size, chunk_overlap)
+                    frame_batches = list(gen_batch_sequence(len(frames), chunk_size, chunk_overlap))
+                    committed = np.zeros(len(frames), dtype=bool)
     
-                    for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
+                    for batch_number, batch in enumerate(tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose)):
                         frame_batch = frames[batch]
     
                         # apply flip classifier on each batch to find which frames to flip
                         flips = get_flips(frame_batch.copy(), flip_file=clf_path, smoothing=smoothing)
-                        flip_indices = np.where(flips)
+                        batch_indices = np.asarray(list(batch))
+                        pending = ~committed[batch_indices]
+                        if chunk_overlap > 0 and batch_number < len(frame_batches) - 1:
+                            pending[-chunk_overlap:] = False
+                        flip_indices = np.where(flips & pending)
+                        committed[batch_indices[pending]] = True
     
                         # rewrite the frames with the newly classified orientation
                         frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
