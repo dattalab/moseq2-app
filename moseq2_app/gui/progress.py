@@ -286,7 +286,7 @@ def find_progress(base_progress):
     models = glob(join(base_dir, '**/*.p'), recursive=True)
 
     if len(models) > 1:
-        models = sorted(models, key=os.path.getmtime)
+        models = sorted(models, key=os.path.getmtime, reverse=True)
         print(f'More than 1 model found. Setting model path to latest generated model: {models[0]}')
     # avoid models not found
     if len(models) > 0:
