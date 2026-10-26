@@ -72,3 +72,9 @@ source = "file"
 path = "moseq2_app/__init__.py"
 
 [tool.pdm]
+
+[tool.pdm.build]
+# pytest.ini carries xfail_strict, --strict-markers and the default
+# deselection of the network tests. Without it the suite shipped in the
+# sdist runs under different rules than the one the project runs.
+source-includes = ["tests", "pytest.ini"]
