@@ -239,7 +239,6 @@ class FlipClassifierWidget:
         smoothing (int): kernel size of the applied median filter on the flip classifier results
         verbose (bool): displays the tqdm progress bars for each session.
         """
-        video_pipe = None
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', UserWarning)
             for key, path in tqdm(self.sessions.items(), desc='Flipping extracted sessions...'):
@@ -251,40 +250,41 @@ class FlipClassifierWidget:
                     frames = f[frame_path]
                     frame_batches = gen_batch_sequence(len(frames)-1, chunk_size, chunk_overlap)
     
-                    for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
-                        frame_batch = frames[batch]
+                    video_pipe = None
+                    try:
+                        for batch in tqdm(frame_batches, desc=f'Adjusting flips: {key}', disable=not verbose):
+                            frame_batch = frames[batch]
     
-                        # apply flip classifier on each batch to find which frames to flip
-                        flips = get_flips(frame_batch.copy(), flip_file=clf_path, smoothing=smoothing)
-                        flip_indices = np.where(flips)
+                            # apply flip classifier on each batch to find which frames to flip
+                            flips = get_flips(frame_batch.copy(), flip_file=clf_path, smoothing=smoothing)
+                            flip_indices = np.where(flips)
     
-                        # rewrite the frames with the newly classified orientation
-                        frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
-                        f[frame_path][batch] = frame_batch
+                            # rewrite the frames with the newly classified orientation
+                            frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
+                            f[frame_path][batch] = frame_batch
     
-                        # augment recorded scalar value to reflect orientation switches
-                        f['scalars/angle'][flip_indices] += np.pi
+                            # augment recorded scalar value to reflect orientation switches
+                            f['scalars/angle'][flip_indices] += np.pi
     
-                        if write_movie:
-                            try:
-                                # Writing frame batch to mp4 file
-                                video_pipe = write_frames_preview(output_movie,
-                                                                  frame_batch,
-                                                                  pipe=video_pipe,
-                                                                  close_pipe=False,
-                                                                  depth_min=0,
-                                                                  depth_max=100,
-                                                                  fps=fps,
-                                                                  progress_bar=verbose)
-                            except AttributeError as e:
-                                warnings.warn(f'Could not generate flipped movie for {key}:{path}. Skipping...')
-                                print(e)
-                                print(e.__traceback__)
-                                break
-                    # Check if video is done writing. If not, wait.
-                    if video_pipe is not None:
-                        video_pipe.communicate()
-                        video_pipe = None
+                            if write_movie:
+                                try:
+                                    # Writing frame batch to mp4 file
+                                    video_pipe = write_frames_preview(output_movie,
+                                                                      frame_batch,
+                                                                      pipe=video_pipe,
+                                                                      close_pipe=False,
+                                                                      depth_min=0,
+                                                                      depth_max=100,
+                                                                      fps=fps,
+                                                                      progress_bar=verbose)
+                                except AttributeError as e:
+                                    warnings.warn(f'Could not generate flipped movie for {key}:{path}. Skipping...')
+                                    print(e)
+                                    print(e.__traceback__)
+                                    break
+                    finally:
+                        if video_pipe is not None:
+                            video_pipe.communicate()
 
     @property
     def training_data_path(self):
