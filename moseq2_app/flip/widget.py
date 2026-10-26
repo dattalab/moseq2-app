@@ -284,6 +284,8 @@ class FlipClassifierWidget:
                     # Check if video is done writing. If not, wait.
                     if video_pipe is not None:
                         video_pipe.communicate()
+                        if video_pipe.returncode != 0:
+                            raise RuntimeError(f"Flip preview writer failed with exit code {video_pipe.returncode}: {output_movie}")
                         video_pipe = None
 
     @property
