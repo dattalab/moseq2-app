@@ -66,7 +66,10 @@ def ztest_vect(d1, d2):
     std1 = d1.std(0)
     std2 = d2.std(0)
     std = np.sqrt(std1 ** 2 + std2 ** 2)
-    return np.minimum(1.0, 2 * stats.norm.cdf(-np.abs(mu1 - mu2) / std))
+    delta = np.abs(mu1 - mu2)
+    z = np.divide(delta, std, out=np.zeros_like(delta, dtype=float), where=std > 0)
+    p = np.minimum(1.0, 2 * stats.norm.cdf(-z))
+    return np.where((std == 0) & (delta > 0), 0.0, p)
 
 
 def bootstrap_group_means(df, group1, group2, statistic="usage", max_syllable=40):
