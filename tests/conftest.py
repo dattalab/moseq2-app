@@ -143,6 +143,39 @@ def analysis_paths(analysis_project, analysis_progress, model_dict):
 
 
 @pytest.fixture(scope="session")
+def sorted_index(analysis_paths):
+    """Cell 4, first half: read the index and put the sessions in a fixed order.
+
+    ``parse_index`` resolves each session's paths against the index file's
+    own directory, which is what lets the project be moved. Everything
+    downstream addresses sessions by uuid, and this is where that mapping
+    comes from.
+    """
+    from moseq2_viz.util import parse_index
+
+    _, index = parse_index(analysis_paths["index_file"])
+    return index
+
+
+@pytest.fixture(scope="session")
+def moseq_df(analysis_paths, sorted_index):
+    """Cell 4, second half: one row per frame, scalars beside syllable labels.
+
+    The join the whole notebook rests on. Each recording's extraction
+    scalars are read out of its h5 and lined up with the syllable the model
+    assigned to that frame, so that every later question (which syllables
+    does this group use, what is the mouse doing during one) is a groupby
+    on this table.
+
+    Big enough to be worth building once: seven hundred thousand rows over
+    the fixture's twenty sessions.
+    """
+    from moseq2_viz.scalars.util import scalars_to_dataframe
+
+    return scalars_to_dataframe(sorted_index, model_path=analysis_paths["model_path"])
+
+
+@pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
 
