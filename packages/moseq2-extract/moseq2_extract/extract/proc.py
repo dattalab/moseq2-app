@@ -648,12 +648,12 @@ def feature_hampel_filter(features, centroid_hampel_span=None, centroid_hampel_s
                                   (((centroid_hampel_span // 2, centroid_hampel_span // 2)),
                                    (0, 0)),
                                   'constant', constant_values = np.nan)
-        for i in range(1):
+        for i in range(2):
             vws = strided_app(padded_centroids[:, i], centroid_hampel_span, 1)
             med = np.nanmedian(vws, axis=1)
             mad = np.nanmedian(np.abs(vws - med[:, None]), axis=1)
             vals = np.abs(features['centroid'][:, i] - med)
-            fill_idx = np.where(vals > med + centroid_hampel_sig * mad)[0]
+            fill_idx = np.where(vals > centroid_hampel_sig * 1.4826 * mad)[0]
             features['centroid'][fill_idx, i] = med[fill_idx]
 
         padded_orientation = np.pad(features['orientation'],
