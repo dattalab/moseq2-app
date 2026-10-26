@@ -98,6 +98,29 @@ def arena(project, progress_file, configured, flipped):
 
 
 @pytest.fixture(scope="session")
+def aggregated(project, progress_file, extracted):
+    """Cell 9: gather every extraction into one directory and index it.
+
+    Until now each recording's output has sat beside the recording. Modeling
+    reads one directory, so the cell copies every extraction into
+    ``aggregate_results/`` under a name built from the acquisition metadata,
+    and writes ``moseq2-index.yaml`` listing what it found. That index is
+    what every cell from here on is pointed at.
+    """
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_extract.gui import aggregate_extract_results_command
+
+    update_progress(
+        str(progress_file), "train_data_dir", str(project / "aggregate_results") + "/"
+    )
+    index = aggregate_extract_results_command(
+        str(project), "{start_time}_{session_name}_{subject_name}", "aggregate_results/"
+    )
+    update_progress(str(progress_file), "index_file", index)
+    return Path(index)
+
+
+@pytest.fixture(scope="session")
 def extracted(project, configured, arena):
     """Cell 6: extract every recording in the project.
 
