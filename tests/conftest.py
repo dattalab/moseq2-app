@@ -314,6 +314,37 @@ def model(model_settings):
     return Path(model_settings["model_path"])
 
 
+#: The kappa the second model is fit at, so cell 19 has a real choice to
+#: make. Well away from the first, whose kappa is the frame count.
+SECOND_KAPPA = 100
+
+
+@pytest.fixture(scope="session")
+def two_models(project, progress_file, configured, model):
+    """A second model beside the first, fit at a different kappa.
+
+    Cell 19 picks the model whose syllable durations best match the
+    changepoints. With one model in the folder it has nothing to choose
+    between, so the chain fits a second at a kappa far from the first, which
+    is what a user comparing kappas would have.
+    """
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_app.util import update_config
+    from moseq2_model.gui import learn_model_command
+
+    second = model.parent / f"model_kappa_{SECOND_KAPPA}.p"
+    paths = update_progress(str(progress_file), "model_path", str(second))
+    with update_config(str(configured)) as config:
+        config["kappa"] = SECOND_KAPPA
+    try:
+        learn_model_command(paths)
+    finally:
+        with update_config(str(configured)) as config:
+            config["kappa"] = MODEL_SETTINGS["kappa"]
+        update_progress(str(progress_file), "model_path", str(model))
+    return {"model.p": model, second.name: second}
+
+
 @pytest.fixture(scope="session")
 def configured(project, progress_file):
     """Cell 3: the config file every later step reads its parameters from."""
