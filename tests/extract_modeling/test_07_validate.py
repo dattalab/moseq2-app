@@ -134,11 +134,6 @@ def test_an_unflagged_recording_is_not_listed(reviewable):
     assert listed <= set(RECORDINGS)
 
 
-@pytest.mark.xfail(
-    reason="a raised flag holds the percentage as a nonzero float, which is "
-    "truthy, so the branch that prints it is only reachable by 0.0 and the "
-    "number is never shown"
-)
 def test_the_percentage_behind_a_flag_is_printed(reviewable):
     """6. How bad a flag is decides whether a user acts on it.
 
