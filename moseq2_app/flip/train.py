@@ -110,12 +110,9 @@ def train_classifier(
     frames = data["frames"]
     flipped = data["flipped"]
 
-    print("Fitting PCA")
-    pca = PCA(n_components=n_components)
-    pca.fit(flatten(frames[-len(frames) // 3:]))
-
     pipeline = make_pipeline(
-        FunctionTransformer(batch_apply_pca, kw_args={"pca": pca}, validate=False),
+        FunctionTransformer(flatten, validate=False),
+        PCA(n_components=n_components),
         StandardScaler(),
         (
             RandomForestClassifier(n_estimators=150)
