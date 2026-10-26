@@ -829,7 +829,9 @@ def relabel_by_usage(labels, fill_value=-5, count='usage'):
     assert count in ('usage', 'frames'), 'count must be "usage" or "frames"'
 
     sorted_labels = deepcopy(labels)
-    usages = get_syllable_usages(labels, count=count)
+    sequences = labels.values() if isinstance(labels, dict) else labels
+    max_state = max((int(np.max(v)) for v in sequences if len(v)), default=-1)
+    usages = get_syllable_usages(labels, max_syllable=max(0, max_state + 1), count=count)
 
     sorting = sorted(usages, key=usages.get, reverse=True)
 
