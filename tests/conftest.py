@@ -165,6 +165,30 @@ def flipped(project, configured, raw_sessions):
 
 
 @pytest.fixture(scope="session")
+def grouped(aggregated):
+    """Cell 10: label each recording with the condition it belongs to.
+
+    Until this runs every recording is in group ``default`` and a group
+    comparison compares the experiment against itself. The cell shows an
+    editable table; a user selects rows, types a name, sets it, and saves the
+    table back to the index. The chain does the same for the two conditions
+    the fixture recordings come from.
+    """
+    from moseq2_app.main import interactive_group_setting
+
+    widget = interactive_group_setting(str(aggregated))
+    for prefix, group in (("saline", "saline"), ("amphetamine", "amph")):
+        table = widget.qgrid_widget.get_changed_df()
+        widget.qgrid_widget.change_selection(
+            [i for i, name in zip(table.index, table["SessionName"]) if name.startswith(prefix)]
+        )
+        widget.group_input.value = group
+        widget.save_button.click()
+    widget.update_index_button.click()
+    return aggregated
+
+
+@pytest.fixture(scope="session")
 def configured(project, progress_file):
     """Cell 3: the config file every later step reads its parameters from."""
     from moseq2_app.gui.progress import update_progress
