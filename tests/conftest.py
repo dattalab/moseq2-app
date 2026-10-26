@@ -241,6 +241,42 @@ def labeled(analysis_project, analysis_paths):
     return label_syllables(paths, **LABELLING)
 
 
+#: How cell 12 normalises its transition matrices: every entry is the share
+#: of all transitions that went from one syllable to another.
+TRANSITION_NORMALIZE = "bigram"
+
+
+@pytest.fixture(scope="session")
+def transitions(analysis_paths, labeled):
+    """Cell 12's computing half: a matrix and a usage count per group.
+
+    Usage says how often a syllable happens; a transition matrix says
+    what it follows and what follows it. Two groups can use the same
+    syllables equally often and string them together quite differently.
+
+    Cell 12 draws these and cell 13 exports them, so the computation is
+    shared.
+    """
+    from moseq2_viz.model.trans_graph import get_group_trans_mats, get_trans_graph_groups
+    from moseq2_viz.model.util import parse_model_results, relabel_by_usage
+
+    model_data = parse_model_results(analysis_paths["model_path"])
+    model_data["labels"] = relabel_by_usage(model_data["labels"], count="usage")[0]
+
+    label_group, uuids = get_trans_graph_groups(model_data)
+    group = sorted(set(label_group))
+    trans_mats, usages = get_group_trans_mats(
+        model_data["labels"], label_group, group, labeled, normalize=TRANSITION_NORMALIZE
+    )
+    return {
+        "group": group,
+        "label_group": label_group,
+        "uuids": uuids,
+        "trans_mats": trans_mats,
+        "usages": usages,
+    }
+
+
 @pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
