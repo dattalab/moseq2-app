@@ -300,6 +300,8 @@ def normalize_usages(usage_dict):
     usage_dict (dict): dictionary containing syllable label keys pointing to usage frequencies.
     """
     total = sum(usage_dict.values())
+    if total == 0:
+        return valmap(lambda v: 0.0, usage_dict)
     return valmap(lambda v: v / total, usage_dict)
 
 
