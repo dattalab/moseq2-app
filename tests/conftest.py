@@ -112,6 +112,37 @@ def analysis_progress(analysis_project):
 
 
 @pytest.fixture(scope="session")
+def model_dict(analysis_progress):
+    """Cell 2, first half: give every model in the project its own folder.
+
+    A project can hold several models fit at different kappas, all sitting
+    together in ``models/``. Everything the analysis notebook produces
+    afterwards belongs to one of them, so the cell gives each its own
+    directory, copies the model into it, and returns where each one went.
+    """
+    from moseq2_app.util import setup_model_folders
+
+    return setup_model_folders(analysis_progress)
+
+
+@pytest.fixture(scope="session")
+def analysis_paths(analysis_project, analysis_progress, model_dict):
+    """Cell 2, second half: point the progress file at the chosen model.
+
+    This is the dictionary the rest of the analysis notebook runs on. Beyond
+    the model itself it names the four places the later cells write: the
+    figures, the crowd movies, the syllable labels and the dataframe cache,
+    all inside that model's folder.
+    """
+    from os.path import basename
+
+    from moseq2_app.util import update_model_paths
+
+    best_model = basename(analysis_progress["model_path"])
+    return update_model_paths(best_model, model_dict, str(analysis_project / "progress.yaml"))
+
+
+@pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
 
