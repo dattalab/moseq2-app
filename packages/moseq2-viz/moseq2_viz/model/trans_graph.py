@@ -375,8 +375,8 @@ def make_difference_graphs(trans_mats, usages, group, group_names, usage_kwargs,
                 usages.append(df_usage)
 
                 # get node sizes and colors based on usage differences
-                node_size = np.abs(list(df_usage.values()))[:len(graph.nodes)] * usage_scale
-                node_edge_color = ['b' if x > 0 else 'r' for x in df_usage.values()][:len(graph.nodes)]
+                node_size = np.array([abs(df_usage[node]) for node in graph.nodes]) * usage_scale
+                node_edge_color = ['b' if df_usage[node] > 0 else 'r' for node in graph.nodes]
 
                 node_sizes.append(node_size)
                 node_edge_colors.append(node_edge_color)
