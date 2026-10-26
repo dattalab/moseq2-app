@@ -683,13 +683,20 @@ def format_plot(plot):
     plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
     plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
 
-def get_minmax_tp(edge_width, diff=False):
+EDGE_WIDTH_SCALE = 250
+DIFF_EDGE_WIDTH_SCALE = 400
+
+
+def get_minmax_tp(edge_width, diff=False, signed_weights=None):
     """
     Compute the min and max transition probabilities given the rescaled edge-widths.
 
     Args:
     edge_width (dict): dict of syllables paired with drawn edge widths
     diff (bool): indicates whether to compute min/max transition probs. for up and down-regulated syllables.
+    signed_weights (dict): edge tuple -> signed transition-probability difference.
+        Required when diff=True, because edge_width holds absolute values and so
+        cannot distinguish up- from down-regulated transitions.
 
     Returns:
     min_tp (float): min transition probability (min_down_tp if diff=True)
@@ -698,33 +705,34 @@ def get_minmax_tp(edge_width, diff=False):
     max_up_tp (float): max transition probability in up-regulated syllable
     """
 
-    if not diff:
-        try:
-            min_tp = min(list(edge_width.values())) / 200
-            max_tp = max(list(edge_width.values())) / 200
-        except ValueError:
-            # handle empty list
-            min_tp, max_tp = 0, 0
-        return min_tp, max_tp
+    scale = DIFF_EDGE_WIDTH_SCALE if diff else EDGE_WIDTH_SCALE
+
+    # signed_weights holds the transition probabilities themselves; edge_width
+    # holds those same values already multiplied by `scale` for drawing, so it
+    # has to be divided back down to recover a probability.
+    if signed_weights is not None:
+        weights = dict(signed_weights)
     else:
-        # get min/max down
-        try:
-            min_down_tp = min([e for e in edge_width.values() if e < 0]) / 350
-            max_down_tp = max([e for e in edge_width.values() if e < 0]) / 350
-        except ValueError:
-            # empty list
-            min_down_tp, max_down_tp = 0, 0
+        weights = {k: v / scale for k, v in edge_width.items()}
 
-        # get min/max up
-        try:
-            min_up_tp = min([e for e in edge_width.values() if e > 0]) / 350
-            max_up_tp = max([e for e in edge_width.values() if e > 0]) / 350
-        except ValueError:
-            min_up_tp, max_up_tp = 0, 0
+    if not diff:
+        values = list(weights.values())
+        if not values:
+            return 0, 0
+        return min(values), max(values)
 
-        return min_down_tp, max_down_tp, min_up_tp, max_up_tp
+    # Classify up/down by the SIGNED weight. edge_width is built with abs(), so
+    # filtering it by `< 0` previously matched nothing and the down-regulated
+    # legend always displayed 0.
+    down = [abs(w) for w in weights.values() if w < 0]
+    up = [w for w in weights.values() if w > 0]
 
-def get_difference_legend_items(plot, edge_width, group_name):
+    min_down_tp, max_down_tp = (min(down), max(down)) if down else (0, 0)
+    min_up_tp, max_up_tp = (min(up), max(up)) if up else (0, 0)
+
+    return min_down_tp, max_down_tp, min_up_tp, max_up_tp
+
+def get_difference_legend_items(plot, edge_width, group_name, signed_weights=None):
     """
     Create the difference graph legend items with the min and max transition probabilities for both the up and down-regulated transition probabilities.
 
@@ -749,13 +757,13 @@ def get_difference_legend_items(plot, edge_width, group_name):
 
     G1 = group_name.split('-')[0]
 
-    min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True)
+    min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True, signed_weights=signed_weights)
 
-    min_down_line = plot.line(line_color='red', line_width=min_down_tp * 350)
-    max_down_line = plot.line(line_color='red', line_width=max_down_tp * 350)
+    min_down_line = plot.line(line_color='red', line_width=abs(min_down_tp) * DIFF_EDGE_WIDTH_SCALE)
+    max_down_line = plot.line(line_color='red', line_width=abs(max_down_tp) * DIFF_EDGE_WIDTH_SCALE)
 
-    min_up_line = plot.line(line_color='blue', line_width=min_up_tp * 350)
-    max_up_line = plot.line(line_color='blue', line_width=max_up_tp * 350)
+    min_up_line = plot.line(line_color='blue', line_width=abs(min_up_tp) * DIFF_EDGE_WIDTH_SCALE)
+    max_up_line = plot.line(line_color='blue', line_width=abs(max_up_tp) * DIFF_EDGE_WIDTH_SCALE)
 
     diff_main_items = [
         LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[b_circle]),
@@ -859,10 +867,10 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     # edge colors for difference graphs
     if difference_graph:
         edge_color = {e: 'blue' if graph.edges()[e]['weight'] > 0 else 'red' for e in graph.edges()}
-        edge_width = {e: abs(graph.edges()[e]['weight'] * 400) for e in graph.edges()}
+        edge_width = {e: abs(graph.edges()[e]['weight'] * DIFF_EDGE_WIDTH_SCALE) for e in graph.edges()}
     else:
         edge_color = {e: 'black' for e in graph.edges()}
-        edge_width = {e: graph.edges()[e]['weight'] * 250 for e in graph.edges()}
+        edge_width = {e: graph.edges()[e]['weight'] * EDGE_WIDTH_SCALE for e in graph.edges()}
 
     selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
 
@@ -1126,7 +1134,7 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
 
     return labels
 
-def get_legend_items(plot, edge_width, group_name, difference_graph=False):
+def get_legend_items(plot, edge_width, group_name, difference_graph=False, signed_weights=None):
     """
     generate two legend items to describe the transition plots.
 
@@ -1147,8 +1155,8 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
 
     min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
 
-    mink_line = plot.line(line_color='black', line_width=min_tp * 200)
-    maxk_line = plot.line(line_color='black', line_width=max_tp * 200)
+    mink_line = plot.line(line_color='black', line_width=min_tp * EDGE_WIDTH_SCALE)
+    maxk_line = plot.line(line_color='black', line_width=max_tp * EDGE_WIDTH_SCALE)
 
     group_items = [
         LegendItem(label="Incoming Transition", renderers=[o_line]),
@@ -1162,7 +1170,7 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
     ]
 
     if difference_graph:
-        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name)
+        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name, signed_weights=signed_weights)
         group_items += diff_main_items
 
     main_legend = Legend(items=group_items,
@@ -1257,7 +1265,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         plot.renderers.append(labels)
 
         # get plot legends
-        main_legend, info_legend = get_legend_items(plot, edge_width, group_names[i], difference_graph)
+        main_legend, info_legend = get_legend_items(plot, edge_width, group_names[i], difference_graph,
+                                                    signed_weights={e: graph.edges[e]['weight'] for e in graph.edges})
 
         # add legends to plot
         plot.renderers.append(main_legend)
