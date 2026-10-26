@@ -70,6 +70,10 @@ def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, p
 
     if isinstance(x, pd.core.series.Series):
         x = x.values
+    x = np.asarray(x)
+    x = x[~np.isnan(x)]
+    if len(x) == 0:
+        return np.array([np.nan, np.nan])
     pct /= 2
     n_vals = len(x)
     if n_samp is None:
