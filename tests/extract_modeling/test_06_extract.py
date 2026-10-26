@@ -42,6 +42,8 @@ import h5py
 import numpy as np
 import pytest
 
+from tests.video import index_is_at_the_front, probe
+
 from moseq2_extract.gui import extract_found_sessions
 from moseq2_extract.util import read_yaml
 
@@ -436,8 +438,7 @@ def test_the_preview_movie_starts_without_reading_all_of_it(extracted):
     preview that opens and one that appears to hang.
     """
     for name in RECORDINGS:
-        data = (proc(extracted, name) / "results_00.mp4").read_bytes()
-        assert data.find(b"moov") < data.find(b"mdat"), name
+        assert index_is_at_the_front(proc(extracted, name) / "results_00.mp4"), name
 
 
 def test_rerunning_the_cell_extracts_nothing_again(extracted, configured):
@@ -460,19 +461,3 @@ def test_rerunning_the_cell_extracts_nothing_again(extracted, configured):
             proc(extracted, name).joinpath("results_00.h5").stat().st_mtime_ns
             == before[name]
         ), f"{name} was extracted again"
-
-
-def probe(path, entries=("codec_name", "pix_fmt")):
-    """What ffprobe reports about a video's first stream, in the order asked."""
-    import subprocess
-
-    return subprocess.run(
-        [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=" + ",".join(entries),
-            "-of", "default=noprint_wrappers=1:nokey=1", str(path),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split()

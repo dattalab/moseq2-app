@@ -201,6 +201,46 @@ def stats_df(moseq_df):
     return compute_behavioral_statistics(moseq_df, **STATISTICS)
 
 
+#: What cell 9 asks for. ``max_syllables=None`` makes the cell work out how
+#: many syllables are worth looking at instead of being told.
+LABELLING = {
+    "max_syllables": None,
+    "n_explained": 99,
+    "select_median_duration_instances": False,
+    "max_examples": 20,
+}
+
+
+@pytest.fixture(scope="session")
+def labeled(analysis_project, analysis_paths):
+    """Cell 9: build a crowd movie for every syllable, and open the labeller.
+
+    Up to here a syllable is a number. This is the cell that makes it
+    something a person can look at: for each one, a movie of twenty
+    instances of it played together, so that what the mouse is doing
+    during that syllable is visible rather than inferred from scalars.
+
+    Generating those movies is the longest step in the notebook. It runs
+    once, and the cells after it read what it wrote.
+
+    Returns the number of syllables the cell settled on, which cells 10,
+    11, 12 and 14 all take as their ``max_syllables``.
+    """
+    from os.path import join
+
+    from moseq2_app.gui.progress import update_progress
+    from moseq2_app.main import label_syllables
+
+    progress_file = str(analysis_project / "progress.yaml")
+    session = analysis_paths["model_session_path"]
+
+    update_progress(progress_file, "crowd_dir", join(session, "crowd_movies/"))
+    update_progress(progress_file, "syll_info", join(session, "syll_info.yaml"))
+    paths = update_progress(progress_file, "df_info_path", join(session, "syll_df.parquet"))
+
+    return label_syllables(paths, **LABELLING)
+
+
 @pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
