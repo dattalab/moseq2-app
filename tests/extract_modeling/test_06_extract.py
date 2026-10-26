@@ -421,8 +421,7 @@ def test_the_preview_movie_is_h264(extracted):
     """
     for name in RECORDINGS:
         codec, pix_fmt = probe(proc(extracted, name) / "results_00.mp4")
-        assert codec == "h264", name
-        assert pix_fmt == "yuv420p", name
+        assert (codec, pix_fmt) == ("h264", "yuv420p"), name
 
 
 @pytest.mark.xfail(
@@ -463,18 +462,17 @@ def test_rerunning_the_cell_extracts_nothing_again(extracted, configured):
         ), f"{name} was extracted again"
 
 
-def probe(path):
-    """The codec and pixel format ffprobe reports for a video."""
+def probe(path, entries=("codec_name", "pix_fmt")):
+    """What ffprobe reports about a video's first stream, in the order asked."""
     import subprocess
 
-    out = subprocess.run(
+    return subprocess.run(
         [
             "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=codec_name,pix_fmt",
+            "-show_entries", "stream=" + ",".join(entries),
             "-of", "default=noprint_wrappers=1:nokey=1", str(path),
         ],
         capture_output=True,
         text=True,
         check=True,
     ).stdout.split()
-    return out[0], out[1]
