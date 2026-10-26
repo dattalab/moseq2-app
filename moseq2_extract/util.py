@@ -13,7 +13,8 @@ import warnings
 import numpy as np
 from glob import glob
 from copy import deepcopy
-import ruamel.yaml as yaml
+from ruamel.yaml.comments import CommentedSeq
+from moseq2_extract._yaml import read_yaml as _read_yaml
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -35,7 +36,6 @@ def filter_warnings(func):
     """
     def apply_warning_filters(*args, **kwargs):
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore', yaml.error.UnsafeLoaderWarning)
             warnings.simplefilter(action='ignore', category=FutureWarning)
             warnings.simplefilter(action='ignore', category=UserWarning)
             return func(*args, **kwargs)
@@ -76,7 +76,7 @@ def command_with_config(config_file_param_name):
                 config_data['output_file'] = None
 
                 # modified to only use keys that are actually defined in options and the value is not not none
-                config_data = {k: tuple(v) if isinstance(v, yaml.comments.CommentedSeq) else v
+                config_data = {k: tuple(v) if isinstance(v, CommentedSeq) else v
                                for k, v in config_data.items() if k in param_defaults.keys() and v is not None}
 
                 # find differences btw config and param defaults
@@ -662,7 +662,7 @@ def escape_path(path):
     path (str): path to original base_dir
     """
 
-    return re.sub(r'\s', '\ ', path)
+    return re.sub(r'\s', r'\ ', path)
 
 
 def clean_file_str(file_str: str, replace_with: str = '-') -> str:
@@ -704,11 +704,21 @@ def load_textdata(data_file, dtype=np.float32):
             timestamps.append(int(float(tmp[0])))
 
             # append data indicator value
-            clean_data = np.fromstring(tmp[1].replace(" ", "").strip(), sep=',', dtype=dtype)
+            #
+            # Parsed as float and then cast, rather than parsed at `dtype`.
+            # numpy 2.4 stopped accepting a decimal string for an integer
+            # dtype -- `np.fromstring("0.000000", sep=",", dtype=int)` raises
+            # ValueError where 2.2 returned 0 -- and these files hold decimals
+            # whatever the column means, so `predictions.txt` stopped loading.
+            # build_manifest catches that and drops the entry, so the data went
+            # missing with nothing raised.
+            clean_data = np.array(
+                [piece for piece in tmp[1].strip().split(',') if piece],
+                dtype=float).astype(dtype)
             data.append(clean_data)
 
     data = np.stack(data, axis=0).squeeze()
-    timestamps = np.array(timestamps, dtype=np.int)
+    timestamps = np.array(timestamps, dtype=int)
 
     return data, timestamps
 
@@ -760,9 +770,7 @@ def read_yaml(yaml_file):
     Returns:
     return_dict (dict): dict of yaml contents
     """
-
-    with open(yaml_file, 'r') as f:
-        return yaml.safe_load(f)
+    return _read_yaml(yaml_file)
 
 def mouse_threshold_filter(h5file, thresh=0):
     """
@@ -781,6 +789,40 @@ def mouse_threshold_filter(h5file, thresh=0):
         frames = f['frames'][:min(f['frames'].shape[0], 1000)]
     return np.nanmean(frames) > thresh
 
+def _read_dataset(dataset):
+    """A dataset's value, as h5py 2.10 handed it back.
+
+    HDF5 stores a character set and a length, not a Python type, and the two
+    h5py versions decide differently what to build from that. h5py 2.10 decoded
+    a variable-length UTF-8 string to ``str``; h5py 3 returns the undecoded
+    ``bytes``. Fixed-width ``|S`` datasets were ``bytes`` under both, so
+    decoding everything would move that class in the other direction.
+
+    The distinction only survives in the dtype. Once a ``bytes`` is in hand
+    there is no way to tell which kind of dataset produced it, which is why the
+    test is ``check_string_dtype`` on the dataset rather than ``isinstance`` on
+    the value. That call exists in both versions and answers the same way in
+    both.
+
+    The type of the value is then checked as well, because on h5py 2 the
+    decoding has already happened and there is nothing left to do. That makes
+    this inert on the stack the reference was recorded against.
+
+    Applied per element rather than to the whole result, since a dataset may
+    hold an array of strings.
+    """
+    value = dataset[()]
+    info = h5py.check_string_dtype(dataset.dtype)
+    if info is None or info.length is not None or info.encoding != "utf-8":
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, np.ndarray) and value.dtype == object:
+        return np.array([v.decode("utf-8") if isinstance(v, bytes) else v
+                         for v in value.ravel()], dtype=object).reshape(value.shape)
+    return value
+
+
 def _load_h5_to_dict(file: h5py.File, path) -> dict:
     """
     Loads h5 contents to dictionary object.
@@ -796,7 +838,7 @@ def _load_h5_to_dict(file: h5py.File, path) -> dict:
     ans = {}
     for key, item in file[path].items():
         if isinstance(item, h5py._hl.dataset.Dataset):
-            ans[key] = item[()]
+            ans[key] = _read_dataset(item)
         elif isinstance(item, h5py._hl.group.Group):
             ans[key] = _load_h5_to_dict(file, '/'.join([path, key]))
     return ans
@@ -840,7 +882,7 @@ def clean_dict(dct):
         elif isinstance(e, np.ndarray):
             out = e.tolist()
         elif isinstance(e, np.generic):
-            out = np.asscalar(e)
+            out = e.item()
         else:
             out = e
         return out
@@ -986,7 +1028,7 @@ def make_gradient(width, height, h, k, a, b, theta=0):
 
 
 def graduate_dilated_wall_area(bground_im, config_data, strel_dilate, output_dir):
-    """
+    r"""
     Creates a gradient to represent the dilated (now visible) bucket wall regions.
     Only is used if background is dilated to capture larger rodents in convex shaped buckets (\_/).
     

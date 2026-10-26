@@ -8,10 +8,10 @@ import shutil
 import tarfile
 import warnings
 import numpy as np
-import ruamel.yaml as yaml
+from moseq2_extract._yaml import write_yaml
 from tqdm.auto import tqdm
 from cytoolz import keymap
-from pkg_resources import get_distribution
+from importlib.metadata import version
 from moseq2_extract.io.video import load_timestamps_from_movie
 from os.path import exists, join, dirname, basename, splitext
 from moseq2_extract.util import (
@@ -153,7 +153,7 @@ def build_manifest(loaded, format, snake_case=True):
         {
             "filename": "feedback_ts.txt",
             "var_name": "realtime_feedback",
-            "dtype": np.bool,
+            "dtype": bool,
         }
     )
 
@@ -162,7 +162,7 @@ def build_manifest(loaded, format, snake_case=True):
         {
             "filename": "predictions.txt",
             "var_name": "realtime_predictions",
-            "dtype": np.int,
+            "dtype": int,
         }
     )
 
@@ -255,7 +255,7 @@ def copy_manifest_results(manifest, output_dir):
 
         v["yaml_dict"].pop("extraction_metadata", None)
         with open(f'{join(output_dir, v["copy_path"])}.yaml', "w") as f:
-            yaml.safe_dump(v["yaml_dict"], f)
+            write_yaml(v["yaml_dict"], f)
 
 
 def handle_extract_metadata(input_file, dirname):
@@ -463,7 +463,7 @@ def create_extract_h5(
     ] = "Computed background image"
 
     # Extract Version
-    extract_version = np.string_(get_distribution("moseq2-extract").version)
+    extract_version = np.bytes_(version("moseq2-extract"))
     h5_file.create_dataset("metadata/extraction/extract_version", data=extract_version)
     h5_file["metadata/extraction/extract_version"].attrs[
         "description"

@@ -251,7 +251,7 @@ def write_frames(
     for i in tqdm(
         range(frames.shape[0]), disable=True, desc=f"Writing frames to {filename}"
     ):
-        pipe.stdin.write(frames[i].astype(frame_dtype).tostring())
+        pipe.stdin.write(frames[i].astype(frame_dtype).tobytes())
 
     if close_pipe:
         pipe.communicate()
@@ -545,6 +545,14 @@ def write_frames_preview(
         str(slicecrc),
         "-r",
         str(fps),
+        # The output pixel format, which is what decides whether a browser can
+        # play the result. Left unset, ffmpeg chooses from the formats libx264
+        # advertises and lands on yuv444p for an rgb24 input, giving a High
+        # 4:4:4 Predictive stream; browser H.264 is 8-bit 4:2:0 only, so the
+        # movie is undecodable in the preview widget that displays it. The
+        # crowd movie writer in moseq2-viz sets the same pair.
+        "-pix_fmt",
+        "yuv420p",
         filename,
     ]
 
@@ -566,6 +574,19 @@ def write_frames_preview(
         disp_img[disp_img < 0] = 0
         disp_img[disp_img > 1] = 1
         disp_img = np.delete(use_cmap(disp_img), 3, 2) * 255
+        # OpenCV 5 asserts img.depth() == CV_8U in putText, where 4.x drew onto
+        # a float image without complaint. The colormap hands back float64 in
+        # 0-255, so the cast to uint8 that used to happen at the pipe write
+        # below now happens here, before the frame number is drawn.
+        #
+        # This is not pixel-identical, and the difference is confined to the
+        # text. It is drawn with LINE_AA, so its antialiased edges blend against
+        # whatever precision the image carries, and blending in uint8 rather
+        # than in float64 moves the boundary pixels of the digits. Every other
+        # pixel is unchanged: the cast is the same truncation wherever it runs.
+        # The artifact is the preview movie's frame-number overlay, which is for
+        # looking at rather than measuring.
+        disp_img = disp_img.astype("uint8")
         if frame_range is not None:
             try:
                 cv2.putText(
@@ -583,7 +604,7 @@ def write_frames_preview(
                 # txt_pos is outside of the frame dimensions
                 print("Could not overlay frame number on preview on video.")
 
-        pipe.stdin.write(disp_img.astype("uint8").tostring())
+        pipe.stdin.write(disp_img.tobytes())
 
     if close_pipe:
         pipe.communicate()
@@ -683,6 +704,31 @@ def get_movie_info(
     return metadata
 
 
+#: The ffprobe field naming a frame's presentation timestamp, oldest spelling
+#: first. ffmpeg 5 renamed ``pkt_pts_time`` to ``pts_time``, removing the old
+#: name rather than aliasing it. The values are identical under both spellings,
+#: so this is a name resolving or not resolving and never a change of number.
+#:
+#: The rename is silent. ffprobe answers a request for a field it does not know
+#: with exit 0, an empty stderr and one blank line per frame, so the parse below
+#: yields an empty list and the function returns ``None``. Neither the exit
+#: status nor the ``if err:`` guard sees anything.
+#:
+#: Two callers read that ``None`` as "this movie carries no timestamps", and
+#: each does something silent with it. ``read_mkv`` keeps its frame numbers as
+#: raw indices but still asks ``read_frames`` for a time-based seek, so frame
+#: *n* fetches second *n* -- correctly shaped depth data from the wrong part of
+#: the recording, at exit 0, until the index passes the duration and the reshape
+#: finally raises. ``handle_extract_metadata`` takes the timestamp count as the
+#: frame count, which for an mkv is the only source of one, and extracts zero
+#: frames.
+#:
+#: The old spelling is tried first so that an ffmpeg which knows it runs exactly
+#: the command this function has always run, and reaches the second name only on
+#: a build where the first can no longer resolve.
+_TIMESTAMP_FIELDS = ("pkt_pts_time", "pts_time")
+
+
 def load_timestamps_from_movie(input_file, threads=8, mapping="DEPTH"):
     """
     Run a ffprobe command to extract the timestamps from the .mkv file, and pipes the
@@ -703,31 +749,40 @@ def load_timestamps_from_movie(input_file, threads=8, mapping="DEPTH"):
         mapping_dict = get_stream_names(input_file)
         mapping = mapping_dict.get(mapping, 0)
 
-    command = [
-        "ffprobe",
-        "-select_streams",
-        f"v:{mapping}",
-        "-threads",
-        str(threads),
-        "-show_entries",
-        "frame=pkt_pts_time",
-        "-v",
-        "quiet",
-        input_file,
-        "-of",
-        "csv=p=0",
-    ]
+    for field in _TIMESTAMP_FIELDS:
+        command = [
+            "ffprobe",
+            "-select_streams",
+            f"v:{mapping}",
+            "-threads",
+            str(threads),
+            "-show_entries",
+            f"frame={field}",
+            "-v",
+            "quiet",
+            input_file,
+            "-of",
+            "csv=p=0",
+        ]
 
-    ffprobe = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = ffprobe.communicate()
+        ffprobe = subprocess.Popen(
+            command, stderr=subprocess.PIPE, stdout=subprocess.PIPE
+        )
+        out, err = ffprobe.communicate()
 
-    if err:
-        print("Error:", err)
-        return None
+        if err:
+            print("Error:", err)
+            return None
 
-    timestamps = [float(t) for t in out.split()]
+        # Each line is one frame. ffprobe 4.2 writes the requested field and
+        # nothing else; newer builds append an empty trailing field on a frame
+        # that carries side data, so the first frame of an Azure mkv arrives as
+        # "0.033000," and reaches float() with the separator still on it. The
+        # value is the first comma-separated field either way, and taking it is
+        # a no-op on output that has no separator in it.
+        timestamps = [float(t.split(b",")[0]) for t in out.split()]
 
-    if len(timestamps) == 0:
-        return None
+        if len(timestamps) > 0:
+            return timestamps
 
-    return timestamps
+    return None

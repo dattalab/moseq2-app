@@ -116,3 +116,4 @@ tests/test_flip_classifiers/flip_classifier_k2_inscopix.pkl
 tests/test_flip_classifiers/flip_test1.pkl
 data/
 .doctrees/
+.pdm-python
