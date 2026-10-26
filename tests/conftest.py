@@ -175,6 +175,32 @@ def moseq_df(analysis_paths, sorted_index):
     return scalars_to_dataframe(sorted_index, model_path=analysis_paths["model_path"])
 
 
+#: What cell 6 asks for: usage as a probability rather than a raw count,
+#: one row per session per syllable, syllables numbered by how much they
+#: are used.
+STATISTICS = {
+    "count": "usage",
+    "groupby": ["group", "uuid"],
+    "usage_normalization": True,
+    "syllable_key": "labels (usage sort)",
+}
+
+
+@pytest.fixture(scope="session")
+def stats_df(moseq_df):
+    """Cell 6: one row per session per syllable.
+
+    Collapses the frame-by-frame table into the unit every later cell
+    works in. How much each session used each syllable, how long its bouts
+    lasted, and what the mouse's scalars looked like while it was doing
+    it. The dendrogram, the fingerprint, the hypothesis tests and the
+    transition graphs all read this.
+    """
+    from moseq2_viz.model.util import compute_behavioral_statistics
+
+    return compute_behavioral_statistics(moseq_df, **STATISTICS)
+
+
 @pytest.fixture(scope="session")
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
