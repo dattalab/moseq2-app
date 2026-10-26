@@ -256,6 +256,9 @@ def get_training_data_splits(split_frac, data_dict):
     validation_data (OrderedDict): the split percentage of the validation data
     """
 
+    if not 0 < split_frac < 1:
+        raise ValueError('split_frac must be strictly between 0 and 1')
+
     training_data = OrderedDict()
     validation_data = OrderedDict()
 
@@ -263,7 +266,7 @@ def get_training_data_splits(split_frac, data_dict):
         # Splitting data by test set
         training_X, testing_X = (
             v[: int(len(v) * split_frac)],
-            v[-int(len(v) * split_frac) :],
+            v[int(len(v) * split_frac) :],
         )
 
         # Setting training data key-value pair
