@@ -47,6 +47,7 @@ def plane_ransac(
     in_ratio=0.1,
     progress_bar=False,
     mask=None,
+    seed=0,
     **kwargs,
 ):
     """
@@ -60,6 +61,8 @@ def plane_ransac(
     in_ratio (float): fraction of points required to consider a plane fit good
     progress_bar (bool): display progress bar
     mask (numpy.ndarray): boolean mask to find region to use
+    seed (int or None): local hypothesis-sampling seed; defaults to reproducible 0.
+        None draws fresh entropy without consuming NumPy's global RNG.
     kwargs (dict): dictionary containing extra keyword arguments from moseq2_extract.proc.get_roi()
 
     Returns:
@@ -99,6 +102,7 @@ def plane_ransac(
         )
 
     best_plane = None
+    rng = np.random.RandomState(seed)
     best_dist = np.inf
     best_num = 0
 
@@ -106,7 +110,7 @@ def plane_ransac(
 
     for _ in tqdm(range(iters), disable=not progress_bar, desc="Finding plane"):
 
-        sel = coords[np.random.choice(coords.shape[0], 3, replace=True)]
+        sel = coords[rng.choice(coords.shape[0], 3, replace=True)]
         tmp_plane = plane_fit3(sel)
 
         if np.all(np.isnan(tmp_plane)):
