@@ -58,10 +58,10 @@ def compute_svd(dask_array, mean, rank, iters, missing_data, mask, recon_pcs, mi
 
     if not missing_data:
         # Compute PCs
-        _, s, v = lng.svd_compressed(dask_array - mean, rank, 0, compute=True)
+        _, s, v = lng.svd_compressed((dask_array - mean).astype('float64'), rank, n_power_iter=0, compute=True)
     else:
         for iter in tqdm(range(iters), total=iters, desc='Computing Iterative PCA'):
-            u, s, v = lng.svd_compressed(dask_array - mean, rank, 0, compute=True)
+            u, s, v = lng.svd_compressed((dask_array - mean).astype('float64'), rank, n_power_iter=0, compute=True)
             if iter < iters - 1:
                 recon = u[:, :recon_pcs].dot(da.diag(s[:recon_pcs]).dot(v[:recon_pcs, :])) + mean
                 recon[recon < min_height] = 0
