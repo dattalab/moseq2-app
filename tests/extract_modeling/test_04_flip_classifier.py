@@ -84,17 +84,22 @@ def test_selection_maps_to_the_published_classifier(selection, tmp_path, recorde
     assert destination == str(tmp_path / filename)
 
 
-def test_a_negative_selection_wraps_to_the_last_classifier(tmp_path, recorded_download):
-    """Captured, not corrected: indexing a list accepts negatives silently.
+@pytest.mark.xfail(
+    reason="the selection is used as a plain list index, so a negative value "
+    "wraps to the end of the list instead of being rejected"
+)
+def test_a_negative_selection_is_rejected(tmp_path, recorded_download):
+    """There is no classifier at a negative index.
 
-    `selection=-1` is not rejected; it quietly fetches the Azure classifier.
+    What happens instead is that `-1` quietly fetches the Azure classifier,
+    which is a long way from what a user asking for it meant.
     """
     config = tmp_path / "config.yaml"
     config.write_text("flip_classifier: null\n")
 
-    download_flip_command(str(tmp_path), str(config), selection=-1)
-
-    assert recorded_download[0][0] == BASE + FLIP_FILES[3][1]
+    with pytest.raises(IndexError):
+        download_flip_command(str(tmp_path), str(config), selection=-1)
+    assert recorded_download == []
 
 
 def test_a_selection_past_the_end_raises(tmp_path, recorded_download):

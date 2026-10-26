@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from pathlib import Path
 
 # Before anything imports matplotlib. Nothing here has a display.
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -25,6 +26,19 @@ import pytest
 
 from tests.fixtures import fetch_analysis_bundle, fetch_raw_sessions
 from tests.widgets import capture_display
+
+
+def pytest_configure(config):
+    """Keep the suite's scratch directories off ``/tmp``.
+
+    ``extract_found_sessions`` discards every recording whose path contains
+    ``/tmp/`` before extracting anything, so a project under pytest's default
+    temporary directory extracts nothing while reporting that it finished.
+    Anchoring the base directory to the rootdir keeps the pipeline fixtures
+    out of that filter's way. An explicit ``--basetemp`` still wins.
+    """
+    if config.option.basetemp is None:
+        config.option.basetemp = str(Path(config.rootpath) / ".pytest-tmp")
 
 
 @pytest.fixture
@@ -81,6 +95,33 @@ def arena(project, progress_file, configured, flipped):
     for _ in widget.sessions:
         click(buttons["Save session parameters and move to next"])
     return session_config
+
+
+@pytest.fixture(scope="session")
+def extracted(project, configured, arena):
+    """Cell 6: extract every recording in the project.
+
+    The heaviest cell, and the one the rest of the notebook is built on. It
+    searches the project for depth files, hands them to a local extraction
+    loop, and leaves a ``proc`` directory beside each recording.
+
+    ``skip_extracted`` carries over from cell 5, where the notebook sets it,
+    so a second run of the cell extracts nothing.
+    """
+    from moseq2_app.util import update_config
+    from moseq2_extract.gui import extract_found_sessions
+
+    with update_config(str(configured)) as config:
+        config["cluster_type"] = "local"
+
+    extract_found_sessions(
+        str(project),
+        str(configured),
+        [".avi", ".dat", ".tar.gz"],
+        extract_all=True,
+        skip_extracted=True,
+    )
+    return project
 
 
 @pytest.fixture(scope="session")

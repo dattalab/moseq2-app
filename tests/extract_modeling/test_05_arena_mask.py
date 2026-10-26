@@ -344,39 +344,41 @@ def test_filter_sizes_are_read_as_python_literals(scratch, typed, expected):
     assert parameters(scratch / "session_config.yaml", data.path)["spatial_filter_size"] == expected
 
 
-@pytest.mark.parametrize(
-    ("typed", "raises"),
-    [("3 by 3", SyntaxError), ("", SyntaxError), ("three", NameError)],
+@pytest.mark.parametrize("typed", ["3 by 3", "", "three"])
+@pytest.mark.xfail(
+    reason="the text is passed to eval() with a fallback for a value of the "
+    "wrong type but none for text that does not parse"
 )
-def test_a_filter_size_that_is_not_python_raises(scratch, typed, raises):
-    """A bug, captured.
+def test_a_filter_size_that_is_not_python_falls_back(scratch, typed):
+    """Text that makes no sense as a filter size should fall back, as a value
+    of the wrong type already does.
 
-    The fallback above handles text that evaluates to the wrong type, but not
-    text that does not evaluate at all. Prose raises ``SyntaxError``, a bare
-    word raises ``NameError``, and so does clearing the box, which is the
-    likeliest way to reach it. The exception comes out of the button callback,
-    so a notebook shows a traceback under the widget and the save does not
-    happen.
+    What happens instead is that the exception comes out of the button
+    callback: ``SyntaxError`` for prose or for an empty box, ``NameError`` for
+    a bare word. A notebook shows it as a traceback under the widget and the
+    save does not happen. Clearing the box is the likeliest way to reach it.
     """
     _, data, buttons = open_widget(scratch)
     data.spatial_filter = typed
-    with pytest.raises(raises):
-        click(buttons["Save session parameters"])
+    click(buttons["Save session parameters"])
+
+    assert parameters(scratch / "session_config.yaml", data.path)["spatial_filter_size"] == [3]
 
 
-def test_the_weight_boxes_reject_a_decimal(scratch):
-    """A bug, captured.
+@pytest.mark.xfail(
+    reason="pn.widgets.NumberInput picks an integer or a float box from the type "
+    "of the value it is handed, and the config spells bg_roi_weights [1, 0.1, 1] "
+    "and noise_tolerance 30, so the whole numbers get integer boxes"
+)
+def test_the_weight_boxes_accept_a_decimal(scratch):
+    """Every one of these parameters is declared ``param.Number``, so a user
+    should be able to type ``0.5`` into any of them.
 
-    Three of the four decimal-valued advanced parameters are built as integer
-    spinners, so a user cannot type ``0.5`` into them. ``_link_data`` builds
-    each box with ``pn.widgets.NumberInput``, which chooses between an integer
-    and a float box from the type of the value it is handed. The values come
-    from the configuration, where ``bg_roi_weights`` is written ``[1, 0.1, 1]``
-    and ``noise_tolerance`` is written ``30``. Whole numbers arrive as ints and
-    get integer boxes; ``0.1`` arrives as a float and gets a float box. So
-    which of these a user can tune is decided by how the shipped config
-    happens to spell the number, and the mask area and distance weights, which
-    ``get_roi`` is most sensitive to, are the ones they cannot.
+    Three of the four are built as integer spinners and refuse. Which ones is
+    decided by how the shipped config happens to spell the number: ``0.1``
+    arrives as a float and gets a float box, ``1`` and ``30`` arrive as ints
+    and get integer boxes. The two that refuse are the mask area and distance
+    weights, which ``get_roi`` is most sensitive to.
     """
     import panel as pn
 
@@ -387,10 +389,11 @@ def test_the_weight_boxes_reject_a_decimal(scratch):
         for b in layout.select(pn.widgets.IntInput) + layout.select(pn.widgets.FloatInput)
     }
 
-    for label in ("Mask area", "Mask distance from center", "RANSAC noise tolerance"):
-        assert isinstance(boxes[label], pn.widgets.IntInput), label
-        with pytest.raises(ValueError):
-            boxes[label].value = 0.5
-
-    assert isinstance(boxes["Mask extent"], pn.widgets.FloatInput)
-    boxes["Mask extent"].value = 0.5
+    for label in (
+        "Mask area",
+        "Mask extent",
+        "Mask distance from center",
+        "RANSAC noise tolerance",
+    ):
+        boxes[label].value = 0.5
+        assert boxes[label].value == 0.5, label

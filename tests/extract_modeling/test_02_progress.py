@@ -233,16 +233,22 @@ def test_pca_item_counts(tmp_path, capsys, n_done):
     assert f"PCA Progress: {n_done} out of 4 items finished" in capsys.readouterr().out
 
 
-def test_all_pca_items_done_reports_an_empty_remainder(tmp_path, capsys):
-    """Current behaviour, captured rather than corrected.
+@pytest.mark.xfail(
+    reason="the branch that names outstanding PCA items is guarded by `==` where "
+    "it means `!=`, so it runs only when none are outstanding and always appends "
+    "an empty list"
+)
+def test_a_finished_project_names_nothing_as_outstanding(tmp_path, capsys):
+    """A project with every PCA item done has nothing left to report.
 
-    The branch that lists outstanding PCA items is reached only when none are
-    outstanding, so the list it appends is always empty and a finished project
-    reports a trailing `:  left`, with the gap where the names would go.
+    What it prints instead is `PCA Progress: 4 out of 4 items finished:  left`,
+    with a gap where the names would go.
     """
     path = build_project(tmp_path / "proj", pca_items=PCA_ITEMS)
     check_progress(str(path))
-    assert "PCA Progress: 4 out of 4 items finished:  left" in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert "PCA Progress: 4 out of 4 items finished" in printed
+    assert "left" not in printed
 
 
 @pytest.mark.parametrize("n_models", [1, 3])
