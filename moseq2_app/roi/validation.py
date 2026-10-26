@@ -56,7 +56,7 @@ def count_nan_rows(scalar_df):
     n_missing_frames (int): Number of frames with NaN computed scalar values.
     """
 
-    return scalar_df.isnull().any(1).sum()
+    return scalar_df.isnull().any(axis=1).sum()
 
 
 def count_missing_mouse_frames(scalar_df):
@@ -212,7 +212,7 @@ def get_scalar_anomaly_sessions(scalar_df, status_dicts):
     # Scalar values to measure
     val_keys = ['area_mm', 'length_mm', 'width_mm', 'height_ave_mm', 'velocity_2d_mm', 'velocity_3d_mm']
 
-    mean_df = scalar_df.groupby('uuid').mean()
+    mean_df = scalar_df.groupby('uuid').mean(numeric_only=True)
 
     try:
         outliers = EllipticEnvelope(random_state=0).fit_predict(mean_df[val_keys].to_numpy())

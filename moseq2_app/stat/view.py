@@ -20,7 +20,7 @@ from bokeh.transform import linear_cmap
 from bokeh.models.tickers import FixedTicker
 from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
-from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Circle, ColorBar, RangeSlider, CustomJS, TextInput,
+from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Scatter, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
 from moseq2_viz.util import get_sorted_index, read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
@@ -209,7 +209,7 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
     grouped = df_group.groupby('syllable')[[stat]]
 
     # Get resorted mean syllable data
-    aux_df = df_group.groupby('syllable', as_index=False).mean().reindex(sorting)
+    aux_df = df_group.groupby('syllable', as_index=False).mean(numeric_only=True).reindex(sorting)
 
     # Get SEM
     if errorbar == 'CI 95%':
@@ -219,10 +219,10 @@ def get_aux_stat_dfs(df, group, sorting, groupby='group', errorbar='CI 95%', sta
             aux_err[s] = df_group.groupby('syllable')[s].apply(get_ci_vect_vectorized).reindex(sorting)
     elif errorbar == 'SEM':
         stat_err = grouped.sem().reindex(sorting)
-        aux_err = df_group.groupby('syllable', as_index=False).sem().reindex(sorting)
+        aux_err = df_group.groupby('syllable', as_index=False).sem(numeric_only=True).reindex(sorting)
     else:
         stat_err = grouped.std().reindex(sorting)
-        aux_err = df_group.groupby('syllable', as_index=False).std().reindex(sorting)
+        aux_err = df_group.groupby('syllable', as_index=False).std(numeric_only=True).reindex(sorting)
 
     # Get min and max error bar values
     if errorbar == 'CI 95%':
@@ -258,7 +258,7 @@ def get_syllable_info(df, sorting):
 
     # Get Labeled Syllable Information
     info_columns = ['syllable', 'label', 'desc', 'crowd_movie_path']
-    desc_data = df.groupby(info_columns, as_index=False).mean()[info_columns].reindex(sorting)
+    desc_data = df.groupby(info_columns, as_index=False).mean(numeric_only=True)[info_columns].reindex(sorting)
 
     # Pack data into numpy arrays
     labels = desc_data['label'].to_numpy()
@@ -484,7 +484,7 @@ def format_stat_plot(p, df, searchbox, slider, sorting):
     """
 
     # Get xtick labels
-    label_df = df.groupby(['syllable', 'label'], as_index=False).mean().reindex(sorting)
+    label_df = df.groupby(['syllable', 'label'], as_index=False).mean(numeric_only=True).reindex(sorting)
 
     xtick_numbers = list(label_df['syllable'])
     xtick_labels = list(label_df['label'])
@@ -736,8 +736,12 @@ def get_difference_legend_items(plot, edge_width, group_name):
     r_line = plot.line(line_color='red')
     b_line = plot.line(line_color='blue')
 
-    r_circle = plot.circle(line_color='red', fill_color='white')
-    b_circle = plot.circle(line_color='blue', fill_color='white')
+    # These two carry no data and exist only as something for a LegendItem to
+    # point at. figure.circle() with neither size nor radius builds a Circle
+    # whose radius is unset, which constructs without complaint and raises
+    # UnsetValueError later, when the document is walked.
+    r_circle = plot.scatter(marker='circle', line_color='red', fill_color='white')
+    b_circle = plot.scatter(marker='circle', line_color='blue', fill_color='white')
 
     G1 = group_name.split('-')[0]
 
@@ -1019,12 +1023,17 @@ def setup_node_and_edge_interactions(graph_renderer, group_stats, scalar_color):
         color_bar = ColorBar(color_mapper=fill_color['transform'])
 
     # node interactions
-    graph_renderer.node_renderer.glyph = Circle(size='node_size', fill_color=fill_color, line_color='node_color')
-    graph_renderer.node_renderer.selection_glyph = Circle(size='node_size', line_color='node_color',
-                                                          fill_color=fill_color)
-    graph_renderer.node_renderer.nonselection_glyph = Circle(size='node_size', line_color='node_color',
-                                                             fill_color=fill_color)
-    graph_renderer.node_renderer.hover_glyph = Circle(size='node_size', fill_color=Spectral4[1])
+    # node_size holds screen units, so the marker is sized rather than given a
+    # radius: Circle measures its radius in data units, which on a normalised
+    # graph layout would draw each node orders of magnitude too large.
+    graph_renderer.node_renderer.glyph = Scatter(size='node_size', marker='circle',
+                                                 fill_color=fill_color, line_color='node_color')
+    graph_renderer.node_renderer.selection_glyph = Scatter(size='node_size', marker='circle',
+                                                           line_color='node_color', fill_color=fill_color)
+    graph_renderer.node_renderer.nonselection_glyph = Scatter(size='node_size', marker='circle',
+                                                              line_color='node_color', fill_color=fill_color)
+    graph_renderer.node_renderer.hover_glyph = Scatter(size='node_size', marker='circle',
+                                                       fill_color=Spectral4[1])
 
     # edge interactions
     graph_renderer.edge_renderer.glyph = MultiLine(line_color='edge_color', line_alpha=0.7,
@@ -1070,8 +1079,7 @@ def set_node_labels(x, y, syllable):
                       x_offset=-7, y_offset=-7,
                       text='syllable', source=label_source,
                       text_color=text_color, text_font_size="12px",
-                      background_fill_color=None,
-                      render_mode='canvas')
+                      background_fill_color=None)
 
     return labels
 
@@ -1265,15 +1273,15 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     # format all the generated bokeh transition graphs
     ncols = 1
     formatted_plots = list(plots)
-    plot_height, plot_width = 550, 550
+    height, width = 550, 550
     if not plot_vertically:
         # Format grid of transition graphs
         ncols = None
-        plot_width, plot_height = 550, 675
+        width, height = 550, 675
         formatted_plots = format_graphs(plots, group)
 
     # Create Bokeh grid plot object
-    gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, plot_width=plot_width, plot_height=plot_height)
+    gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, width=width, height=height)
     show(gp)
 
 def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllable = 40, color_by_cluster=False):

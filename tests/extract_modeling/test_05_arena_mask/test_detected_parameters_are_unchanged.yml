@@ -1,0 +1,87 @@
+angle_hampel_sig: 3
+angle_hampel_span: 0
+bg_roi_depth_range:
+- 650
+- 750
+bg_roi_dilate:
+- 10
+- 10
+bg_roi_erode:
+- 1
+- 1
+bg_roi_fill_holes: true
+bg_roi_gradient_filter: false
+bg_roi_gradient_kernel: 7
+bg_roi_gradient_threshold: 3000
+bg_roi_index: 0
+bg_roi_shape: ellipse
+bg_roi_weights:
+- 1
+- 0.1
+- 1
+bg_sort_roi_by_position: false
+bg_sort_roi_by_position_max_rois: 2
+cable_filter_iters: 0
+cable_filter_shape: rectangle
+cable_filter_size:
+- 5
+- 5
+camera_type: auto
+centroid_hampel_sig: 3
+centroid_hampel_span: 0
+chunk_overlap: 0
+chunk_size: 3000
+cluster_type: local
+compress: false
+compress_chunk_size: 3000
+compress_threads: 3
+compute_raw_scalars: false
+crop_size:
+- 80
+- 80
+delete: false
+detected_true_depth: auto
+dilate_iterations: 1
+erode_iterations: 0
+flip_classifier_smoothing: 51
+fps: 30
+frame_dtype: uint8
+frame_trim:
+- 0
+- 0
+graduate_walls: false
+manual_set_depth_range: true
+mapping: DEPTH
+max_height: 120
+min_height: 10
+model_smoothing_clips:
+- 0
+- 0
+movie_dtype: <u2
+noise_tolerance: 30
+num_frames: null
+output_dir: proc
+pixel_format: gray16le
+progress_bar: false
+recompute_bg: false
+skip_completed: false
+spatial_filter_size:
+- 3
+tail_filter_iters: 1
+tail_filter_shape: ellipse
+tail_filter_size:
+- 9
+- 9
+temporal_filter_size:
+- 0
+threads: 8
+tracking_model_init: raw
+tracking_model_ll_clip: -100
+tracking_model_ll_threshold: -100
+tracking_model_mask_threshold: -16
+tracking_model_segment: true
+use_cc: true
+use_plane_bground: false
+use_tracking_model: false
+widen_radius: 0
+write_movie: true

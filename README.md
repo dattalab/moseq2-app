@@ -5,16 +5,13 @@
 
 Welcome to the `moseq2-app` repository. Motion Sequencing (MoSeq) is an unsupervised machine learning method used to describe mouse behavior and `moseq2-app` is the starting point to MoSeq2 package suite.
 
- To get started, head over to the [wiki](https://github.com/dattalab/moseq2-app/wiki) to find which installation option works best for your environment and detailed documentation for the MoSeq2 package suite.
+ To get started, install it with `pip install moseq2-app` and head over to the [wiki](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation) for the full procedure and documentation for the MoSeq2 package suite.
 
 **Quick Links:**
 [![MoSeq Slack Channel](https://img.shields.io/badge/slack-MoSeq-blue.svg?logo=slack)](https://moseqworkspace.slack.com)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Wiki-blue)](https://github.com/dattalab/moseq2-app/wiki)
 [![DOI](https://zenodo.org/badge/204555901.svg)](https://zenodo.org/badge/latestdoi/204555901)
 
-
-Last Updated: 12/23/2021
 
 # Overview
 
@@ -31,18 +28,32 @@ There are two basic steps to MoSeq, and this GitHub repository and the wiki supp
 The MoSeq2 toolkit enables users to model mouse behavior across different experimental groups, and measure the differences between their behavior usages, durations, transition patterns. etc.
 
 This package contains functionalities that can be used interactively in jupyter notebooks. 
-We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has Google Colab notebooks and a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
-You can try MoSeq on [Google Colab](https://colab.research.google.com/drive/1WV97_Ko7qu6-l8sE03DCG6SRxcua_3eX?usp=sharing) on our test data or your data on Google Drive.
+We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to process their depth videos of mice, and segment their behavior into what is denoted as "syllables". In addition to the Jupyter notebooks, MoSeq has a Command Line Interface. Consult the wiki page for more detailed documentation of the MoSeq pipeline [here](https://github.com/dattalab/moseq2-app/wiki).
 
 # Getting Started
 
-If you like MoSeq and you are interested in installing it in your environment, you can install the MoSeq2 package suite with either Conda or Docker. 
+```bash
+pip install moseq2-app
+```
 
-- If you are familiar with Conda/terminal, and you enjoy more control over the packages and virtual environment, we recommend installing the MoSeq2 package suite with Conda.
+Python 3.10 or newer. Verified on Linux; macOS and Windows support is being
+verified. Installing `moseq2-app` brings the rest of the suite with it:
+`moseq2-extract`, `moseq2-pca`, `moseq2-model` and `moseq2-viz`, along with
+their command line interfaces.
 
-- If you are interested in using a standardized/containerized version of the MoSeq2 package suite with simple installation steps and minimum local environment setup, we recommend installing the MoSeq2 package suite with Docker.
+**ffmpeg is a separate requirement.** `moseq2-extract` reads and writes depth
+video by calling `ffmpeg` and `ffprobe` and expects to find them on your
+`PATH`. No Python install provides them, so install them yourself with conda,
+apt or Homebrew.
 
-### **We provide step-by-step guides for installing the MoSeq2 package suite in the [installation documentation](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).**
+**The notebooks are not part of the package.** Download the two that make up
+the pipeline and put them in the parent directory of your data, which is what
+lets the interactive video widgets load:
+
+- [MoSeq2-Extract-Modeling-Notebook.ipynb](https://raw.githubusercontent.com/dattalab/moseq2-app/release/notebooks/MoSeq2-Extract-Modeling-Notebook.ipynb)
+- [MoSeq2-Analysis-Visualization-Notebook.ipynb](https://raw.githubusercontent.com/dattalab/moseq2-app/release/notebooks/MoSeq2-Analysis-Visualization-Notebook.ipynb)
+
+### **[The installation guide](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation) carries the whole procedure, including how to launch Jupyter so the notebooks' video widgets work.**
 
 You can find more information about the MoSeq2 package suite, the acquisition and analysis pipeline, documentation for Command Line Interface (CLI), tutorials, etc. in the [wiki](https://github.com/dattalab/moseq2-app/wiki). If you want to explore MoSeq functionalities, check out the guide for [downloading test data](https://github.com/dattalab/moseq2-app/wiki/Download-Test-Data).
 
@@ -54,14 +65,7 @@ You can find more information about the MoSeq2 package suite, the acquisition an
 - Please tell us what you think by filling out [this user survey](https://forms.gle/S88jptAEs41mQjff7).
 
 # Versions
-- Current version: Version 1.2.0
 - [Changelog](https://github.com/dattalab/moseq2-app/wiki/Changelog)
-
-# Events & News
-<!---Future events, project related news etc-->
-We are hosting a tutorial workshop on Thursday, March 3rd, 2022 at 1:30-4PM EST.
-Fill out [this form](https://forms.gle/gp2ipZ6BTyFf1GrA8)
-by March 2nd to register for the workshop and receive the Zoom link and password.
 
 # Publications
 - [Mapping Sub-Second Structure in Mouse Behavior](http://datta.hms.harvard.edu/wp-content/uploads/2018/01/pub_23.pdf)

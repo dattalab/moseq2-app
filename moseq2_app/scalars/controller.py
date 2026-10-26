@@ -26,9 +26,9 @@ class InteractiveScalarViewer(InteractiveScalarWidgets):
         _, self.sorted_index = parse_index(index_filepath)
         self.scalar_df = scalars_to_dataframe(self.sorted_index)
 
-        self.mean_df = self.scalar_df.groupby(['uuid', 'SessionName', 'SubjectName', 'group'], as_index=False).mean()
+        self.mean_df = self.scalar_df.groupby(['uuid', 'SessionName', 'SubjectName', 'group'], as_index=False).mean(numeric_only=True)
         self.std_df = self.scalar_df.groupby(['uuid', 'SessionName', 'SubjectName', 'group'],
-                                        as_index=True).std().reset_index()
+                                        as_index=True).std(numeric_only=True).reset_index()
         self.colors = px.colors.qualitative.Alphabet
 
         # populate column selector

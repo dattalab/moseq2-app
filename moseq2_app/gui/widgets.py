@@ -2,9 +2,12 @@
 This module contains the widget components that comprise the group setting table functionality.
 """
 
-import qgrid
+# qgrid stopped at ipywidgets 7: it registers its widget with the zero-argument
+# `@widgets.register()` form, which raises on import under 8. qgridnext is a
+# fork of it that carries the same API, so the calls below are unchanged.
+import qgridnext as qgrid
 import pandas as pd
-import ruamel.yaml as yaml
+from moseq2_app._yaml import write_yaml as _write_yaml
 import ipywidgets as widgets
 from IPython.display import clear_output
 from moseq2_app.util import index_to_dataframe
@@ -97,8 +100,7 @@ class GroupSettingWidgets:
         updated_index = {'files': list(self.df.drop(meta_cols, axis=1).to_dict(orient='index').values()),
                          'pca_path': self.index_dict['pca_path']}
 
-        with open(self.index_filepath, 'w') as f:
-            yaml.safe_dump(updated_index, f)
+        _write_yaml(updated_index, self.index_filepath)
 
         self.update_index_button.button_style = 'success'
         self.update_index_button.icon = 'check'

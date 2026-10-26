@@ -72,7 +72,7 @@ class InteractiveExtractionViewer:
                         </script>
                      """
 
-        div = Div(text=video_div, style={
+        div = Div(text=video_div, styles={
                   'width': '100%', 'align-items': 'center', 'display': 'contents'})
 
         slider = Slider(start=0, end=4, value=1, step=0.1,

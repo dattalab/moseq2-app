@@ -115,6 +115,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Set the syllable dropdown options
         self.syll_select.options = self.option_dict
+        # Selecting the first syllable is what the labeller assumes: `on_next`,
+        # `on_prev` and the crowd-movie view all index `syll_info` by
+        # `syll_select.index`, and there is no entry under `None`. Assigning
+        # options to a dropdown that has no selection used to choose the first
+        # option on its own; it now leaves the selection empty.
+        if len(self.syll_select.options) > 0:
+            self.syll_select.index = 0
 
     def write_syll_info(self, curr_syll=None):
         """
@@ -192,7 +199,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.groups = df.group.unique()
 
         # Get grouped DataFrame
-        group_df = df.groupby(['group', 'syllable'], as_index=False).mean()
+        group_df = df.groupby(['group', 'syllable'], as_index=False).mean(numeric_only=True)
 
         # Get self.group_info
         self.get_mean_group_dict(group_df)
@@ -272,7 +279,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
                     """
 
         # Create embedded HTML Div and view layout
-        div = Div(text=video_div, style={'width': '100%'})
+        div = Div(text=video_div, styles={'width': '100%'})
 
         slider = Slider(start=0, end=2, value=1, step=0.1, width=video_dims[0]-50,
                         format="0[.]00", title=f"Playback Speed")
@@ -452,6 +459,12 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Get dropdown options with labels
         self.cm_syll_options = [f'{i} - {x["label"]}' for i, x in enumerate(self.syll_info.values())]
         self.cm_syll_select.options = self.cm_syll_options
+        # As in `set_syllable_select`: a dropdown given its options after
+        # construction no longer selects the first one on its own, and
+        # `crowd_movie_preview` parses `cm_syll_select.value` with
+        # `.split(' - ')`, which has nothing to split under `None`.
+        if len(self.cm_syll_select.options) > 0:
+            self.cm_syll_select.index = 0
 
     def set_default_cm_parameters(self):
         """
@@ -542,13 +555,13 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             self.df['SessionName'] = self.df['SessionName'].astype(str)
 
         # Get grouped DataFrame
-        self.session_df = df.groupby(['SessionName', 'syllable'], as_index=False).mean()
-        self.subject_df = df.groupby(['SubjectName', 'syllable'], as_index=False).mean()
+        self.session_df = df.groupby(['SessionName', 'syllable'], as_index=False).mean(numeric_only=True)
+        self.subject_df = df.groupby(['SubjectName', 'syllable'], as_index=False).mean(numeric_only=True)
 
         self.groups = list(df.group.unique())
 
         # Get group DataFrame
-        self.group_df = df.groupby(['group', 'syllable'], as_index=False).mean()
+        self.group_df = df.groupby(['group', 'syllable'], as_index=False).mean(numeric_only=True)
 
         self.get_mean_group_dict(self.group_df)
 
