@@ -99,7 +99,7 @@ def count_stationary_frames(scalar_df):
     """
     
     # subtract 1 because first frame is always 0mm/s
-    return (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1
+    return max(0, (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1)
 
 
 def get_scalar_df(path_dict):
