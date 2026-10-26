@@ -92,6 +92,10 @@ def plane_ransac(
     )
     coords = coords.T
 
+    if len(coords) < 3:
+        raise ValueError('Too few points remain after applying the ROI mask; at least 3 are required.')
+
+    best_plane = None
     best_dist = np.inf
     best_num = 0
 
@@ -117,6 +121,9 @@ def plane_ransac(
             best_dist = np.mean(dist)
             best_num = ninliers
             best_plane = tmp_plane
+
+    if best_plane is None:
+        raise ValueError('RANSAC found no accepted plane; check the depth range, mask and iteration count.')
 
     # fit the plane to our x,y,z coordinates
     coords = np.vstack((xx.ravel(), yy.ravel(), depth_image.ravel())).T
