@@ -189,7 +189,7 @@ def learn_model_wrapper(input_file, dest_file, config_data):
     export_dict = {
         "loglikes": loglikes,
         "labels": labels,
-        "keys": all_keys,
+        "keys": list(arhmm._session_order),
         "heldout_ll": heldout_ll,
         "model_parameters": save_parameters,
         "run_parameters": run_parameters,
