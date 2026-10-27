@@ -31,9 +31,9 @@ import pytest
 from moseq2_app.main import interactive_group_setting
 from moseq2_extract.util import read_yaml
 
-from tests.extract_modeling.test_03_config import plain
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_09_aggregate import entries
+from test_03_config import plain
+from test_05_arena_mask import RECORDINGS
+from test_09_aggregate import entries
 
 #: The conditions the fixture recordings come from, by name prefix.
 CONDITIONS = {"saline": "saline", "amphetamine": "amph"}

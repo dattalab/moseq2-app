@@ -38,8 +38,8 @@ import pytest
 
 from moseq2_app.main import validate_extractions
 
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_06_extract import proc
+from test_05_arena_mask import RECORDINGS
+from test_06_extract import proc
 
 #: Frames out of 600 to make unmeasurable: comfortably under and over the
 #: five percent at which a flag is raised.

@@ -39,8 +39,8 @@ import pytest
 from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_extract.util import read_yaml
 
-from tests.conftest import MODEL_SETTINGS
-from tests.extract_modeling.test_03_config import plain
+from conftest import MODEL_SETTINGS
+from test_03_config import plain
 
 #: How many models a scan spools, and over what scale.
 SCAN = {"scan_scale": "log", "n_models": 15, "out_script": "train_out.sh"}

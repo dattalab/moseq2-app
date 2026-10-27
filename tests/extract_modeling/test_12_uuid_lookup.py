@@ -27,7 +27,7 @@ import pytest
 
 from moseq2_app.util import uuid_lookup
 
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
+from test_05_arena_mask import RECORDINGS
 
 #: The fields the lookup prints, in the order it prints them.
 REPORTED = ("SessionName", "SubjectName", "StartTime", "h5Path", "yamlPath")

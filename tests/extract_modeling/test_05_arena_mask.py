@@ -47,8 +47,8 @@ from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_app.roi.widget import ArenaMaskWidget
 from moseq2_extract.util import read_yaml
 
-from tests.extract_modeling.test_03_config import plain
-from tests.widgets import buttons_of, click
+from test_03_config import plain
+from widgets import buttons_of, click
 
 #: The four recordings, in the order the selector offers them.
 RECORDINGS = [

@@ -29,10 +29,10 @@ import joblib
 import numpy as np
 import pytest
 
-from tests.conftest import MODEL_SETTINGS
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_09_aggregate import entries
-from tests.extract_modeling.test_15_scores import uuids
+from conftest import MODEL_SETTINGS
+from test_05_arena_mask import RECORDINGS
+from test_09_aggregate import entries
+from test_15_scores import uuids
 
 FRAMES = 600
 

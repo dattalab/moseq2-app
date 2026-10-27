@@ -38,7 +38,7 @@ import pytest
 
 from moseq2_extract.util import read_yaml
 
-from tests.extract_modeling.test_03_config import plain
+from test_03_config import plain
 
 #: The crop is 80x80, so a flattened frame is this long.
 PIXELS = 6400

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import sys
 from pathlib import Path
 
 # Before anything imports matplotlib. Nothing here has a display.
@@ -25,8 +24,8 @@ os.environ.setdefault("MPLBACKEND", "Agg")
 
 import pytest
 
-from tests.fixtures import fetch_analysis_bundle, fetch_raw_sessions
-from tests.widgets import capture_display
+from fixtures import fetch_analysis_bundle, fetch_raw_sessions
+from widgets import capture_display
 
 
 def pytest_configure(config):
@@ -299,7 +298,7 @@ def arena(project, progress_file, configured, flipped):
     from moseq2_app.roi.widget import ArenaMaskWidget
     from moseq2_app.util import update_config
 
-    from tests.widgets import buttons_of, click
+    from widgets import buttons_of, click
 
     pn.extension()
 
@@ -430,15 +429,6 @@ def pca(project, progress_file, configured, grouped):
 
     Runs under dask, which is why the cell configures workers.
     """
-    if sys.platform == "darwin" and sys.version_info[:2] == (3, 14):
-        pytest.skip(
-            "dask deadlocks here. svd_compressed submits its graph and waits "
-            "on futures that never resolve, while the scheduler's IO loop and "
-            "every worker thread sit idle. Seen only on macOS under Python "
-            "3.14: macOS on 3.10, Linux on 3.14 and Windows on 3.14 all pass "
-            "on the same dask 2026.8.0."
-        )
-
     from moseq2_app.gui.progress import update_progress
     from moseq2_app.util import update_config
     from moseq2_pca.gui import train_pca_command

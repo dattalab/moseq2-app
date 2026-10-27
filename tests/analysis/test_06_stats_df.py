@@ -31,7 +31,7 @@ import pytest
 
 from moseq2_viz.model.util import compute_behavioral_statistics
 
-from tests.conftest import STATISTICS
+from conftest import STATISTICS
 
 #: The columns that identify a row, and the two statistics the cell exists
 #: to produce.
