@@ -50,7 +50,12 @@ def siblings_of(package):
             continue
         text = path.read_text()
         for raw in re.findall(r"""["'](moseq2-[a-z]+[^"']*)["']""", text):
-            requirement = Requirement(raw)
+            try:
+                requirement = Requirement(raw)
+            except Exception:
+                # Console scripts live in these files too, and
+                # "moseq2-viz = moseq2_viz.cli:cli" is not a requirement.
+                continue
             if not requirement.specifier or requirement.name in seen:
                 continue
             seen.add(requirement.name)
