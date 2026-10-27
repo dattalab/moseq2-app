@@ -705,7 +705,11 @@ def labels_to_changepoints(labels, fs=30):
     cp_dist = []
 
     for lab in labels:
-        cp_dist.append(np.diff(get_transitions(lab)[1].squeeze()) / fs)
+        # get_transitions returns the change indices from np.where, which is
+        # already one dimensional. Squeezing it only ever changed the one case
+        # it could not survive: a session with a single transition became a
+        # scalar, and np.diff rejects that.
+        cp_dist.append(np.diff(get_transitions(lab)[1]) / fs)
 
     return np.concatenate(cp_dist)
 
