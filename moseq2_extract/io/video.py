@@ -3,9 +3,11 @@ Video and video-metadata read/write functions.
 """
 
 import os
+import re
 import cv2
 import tarfile
 import datetime
+import functools
 import subprocess
 import numpy as np
 from os.path import exists
@@ -296,6 +298,47 @@ def get_stream_names(filename, stream_tag="title"):
     return {o: i for i, o in enumerate(out)}
 
 
+
+@functools.lru_cache(maxsize=1)
+def frame_passthrough_option():
+    """The option asking ffmpeg for one output frame per input frame.
+
+    ``-vsync 0`` and ``-fps_mode passthrough`` both mean: hand each decoded
+    frame on with its own timestamp, neither duplicating nor dropping any to
+    reach a target rate. Without it a variable-rate recording decodes to a
+    different number of frames than it holds, and the frame a caller asked for
+    is not the frame it gets.
+
+    ffmpeg 5.1 added the second spelling and ffmpeg 9 removed the first, so no
+    one spelling reaches every build. The old spelling is kept wherever it
+    still resolves, which is every build through 8.1, so that an ffmpeg able
+    to run the command this function has always run does exactly that.
+
+    Unlike the timestamp field rename below, this one is loud. An ffmpeg that
+    does not know the option exits non-zero having written nothing, saying
+    ``Error splitting the argument list: Option not found``, so the wrong
+    choice costs a failed read rather than correct-looking frames from the
+    wrong part of the recording.
+
+    A banner carrying no numbered version belongs to a build from master,
+    which is past the removal.
+    """
+    try:
+        banner = subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ["-fps_mode", "passthrough"]
+
+    version = re.search(r"ffmpeg version n?(\d+)\.", banner)
+    if version is None or int(version.group(1)) >= 9:
+        return ["-fps_mode", "passthrough"]
+    return ["-vsync", "0"]
+
+
 def read_frames(
     filename,
     frames=range(
@@ -383,7 +426,7 @@ def read_frames(
 
     if filename.endswith((".mkv", ".avi")):
         command += ["-map", f"0:{mapping}"]
-        command += ["-vsync", "0"]
+        command += frame_passthrough_option()
 
     command += ["-"]
 
