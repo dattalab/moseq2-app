@@ -522,10 +522,15 @@ def initialize_dask(nworkers=50, processes=1, memory='4GB', cores=1,
         allowed = max_mem * 0.4 
         max_workers = allowed // overhead
 
-        # set number of workers to maximum workers, or total number of CPUs
-        if nworkers > max_workers:
-            click.echo(f'Reducing number of workers to {min(max_workers, max_cpu)} to account for worker base memory and the number of CPUs')
-        nworkers = int(min(max(1, nworkers), max_workers, max_cpu))
+        # Set the number of workers to the maximum the memory and the CPUs
+        # allow, and never to none. A cluster with no workers accepts the graph
+        # and then never finishes it, so asking for zero is an indefinite hang
+        # with no error, and the ceilings reach zero on an ordinary machine:
+        # max_workers is zero whenever less than about 2.5GB is free.
+        requested = nworkers
+        nworkers = int(max(1, min(nworkers, max_workers, max_cpu)))
+        if nworkers < requested:
+            click.echo(f'Reducing number of workers to {nworkers} to account for worker base memory and the number of CPUs')
 
         # compute mem limit per worker
         try:
