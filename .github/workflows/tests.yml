@@ -3,6 +3,10 @@ name: tests
 # The suite is the cross-platform equivalence check for the MoSeq2 pipeline.
 # A run answers one question: does a user on this operating system, with this
 # Python, get the same results as a user on any other?
+#
+# Pull requests test the oldest and newest supported Pythons on all three
+# operating systems. Pushes to release, the nightly run and manual runs test
+# every supported Python.
 
 on:
   push:
@@ -14,8 +18,11 @@ on:
     - cron: "17 7 * * *"
   workflow_dispatch:
 
+# A new push to a pull request cancels that pull request's earlier run. Other
+# events each get their own group, so a nightly or a run on release is never
+# cancelled by something else arriving.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 defaults:
@@ -72,10 +79,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # The ends of the range pyproject.toml declares. The suite has never
-        # run on macOS or Windows, so the first question a run has to answer
-        # is whether the platform works at all, not which Python version does.
-        python: ["3.10", "3.14"]
+        # Keep both lists in step with PYTHON_VERSIONS in noxfile.py.
+        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     steps:
       - uses: actions/checkout@v4
 
