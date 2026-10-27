@@ -4,7 +4,6 @@ General utility functions.
 import pandas as pd
 from moseq2_app._yaml import write_yaml as _write_yaml
 from copy import deepcopy
-from pprint import pprint
 from os.path import basename, join, exists, splitext
 from os import mkdir
 from glob import glob
@@ -134,9 +133,15 @@ def uuid_lookup(target_uuid, uuid_dict_source):
     for uuid, info in uuid_dict.items():
         if target_uuid in uuid:
             print('UUID:', uuid)
-            # put the path in info['metadata'] for printing
-            info['metadata']['h5Path'], info['metadata']['yamlPath'] = info['path']
-            pprint({k: info['metadata'][k] for k in ['SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath']})
+            # Printed a field at a time rather than as a dict, so that a path
+            # arrives as a path. Rendering the dict quotes every value and
+            # escapes each separator, which on Windows turns a path the user
+            # is being handed in order to go and open it into one they have to
+            # edit first.
+            metadata = info['metadata']
+            metadata['h5Path'], metadata['yamlPath'] = info['path']
+            for field in ('SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath'):
+                print(f'  {field}: {metadata[field]}')
 
 def setup_model_folders(progress_paths):
     """Create model-specific folders

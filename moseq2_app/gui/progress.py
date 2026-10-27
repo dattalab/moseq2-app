@@ -152,7 +152,7 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
                 sessions += sorted(glob(join(data_dir, f'*.{ext}')))
 
     if extracted:
-        names = [dirname(sess).split('/')[-2] for sess in sessions]
+        names = [basename(dirname(dirname(sess))) for sess in sessions]
         if len(set(names)) == len(sessions):
             path_dict = {n: p for n, p in zip(names, sessions)}
         else:

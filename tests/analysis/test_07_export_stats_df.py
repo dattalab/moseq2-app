@@ -25,6 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from pandas.api.types import is_numeric_dtype
 
 
 @pytest.fixture(scope="module")
@@ -69,7 +70,11 @@ def test_the_statistics_come_back_as_they_went_out(exported, stats_df):
     assert len(back) == len(stats_df)
 
     for column in stats_df.columns:
-        if stats_df[column].dtype == object:
+        # Text columns are compared as text. pandas 2 gives them the object
+        # dtype and pandas 3 a string dtype of its own, so the question asked
+        # here is whether the column is numeric rather than what text looks
+        # like.
+        if not is_numeric_dtype(stats_df[column]):
             assert back[column].tolist() == stats_df[column].tolist(), column
         else:
             np.testing.assert_allclose(
