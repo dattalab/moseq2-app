@@ -1,0 +1,39 @@
+name: tests
+
+# This package has no suite of its own. moseq2-app's walks both notebooks
+# cell by cell, and every cell runs through this package, so that is the
+# suite that can say whether a change here breaks the pipeline. It runs with
+# this checkout laid over the released rest of it.
+#
+# Pull requests test the oldest and newest supported Pythons on all three
+# operating systems. The nightly run and manual runs test every supported
+# Python.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "41 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    uses: dattalab/moseq2-app/.github/workflows/suite.yml@main
+    with:
+      sibling: ${{ github.repository }}
+      sibling-ref: ${{ github.sha }}
+      pythons: ${{ github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]' }}
+
+  # The check this repository requires before merging.
+  tests:
+    name: tests
+    if: always()
+    needs: suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the suite to have passed
+        run: test "${{ needs.suite.result }}" = success
