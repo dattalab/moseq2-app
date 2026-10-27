@@ -1,0 +1,132 @@
+name: suite
+
+# moseq2-app's suite is the test for all five packages: it walks both
+# notebooks cell by cell, and every cell runs through the siblings. A sibling
+# has no suite of its own, so it calls this one and gets its own checkout
+# tested against the released rest of the pipeline.
+#
+# The install is the ordinary one, which brings the siblings from PyPI, and
+# the sibling under test is then laid over it from its checkout. Everything
+# around it is therefore what a user would have.
+
+on:
+  workflow_call:
+    inputs:
+      sibling:
+        description: The repository under test, as owner/name.
+        type: string
+        required: true
+      sibling-ref:
+        description: The commit of that repository to test.
+        type: string
+        required: true
+      pythons:
+        description: A JSON array of Python versions.
+        type: string
+        default: '["3.10", "3.14"]'
+
+defaults:
+  run:
+    # Git Bash on the Windows runners, so every step below is one script.
+    shell: bash
+
+jobs:
+  fixtures:
+    name: fixtures / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: dattalab/moseq2-app
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Fetch the bundles
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python -c "import sys; sys.path.insert(0, 'tests'); import fixtures; fixtures.fetch_raw_sessions(); fixtures.fetch_analysis_bundle()"
+
+  suite:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    needs: fixtures
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ${{ fromJSON(inputs.pythons) }}
+    steps:
+      - name: Check out moseq2-app
+        uses: actions/checkout@v4
+        with:
+          repository: dattalab/moseq2-app
+          ref: main
+
+      - name: Check out the sibling under test
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.sibling }}
+          ref: ${{ inputs.sibling-ref }}
+          path: .sibling
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install ffmpeg
+        run: |
+          case "$RUNNER_OS" in
+            Linux)   sudo apt-get update && sudo apt-get install -y ffmpeg ;;
+            macOS)   brew install ffmpeg ;;
+            Windows) choco install ffmpeg -y --no-progress ;;
+          esac
+
+      - name: Record the ffmpeg version
+        run: ffmpeg -version | head -1
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Install the pipeline as a user would
+        run: python -m pip install ".[tests]"
+
+      # The sibling under test replaces the release that came from PyPI.
+      # --no-deps so its own requirements cannot quietly move anything else.
+      - name: Lay the sibling under test over it
+        run: python -m pip install --no-deps --force-reinstall ./.sibling
+
+      - name: Record the resolution
+        run: python -m pip freeze
+
+      - name: Run the suite
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q
