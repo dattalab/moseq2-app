@@ -1,0 +1,51 @@
+name: release
+
+# Checks that PyPI will accept an upload from this repository over trusted
+# publishing, by making the same OIDC exchange an upload makes and stopping
+# at the answer. Nothing is built and nothing is uploaded.
+#
+# PyPI scopes a trusted publisher to one repository and one workflow file, by
+# name. This file has to keep the name the publisher was registered with, and
+# the upload has to run from this file, or the exchange is refused however
+# correct the rest of the registration is.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    name: trusted publisher
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask PyPI for a token
+        run: |
+          set -euo pipefail
+
+          audience=$(curl -fsS https://pypi.org/_/oidc/audience \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["audience"])')
+
+          # The runner mints the OIDC token; it is never printed.
+          id_token=$(curl -fsS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')
+
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST https://pypi.org/_/oidc/mint-token \
+            -d "{\"token\": \"$id_token\"}")
+
+          if [ "$status" = "200" ]; then
+            echo "PyPI accepted the exchange. The trusted publisher is registered"
+            echo "for this repository and this workflow file."
+            exit 0
+          fi
+
+          echo "PyPI refused the exchange (HTTP $status). What it said:"
+          # The refusal carries no token, only the reason.
+          python3 -c 'import json;print(json.dumps(json.load(open("response.json")),indent=2))' \
+            || cat response.json
+          exit 1
