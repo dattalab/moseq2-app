@@ -5,22 +5,21 @@ name: tests
 # Python, get the same results as a user on any other?
 #
 # Pull requests test the oldest and newest supported Pythons on all three
-# operating systems. Pushes to release, the nightly run and manual runs test
-# every supported Python.
+# operating systems. The nightly run and manual runs test every supported
+# Python. Nothing reaches main except through a pull request, so a push to it
+# has already been tested as one.
 
 on:
-  push:
-    branches: [release]
   pull_request:
-    branches: [release]
+    branches: [main]
   schedule:
     # Nightly, including the tests that reach the network.
     - cron: "17 7 * * *"
   workflow_dispatch:
 
 # A new push to a pull request cancels that pull request's earlier run. Other
-# events each get their own group, so a nightly or a run on release is never
-# cancelled by something else arriving.
+# events each get their own group, so a nightly is never cancelled by
+# something else arriving.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
@@ -68,7 +67,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: python -c "import sys; sys.path.insert(0, 'tests'); import fixtures; fixtures.fetch_raw_sessions(); fixtures.fetch_analysis_bundle()"
 
-  tests:
+  suite:
     name: ${{ matrix.os }} / py${{ matrix.python }}
     needs: fixtures
     runs-on: ${{ matrix.os }}
@@ -161,3 +160,17 @@ jobs:
         env:
           MPLBACKEND: Agg
         run: pytest -q -m network
+
+  # The check the repository requires before merging. It passes only when every
+  # job above passed, whichever Pythons this run chose to test. A matrix whose
+  # size depends on the event cannot be named in a required check; this job can.
+  tests:
+    name: tests
+    if: always()
+    needs: [fixtures, suite]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to have passed
+        run: |
+          test "${{ needs.fixtures.result }}" = success
+          test "${{ needs.suite.result }}" = success
