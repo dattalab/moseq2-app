@@ -33,8 +33,8 @@ import h5py
 import numpy as np
 import pytest
 
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_15_scores import uuids
+from test_05_arena_mask import RECORDINGS
+from test_15_scores import uuids
 
 FRAMES = 600
 FPS = 30

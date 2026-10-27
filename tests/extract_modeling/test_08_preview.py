@@ -32,8 +32,8 @@ from bokeh.models import Div, Slider
 from moseq2_app.main import preview_extractions
 from moseq2_app.roi.controller import InteractiveExtractionViewer
 
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_06_extract import probe, proc
+from test_05_arena_mask import RECORDINGS
+from test_06_extract import probe, proc
 
 
 @pytest.fixture

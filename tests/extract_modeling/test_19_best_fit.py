@@ -32,7 +32,7 @@ import pytest
 from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_viz.gui import get_best_fit_model
 
-from tests.conftest import SECOND_KAPPA
+from conftest import SECOND_KAPPA
 
 #: The objectives the notebook names. The first is the default; the comment
 #: in the cell says to switch to the third when choosing a final model.

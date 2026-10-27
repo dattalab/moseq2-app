@@ -27,10 +27,10 @@ import h5py
 import numpy as np
 import pytest
 
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_06_extract import proc
-from tests.extract_modeling.test_09_aggregate import entries
-from tests.extract_modeling.test_13_pca import PIXELS, RANK, decomposition
+from test_05_arena_mask import RECORDINGS
+from test_06_extract import proc
+from test_09_aggregate import entries
+from test_13_pca import PIXELS, RANK, decomposition
 
 FRAMES = 600
 

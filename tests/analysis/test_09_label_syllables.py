@@ -38,8 +38,8 @@ from moseq2_app.main import label_syllables
 from moseq2_viz.model.util import parse_model_results
 from moseq2_viz.util import read_yaml
 
-from tests.conftest import LABELLING
-from tests.video import index_is_at_the_front, probe
+from conftest import LABELLING
+from video import index_is_at_the_front, probe
 
 #: Crowd movies are named after both numberings: where the syllable ranks
 #: by usage, and what the model called it.

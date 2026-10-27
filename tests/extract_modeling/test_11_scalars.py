@@ -24,8 +24,8 @@ import pytest
 
 from moseq2_app.main import interactive_scalar_summary
 
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_09_aggregate import entries
+from test_05_arena_mask import RECORDINGS
+from test_09_aggregate import entries
 
 #: What a user can plot, in the order offered.
 OFFERED = [

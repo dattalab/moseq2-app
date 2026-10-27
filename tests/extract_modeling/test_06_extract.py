@@ -42,13 +42,13 @@ import h5py
 import numpy as np
 import pytest
 
-from tests.video import index_is_at_the_front, probe
+from video import index_is_at_the_front, probe
 
 from moseq2_extract.gui import extract_found_sessions
 from moseq2_extract.util import read_yaml
 
-from tests.extract_modeling.test_03_config import plain
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
+from test_03_config import plain
+from test_05_arena_mask import RECORDINGS
 
 #: The extensions the notebook searches for.
 EXTENSIONS = [".avi", ".dat", ".tar.gz"]

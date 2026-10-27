@@ -37,9 +37,9 @@ import h5py
 from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_extract.util import read_yaml
 
-from tests.extract_modeling.test_03_config import plain
-from tests.extract_modeling.test_05_arena_mask import RECORDINGS
-from tests.extract_modeling.test_06_extract import proc
+from test_03_config import plain
+from test_05_arena_mask import RECORDINGS
+from test_06_extract import proc
 
 #: What is copied for each recording. The index names only the first two.
 COPIED = ("h5", "mp4", "yaml")
