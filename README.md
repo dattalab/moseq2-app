@@ -7,7 +7,7 @@
 # Installation
 
 ```bash
-pip install moseq2-extract
+python -m pip install moseq2-extract
 ```
 
 Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
