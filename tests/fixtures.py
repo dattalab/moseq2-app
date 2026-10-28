@@ -1,6 +1,7 @@
 """Fetch the recordings and the model bundle the suite runs against.
 
-Two bundles, because the two notebooks need different things.
+Three bundles. Two of them are what the notebooks need; the third is a
+single synthetic recording the video tests read.
 
 ``raw-sessions`` is four depth recordings cut down to 600 frames each, two
 per experimental group. The extraction and modeling notebook runs on these
@@ -21,6 +22,12 @@ speaks http, https, ftp, sftp and doi, so a path on disk is not a mirror.
 To run against a bundle that is not served anywhere yet, drop the tarball
 into the cache directory under its registered name and pooch will verify its
 hash and unpack it rather than reaching for the network.
+
+``azure-mkv`` is one 64x48, 60-frame synthetic Azure Kinect recording:
+a ``COLOR`` track and a 16-bit big-endian ``DEPTH`` track, named by Matroska
+title tags the way a real one is. No public Azure Kinect sample is
+downloadable, and the depth reader is the only part of the video layer that
+no real recording in the suite exercises.
 
 ``analysis-bundle`` carries no preview movies. The index names each session's
 h5 and its yaml sidecar, crowd movies are composited out of the h5 frames,
@@ -46,6 +53,7 @@ REGISTRY_FILE = Path(__file__).parent / "fixture_registry.txt"
 
 RAW_SESSIONS = "raw-sessions.tar.gz"
 ANALYSIS_BUNDLE = "analysis-bundle.tar.gz"
+AZURE_MKV = "azure-mkv.tar.gz"
 
 
 def _registry():
@@ -78,3 +86,8 @@ def fetch_raw_sessions():
 def fetch_analysis_bundle():
     """The finished twenty-session project the analysis notebook reads."""
     return _fetch_bundle(ANALYSIS_BUNDLE)
+
+
+def fetch_azure_mkv():
+    """The synthetic Azure Kinect recording, holding ``depth.mkv``."""
+    return _fetch_bundle(AZURE_MKV)
