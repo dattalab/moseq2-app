@@ -33,18 +33,13 @@ We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to
 # Getting Started
 
 ```bash
-pip install moseq2-app
+python -m pip install moseq2-app
 ```
 
 Python 3.10 or newer. Verified on Linux; macOS and Windows support is being
 verified. Installing `moseq2-app` brings the rest of the suite with it:
 `moseq2-extract`, `moseq2-pca`, `moseq2-model` and `moseq2-viz`, along with
 their command line interfaces.
-
-**ffmpeg is a separate requirement.** `moseq2-extract` reads and writes depth
-video by calling `ffmpeg` and `ffprobe` and expects to find them on your
-`PATH`. No Python install provides them, so install them yourself with conda,
-apt or Homebrew.
 
 **The notebooks are not part of the package.** Download the two that make up
 the pipeline and put them in the parent directory of your data, which is what

@@ -47,10 +47,14 @@ dependencies = [
     "scikit-learn>=0.20.3",
     "scipy>=1.3.2",
     "seaborn>=0.11.0",
-    "moseq2-extract>=1.4.1,<2",
-    "moseq2-model>=1.4.0,<2",
-    "moseq2-pca>=1.4.1,<2",
-    "moseq2-viz>=1.4.0,<2",
+    # Exact pins, not floors. The five packages release together at one
+    # version, and the notebooks carry a directory tree and a config file
+    # between steps rather than a return value, so a mixed set is a
+    # pipeline whose halves disagree about the files they hand each other.
+    "moseq2-extract==1.4.3",
+    "moseq2-model==1.4.3",
+    "moseq2-pca==1.4.3",
+    "moseq2-viz==1.4.3",
     "Cython>=3.0.11",
     "requests>=2.32.3",
 ]
