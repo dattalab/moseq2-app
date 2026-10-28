@@ -55,6 +55,10 @@ setup(
         # that requires it; the rest are left to the resolver, since every
         # previous "==" pin was contemporaneous with Python 3.7 and none of them
         # builds on a supported interpreter.
+        # ffmpeg's own libraries, as a wheel. Crowd movies are written
+        # through these rather than through an ffmpeg a user has to install
+        # themselves.
+        'av>=17.1',
         'h5py>=3',
         # ruamel dropped the module-level safe_load/safe_dump in 0.18;
         # moseq2_viz._yaml uses the YAML() interface, present from 0.17.

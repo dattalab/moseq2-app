@@ -2,9 +2,10 @@
 Helper functions for handling crowd movie file writing and video metadata maintenance.
 """
 
+import av
+from fractions import Fraction
 import cv2
 import warnings
-import subprocess
 import numpy as np
 from os.path import join
 from tqdm.auto import tqdm
@@ -251,6 +252,41 @@ def _matrix_writer_helper(syll, matrix_fun, slice_fun, write_fun, namer):
     return None
 
 
+class _VideoWriter:
+    """An open output file, written one frame at a time.
+
+    A crowd movie is composited in chunks and the file stays open between
+    them. ``communicate`` flushes whatever the encoder is still holding,
+    writes the container's trailer and closes the file; calling it twice is
+    harmless.
+    """
+
+    def __init__(self, filename, codec, pix_fmt, frame_size, fps, threads):
+        self.container = av.open(str(filename), "w")
+        # A rate is a rational, and callers hand this one in as whatever
+        # their config or CLI made of it: an int, a float from a `type=float`
+        # option, or a string from a yaml file. 1000 is enough denominator
+        # for the broadcast rates (30000/1001 and friends) a camera reports.
+        rate = Fraction(str(fps)).limit_denominator(1000)
+        self.stream = self.container.add_stream(codec, rate=rate)
+        self.stream.width, self.stream.height = frame_size
+        self.stream.pix_fmt = pix_fmt
+        self.stream.thread_type = "AUTO"
+        self.stream.codec_context.thread_count = threads
+
+    def write(self, frame, format):
+        """Encode one ``(height, width, 3)`` array."""
+        self.container.mux(self.stream.encode(av.VideoFrame.from_ndarray(frame, format=format)))
+
+    def communicate(self, *args, **kwargs):
+        """Flush the encoder, write the trailer and close the file."""
+        if self.container is not None:
+            self.container.mux(self.stream.encode())
+            self.container.close()
+            self.container = None
+        return None, None
+
+
 def write_frames_preview(
     filename,
     frames=np.empty((0,)),
@@ -263,7 +299,6 @@ def write_frames_preview(
     frame_size=None,
     depth_min=0,
     depth_max=80,
-    get_cmd=False,
     cmap="jet",
     text=None,
     text_scale=1,
@@ -281,25 +316,24 @@ def write_frames_preview(
     frames (numpy.ndarray): num_frames x rows x columns
     threads (int): number of threads to write file
     fps (int): frames per second
-    pixel_format (str): ffmpeg image formatting flag.
-    codec (str): ffmpeg image encoding flag.
-    slices (int): number of slices per thread.
-    slicecrc (int): check integrity of slices.
+    pixel_format (str): format of the frames handed to the encoder
+    codec (str): encoder to write with
+    slices (int): unused, kept so a config splatted in as keywords still fits
+    slicecrc (int): unused, kept so a config splatted in as keywords still fits
     frame_size (tuple): image dimensions
     depth_min (int): minimum mouse distance from bucket floor
     depth_max (int): maximum mouse distance from bucket floor
-    get_cmd (bool): return ffmpeg command instead of executing the command in python.
     cmap (str): color map selection.
     text (range(num_frames): display frame number in output video.
     text_scale (int): text size.
     text_thickness (int): text thickness.
-    pipe (subProcess.Pipe object): if not None, indicates that there are more frames to be written.
+    pipe (_VideoWriter): if not None, indicates that there are more frames to be written.
     close_pipe (bool): indicates whether video is done writing, and to close pipe to file-stream.
     progress_bar (bool): display progress bar.
     kwargs (dict): extra keyword arguments
 
     Returns:
-    pipe (subProcess.Pipe object): if there are more slices/chunks to write to, otherwise the path to the movie.
+    pipe (_VideoWriter): if there are more slices/chunks to write to, otherwise the path to the movie.
     """
 
     # pad frames so that dimensions are divisible by 2
@@ -309,54 +343,34 @@ def write_frames_preview(
     if not np.mod(frames.shape[2], 2) == 0:
         frames = np.pad(frames, ((0, 0), (0, 0), (0, 1)), "constant", constant_values=0)
 
-    # Get string frame dimensions
+    # Get frame dimensions
     if not frame_size and type(frames) is np.ndarray:
-        frame_size = f"{frames.shape[2]}x{frames.shape[1]}"
+        frame_size = (frames.shape[2], frames.shape[1])
     elif not frame_size and type(frames) is tuple:
-        frame_size = f"{int(frames[0])}x{int(frames[1])}"
+        frame_size = (int(frames[0]), int(frames[1]))
+    elif isinstance(frame_size, str):
+        width, height = frame_size.split("x")
+        frame_size = (int(width), int(height))
 
     # Set text metadata to write frame numbers
     font = cv2.FONT_HERSHEY_SIMPLEX
     white = (255, 255, 255)
     txt_pos = (5, frames.shape[-1] - 40)
 
-    command = [
-        "ffmpeg",
-        "-y",
-        "-loglevel",
-        "fatal",
-        "-threads",
-        str(threads),
-        "-framerate",
-        str(fps),
-        "-f",
-        "rawvideo",
-        "-s",
-        frame_size,
-        "-pix_fmt",
-        pixel_format,
-        "-i",
-        "-",
-        "-an",
-        "-vcodec",
-        codec,
-        "-slices",
-        str(slices),
-        "-slicecrc",
-        str(slicecrc),
-        "-r",
-        str(fps),
-        "-pix_fmt",
-        "yuv420p",
-        filename,
-    ]
-
-    if get_cmd:
-        return command
-
-    # Run ffmpeg command
     if not pipe:
-        pipe = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        pipe = _VideoWriter(
+            filename,
+            codec=codec,
+            # The output pixel format, which is what decides whether a browser
+            # can play the result. Left to the encoder's own preference, an
+            # rgb24 input lands on yuv444p, giving a High 4:4:4 Predictive
+            # stream; browser H.264 is 8-bit 4:2:0 only, so the movie is
+            # undecodable in the widget that displays it.
+            pix_fmt="yuv420p",
+            frame_size=frame_size,
+            fps=fps,
+            threads=threads,
+        )
 
     # Get color map
     use_cmap = plt.get_cmap(cmap)
@@ -370,6 +384,11 @@ def write_frames_preview(
         disp_img[disp_img < 0] = 0
         disp_img[disp_img > 1] = 1
         disp_img = np.delete(use_cmap(disp_img), 3, 2) * 255
+        # OpenCV 5 asserts img.depth() == CV_8U in putText, where 4.x drew
+        # onto a float image without complaint. The colormap hands back
+        # float64 in 0-255, so the cast happens before the text is drawn
+        # rather than at the write below.
+        disp_img = disp_img.astype("uint8")
         if text is not None:
             disp_img = cv2.putText(
                 disp_img,
@@ -381,7 +400,7 @@ def write_frames_preview(
                 text_thickness,
                 cv2.LINE_AA,
             )
-        pipe.stdin.write(disp_img.astype("uint8").tobytes())
+        pipe.write(disp_img, format=pixel_format)
 
     if close_pipe:
         pipe.communicate()
