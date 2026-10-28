@@ -6,15 +6,17 @@
 
 # Installation
 
+`moseq2-extract` is one package of the MoSeq2 pipeline. Install the whole pipeline:
+
 ```bash
-python -m pip install moseq2-extract
+python -m pip install moseq2-app
 ```
 
-Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
+You need Python 3.10 or newer on your system. [The installation
+guide](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation) carries
+the whole procedure, including the notebooks.
 
-Most people install the whole pipeline in one step with `pip install
-moseq2-app`, which brings this package with it. See [the installation
-guide](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation).
+To install this package on its own: `python -m pip install moseq2-extract`.
 
 # [Documentation: MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki)
 You can find more information about MoSeq Pipeline, installation, step-by-step instructions, documentation for Command Line Interface(CLI), tutorials etc in [MoSeq2 Wiki](https://github.com/dattalab/moseq2-app/wiki).
