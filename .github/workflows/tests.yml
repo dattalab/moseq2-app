@@ -37,6 +37,9 @@ jobs:
     uses: ./.github/workflows/suite.yml
     with:
       app-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      # The video tests describe moseq2-extract 1.4.3, which is not
+      # published yet. Comes out when it is.
+      overlays: '[{"repository": "dattalab/moseq2-extract", "ref": "video/pyav-readers"}, {"repository": "dattalab/moseq2-viz", "ref": "video/pyav-writer"}]'
       pythons: ${{ github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]' }}
       network: ${{ github.event_name != 'pull_request' }}
 

@@ -14,8 +14,6 @@ import numpy as np
 import pytest
 from moseq2_extract.io.video import read_frames, read_mkv
 
-from defects import BYTE_ORDER, SEEK_RATE
-
 
 def depth_avi(raw_sessions):
     return str(raw_sessions / "saline_example_0" / "depth.avi")
@@ -44,7 +42,6 @@ def test_read_frames_starts_where_it_was_asked_to(raw_sessions):
     assert np.array_equal(whole[10:], later)
 
 
-@SEEK_RATE
 def test_read_frames_seeks_by_the_recordings_own_rate(sixty_hz_avi):
     """A recording at 60 Hz, read without being told its rate.
 
@@ -60,7 +57,6 @@ def test_read_mkv_returns_the_depth_stream(azure_mkv):
     assert frames.shape == (10, 48, 64)
 
 
-@BYTE_ORDER
 def test_read_mkv_reads_the_big_endian_depth_samples(azure_mkv):
     """The fixture's samples are ``frame * 1000 + row * 100 + column``.
 
