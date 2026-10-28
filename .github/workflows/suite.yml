@@ -82,7 +82,7 @@ jobs:
 
       - name: Fetch the bundles
         if: steps.cache.outputs.cache-hit != 'true'
-        run: python -c "import sys; sys.path.insert(0, 'tests'); import fixtures; fixtures.fetch_raw_sessions(); fixtures.fetch_analysis_bundle()"
+        run: python -c "import sys; sys.path.insert(0, 'tests'); import fixtures; fixtures.fetch_raw_sessions(); fixtures.fetch_analysis_bundle(); fixtures.fetch_azure_mkv()"
 
   suite:
     name: ${{ matrix.os }} / py${{ matrix.python }}
