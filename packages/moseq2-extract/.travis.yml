@@ -1,0 +1,33 @@
+#specs for travis ci
+language: python
+dist: xenial
+os: linux
+cache: false
+
+stages:
+  - latest-pythons
+
+jobs:
+  include:
+    - env: ISOLATED=true
+      dist: xenial
+      python: '3.7'
+      stage: latest-pythons
+      # get the dependencies
+      before_install:
+        - pip install -U pip
+        - pip install pytest codecov
+        - pip install "pytest-cov>=2.4.0,<2.6"
+        - export PYTHONPATH=$PYTHONPATH:$(pwd)
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo add-apt-repository -y ppa:mc3man/xerus-media; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get update; fi
+        - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install -y ffmpeg --allow-unauthenticated; fi
+      install:
+        - pip install --upgrade importlib_metadata
+        - pip install -e .
+      before_script:
+        - ./scripts/download_test_dataset.sh
+      script:
+        - pytest --cov=./tests/
+      after_success:
+        - codecov -t $CC_TEST_REPORTER_ID
