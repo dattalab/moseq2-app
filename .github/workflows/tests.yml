@@ -4,11 +4,9 @@ name: tests
 # A run answers one question: does a user on this operating system, with this
 # Python, get the same results as a user on any other?
 #
-# It lives in suite.yml, which all five repositories call, so this package
-# reaches it the same way its siblings do. A pull request here passes its own
-# head as the suite to run, so a change to the suite is run by the pull
-# request that makes it, and may name sibling branches alongside it when the
-# change spans two repositories.
+# It walks both notebooks cell by cell, and every cell runs through the four
+# packages under packages/, so it is the test for all five. A run installs all
+# five from this checkout and everything else the way a user's install would.
 #
 # Pull requests test the oldest and newest supported Pythons on all three
 # operating systems. The nightly run and manual runs test every supported
@@ -30,27 +28,142 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    # Git Bash on the Windows runners, so every step below is one script.
+    shell: bash
+
 jobs:
+  fixtures:
+    name: fixtures / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Fetch the bundles
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python -c "import sys; sys.path.insert(0, 'tests'); import fixtures; fixtures.fetch_raw_sessions(); fixtures.fetch_analysis_bundle(); fixtures.fetch_azure_mkv()"
+
   suite:
-    # The local path, so a pull request runs the suite as it changes it
-    # rather than the one already on main.
-    uses: ./.github/workflows/suite.yml
-    with:
-      app-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-      # The video tests describe moseq2-extract 1.4.3, which is not
-      # published yet. Comes out when it is.
-      pythons: ${{ github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]' }}
-      network: ${{ github.event_name != 'pull_request' }}
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    needs: fixtures
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      # One command, so the resolver sees all five at once: the four checkouts
+      # satisfy moseq2-app's exact pins on them, and each brings its own
+      # requirements with it.
+      - name: Install the pipeline from this checkout
+        run: |
+          python -m pip install \
+            ./packages/moseq2-extract \
+            ./packages/moseq2-pca \
+            ./packages/moseq2-model \
+            ./packages/moseq2-viz \
+            ".[tests]"
+
+      - name: Record the resolution
+        run: python -m pip freeze
+
+      - name: Run the suite
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q
+
+  # The flip-classifier cell downloads a trained classifier. Those tests sit
+  # out of pull requests so a remote outage cannot redden one.
+  network:
+    name: network tests
+    if: github.event_name != 'pull_request'
+    needs: fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Install the pipeline from this checkout
+        run: |
+          python -m pip install \
+            ./packages/moseq2-extract \
+            ./packages/moseq2-pca \
+            ./packages/moseq2-model \
+            ./packages/moseq2-viz \
+            ".[tests]"
+
+      - name: Run the tests that reach the network
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q -m network
 
   # The check the repository requires before merging. It passes only when the
-  # suite passed, whichever Pythons this run chose to test. A matrix whose
-  # size depends on the event cannot be named in a required check; this job
-  # can.
+  # suite passed, whichever Pythons this run chose to test, and the network
+  # tests passed wherever they ran. A matrix whose size depends on the event
+  # cannot be named in a required check; this job can.
   tests:
     name: tests
     if: always()
-    needs: suite
+    needs: [suite, network]
     runs-on: ubuntu-latest
     steps:
       - name: Require the suite to have passed
-        run: test "${{ needs.suite.result }}" = success
+        run: |
+          test "${{ needs.suite.result }}" = success
+          case "${{ needs.network.result }}" in success|skipped) ;; *) exit 1 ;; esac
