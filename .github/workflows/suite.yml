@@ -89,8 +89,12 @@ jobs:
         env:
           OVERLAYS: ${{ inputs.overlays }}
         run: |
+          # jq writes its output through the Windows C runtime in text mode,
+          # so every line it prints there ends CRLF. A ref carrying the
+          # carriage return is not a ref git will fetch.
           printf '%s' "$OVERLAYS" |
             jq -r 'to_entries[] | "\(.key)\t\(.value.repository)\t\(.value.ref)"' |
+            tr -d '\r' |
             while IFS="$(printf '\t')" read -r i repo ref; do
               # Fetching the ref by name covers a branch and a bare sha alike;
               # --branch would reject the sha a pull request actually passes.
