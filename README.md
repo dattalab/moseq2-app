@@ -9,7 +9,7 @@ This is a library for computing PCA components and scores from extracted mouse m
 # Installation
 
 ```bash
-pip install moseq2-pca
+python -m pip install moseq2-pca
 ```
 
 Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
