@@ -6,7 +6,7 @@
 # Installation
 
 ```bash
-pip install moseq2-model
+python -m pip install moseq2-model
 ```
 
 Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
