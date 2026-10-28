@@ -3,8 +3,6 @@ CLI for extracting the depth data.
 """
 
 import os
-import shutil
-import sys
 import click
 from moseq2_extract._yaml import write_yaml
 from tqdm.auto import tqdm
@@ -37,62 +35,10 @@ def new_init(self, *args, **kwargs):
 click.core.Option.__init__ = new_init
 
 
-#: The two programs this package runs as subprocesses. Neither is a Python
-#: package, so neither can be declared in pyproject.toml's `dependencies` and
-#: neither arrives with an install.
-_REQUIRED_EXECUTABLES = ("ffmpeg", "ffprobe")
-
-#: The commands that reach io/video.py, which is the only module that spawns
-#: either program. The rest -- generate-config, generate-index,
-#: aggregate-results, download-flip-file -- read and write yaml, h5 and files on
-#: disk, and work perfectly well with no ffmpeg installed at all. Requiring it
-#: from them would refuse to write a config file over a video decoder that
-#: writing a config file does not use.
-_NEEDS_EXECUTABLES = frozenset((
-    "extract",
-    "batch-extract",
-    "find-roi",
-    "convert-raw-to-avi",
-    "copy-slice",
-))
-
-
-def _check_executables(subcommand):
-    """Refuse to start rather than fail partway through a recording.
-
-    Every video read and every video write shells out by bare name. Without this
-    the first sign of a missing ffmpeg is a FileNotFoundError raised inside a
-    pipe, which on a batch of sessions arrives after the first one has already
-    been read and can look like a corrupt recording rather than a missing
-    program.
-
-    Asking for help is exempt. A user who cannot run a command should still be
-    able to read what it would have done, and refusing that is how a missing
-    dependency turns into a user who cannot find out what they are missing.
-    """
-    if subcommand not in _NEEDS_EXECUTABLES:
-        return
-    if "--help" in sys.argv:
-        return
-    missing = [name for name in _REQUIRED_EXECUTABLES
-               if shutil.which(name) is None]
-    if not missing:
-        return
-    raise click.ClickException(
-        "moseq2-extract needs %s on your PATH, and cannot find %s.\n\n"
-        "These are not Python packages and installing moseq2-extract does not\n"
-        "provide them. Install them with one of:\n\n"
-        "    conda install -c conda-forge ffmpeg\n"
-        "    sudo apt install ffmpeg\n"
-        "    brew install ffmpeg\n"
-        % (" and ".join(_REQUIRED_EXECUTABLES), " and ".join(missing)))
-
-
 @click.group()
 @click.version_option()
-@click.pass_context
-def cli(ctx):
-    _check_executables(ctx.invoked_subcommand)
+def cli():
+    pass
 
 
 

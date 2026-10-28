@@ -3,14 +3,12 @@ Video and video-metadata read/write functions.
 """
 
 import os
-import re
+import av
+import functools
+from fractions import Fraction
 import cv2
 import tarfile
-import datetime
-import functools
-import subprocess
 import numpy as np
-from os.path import exists
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 
@@ -66,7 +64,7 @@ def read_frames_raw(
     frames (list or range): frames to extract
     frame_dims (tuple): wxh of frames in pixels
     bit_depth (int): bits per pixel (default: 16)
-    movie_dtype (str): An indicator for numpy to store the piped ffmpeg-read video in memory for processing.
+    movie_dtype (str): numpy dtype to read the raw frames as.
 
     Returns:
     chunk (numpy ndarray): nframes x h x w
@@ -105,7 +103,55 @@ def read_frames_raw(
     return chunk
 
 
-# https://gist.github.com/hiwonjoon/035a1ead72a767add4b87afe03d0dd7b
+
+def _open(filename):
+    """Open a video for reading, or say why it cannot be read.
+
+    Every probe and reader below starts here, so a path that is missing,
+    truncated past its header or not a video at all fails in one place and
+    with one exception rather than part way through a decode.
+    """
+    try:
+        return av.open(str(filename))
+    except (OSError, av.FFmpegError) as error:
+        raise ValueError(f"could not read {filename}: {error}") from error
+
+
+def _video_stream(container, mapping):
+    """The stream a ``mapping`` names, as an index or as a track title."""
+    if isinstance(mapping, str):
+        mapping = get_stream_names(container.name).get(mapping, 0)
+    return container.streams.video[mapping]
+
+
+@functools.lru_cache(maxsize=8)
+def _frame_timestamps(filename, index, fingerprint):
+    """Every frame's presentation timestamp, in the stream's own time base.
+
+    A container is not indexed by frame number, so the only thing that says
+    where frame *n* is, is the timestamp of the *n*th frame. Working one out
+    from the rate the stream declares instead would be at the mercy of what
+    that rate says: Matroska often carries a guessed or millisecond-quantised
+    rate, and a recording that dropped frames did not run at its nominal one.
+
+    Reading them costs a demux of the file, without decoding any of it, so
+    the list is kept for as long as the file it came from is unchanged.
+    """
+    with _open(filename) as container:
+        stream = container.streams.video[index]
+        return tuple(
+            packet.pts
+            for packet in container.demux(stream)
+            if packet.pts is not None and packet.size
+        )
+
+
+def _fingerprint(filename):
+    """What makes a cached timestamp list stale."""
+    stat = os.stat(filename)
+    return stat.st_size, stat.st_mtime_ns
+
+
 def get_video_info(filename, mapping="DEPTH", threads=8, count_frames=False, **kwargs):
     """
     Get file metadata from videos.
@@ -113,64 +159,96 @@ def get_video_info(filename, mapping="DEPTH", threads=8, count_frames=False, **k
     Args:
     filename (str): name of file to read video metadata from.
     mapping (str): chooses the stream to read from files.
-    threads (int): number of threads to simultanoues run the ffprobe command
+    threads (int): number of threads to use for decode
     count_frames (bool): indicates whether to count the frames individually.
 
     Returns:
     out_dict (dict): dictionary containing video file metadata
     """
 
-    mapping_dict = get_stream_names(filename)
-    if isinstance(mapping, str):
-        mapping = mapping_dict.get(mapping, 0)
+    with _open(filename) as container:
+        stream = _video_stream(container, mapping)
 
-    stream_str = "stream=width,height,r_frame_rate,"
-    if count_frames:
-        stream_str += "nb_read_frames"
-    else:
-        stream_str += "nb_frames"
+        # The rate the stream declares, not the average over the frames that
+        # turned up. A recording that dropped frames still ran at the rate
+        # its camera was set to, and that is what the readers seek by.
+        rate = stream.base_rate
 
-    command = [
-        "ffprobe",
-        "-v",
-        "fatal",
-        "-select_streams",
-        f"v:{mapping}",
-        "-show_entries",
-        stream_str,
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        "-threads",
-        str(threads),
-        filename,
-        "-sexagesimal",
-    ]
+        # Matroska stores a duration rather than a frame count, so an Azure
+        # Kinect recording has none to report. None rather than 0: a caller
+        # that asks for every frame tests this and falls back to the
+        # timestamps, where 0 would read nothing and report success.
+        if count_frames:
+            # Demuxing ends with a zero-size flush packet, which is not a
+            # frame and must not be counted as one: a frame count one past
+            # the end reaches gen_batch_sequence and the last batch asks
+            # for a frame the file does not hold.
+            nframes = sum(1 for packet in container.demux(stream) if packet.size)
+        else:
+            nframes = stream.frames or None
 
-    if count_frames:
-        command += ["-count_frames"]
-
-    ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = ffmpeg.communicate()
-
-    if err:
-        print(err)
-
-    out = out.decode().split("\n")
-    out_dict = {
-        "file": filename,
-        "dims": (int(float(out[0])), int(float(out[1]))),
-        "fps": float(out[2].split("/")[0]) / float(out[2].split("/")[1]),
-    }
-
-    try:
-        out_dict["nframes"] = int(out[3])
-    except ValueError:
-        out_dict["nframes"] = None
-
-    return out_dict
+        return {
+            "file": filename,
+            "dims": (stream.width, stream.height),
+            "fps": float(rate),
+            "nframes": nframes,
+        }
 
 
-# simple command to pipe frames to an ffv1 file
+
+def _frame_dimensions(frames, frame_size):
+    """The width and height to size an output stream with.
+
+    ``frame_size`` wins when it is given, as either a ``(width, height)``
+    pair or a ``"WxH"`` string. Otherwise the frames say: an ndarray by its
+    shape, or a bare ``(width, height)`` pair passed in place of one by a
+    caller opening the file before its first chunk has arrived.
+    """
+    if frame_size:
+        if isinstance(frame_size, str):
+            width, height = frame_size.split("x")
+            return int(width), int(height)
+        return int(frame_size[0]), int(frame_size[1])
+    if isinstance(frames, np.ndarray):
+        return int(frames.shape[2]), int(frames.shape[1])
+    return int(frames[0]), int(frames[1])
+
+
+class _VideoWriter:
+    """An open output file, written one frame at a time.
+
+    Extraction writes its output in chunks and keeps the file open between
+    them. ``communicate`` flushes whatever the encoder is still holding,
+    writes the container's trailer and closes the file; calling it twice is
+    harmless.
+    """
+
+    def __init__(self, filename, codec, pix_fmt, frame_size, fps, threads):
+        self.container = av.open(str(filename), "w")
+        # A rate is a rational, and callers hand this one in as whatever
+        # their config or CLI made of it: an int, a float from a `type=float`
+        # option, or a string from a yaml file. 1000 is enough denominator
+        # for the broadcast rates (30000/1001 and friends) a camera reports.
+        rate = Fraction(str(fps)).limit_denominator(1000)
+        self.stream = self.container.add_stream(codec, rate=rate)
+        self.stream.width, self.stream.height = frame_size
+        self.stream.pix_fmt = pix_fmt
+        self.stream.thread_type = "AUTO"
+        self.stream.codec_context.thread_count = threads
+
+    def write(self, frame, format):
+        """Encode one ``(height, width)`` or ``(height, width, 3)`` array."""
+        self.container.mux(self.stream.encode(av.VideoFrame.from_ndarray(frame, format=format)))
+
+    def communicate(self, *args, **kwargs):
+        """Flush the encoder, write the trailer and close the file."""
+        if self.container is not None:
+            self.container.mux(self.stream.encode())
+            self.container.close()
+            self.container = None
+        return None, None
+
+
 def write_frames(
     filename,
     frames,
@@ -184,76 +262,44 @@ def write_frames(
     slices=24,
     slicecrc=1,
     frame_size=None,
-    get_cmd=False,
 ):
     """
     Write frames to avi file using the ffv1 lossless encoder
 
     Args:
     filename (str): path to file to write to.
-    frames (np.ndarray): frames to write
+    frames (np.ndarray): frames to write, or a (width, height) pair to size
+    the file with when no frames have arrived yet.
     threads (int): number of threads to write video
     fps (int): frames per second
     pixel_format (str): format video color scheme
-    codec (str): ffmpeg encoding-writer method to use
+    codec (str): encoder to write with
     close_pipe (bool): indicates to close the open pipe to video when done writing.
-    pipe (subProcess.Pipe): pipe to currently open video file.
+    pipe (_VideoWriter): the already open file to keep writing to.
     frame_dtype (str): indicates the data type to use when writing the videos
-    slices (int): number of frame slices to write at a time.
-    slicecrc (int): check integrity of slices
+    slices (int): unused, kept so a config splatted in as keywords still fits
+    slicecrc (int): unused, kept so a config splatted in as keywords still fits
     frame_size (tuple): shape/dimensions of image.
-    get_cmd (bool): indicates whether function should return ffmpeg command (instead of executing)
 
     Returns:
-    pipe (subProcess.Pipe): indicates whether video writing is complete.
+    pipe (_VideoWriter): indicates whether video writing is complete.
     """
 
-    # we probably want to include a warning about multiples of 32 for videos
-    # (then we can use pyav and some speedier tools)
-    if not frame_size and type(frames) is np.ndarray:
-        frame_size = "{0:d}x{1:d}".format(frames.shape[2], frames.shape[1])
-    elif not frame_size and type(frames) is tuple:
-        frame_size = "{0:d}x{1:d}".format(frames[0], frames[1])
-
-    command = [
-        "ffmpeg",
-        "-y",
-        "-loglevel",
-        "fatal",
-        "-framerate",
-        str(fps),
-        "-f",
-        "rawvideo",
-        "-s",
-        frame_size,
-        "-pix_fmt",
-        pixel_format,
-        "-i",
-        "-",
-        "-an",
-        "-vcodec",
-        codec,
-        "-threads",
-        str(threads),
-        "-slices",
-        str(slices),
-        "-slicecrc",
-        str(slicecrc),
-        "-r",
-        str(fps),
-        filename,
-    ]
-
-    if get_cmd:
-        return command
-
     if not pipe:
-        pipe = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        pipe = _VideoWriter(
+            filename,
+            codec=codec,
+            pix_fmt=pixel_format,
+            frame_size=_frame_dimensions(frames, frame_size),
+            fps=fps,
+            threads=threads,
+        )
 
-    for i in tqdm(
-        range(frames.shape[0]), disable=True, desc=f"Writing frames to {filename}"
-    ):
-        pipe.stdin.write(frames[i].astype(frame_dtype).tobytes())
+    if isinstance(frames, np.ndarray):
+        for i in tqdm(
+            range(frames.shape[0]), disable=True, desc=f"Writing frames to {filename}"
+        ):
+            pipe.write(frames[i].astype(frame_dtype), format=pixel_format)
 
     if close_pipe:
         pipe.communicate()
@@ -264,79 +310,28 @@ def write_frames(
 
 def get_stream_names(filename, stream_tag="title"):
     """
-    Run an FFProbe command to determine whether an input video file contains multiple streams, and
+    Determine whether an input video file contains multiple streams, and
     returns a stream_name to paired int values to extract the desired stream.
 
     Args:
     filename (str): path to video file to get streams from.
-    stream_tag (str): value of the stream tags for ffprobe command to return
+    stream_tag (str): the stream metadata tag naming each track
 
     Returns:
     out (dict): Dictionary of string to int pairs for the included streams in the mkv file.
     Dict will be used to choose the correct mapping number to choose which stream to read in read_frames().
     """
 
-    command = [
-        "ffprobe",
-        "-v",
-        "fatal",
-        "-show_entries",
-        "stream_tags={}".format(stream_tag),
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        filename,
-    ]
+    with _open(filename) as container:
+        named = {
+            stream.metadata[stream_tag]: i
+            for i, stream in enumerate(container.streams.video)
+            if stream_tag in stream.metadata
+        }
 
-    ffmpeg = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = ffmpeg.communicate()
-
-    if err or len(out) == 0:
-        return {"DEPTH": 0}
-
-    out = out.decode("utf-8").rstrip("\n").split("\n")
-
-    return {o: i for i, o in enumerate(out)}
-
-
-
-@functools.lru_cache(maxsize=1)
-def frame_passthrough_option():
-    """The option asking ffmpeg for one output frame per input frame.
-
-    ``-vsync 0`` and ``-fps_mode passthrough`` both mean: hand each decoded
-    frame on with its own timestamp, neither duplicating nor dropping any to
-    reach a target rate. Without it a variable-rate recording decodes to a
-    different number of frames than it holds, and the frame a caller asked for
-    is not the frame it gets.
-
-    ffmpeg 5.1 added the second spelling and ffmpeg 9 removed the first, so no
-    one spelling reaches every build. The old spelling is kept wherever it
-    still resolves, which is every build through 8.1, so that an ffmpeg able
-    to run the command this function has always run does exactly that.
-
-    Unlike the timestamp field rename below, this one is loud. An ffmpeg that
-    does not know the option exits non-zero having written nothing, saying
-    ``Error splitting the argument list: Option not found``, so the wrong
-    choice costs a failed read rather than correct-looking frames from the
-    wrong part of the recording.
-
-    A banner carrying no numbered version belongs to a build from master,
-    which is past the removal.
-    """
-    try:
-        banner = subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
-        return ["-fps_mode", "passthrough"]
-
-    version = re.search(r"ffmpeg version n?(\d+)\.", banner)
-    if version is None or int(version.group(1)) >= 9:
-        return ["-fps_mode", "passthrough"]
-    return ["-vsync", "0"]
+    # A file from anything but an Azure Kinect names nothing. Its one track
+    # is the one the caller is about to read depth out of.
+    return named or {"DEPTH": 0}
 
 
 def read_frames(
@@ -346,105 +341,81 @@ def read_frames(
     ),
     threads=6,
     fps=30,
-    frames_is_timestamp=False,
     pixel_format="gray16le",
     movie_dtype="uint16",
     frame_size=None,
     slices=24,
     slicecrc=1,
     mapping="DEPTH",
-    get_cmd=False,
     finfo=None,
     **kwargs,
 ):
     """
-    Read in frames from the .mp4/.avi file using a pipe from ffmpeg.
+    Read in frames from a video file.
+
+    Frames are addressed by index. ``fps`` describes the recording and is not
+    used to locate anything, so a recording at any rate returns the frames
+    that were asked for.
 
     Args:
     filename (str): filename to get frames from
     frames (list or numpy.ndarray): list of frames to grab
     threads (int): number of threads to use for decode
     fps (int): frame rate of camera
-    frames_is_timestamp (bool): if False, indicates timestamps represent kinect v2 absolute machine timestamps,
-    pixel_format (str): ffmpeg pixel format of data
-    movie_dtype (str): An indicator for numpy to store the piped ffmpeg-read video in memory for processing.
-    frame_size (str): wxh frame size in pixels
-    slices (int): number of slices to use for decode
-    slicecrc (int): check integrity of slices
-    mapping (str): the stream to read from mkv files.
-    get_cmd (bool): indicates whether function should return ffmpeg command (instead of executing).
+    pixel_format (str): pixel format to return the frames in
+    movie_dtype (str): numpy dtype of the returned array
+    frame_size (tuple): wxh frame size in pixels, if the frames are to be resized
+    slices (int): unused, kept so a config splatted in as keywords still fits
+    slicecrc (int): unused, kept so a config splatted in as keywords still fits
+    mapping (str or int): the stream to read from mkv files.
     finfo (dict): dictionary containing video file metadata
 
     Returns:
     video (numpy.ndarray):  frames x rows x columns
     """
 
-    if finfo is None:
-        finfo = get_video_info(filename, threads=threads, **kwargs)
+    with _open(filename) as container:
+        stream = _video_stream(container, mapping)
+        stream.thread_type = "AUTO"
+        stream.codec_context.thread_count = threads
 
-    if frames is None or len(frames) == 0:
-        frames = np.arange(finfo["nframes"], dtype="int64")
+        if frames is None or len(frames) == 0:
+            if finfo is None:
+                finfo = get_video_info(filename, threads=threads, **kwargs)
+            frames = np.arange(finfo["nframes"], dtype="int64")
 
-    if not frame_size:
-        frame_size = finfo["dims"]
+        width, height = frame_size or (stream.width, stream.height)
 
-    # Compute starting time point to retrieve frames from
-    if frames_is_timestamp:
-        start_time = str(datetime.timedelta(seconds=frames[0]))
-    else:
-        start_time = str(datetime.timedelta(seconds=frames[0] / fps))
+        # Where the first requested frame actually sits, read from the file
+        # rather than worked out from the rate it declares. The seek lands on
+        # or before it, because a decoder has to start from a keyframe, so
+        # the frames in between are decoded and dropped.
+        timestamps = _frame_timestamps(str(filename), stream.index, _fingerprint(filename))
+        if frames[0] >= len(timestamps):
+            raise ValueError(
+                f"{filename} holds {len(timestamps)} frames and frame "
+                f"{frames[0]} was requested"
+            )
+        first = timestamps[frames[0]]
+        container.seek(first, stream=stream)
 
-    command = [
-        "ffmpeg",
-        "-loglevel",
-        "fatal",
-        "-ss",
-        start_time,
-        "-i",
-        filename,
-        "-vframes",
-        str(len(frames)),
-        "-f",
-        "image2pipe",
-        "-s",
-        "{:d}x{:d}".format(frame_size[0], frame_size[1]),
-        "-pix_fmt",
-        pixel_format,
-        "-threads",
-        str(threads),
-        "-slices",
-        str(slices),
-        "-slicecrc",
-        str(slicecrc),
-        "-vcodec",
-        "rawvideo",
-    ]
+        video = []
+        for frame in container.decode(stream):
+            if frame.pts is not None and frame.pts < first:
+                continue
+            video.append(
+                frame.reformat(width=width, height=height, format=pixel_format).to_ndarray()
+            )
+            if len(video) == len(frames):
+                break
 
-    if isinstance(mapping, str):
-        mapping_dict = get_stream_names(filename)
-        mapping = mapping_dict.get(mapping, 0)
+    if len(video) != len(frames):
+        raise ValueError(
+            f"{filename} has {len(video)} frames from index {frames[0]}, "
+            f"and {len(frames)} were requested"
+        )
 
-    if filename.endswith((".mkv", ".avi")):
-        command += ["-map", f"0:{mapping}"]
-        command += frame_passthrough_option()
-
-    command += ["-"]
-
-    if get_cmd:
-        return command
-
-    pipe = subprocess.Popen(command, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    out, err = pipe.communicate()
-
-    if err:
-        print("Error:", err)
-        return None
-
-    video = np.frombuffer(out, dtype=movie_dtype).reshape(
-        (len(frames), frame_size[1], frame_size[0])
-    )
-
-    return video.astype("uint16")
+    return np.asarray(video, dtype=movie_dtype)
 
 
 def read_mkv(
@@ -452,52 +423,37 @@ def read_mkv(
     frames=range(
         0,
     ),
-    pixel_format="gray16be",
+    pixel_format="gray16le",
     movie_dtype="uint16",
-    frames_is_timestamp=True,
     timestamps=None,
     **kwargs,
 ):
     """
-    Read in frames from a .mkv file using a pipe from ffmpeg.
+    Read in frames from an Azure Kinect .mkv file.
+
+    An Azure Kinect names its tracks, and the depth one is not the first, so
+    the stream is chosen by title rather than by position. The track holds
+    16-bit samples big-endian; the decoder converts them, so what comes back
+    is in the machine's own byte order whatever the recording stored.
 
     Args:
     filename (str): filename to get frames from
     frames (list or numpy.ndarray): list of frame indices to read
-    pixel_format (str): ffmpeg pixel format of data
-    movie_dtype (str): An indicator for numpy to store the piped ffmpeg-read video in memory for processing.
-    frames_is_timestamp (bool): if False, use machine timestamp if True, use frame as timestamp
-    timestamps (list): array of timestamps to slice into using the frame indices
-    threads (int): number of threads to use for decode
-    fps (int): frame rate of camera in Hz
-    frame_size (str): wxh frame size in pixels
-    frame_dtype (str): indicates the data type to use when reading the videos
-    slices (int): number of slices to use for decode
-    slicecrc (int): check integrity of slices
-    mapping (int): ffmpeg channel mapping; "o:mapping"; chooses the stream to read from mkv files.
-    get_cmd (bool): indicates whether function should return ffmpeg command (instead of executing).
+    pixel_format (str): pixel format to return the frames in
+    movie_dtype (str): numpy dtype of the returned array
+    timestamps (list): unused, kept so an existing caller still fits
+    mapping (str or int): the stream to read from mkv files.
 
     Returns:
     video (numpy.ndarray):  frames x rows x columns
     """
 
-    if timestamps is None and exists(filename):
-        timestamps = load_timestamps_from_movie(
-            filename, mapping=kwargs.get("mapping", "DEPTH")
-        )
-
-    if timestamps is not None:
-        if isinstance(frames, range):
-            frames = timestamps[slice(frames.start, frames.stop, frames.step)]
-        else:
-            frames = [timestamps[frames[0]]]
-
+    kwargs.setdefault("mapping", "DEPTH")
     return read_frames(
         filename,
         frames,
         pixel_format=pixel_format,
         movie_dtype=movie_dtype,
-        frames_is_timestamp=frames_is_timestamp,
         **kwargs,
     )
 
@@ -514,7 +470,6 @@ def write_frames_preview(
     frame_size=None,
     depth_min=0,
     depth_max=80,
-    get_cmd=False,
     cmap="jet",
     pipe=None,
     close_pipe=True,
@@ -522,132 +477,106 @@ def write_frames_preview(
     progress_bar=False,
 ):
     """
-    Simple command to pipe frames to an ffv1 file. Writes out a false-colored mp4 video.
+    Write out a false-colored mp4 a person can watch in a browser.
 
     Args:
     filename (str): path to file to write to.
-    frames (np.ndarray): frames to write
+    frames (np.ndarray): frames to write, or a (width, height) pair to size
+    the file with when no frames have arrived yet.
     threads (int): number of threads to write video
     fps (int): frames per second
-    pixel_format (str): format video color scheme
-    codec (str): ffmpeg encoding-writer method to use
-    slices (int): number of frame slices to write at a time.
-    slicecrc (int): check integrity of slices
+    pixel_format (str): format of the frames handed to the encoder
+    codec (str): encoder to write with
+    slices (int): unused, kept so a config splatted in as keywords still fits
+    slicecrc (int): unused, kept so a config splatted in as keywords still fits
     frame_size (tuple): shape/dimensions of image.
     depth_min (int): minimum mouse depth from floor in (mm)
     depth_max (int): maximum mouse depth from floor in (mm)
-    get_cmd (bool): indicates whether function should return ffmpeg command (instead of executing)
     cmap (str): color map to use.
-    pipe (subProcess.Pipe): pipe to currently open video file.
+    pipe (_VideoWriter): the already open file to keep writing to.
     close_pipe (bool): indicates to close the open pipe to video when done writing.
     frame_range (range()): frame indices to write on video
     progress_bar (bool): If True, displays a TQDM progress bar for the video writing progress.
 
     Returns:
-    pipe (subProcess.Pipe): indicates whether video writing is complete.
+    pipe (_VideoWriter): indicates whether video writing is complete.
     """
 
     font = cv2.FONT_HERSHEY_SIMPLEX
     white = (255, 255, 255)
-    txt_pos = (5, frames.shape[-1] - 40)
 
-    if not np.mod(frames.shape[1], 2) == 0:
-        frames = np.pad(frames, ((0, 0), (0, 1), (0, 0)), "constant", constant_values=0)
+    if isinstance(frames, np.ndarray):
+        txt_pos = (5, frames.shape[-1] - 40)
 
-    if not np.mod(frames.shape[2], 2) == 0:
-        frames = np.pad(frames, ((0, 0), (0, 0), (0, 1)), "constant", constant_values=0)
+        # H.264 cannot encode an odd width or height.
+        if not np.mod(frames.shape[1], 2) == 0:
+            frames = np.pad(frames, ((0, 0), (0, 1), (0, 0)), "constant", constant_values=0)
 
-    if not frame_size and type(frames) is np.ndarray:
-        frame_size = "{0:d}x{1:d}".format(frames.shape[2], frames.shape[1])
-    elif not frame_size and type(frames) is tuple:
-        frame_size = "{0:d}x{1:d}".format(frames[0], frames[1])
-
-    command = [
-        "ffmpeg",
-        "-y",
-        "-loglevel",
-        "fatal",
-        "-threads",
-        str(threads),
-        "-framerate",
-        str(fps),
-        "-f",
-        "rawvideo",
-        "-s",
-        frame_size,
-        "-pix_fmt",
-        pixel_format,
-        "-i",
-        "-",
-        "-an",
-        "-vcodec",
-        codec,
-        "-slices",
-        str(slices),
-        "-slicecrc",
-        str(slicecrc),
-        "-r",
-        str(fps),
-        # The output pixel format, which is what decides whether a browser can
-        # play the result. Left unset, ffmpeg chooses from the formats libx264
-        # advertises and lands on yuv444p for an rgb24 input, giving a High
-        # 4:4:4 Predictive stream; browser H.264 is 8-bit 4:2:0 only, so the
-        # movie is undecodable in the preview widget that displays it. The
-        # crowd movie writer in moseq2-viz sets the same pair.
-        "-pix_fmt",
-        "yuv420p",
-        filename,
-    ]
-
-    if get_cmd:
-        return command
+        if not np.mod(frames.shape[2], 2) == 0:
+            frames = np.pad(frames, ((0, 0), (0, 0), (0, 1)), "constant", constant_values=0)
 
     if not pipe:
-        pipe = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        pipe = _VideoWriter(
+            filename,
+            codec=codec,
+            # The output pixel format, which is what decides whether a browser
+            # can play the result. Left to the encoder's own preference, an
+            # rgb24 input lands on yuv444p, giving a High 4:4:4 Predictive
+            # stream; browser H.264 is 8-bit 4:2:0 only, so the movie is
+            # undecodable in the preview widget that displays it. The crowd
+            # movie writer in moseq2-viz sets the same pair.
+            pix_fmt="yuv420p",
+            frame_size=_frame_dimensions(frames, frame_size),
+            fps=fps,
+            threads=threads,
+        )
 
-    # scale frames to appropriate depth ranges
-    use_cmap = plt.get_cmap(cmap)
-    for i in tqdm(
-        range(frames.shape[0]),
-        disable=not progress_bar,
-        desc=f"Writing frames to {filename}",
-    ):
-        disp_img = frames[i, :].copy().astype("float32")
-        disp_img = (disp_img - depth_min) / (depth_max - depth_min)
-        disp_img[disp_img < 0] = 0
-        disp_img[disp_img > 1] = 1
-        disp_img = np.delete(use_cmap(disp_img), 3, 2) * 255
-        # OpenCV 5 asserts img.depth() == CV_8U in putText, where 4.x drew onto
-        # a float image without complaint. The colormap hands back float64 in
-        # 0-255, so the cast to uint8 that used to happen at the pipe write
-        # below now happens here, before the frame number is drawn.
-        #
-        # This is not pixel-identical, and the difference is confined to the
-        # text. It is drawn with LINE_AA, so its antialiased edges blend against
-        # whatever precision the image carries, and blending in uint8 rather
-        # than in float64 moves the boundary pixels of the digits. Every other
-        # pixel is unchanged: the cast is the same truncation wherever it runs.
-        # The artifact is the preview movie's frame-number overlay, which is for
-        # looking at rather than measuring.
-        disp_img = disp_img.astype("uint8")
-        if frame_range is not None:
-            try:
-                cv2.putText(
-                    disp_img,
-                    str(frame_range[i]),
-                    txt_pos,
-                    font,
-                    1,
-                    white,
-                    2,
-                    cv2.LINE_AA,
-                )
-            except (IndexError, ValueError):
-                # len(frame_range) M < len(frames) or
-                # txt_pos is outside of the frame dimensions
-                print("Could not overlay frame number on preview on video.")
+    if isinstance(frames, np.ndarray):
+        # scale frames to appropriate depth ranges
+        use_cmap = plt.get_cmap(cmap)
+        for i in tqdm(
+            range(frames.shape[0]),
+            disable=not progress_bar,
+            desc=f"Writing frames to {filename}",
+        ):
+            disp_img = frames[i, :].copy().astype("float32")
+            disp_img = (disp_img - depth_min) / (depth_max - depth_min)
+            disp_img[disp_img < 0] = 0
+            disp_img[disp_img > 1] = 1
+            disp_img = np.delete(use_cmap(disp_img), 3, 2) * 255
+            # OpenCV 5 asserts img.depth() == CV_8U in putText, where 4.x drew
+            # onto a float image without complaint. The colormap hands back
+            # float64 in 0-255, so the cast to uint8 that used to happen at the
+            # pipe write below now happens here, before the frame number is
+            # drawn.
+            #
+            # This is not pixel-identical, and the difference is confined to
+            # the text. It is drawn with LINE_AA, so its antialiased edges
+            # blend against whatever precision the image carries, and blending
+            # in uint8 rather than in float64 moves the boundary pixels of the
+            # digits. Every other pixel is unchanged: the cast is the same
+            # truncation wherever it runs. The artifact is the preview movie's
+            # frame-number overlay, which is for looking at rather than
+            # measuring.
+            disp_img = disp_img.astype("uint8")
+            if frame_range is not None:
+                try:
+                    cv2.putText(
+                        disp_img,
+                        str(frame_range[i]),
+                        txt_pos,
+                        font,
+                        1,
+                        white,
+                        2,
+                        cv2.LINE_AA,
+                    )
+                except (IndexError, ValueError):
+                    # len(frame_range) M < len(frames) or
+                    # txt_pos is outside of the frame dimensions
+                    print("Could not overlay frame number on preview on video.")
 
-        pipe.stdin.write(disp_img.tobytes())
+            pipe.write(disp_img, format=pixel_format)
 
     if close_pipe:
         pipe.communicate()
@@ -747,40 +676,17 @@ def get_movie_info(
     return metadata
 
 
-#: The ffprobe field naming a frame's presentation timestamp, oldest spelling
-#: first. ffmpeg 5 renamed ``pkt_pts_time`` to ``pts_time``, removing the old
-#: name rather than aliasing it. The values are identical under both spellings,
-#: so this is a name resolving or not resolving and never a change of number.
-#:
-#: The rename is silent. ffprobe answers a request for a field it does not know
-#: with exit 0, an empty stderr and one blank line per frame, so the parse below
-#: yields an empty list and the function returns ``None``. Neither the exit
-#: status nor the ``if err:`` guard sees anything.
-#:
-#: Two callers read that ``None`` as "this movie carries no timestamps", and
-#: each does something silent with it. ``read_mkv`` keeps its frame numbers as
-#: raw indices but still asks ``read_frames`` for a time-based seek, so frame
-#: *n* fetches second *n* -- correctly shaped depth data from the wrong part of
-#: the recording, at exit 0, until the index passes the duration and the reshape
-#: finally raises. ``handle_extract_metadata`` takes the timestamp count as the
-#: frame count, which for an mkv is the only source of one, and extracts zero
-#: frames.
-#:
-#: The old spelling is tried first so that an ffmpeg which knows it runs exactly
-#: the command this function has always run, and reaches the second name only on
-#: a build where the first can no longer resolve.
-_TIMESTAMP_FIELDS = ("pkt_pts_time", "pts_time")
-
-
 def load_timestamps_from_movie(input_file, threads=8, mapping="DEPTH"):
     """
-    Run a ffprobe command to extract the timestamps from the .mkv file, and pipes the
-    output data to a csv file.
+    Read the presentation timestamp of every frame in a movie.
+
+    An Azure Kinect recording carries no frame count, so the length of this
+    list is the only frame count there is for one.
 
     Args:
-    filename (str): path to input file to extract timestamps from.
-    threads (int): number of threads to simultaneously read timestamps
-    mapping (str): chooses the stream to read from mkv files. (Will default to if video is not an mkv format)
+    input_file (str): path to input file to extract timestamps from.
+    threads (int): number of threads to use for decode
+    mapping (str): chooses the stream to read from mkv files.
 
     Returns:
     timestamps (list): list of float values representing timestamps for each frame.
@@ -788,44 +694,12 @@ def load_timestamps_from_movie(input_file, threads=8, mapping="DEPTH"):
 
     print("Loading movie timestamps")
 
-    if isinstance(mapping, str):
-        mapping_dict = get_stream_names(input_file)
-        mapping = mapping_dict.get(mapping, 0)
+    with _open(input_file) as container:
+        stream = _video_stream(container, mapping)
+        time_base = stream.time_base
+        index = stream.index
 
-    for field in _TIMESTAMP_FIELDS:
-        command = [
-            "ffprobe",
-            "-select_streams",
-            f"v:{mapping}",
-            "-threads",
-            str(threads),
-            "-show_entries",
-            f"frame={field}",
-            "-v",
-            "quiet",
-            input_file,
-            "-of",
-            "csv=p=0",
-        ]
-
-        ffprobe = subprocess.Popen(
-            command, stderr=subprocess.PIPE, stdout=subprocess.PIPE
-        )
-        out, err = ffprobe.communicate()
-
-        if err:
-            print("Error:", err)
-            return None
-
-        # Each line is one frame. ffprobe 4.2 writes the requested field and
-        # nothing else; newer builds append an empty trailing field on a frame
-        # that carries side data, so the first frame of an Azure mkv arrives as
-        # "0.033000," and reaches float() with the separator still on it. The
-        # value is the first comma-separated field either way, and taking it is
-        # a no-op on output that has no separator in it.
-        timestamps = [float(t.split(b",")[0]) for t in out.split()]
-
-        if len(timestamps) > 0:
-            return timestamps
-
-    return None
+    return [
+        float(pts * time_base)
+        for pts in _frame_timestamps(str(input_file), index, _fingerprint(input_file))
+    ]

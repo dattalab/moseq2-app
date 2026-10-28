@@ -4,23 +4,6 @@
 [![codecov](https://codecov.io/gh/dattalab/moseq2-extract/branch/test-suite/graph/badge.svg?token=ICPjpMMwYZ)](https://codecov.io/gh/dattalab/moseq2-extract)
 [![DOI](https://zenodo.org/badge/120829989.svg)](https://zenodo.org/badge/latestdoi/120829989)
 
-# Requirements
-
-`moseq2-extract` reads and writes depth video by calling **ffmpeg** and
-**ffprobe**, which it expects to find on your `PATH`. They are not Python
-packages and installing `moseq2-extract` does not bring them with it, so install
-them yourself first:
-
-```bash
-conda install -c conda-forge ffmpeg   # any platform, if you use conda
-sudo apt install ffmpeg               # Debian / Ubuntu
-brew install ffmpeg                   # macOS
-```
-
-ffmpeg 4.2 and newer are supported. `moseq2-extract` reports what it found and
-what it needs if either program is missing, and every command checks before it
-starts work.
-
 # Installation
 
 ```bash
@@ -28,8 +11,6 @@ pip install moseq2-extract
 ```
 
 Python 3.10 or newer, on Linux. macOS and Windows support is being verified.
-
-ffmpeg has to be on your `PATH` first; see Requirements above.
 
 Most people install the whole pipeline in one step with `pip install
 moseq2-app`, which brings this package with it. See [the installation
