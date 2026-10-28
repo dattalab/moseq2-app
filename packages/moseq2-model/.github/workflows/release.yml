@@ -1,0 +1,114 @@
+name: release
+
+# Publishing a GitHub release builds the distributions from the release tag
+# and uploads them to PyPI over trusted publishing, so no API token is stored
+# anywhere. Running the workflow by hand instead checks that the publisher is
+# registered, by making the same exchange and stopping at the answer.
+#
+# PyPI scopes a trusted publisher to one repository and one workflow file, by
+# name. This file has to keep the name the publisher was registered with, and
+# the upload has to run from this file, or the exchange is refused however
+# correct the rest of the registration is.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PACKAGE: moseq2_model
+  DISTRIBUTION: moseq2-model
+
+jobs:
+  # Only ever runs by hand. Proves the registration without publishing.
+  verify:
+    name: trusted publisher
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask PyPI for a token
+        run: |
+          set -euo pipefail
+
+          audience=$(curl -fsS https://pypi.org/_/oidc/audience \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["audience"])')
+
+          # The runner mints the OIDC token; it is never printed.
+          id_token=$(curl -fsS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')
+
+          status=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST https://pypi.org/_/oidc/mint-token \
+            -d "{\"token\": \"$id_token\"}")
+
+          if [ "$status" = "200" ]; then
+            echo "PyPI accepted the exchange. The trusted publisher is registered"
+            echo "for this repository and this workflow file."
+            exit 0
+          fi
+
+          echo "PyPI refused the exchange (HTTP $status). What it said:"
+          # The refusal carries no token, only the reason.
+          python3 -c 'import json;print(json.dumps(json.load(open("response.json")),indent=2))' \
+            || cat response.json
+          exit 1
+
+  publish:
+    name: publish to PyPI
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the checker's dependencies
+        run: python -m pip install --quiet packaging
+
+      # Refuses a tag whose metadata disagrees with it, and a sibling floor
+      # that names a release nobody published.
+      - name: Check the release against its tag
+        run: python .github/scripts/check_release.py "${{ github.event.release.tag_name }}" "$PACKAGE"
+
+      - name: Build
+        run: pipx run build
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+      # An upload returns before the index installers read has caught up.
+      - name: Wait for the index
+        run: |
+          python .github/scripts/await_index.py "$DISTRIBUTION" \
+            "$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')"
+
+  # The release branch names the newest version a user can install. pip does
+  # not install a pre-release by default, so one leaves the branch where it is.
+  release-branch:
+    name: move the release branch
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Is this a final release?
+        id: final
+        run: python .github/scripts/is_final_release.py "${{ github.event.release.tag_name }}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Move it
+        if: steps.final.outputs.final == 'true'
+        run: git push origin HEAD:refs/heads/release

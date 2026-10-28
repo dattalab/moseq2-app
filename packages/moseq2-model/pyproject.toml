@@ -1,0 +1,9 @@
+# Build backend only. Package metadata stays in setup.py.
+#
+# Declaring this is what lets pip and uv build the package in an isolated
+# environment. Without it they fall back to a legacy in-place setup.py
+# invocation, which is why the old setup.py had to pip-install numpy and cython
+# itself before it could run.
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"

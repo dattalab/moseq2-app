@@ -1,0 +1,60 @@
+[tool.pdm.version]
+source = "file"
+path = "moseq2_pca/__init__.py"
+
+[tool.pdm]
+
+[project]
+name = "moseq2-pca"
+dynamic = ["version"]
+description = "To boldly go where no mouse has gone before"
+readme = "README.md"
+authors = [
+    {name = "Jeff Markowitz"},
+]
+license = "LicenseRef-Harvard-Academic-Non-Commercial"
+license-files = ["LICENSE.md"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+# The floor is 3.10 because jax-moseq declares it and keypoint-moseq
+# depends on jax-moseq. There is no ceiling: what the upper bound should
+# be is what the version matrix measures, and a ceiling here would refuse
+# the columns that produce the answer.
+requires-python = ">=3.10"
+dependencies = [
+    "bokeh>=2.4.2",
+    "chest>=0.2.3",
+    "click>=8.0",
+    "dask-jobqueue>=0.7.3",
+    "dask>=2.30.0",
+    "distributed>=2.30.1",
+    "h5py>=2.10.0",
+    "joblib>=0.15.1",
+    "matplotlib>=3.1.2",
+    "numpy>=1.18.3",
+    "opencv-python>=4.1.2.30",
+    "pathspec>=0.5.3",
+    "psutil>=5.6.7",
+    "ruamel.yaml>=0.16.5",
+    "scikit-image>=0.16.2",
+    "scikit-learn>=0.20.3",
+    "scipy>=1.3.2",
+    "seaborn>=0.11.0",
+    "tqdm>=4.48.0",
+]
+
+[project.scripts]
+moseq2-pca = "moseq2_pca.cli:cli"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
