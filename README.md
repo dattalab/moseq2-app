@@ -32,14 +32,21 @@ We provide a series of Jupyter Notebooks that cover the entire MoSeq pipeline to
 
 # Getting Started
 
+You need Python 3.10 or newer on your system. Then:
+
 ```bash
 python -m pip install moseq2-app
 ```
 
-Python 3.10 or newer. Verified on Linux; macOS and Windows support is being
-verified. Installing `moseq2-app` brings the rest of the suite with it:
-`moseq2-extract`, `moseq2-pca`, `moseq2-model` and `moseq2-viz`, along with
-their command line interfaces.
+If you have several projects on your computer using Python, you may want to
+install MoSeq2 into a fresh Python environment so its packages cannot collide
+with theirs. One way to do that is
+[conda](https://docs.conda.io/projects/conda/en/stable/user-guide/getting-started.html);
+[the installation
+guide](https://github.com/dattalab/moseq2-app/wiki/MoSeq2-Installation) shows
+how.
+
+Verified on Linux; macOS and Windows support is being verified.
 
 **The notebooks are not part of the package.** Download the two that make up
 the pipeline and put them in the parent directory of your data, which is what
