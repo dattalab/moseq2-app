@@ -24,8 +24,7 @@ jobs:
   suite:
     uses: dattalab/moseq2-app/.github/workflows/suite.yml@main
     with:
-      sibling: ${{ github.repository }}
-      sibling-ref: ${{ github.sha }}
+      overlays: '[{"repository": "${{ github.repository }}", "ref": "${{ github.sha }}"}]'
       pythons: ${{ github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]' }}
 
   # The check this repository requires before merging.
