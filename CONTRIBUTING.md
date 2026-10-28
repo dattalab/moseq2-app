@@ -1,7 +1,9 @@
 # Contributing to MoSeq2
 
 MoSeq2 is five packages: `moseq2-app` and the four it drives, `moseq2-extract`,
-`moseq2-pca`, `moseq2-model` and `moseq2-viz`. This page covers how changes get
+`moseq2-pca`, `moseq2-model` and `moseq2-viz`. All five live in this
+repository, `moseq2-app` at the root and the other four under `packages/`, and
+each is published to PyPI under its own name. This page covers how changes get
 into any of them and how to run and extend the test suite.
 
 ## How changes get merged
@@ -17,16 +19,18 @@ documentation always open the version a user can install.
 
 ## Running the tests
 
-The suite lives in `moseq2-app` and runs the steps of both notebooks against a
-small fixture dataset. With [uv](https://docs.astral.sh/uv/) installed, run it
-from a `moseq2-app` checkout:
+The suite runs the steps of both notebooks against a small fixture dataset,
+and every step runs through the four packages under `packages/`, so it is the
+test for all five. With [uv](https://docs.astral.sh/uv/) installed, run it from
+a checkout of this repository:
 
 ```bash
 uvx nox -s tests-3.10
 ```
 
-This builds a fresh environment, installs `moseq2-app` with its `tests`
-dependencies, and runs pytest. The first run downloads about 640 MB of
+This builds a fresh environment, installs all five packages from the checkout
+along with `moseq2-app`'s `tests` dependencies, and runs pytest. A change to
+any of the five is therefore tested by the same command. The first run downloads about 640 MB of
 fixtures and caches them in your user cache directory. The suite takes roughly
 eight minutes.
 
@@ -35,16 +39,6 @@ uvx nox -s tests-3.10 tests-3.14          # the versions a pull request tests
 uvx nox -R -s tests-3.10                  # reuse the existing environment
 uvx nox -R -s tests-3.10 -- tests/analysis/test_07_export_stats_df.py
 uvx nox -R -s tests-3.10 -- -k uuid       # tests whose names match
-```
-
-ffmpeg has to be on your PATH. It is not a Python dependency and no install
-provides it, so the version you have is a property of your environment: the
-suite has found breakage in ffmpeg 9 that ffmpeg 6 did not show.
-
-To work on one of the four siblings, point the suite at your checkout:
-
-```bash
-MOSEQ2_SIBLING_PATHS=/path/to/moseq2-extract uvx nox -R -s tests-3.10
 ```
 
 ## Which Python versions are tested
@@ -65,10 +59,6 @@ to answer whether a user on one gets what a user on another gets. Each cell is
 its own job and they run in parallel, and the `tests` check passes only when
 every one of them did.
 
-A pull request to a sibling runs the same suite with that checkout laid over
-the released rest of the pipeline, so a change there is tested against the
-pipeline before it merges.
-
 ## What the tests check
 
 Most tests record what MoSeq2 does today, not what it should do. Their job is
@@ -87,11 +77,12 @@ every thread rather than running until the job times out with nothing to read.
 
 ## Version numbers
 
-The five packages version independently. Nothing requires them to share a
-number, and nothing checks that they do: what binds them is the requirements
-`moseq2-app` declares, and the suite checks that each installed sibling
-satisfies those. So "install 1.4.0 of everything" is not a thing to say;
-install `moseq2-app` and let the resolver work.
+The five packages share one version and release together. `moseq2-app` pins
+the other four at exactly its own version, so installing `moseq2-app` at a
+version installs the whole pipeline at that version.
+
+Each notebook records the minor version it is written for in its notebook
+metadata, as `"moseq2": {"version": "1.4"}`. A patch release leaves it alone.
 
 A minor release either substantially changes a result or changes something
 about the notebook interface: which cells a user runs, what a cell takes, or
@@ -109,17 +100,21 @@ whether you think the change is substantial.
 ## Releasing
 
 Publish a GitHub release against a tag on `main`. The release workflow builds
-from the tag and uploads to PyPI over trusted publishing, so no token is
-stored anywhere. Before uploading it checks that the tag agrees with the
-version the package declares, and that every sibling requirement names a
-release that exists on PyPI. After uploading it waits for the index, then
-moves `release` to the tag.
+all five packages from the tag and uploads them to PyPI over trusted
+publishing, so no token is stored anywhere. Before uploading anything it
+checks that every package declares the version the tag names, that
+`moseq2-app` pins the other four at that version, and that every notebook
+names the tag's minor version. It uploads `moseq2-app` last, so a failure
+partway never leaves it requiring a release that is not there. After
+uploading it waits for the index, then moves `release` to the tag.
 
-Bump the version in `<package>/__init__.py` in its own pull request first. A
-tag cut before that bump publishes the previous release's number.
+Bump the version in its own pull request first: `__version__` in all five
+`__init__.py` files and the four pins in `moseq2-app`'s `pyproject.toml`, plus
+the notebooks' metadata for a minor release. A tag cut before that bump
+publishes the previous release's number.
 
 ## Reporting problems
 
-Open an issue on the repository the problem is in. Include the version of each
-MoSeq2 package you have, your Python version, your operating system, your
-ffmpeg version, and the full error message.
+Open an issue on this repository. Include the version of each MoSeq2 package
+you have, your Python version, your operating system, and the full error
+message.
