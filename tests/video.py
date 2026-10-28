@@ -1,4 +1,4 @@
-"""Ask ffmpeg what is actually in a video file.
+"""Ask what is actually in a video file.
 
 Both notebooks write mp4s a user is expected to open in a browser: the
 extraction previews, and the crowd movies that show what a syllable looks
@@ -8,21 +8,24 @@ frames, and nothing in the pipeline checks it.
 
 from __future__ import annotations
 
-import subprocess
+import av
 
 
 def probe(path, entries=("codec_name", "pix_fmt")):
-    """What ffprobe reports about a video's first stream, in the order asked."""
-    return subprocess.run(
-        [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=" + ",".join(entries),
-            "-of", "default=noprint_wrappers=1:nokey=1", str(path),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split()
+    """What a video's first stream reports, in the order asked.
+
+    The names are ffprobe's, because that is what the values are usually
+    read against: ``codec_name``, ``pix_fmt``, ``width``, ``height``.
+    """
+    fields = {
+        "codec_name": lambda s: s.codec_context.name,
+        "pix_fmt": lambda s: s.codec_context.pix_fmt,
+        "width": lambda s: s.codec_context.width,
+        "height": lambda s: s.codec_context.height,
+    }
+    with av.open(str(path)) as container:
+        stream = container.streams.video[0]
+        return [fields[entry](stream) for entry in entries]
 
 
 def index_is_at_the_front(path):
