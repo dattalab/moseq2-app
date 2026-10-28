@@ -9,21 +9,40 @@ name: suite
 # the checkouts under test are then laid over it. Everything around them is
 # therefore what a user would have. A change spanning two repositories names
 # both, so neither half waits on the other to be released.
+#
+# All five repositories reach the suite through here, including moseq2-app
+# itself, so there is one description of what a run is and either side of a
+# cross-repository change can name the other.
 
 on:
   workflow_call:
     inputs:
+      app-ref:
+        description: >
+          Which moseq2-app to run the suite from. A sibling leaves this at
+          main and gets the released suite; moseq2-app's own pull requests
+          pass their head, so a change to the suite is run by the pull
+          request that makes it.
+        type: string
+        default: main
       overlays:
         description: >
           JSON array of {"repository": "owner/name", "ref": "sha-or-branch"}.
           Each is laid over the released pipeline in order, so a change
-          spanning two repositories can be tested as one.
+          spanning two repositories can be tested as one. Empty means the
+          released pipeline exactly.
         type: string
-        required: true
+        default: "[]"
       pythons:
         description: A JSON array of Python versions.
         type: string
         default: '["3.10", "3.14"]'
+      network:
+        description: >
+          Also run the tests that reach a remote host. Those sit out of pull
+          requests so a remote outage cannot redden one.
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -43,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: dattalab/moseq2-app
-          ref: main
+          ref: ${{ inputs.app-ref }}
 
       - uses: actions/setup-python@v5
         with:
@@ -80,7 +99,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: dattalab/moseq2-app
-          ref: main
+          ref: ${{ inputs.app-ref }}
 
       # actions/checkout takes one repository, and a change that spans two
       # cannot be tested one half at a time: each half's pull request would
@@ -137,7 +156,7 @@ jobs:
       # array order so a later overlay wins over an earlier one.
       - name: Lay the overlays over it
         run: |
-          for dir in $(ls -d .overlay-* | sort -V); do
+          for dir in $(ls -d .overlay-* 2>/dev/null | sort -V); do
             python -m pip install --no-deps --force-reinstall "./$dir"
           done
 
@@ -148,3 +167,43 @@ jobs:
         env:
           MPLBACKEND: Agg
         run: pytest -q
+
+  # The flip-classifier cell downloads a trained classifier. Those tests sit
+  # out of pull requests so a remote outage cannot redden one.
+  network:
+    name: network tests
+    if: inputs.network
+    needs: fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: dattalab/moseq2-app
+          ref: ${{ inputs.app-ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Locate the fixture cache
+        id: cache-dir
+        run: |
+          python -m pip install --quiet pooch
+          python -c "import pooch; print('dir=' + str(pooch.os_cache('moseq2-app-tests')))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
+          key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
+
+      - name: Install the package as a user would
+        run: python -m pip install ".[tests]"
+
+      - name: Run the tests that reach the network
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q -m network
