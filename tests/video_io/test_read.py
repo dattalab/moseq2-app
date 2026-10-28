@@ -52,6 +52,16 @@ def test_read_frames_seeks_by_the_recordings_own_rate(sixty_hz_avi):
     assert frames[0, 0, 0] == 10
 
 
+def test_read_frames_addresses_a_stream_that_starts_late(offset_mkv):
+    """Frame 0 is the recording's first frame, not its clock's origin.
+
+    Worked out from the rate the stream declares, frame 3 of a recording
+    beginning two frames in is frame 1 of the recording.
+    """
+    frames = read_frames(str(offset_mkv), range(3, 6), mapping=0)
+    assert [int(frame[0, 0]) for frame in frames] == [3, 4, 5]
+
+
 def test_read_mkv_returns_the_depth_stream(azure_mkv):
     frames = read_mkv(str(azure_mkv / "depth.mkv"), range(0, 10))
     assert frames.shape == (10, 48, 64)

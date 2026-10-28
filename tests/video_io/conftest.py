@@ -13,6 +13,8 @@ is.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import numpy as np
 import pytest
 
@@ -70,6 +72,34 @@ def sixty_hz_avi(tmp_path):
             frame = av.VideoFrame.from_ndarray(
                 np.full((HEIGHT, WIDTH), i, np.uint16), format="gray16le"
             )
+            out.mux(stream.encode(frame))
+        out.mux(stream.encode())
+    return path
+
+
+@pytest.fixture
+def offset_mkv(tmp_path):
+    """A recording whose first frame is two frames' worth into its clock.
+
+    A stream does not have to begin at zero. A muxer that holds frames back
+    to keep decode timestamps positive shifts every presentation timestamp
+    forward, and frame 0 is then that first timestamp rather than the
+    origin. Every pixel of frame ``i`` is ``i``, so what came back says
+    which frame it was.
+    """
+    import av
+
+    path = tmp_path / "offset.mkv"
+    with av.open(str(path), "w") as out:
+        stream = out.add_stream("ffv1", rate=30)
+        stream.width, stream.height, stream.pix_fmt = WIDTH, HEIGHT, "gray16le"
+        stream.time_base = Fraction(1, 1000)
+        for i in range(30):
+            frame = av.VideoFrame.from_ndarray(
+                np.full((HEIGHT, WIDTH), i, np.uint16), format="gray16le"
+            )
+            frame.pts = round((i + 2) * 1000 / 30)
+            frame.time_base = stream.time_base
             out.mux(stream.encode(frame))
         out.mux(stream.encode())
     return path
