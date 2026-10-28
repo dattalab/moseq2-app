@@ -1,14 +1,15 @@
 name: release
 
-# Publishing a GitHub release builds the distributions from the release tag
+# Publishing a GitHub release builds all five packages from the release tag
 # and uploads them to PyPI over trusted publishing, so no API token is stored
 # anywhere. Running the workflow by hand instead checks that the publisher is
 # registered, by making the same exchange and stopping at the answer.
 #
 # PyPI scopes a trusted publisher to one repository and one workflow file, by
-# name. This file has to keep the name the publisher was registered with, and
-# the upload has to run from this file, or the exchange is refused however
-# correct the rest of the registration is.
+# name, and all five PyPI projects name this repository and this file. It has
+# to keep the name the publisher was registered with, and the upload has to
+# run from this file, or the exchange is refused however correct the rest of
+# the registration is.
 
 on:
   release:
@@ -18,10 +19,6 @@ on:
 permissions:
   contents: read
   id-token: write
-
-env:
-  PACKAGE: moseq2_app
-  DISTRIBUTION: moseq2-app
 
 jobs:
   # Only ever runs by hand. Proves the registration without publishing.
@@ -75,21 +72,42 @@ jobs:
       - name: Install the checker's dependencies
         run: python -m pip install --quiet packaging
 
-      # Refuses a tag whose metadata disagrees with it, and a sibling floor
-      # that names a release nobody published.
+      # Refuses a tag that any package, moseq2-app's pins or a notebook
+      # disagrees with.
       - name: Check the release against its tag
-        run: python .github/scripts/check_release.py "${{ github.event.release.tag_name }}" "$PACKAGE"
+        run: python .github/scripts/check_release.py "${{ github.event.release.tag_name }}"
 
+      # All five are built before any is uploaded, so one that fails to build
+      # publishes nothing.
       - name: Build
-        run: pipx run build
+        run: |
+          for dir in packages/*/; do
+            pipx run build --outdir dist/siblings "$dir"
+          done
+          pipx run build --outdir dist/app .
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      # moseq2-app pins the other four exactly, so it goes up last: whatever
+      # fails before it, nothing on PyPI requires a release that is not there.
+      # skip-existing lets a rerun after a partial upload finish the rest.
+      - name: Publish the four packages moseq2-app drives
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/siblings/
+          skip-existing: true
+
+      - name: Publish moseq2-app
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/app/
+          skip-existing: true
 
       # An upload returns before the index installers read has caught up.
       - name: Wait for the index
         run: |
-          python .github/scripts/await_index.py "$DISTRIBUTION" \
-            "$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')"
+          version=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
+          for name in moseq2-extract moseq2-pca moseq2-model moseq2-viz moseq2-app; do
+            python .github/scripts/await_index.py "$name" "$version"
+          done
 
   # The release branch names the newest version a user can install. pip does
   # not install a pre-release by default, so one leaves the branch where it is.
