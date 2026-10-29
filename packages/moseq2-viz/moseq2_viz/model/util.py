@@ -5,7 +5,6 @@ Utility functions for handling model data during pre and post processing.
 import os
 from statistics import median
 import h5py
-import glob
 import joblib
 import warnings
 import numpy as np
@@ -15,32 +14,14 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from typing import Iterator, Any, Dict
-from itertools import product
-from cytoolz.curried import get, get_in
+from cytoolz.curried import get
 from os.path import join, basename, dirname
 from moseq2_viz.util import h5_to_dict, star
 from collections import defaultdict, OrderedDict
-from scipy.optimize import linear_sum_assignment
-from scipy.spatial.distance import jensenshannon, dice
+from scipy.spatial.distance import jensenshannon
 from moseq2_viz.model.trans_graph import get_transitions
 from moseq2_viz.util import load_changepoint_distribution
 from cytoolz import curry, valmap, compose, complement, itemmap, keyfilter
-
-
-def _assert_models_have_same_kappa(model_paths):
-    """
-    ensure that recursively found models to merge were trained using the same kappa hyperparameter value.
-
-    Args:
-    model_paths (list of str): list of strings pointing to model paths to check.
-    """
-
-    get_kappa = get_in(['model_parameters', 'kappa'])
-    def _load_kappa(pth):
-        return get_kappa(parse_model_results(pth))
-    kappas = set(map(_load_kappa, model_paths))
-    if len(kappas) > 1:
-        raise ValueError('You cannot merge models trained with different kappas')
 
 
 def get_num_syllables_for_coverage(labels, n_explained=99):
@@ -92,83 +73,6 @@ def compute_syllable_explained_variance(model, save_dir=os.getcwd(), n_explained
     plt.savefig(os.path.join(save_dir, 'syllable_needed_explained_variance.png'))
 
     return max_sylls
-
-
-def merge_models(model_dir, ext='p',count='usage', force_merge=False,
-                 cost_function='ar_norm'):
-    """
-    WARNING: THIS IS EXPERIMENTAL. USE AT YOUR OWN RISK.
-    Merge model states by using the Hungarian Algorithm:  a minimum distance state matching algorithm. 
-    User inputs a directory containing models to merge, (and the name of the latest-trained model) to match other model states to.
-
-    Args:
-    model_dir (str): path to directory containing all the models to merge.
-    ext (str): model extension to search for.
-    count (str): method to compute syllable mean usage, either 'usage' or 'frames'. 
-    force_merge (bool): whether or not to force a merge. Keeping this false will protect you from merging models trained with different kappa values.
-    cost_function (str): either ar_norm or label for the cost function in Hungarian Algorithm. 
-
-    Returns:
-    model_data (dict): a dictionary containing all the new keys and state-matched labels.
-    """
-
-    tmp = join(model_dir, '*.'+ext.strip('.'))
-    model_paths = [m for m in glob.glob(tmp)]
-
-    if not force_merge:
-        _assert_models_have_same_kappa(model_paths)
-
-    # TODO: choosing the first model biases the re-labeling. Leave as is for now, but think about this for the future...
-    template = parse_model_results(model_paths[0], sort_labels_by_usage=True, count=count, map_uuid_to_keys=True)
-
-    model_data = {
-        'template': model_paths[0],
-        model_paths[0]: template
-    }
-
-    for pth in model_paths[1:]:
-        unit_data = parse_model_results(pth, sort_labels_by_usage=True, count=count, map_uuid_to_keys=True)
-
-        curr_ar = deepcopy(unit_data['model_parameters']['ar_mat'])
-        # compute cost function
-        # the ar matrices to find the most similar syllables
-        if cost_function == 'ar_mat':
-            prev_ar = template['model_parameters']['ar_mat']
-            cost = np.zeros((len(prev_ar), len(curr_ar)))
-            for i, state1 in enumerate(prev_ar):
-                for j, state2 in enumerate(curr_ar):
-                    # remove offset term
-                    cost[i, j] = linalg.norm(abs(state1[:, :-1] - state2[:, :-1]))
-            # row_ind is template state, col_ind is unit_data state
-            row_ind, col_ind = linear_sum_assignment(cost)
-            mapping = dict(zip(col_ind, row_ind))
-        # finds the syllable labels that are most overlapping
-        elif cost_function == 'label':
-            uuids = set(unit_data['labels']) & set(template['labels'])
-            l1 = template['labels']
-            l2 = unit_data['labels']
-            max_s1 = np.max(np.concatenate(list(l1.values()))) + 1
-            max_s2 = np.max(np.concatenate(list(l2.values()))) + 1
-            cost = np.zeros((max_s1, max_s2))
-            for s1, s2 in product(range(max_s1), range(max_s2)):
-                mu_dice = np.mean([dice(l1[uuid] == s1, l2[uuid] == s2) for uuid in uuids])
-                cost[s1, s2] = mu_dice
-            # row_ind is template state, col_ind is unit_data state
-            row_ind, col_ind = linear_sum_assignment(cost)
-            mapping = dict(zip(col_ind, row_ind))
-        mapping[-5] = -5
-
-        def _map_sylls(labels):
-            return pd.Series(labels).map(mapping).to_numpy()
-        
-        unit_data['labels'] = valmap(_map_sylls, unit_data['labels'])
-
-        # remap the AR matrix
-        for k, v in filter(lambda k: k[0] != -5, mapping.items()):
-            unit_data['model_parameters']['are_mat'][k] = curr_ar[v]
-        model_data[pth] = unit_data
-
-    return model_data
 
 
 def get_best_fit(cp_path, model_results):
