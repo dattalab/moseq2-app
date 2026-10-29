@@ -73,7 +73,7 @@ def create_training_dataset(
     )
     frames = np.concatenate((frames, shifted_frames, cleaned_frames), axis=0)
     print(
-        f"Training data shape: {frames.shape}; memory usage: {frames.nbytes / 1e9 * 4:0.2f} GB"
+        f"Training data shape: {frames.shape}; memory usage: {frames.nbytes / 1e9:0.2f} GB"
     )
 
     flipped = np.concatenate((flipped, flipped, flipped), axis=0)
