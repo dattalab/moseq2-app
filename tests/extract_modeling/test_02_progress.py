@@ -226,6 +226,18 @@ def test_an_incomplete_extraction_is_named(tmp_path, capsys):
     assert "is listed as incomplete." in capsys.readouterr().out
 
 
+
+def test_a_directory_named_for_mp4_does_not_hide_extractions(tmp_path, capsys):
+    """An extraction's .yaml is found by swapping its .mp4's extension.
+
+    Nothing else in the path is the extension, however the directories
+    holding the project are named.
+    """
+    path = build_project(tmp_path / "mp4_archive" / "proj", n_extracted=4)
+    check_progress(str(path))
+    assert "Extraction Progress: 4 out of 4 session(s) extracted" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("n_done", [0, 1, 3])
 def test_pca_item_counts(tmp_path, capsys, n_done):
     path = build_project(tmp_path / "proj", pca_items=PCA_ITEMS[:n_done])
