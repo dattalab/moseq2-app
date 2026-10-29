@@ -274,9 +274,9 @@ class FlipClassifierWidget:
     
                         if write_movie:
                             try:
-                                # Writing frame batch to mp4 file
+                                # Write the frames this batch committed, so a frame shared with the next batch appears once
                                 video_pipe = write_frames_preview(output_movie,
-                                                                  frame_batch,
+                                                                  frame_batch[pending],
                                                                   pipe=video_pipe,
                                                                   close_pipe=False,
                                                                   depth_min=0,
