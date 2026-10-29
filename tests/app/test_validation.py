@@ -8,9 +8,13 @@ counts themselves to what they claim to count.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
-from moseq2_app.roi.validation import count_stationary_frames
+from moseq2_app.roi.validation import (
+    check_timestamp_error_percentage,
+    count_stationary_frames,
+)
 
 
 def test_a_recording_that_never_stops_has_no_stationary_frames():
@@ -21,3 +25,15 @@ def test_a_recording_that_never_stops_has_no_stationary_frames():
     """
     moving = pd.DataFrame({"velocity_2d_mm": [float("nan"), 1.0, 2.0, 3.0]})
     assert count_stationary_frames(moving) == 0
+
+
+def test_integer_timestamps_are_rescaled_like_float_ones():
+    """Millisecond timestamps are rescaled to seconds before the rate is measured.
+
+    Extraction writes them as floats, but an h5 written any other way can hold
+    integers, and those should give the same answer.
+    """
+    milliseconds = np.arange(10) * 33
+    assert check_timestamp_error_percentage(milliseconds) == check_timestamp_error_percentage(
+        milliseconds.astype(float)
+    )
