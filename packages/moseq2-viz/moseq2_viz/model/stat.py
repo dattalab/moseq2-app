@@ -486,6 +486,21 @@ def run_pairwise_stats(df, group1, group2, test_type="mw", verbose=False, **kwar
 MannwhitneyuResult = namedtuple("MannwhitneyuResult", ("statistic", "pvalue"))
 
 
+def _one_value_everywhere(x, y):
+    """
+    Find the syllables on which every session of both groups holds the same value.
+
+    Args:
+    x (2D array): sessions x syllables for the first group.
+    y (2D array): sessions x syllables for the second group.
+
+    Returns:
+    (1D bool array): one entry per syllable, True where there is no difference to test.
+    """
+
+    return np.all(x == x[:1], axis=0) & np.all(y == x[:1], axis=0)
+
+
 def mannwhitneyu(x, y):
     """
     Run a Mann-Whitney U test, returning the smaller U and a one-sided p-value.
@@ -551,8 +566,11 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
         group: grouped_data.loc[grouped_data.group == group, range(max_syllable)].values
         for group in (group1, group2)
     }
+    # a syllable with one value in every session has nothing to rank, and gets p = 1
+    constant = _one_value_everywhere(values[group1], values[group2])
     df_mw_real = pd.DataFrame(
-        [mannwhitneyu(values[group1][:, i], values[group2][:, i])
+        [MannwhitneyuResult(len(values[group1]) * len(values[group2]) / 2.0, 1.0) if constant[i]
+         else mannwhitneyu(values[group1][:, i], values[group2][:, i])
          for i in range(max_syllable)]
     )
     return get_sig_syllables(df_mw_real, verbose=verbose, **kwargs)
@@ -609,6 +627,8 @@ def ttest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     df_t = pd.DataFrame(
         stats.ttest_ind(usages[group1], usages[group2]), index=["t", "pvalue"]
     ).T
+    # a syllable with one value in every session has no difference to test, and gets p = 1
+    df_t.loc[_one_value_everywhere(usages[group1], usages[group2]), "pvalue"] = 1.0
     return get_sig_syllables(df_t, verbose=verbose, **kwargs)
 
 
