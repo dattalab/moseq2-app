@@ -4,6 +4,7 @@ Video pre-processing utilities for detecting ROIs and extracting raw data.
 
 import cv2
 import tarfile
+import warnings
 import scipy.stats
 import numpy as np
 import scipy.signal
@@ -132,7 +133,13 @@ def get_bground_im_file(frames_file, frame_stride=500, med_scale=5, output_dir=N
                                                           **kwargs).squeeze()
             frame_store.append(cv2.medianBlur(frs, med_scale))
 
-        bground = np.nanmedian(frame_store, axis=0)
+        # A depth of 0 is the camera's "no reading": each pixel's median is over the frames
+        # that observed it, and a pixel no sampled frame observed stays at 0.
+        frame_store = np.asarray(frame_store, dtype='float64')
+        frame_store[frame_store == 0] = np.nan
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            bground = np.nan_to_num(np.nanmedian(frame_store, axis=0), nan=0)
 
         write_image(bground_path, bground, scale=True)
     else:
