@@ -460,12 +460,12 @@ class ArenaMaskView(Viewer):
         mask_shape = _link_data(pn.widgets.Select, "mask_shape", height=40)
         dilation_kernel = _link_data(pn.widgets.IntSlider, "dilation_kernel", step=1, height=40)
 
-        mask_weight1 = _link_data(pn.widgets.NumberInput, "mask_weight1", height=45)
-        mask_weight2 = _link_data(pn.widgets.NumberInput, "mask_weight2", height=45)
-        mask_weight3 = _link_data(pn.widgets.NumberInput, "mask_weight3", height=45)
+        mask_weight1 = _link_data(pn.widgets.FloatInput, "mask_weight1", height=45)
+        mask_weight2 = _link_data(pn.widgets.FloatInput, "mask_weight2", height=45)
+        mask_weight3 = _link_data(pn.widgets.FloatInput, "mask_weight3", height=45)
 
         mask_index = _link_data(pn.widgets.IntInput, "mask_index", height=45)
-        noise_tolerance = _link_data(pn.widgets.NumberInput, "noise_tolerance", height=45)
+        noise_tolerance = _link_data(pn.widgets.FloatInput, "noise_tolerance", height=45)
 
         adv_arena_mask = pn.Column(
             mask_index,

@@ -361,20 +361,10 @@ def test_a_filter_size_that_is_not_python_falls_back(scratch, typed, box, key, f
     assert parameters(scratch / "session_config.yaml", data.path)[key] == fallback
 
 
-@pytest.mark.xfail(
-    reason="pn.widgets.NumberInput picks an integer or a float box from the type "
-    "of the value it is handed, and the config spells bg_roi_weights [1, 0.1, 1] "
-    "and noise_tolerance 30, so the whole numbers get integer boxes"
-)
 def test_the_weight_boxes_accept_a_decimal(scratch):
     """Every one of these parameters is declared ``param.Number``, so a user
-    should be able to type ``0.5`` into any of them.
-
-    Three of the four are built as integer spinners and refuse. Which ones is
-    decided by how the shipped config happens to spell the number: ``0.1``
-    arrives as a float and gets a float box, ``1`` and ``30`` arrive as ints
-    and get integer boxes. The two that refuse are the mask area and distance
-    weights, which ``get_roi`` is most sensitive to.
+    can type ``0.5`` into any of them, however the shipped config happens to
+    spell its value (``1`` and ``30`` as well as ``0.1``).
     """
     import panel as pn
 
