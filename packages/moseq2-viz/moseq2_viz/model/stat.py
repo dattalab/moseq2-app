@@ -1,6 +1,7 @@
 """
 Functions for statistical tests for analyzing model results.
 """
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -41,15 +42,26 @@ def bootstrap_me(usages, n_iters=10000):
     Bootstrap the inputted stat data using random sampling with replacement.
 
     Args:
-    usages (np.array): Data to bootstrap
+    usages (np.array): sessions x syllables; NaN marks a session that never used the syllable
     n_iters (int): Number of samples to return.
 
     Returns:
-    boots (np.array): Bootstrapped input array of shape
+    boots (np.array): n_iters x syllables bootstrapped means, each syllable resampled from the sessions that used it (NaN where none did)
     """
 
     n_mice = usages.shape[0]
-    return np.nanmean(usages[np.random.choice(n_mice, size=(n_mice, n_iters))], axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        boots = np.nanmean(usages[np.random.choice(n_mice, size=(n_mice, n_iters))], axis=0)
+
+    # a syllable some sessions never used is resampled from the sessions that did
+    for s in np.flatnonzero(np.isnan(usages).any(axis=0)):
+        observed = usages[~np.isnan(usages[:, s]), s]
+        if observed.size == 0:
+            boots[:, s] = np.nan
+        else:
+            boots[:, s] = observed[np.random.choice(observed.size, size=(observed.size, n_iters))].mean(0)
+    return boots
 
 
 def ztest_vect(d1, d2):
@@ -489,19 +501,26 @@ def run_pairwise_stats(df, group1, group2, test_type="mw", verbose=False, **kwar
 MannwhitneyuResult = namedtuple("MannwhitneyuResult", ("statistic", "pvalue"))
 
 
-def _one_value_everywhere(x, y):
+def _untestable(*groups):
     """
-    Find the syllables on which every session of both groups holds the same value.
+    Find the syllables a group comparison cannot evaluate.
 
     Args:
-    x (2D array): sessions x syllables for the first group.
-    y (2D array): sessions x syllables for the second group.
+    groups (2D arrays): sessions x syllables for each group; NaN marks a session that never used the syllable.
 
     Returns:
-    (1D bool array): one entry per syllable, True where there is no difference to test.
+    (1D bool array): one entry per syllable, True where a group has no session that used it or every
+    observed value is the same, so there is no difference to test.
     """
 
-    return np.all(x == x[:1], axis=0) & np.all(y == x[:1], axis=0)
+    empty = np.zeros(groups[0].shape[1], dtype=bool)
+    for values in groups:
+        empty |= np.isnan(values).all(axis=0)
+    observed = np.concatenate(groups, axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        spread = np.nanmax(observed, axis=0) - np.nanmin(observed, axis=0)
+    return empty | ~(spread > 0)
 
 
 def mannwhitneyu(x, y):
@@ -570,7 +589,7 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
         for group in (group1, group2)
     }
     # a syllable with one value in every session has nothing to rank, and gets p = 1
-    constant = _one_value_everywhere(values[group1], values[group2])
+    constant = _untestable(values[group1], values[group2])
     df_mw_real = pd.DataFrame(
         [MannwhitneyuResult(len(values[group1]) * len(values[group2]) / 2.0, 1.0) if constant[i]
          else mannwhitneyu(values[group1][:, i], values[group2][:, i])
@@ -600,6 +619,8 @@ def ztest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     boots = bootstrap_group_means(df, group1, group2, statistic, max_syllable)
     # do a ztest on the bootstrap distributions of your 2 conditions
     pvals_ztest_boots = ztest_vect(boots[group1], boots[group2])
+    # a syllable a group never used has nothing to compare, and gets p = 1
+    pvals_ztest_boots[np.isnan(boots[group1]).all(0) | np.isnan(boots[group2]).all(0)] = 1.0
     df_z = pd.DataFrame(pvals_ztest_boots, columns=["pvalue"])
     return get_sig_syllables(df_z, verbose=verbose, **kwargs)
 
@@ -631,7 +652,7 @@ def ttest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
         stats.ttest_ind(usages[group1], usages[group2]), index=["t", "pvalue"]
     ).T
     # a syllable with one value in every session has no difference to test, and gets p = 1
-    df_t.loc[_one_value_everywhere(usages[group1], usages[group2]), "pvalue"] = 1.0
+    df_t.loc[_untestable(usages[group1], usages[group2]), "pvalue"] = 1.0
     return get_sig_syllables(df_t, verbose=verbose, **kwargs)
 
 
