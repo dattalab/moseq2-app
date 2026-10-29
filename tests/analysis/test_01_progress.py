@@ -35,6 +35,8 @@ objective, draws the figure and records the result.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from moseq2_app.gui.progress import (
@@ -164,39 +166,59 @@ def cli_best_fit(analysis_project, tmp_path_factory):
     return best, Path(output_file + ".png"), progress_file
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="progress_path_sanity_check compares path strings and opens nothing, "
-    "so a project whose _pca directory has been deleted passes it silently and "
-    "fails several cells later. The cell's own comment reads "
-    "'# check all necessary paths exist'.",
-)
-def test_the_sanity_check_notices_a_directory_that_is_gone(analysis_progress, tmp_path, capsys):
-    """6. What the cell's comment promises.
+def _break(progress, root, what):
+    """A copy of the project's paths with one input the analysis cells read gone.
 
-    A user who moved or cleaned the project gets no warning here. The check
-    tests whether each path string contains an expected substring, which a
-    path to a deleted directory still does.
+    The index is copied before it is edited, so the shared project stays whole.
     """
-    broken = dict(analysis_progress)
-    broken["pca_dirname"] = str(tmp_path / "_pca") + "/"
+    from moseq2_app._yaml import write_yaml
+    from moseq2_viz.util import read_yaml
 
-    progress_path_sanity_check(broken, str(tmp_path / "progress.yaml"))
-    assert "pca_dirname" in capsys.readouterr().out
+    broken = dict(progress)
+    if what == "model":
+        broken["model_path"] = str(root / "models" / "gone.p")
+        return broken, "gone.p"
+
+    index = read_yaml(progress["index_file"])
+    if what == "pca":
+        index["pca_path"] = "_pca/gone.h5"
+        missing = "gone.h5"
+    else:
+        index["files"][0]["path"][0] = "proc/gone/results_00.h5"
+        missing = "results_00.h5"
+    copy = Path(progress["index_file"]).parent / f"moseq2-index-{what}.yaml"
+    write_yaml(index, str(copy))
+    broken["index_file"] = str(copy)
+    return broken, missing
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the pipeline leaves scores_filename empty and nothing reads it, but "
-    "the check requires every path to contain its keyword, so it complains about "
-    "a project it produced itself.",
-)
+@pytest.mark.parametrize("what", ["model", "pca", "session"])
+def test_the_sanity_check_notices_an_input_that_is_gone(analysis_progress, analysis_project, capsys, what):
+    """6. What the cell's comment promises: ``# check all necessary paths exist``.
+
+    A moved or cleaned project fails several cells later, on a file whose
+    name says little about why. The check opens nothing but asks whether each
+    input the analysis cells read is there: the model and its folder, the
+    index and config named in the progress file, and the PCA scores and
+    extraction results the index names.
+    """
+    broken, missing = _break(analysis_progress, analysis_project, what)
+    try:
+        progress_path_sanity_check(broken, str(analysis_project / "progress.yaml"))
+    finally:
+        if what != "model":
+            Path(broken["index_file"]).unlink()
+
+    printed = capsys.readouterr().out
+    assert missing in printed
+    assert len(printed.strip().splitlines()) == 1, printed
+
+
 def test_the_sanity_check_is_quiet_about_a_healthy_project(analysis_project, analysis_progress, capsys):
     """7. The other half.
 
     This project is the one the extraction and modeling notebook produces
-    and every later cell reads without complaint. The check reports it as
-    suspect anyway, which teaches a user to ignore the output.
+    and every later cell reads without complaint, so the check says nothing.
     """
     progress_path_sanity_check(analysis_progress, str(analysis_project / "progress.yaml"))
     assert capsys.readouterr().out == ""
