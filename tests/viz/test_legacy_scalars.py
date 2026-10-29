@@ -35,3 +35,23 @@ def test_integer_pixels_give_the_same_millimetres_as_float_ones():
 
     assert np.issubdtype(millimetres.dtype, np.floating)
     np.testing.assert_allclose(millimetres, convert_pxs_to_mm(pixels.astype(float)))
+
+
+def test_area_grows_with_the_square_of_depth():
+    """An area in mm² converts with the product of the two per-axis factors.
+
+    Moving the same pixel footprint twice as far from the camera doubles each
+    side in millimetres, so the area quadruples while the length doubles. This
+    matches what extraction computes for ``area_mm``.
+    """
+    scalars = {
+        key: np.array([value], dtype=float)
+        for key, value in dict(
+            centroid_x=250, centroid_y=210, width=10, length=20, area=150, height_ave=10, angle=0
+        ).items()
+    }
+    near = convert_legacy_scalars(scalars, force=True, true_depth=400)
+    far = convert_legacy_scalars(scalars, force=True, true_depth=800)
+
+    np.testing.assert_allclose(far["area_mm"], 4 * near["area_mm"])
+    np.testing.assert_allclose(far["length_mm"], 2 * near["length_mm"])

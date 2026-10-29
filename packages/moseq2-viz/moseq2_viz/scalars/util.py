@@ -165,7 +165,7 @@ def convert_legacy_scalars(old_features, force: bool = False, true_depth: float 
 
     features['width_mm'] = features['width_px'] * px_to_mm[:, 1]
     features['length_mm'] = features['length_px'] * px_to_mm[:, 0]
-    features['area_mm'] = features['area_px'] * px_to_mm.mean(axis=1)
+    features['area_mm'] = features['area_px'] * px_to_mm.prod(axis=1)
 
     features['angle'] = old_features['angle']
 
