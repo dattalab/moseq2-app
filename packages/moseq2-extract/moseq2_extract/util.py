@@ -1026,6 +1026,29 @@ def get_bucket_center(img, true_depth, threshold=650):
 
     return cX, cY
 
+def _floor_depth(bground_im, cx, cy, half_width=2):
+    """
+    Read the floor depth around the arena centre found by get_bucket_center.
+
+    Args:
+    bground_im (np.ndarray): background image
+    cx (int): x-coordinate of the arena centre
+    cy (int): y-coordinate of the arena centre
+    half_width (int): the patch read is (2 * half_width + 1) pixels square
+
+    Returns:
+    depth (float): median depth of the pixels in the patch that have a reading (a depth of 0 is "no reading")
+    """
+
+    patch = bground_im[max(cy - half_width, 0):cy + half_width + 1, max(cx - half_width, 0):cx + half_width + 1]
+    observed = patch[patch > 0]
+    if observed.size == 0:
+        raise ValueError(
+            'Could not read the floor depth at the arena centre: no pixel near it has a depth reading. '
+            'Set "bg_roi_depth_range" by hand and "manual_set_depth_range" to True.'
+        )
+    return float(np.median(observed))
+
 def make_gradient(width, height, h, k, a, b, theta=0):
     """
     Create gradient around bucket floor representing slanted wall values.
