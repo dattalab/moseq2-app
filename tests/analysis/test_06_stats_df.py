@@ -1,7 +1,7 @@
 """Cell 6: collapse the frames into syllable statistics.
 
     count = 'usage'
-    syllable_key = 'labels (usage sort)'   # either 'labels (usage sort)', 'labels', or 'labels (frames sort)'
+    syllable_key = 'labels (usage sort)'   # either 'labels (usage sort)', 'labels (original)', or 'labels (frames sort)'
     groupby = ['group', 'uuid']
     usage_normalization = True
     stats_df = compute_behavioral_statistics(moseq_df, count=count, groupby=groupby,
@@ -26,11 +26,14 @@ the other.
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pytest
 
 from moseq2_viz.model.util import compute_behavioral_statistics
 
+from cells import ANALYSIS, code_cell
 from conftest import STATISTICS
 
 #: The columns that identify a row, and the two statistics the cell exists
@@ -178,17 +181,18 @@ def test_the_table_records_which_labelling_it_was_built_from(stats_df):
     assert stats_df["syllable key"].unique().tolist() == [STATISTICS["syllable_key"]]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the cell offers 'labels' as a syllable_key, but scalars_to_dataframe "
-    "names that column 'labels (original)'. A user who takes the comment at its "
-    "word gets KeyError: 'Column not found: labels'.",
-)
-def test_the_unsorted_labelling_the_cell_offers_works(moseq_df):
-    """10. One of the three options in the cell's comment does not exist.
+def test_every_labelling_the_cell_offers_works(moseq_df):
+    """10. Each option in the cell's comment names a real column.
 
-    The other two name real columns. This one names the model's own
-    syllable numbering, which cell 4 produces under a different name, so
-    the only way to ask for it is to know that the comment is wrong.
+    ``syllable_key`` chooses the syllable numbering the table uses: sorted
+    by usage, sorted by frames, or the model's own. The comment beside it
+    is where a user learns the choices, so each one has to work as written.
     """
-    compute_behavioral_statistics(moseq_df, **{**STATISTICS, "syllable_key": "labels"})
+    line = next(
+        line for line in code_cell(ANALYSIS, 6).splitlines() if line.startswith("syllable_key =")
+    )
+    offered = re.findall(r"'([^']+)'", line.split("#", 1)[1])
+
+    assert len(offered) == 3, line
+    for key in offered:
+        compute_behavioral_statistics(moseq_df, **{**STATISTICS, "syllable_key": key})
