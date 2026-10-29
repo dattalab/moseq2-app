@@ -85,25 +85,31 @@ def get_selected_sessions(to_extract, extract_all):
             sessions = input("Input your selected sessions to extract: ")
             if "q" in sessions.lower():
                 return []
-            if "," in sessions:
-                selection = sessions.split(",")
-                for s in selection:
-                    s = s.strip()
-                    parse_input(s)
-                for i in selected_sess_idx:
-                    if i not in excluded_sess_idx:
-                        ret_extract.append(to_extract[i - 1])
-            elif len(sessions) > 0:
-                parse_input(sessions)
-                if len(selected_sess_idx) > 0:
-                    iters = selected_sess_idx
-                else:
-                    iters = range(1, len(to_extract) + 1)
-                for i in iters:
-                    if i not in excluded_sess_idx:
-                        if i - 1 < len(to_extract):
+            try:
+                if "," in sessions:
+                    selection = sessions.split(",")
+                    for s in selection:
+                        s = s.strip()
+                        parse_input(s)
+                    for i in selected_sess_idx:
+                        if i not in excluded_sess_idx:
                             ret_extract.append(to_extract[i - 1])
-            else:
+                elif len(sessions) > 0:
+                    parse_input(sessions)
+                    if len(selected_sess_idx) > 0:
+                        iters = selected_sess_idx
+                    else:
+                        iters = range(1, len(to_extract) + 1)
+                    for i in iters:
+                        if i not in excluded_sess_idx:
+                            if i - 1 < len(to_extract):
+                                ret_extract.append(to_extract[i - 1])
+                else:
+                    print("Invalid input. Try again or press q to quit.")
+            except (ValueError, SyntaxError):
+                # an answer that is not a number, a list or a range
+                selected_sess_idx.clear()
+                excluded_sess_idx.clear()
                 print("Invalid input. Try again or press q to quit.")
     else:
         return to_extract
