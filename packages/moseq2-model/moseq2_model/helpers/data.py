@@ -204,8 +204,11 @@ def prepare_model_metadata(data_dict, data_metadata, config_data):
     whitening_parameters = None
     if config_data["whiten"][0].lower() == "a":
         click.echo("Whitening the training data using the whiten_all function")
-        # in this case, whitening_parameters is a single tuple
-        data_dict, whitening_parameters = whiten_all(data_dict)
+        # in this case, whitening_parameters is a single tuple. The mean and covariance come from
+        # the frames the model trains on, so held-out sessions and validation frames do not shape them.
+        data_dict, whitening_parameters = whiten_all(
+            data_dict, fit_on=_training_frames(data_dict, train, config_data)
+        )
     elif config_data["whiten"][0].lower() == "e":
         click.echo("Whitening the training data using the whiten_each function")
         # in this case, whitening_parameters is a dictionary of parameters
@@ -220,6 +223,26 @@ def prepare_model_metadata(data_dict, data_metadata, config_data):
             data_dict[k] = v + np.random.randn(*v.shape) * config_data["noise_level"]
 
     return data_dict, model_parameters, train, hold_out, whitening_parameters
+
+
+def _training_frames(data_dict, train_list, config_data):
+    """
+    Select the frames the model trains on.
+
+    Args:
+    data_dict (OrderedDict): uuid to PC score key-value pairs for all data included in the model.
+    train_list (list): uuids of the training sessions.
+    config_data (dict): modeling parameters; with hold_out off, a percent_split above 0 keeps the part of
+        each session before its validation frames.
+
+    Returns:
+    training_data (OrderedDict): uuid to PC score key-value pairs of the training frames.
+    """
+
+    training_data = OrderedDict((k, data_dict[k]) for k in train_list)
+    if not config_data["hold_out"] and config_data.get("percent_split", 0) > 0:
+        training_data, _ = get_training_data_splits(config_data["percent_split"] / 100, training_data)
+    return training_data
 
 
 def get_heldout_data_splits(data_dict, train_list, hold_out_list):
