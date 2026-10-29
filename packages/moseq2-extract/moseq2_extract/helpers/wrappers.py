@@ -658,13 +658,18 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
         for idx, (k, v) in enumerate(flip_files.items()):
             print(f"[{idx}] {k} ---> {v}")
     else:
+        if selected_flip < 0:
+            raise IndexError("list index out of range")
         selected_flip = key_list[selected_flip]
 
     # prompt for user selection if not already inputted
     while selected_flip is None:
         try:
-            selected_flip = key_list[int(input("Enter a selection "))]
-        except ValueError:
+            choice = int(input("Enter a selection "))
+            if choice < 0:
+                raise IndexError
+            selected_flip = key_list[choice]
+        except (ValueError, IndexError):
             print("Please enter a valid number listed above")
             continue
 
