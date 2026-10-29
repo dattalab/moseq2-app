@@ -42,6 +42,7 @@ from moseq2_extract.util import (
     clean_dict,
     graduate_dilated_wall_area,
     get_bucket_center,
+    _floor_depth,
     h5_to_dict,
     detect_and_set_camera_parameters,
     get_frame_range_indices,
@@ -273,7 +274,7 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
         cX, cY = get_bucket_center(
             bground_im, bground_im.max(), threshold=int(np.median(bground_im) / 2)
         )
-        adjusted_bg_depth_range = bground_im[cY][cX]
+        adjusted_bg_depth_range = _floor_depth(bground_im, cX, cY)
         config_data["bg_roi_depth_range"] = [
             int(adjusted_bg_depth_range - 50),
             int(adjusted_bg_depth_range + 50),
