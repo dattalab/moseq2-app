@@ -145,15 +145,16 @@ def gaussian_kernel1d(n=None, sig=3):
     Get 1D gaussian kernel.
 
     Args:
-    n (int): window size.
+    n (int): half-width of the window in samples, rounded down to a whole sample.
     sig (int): variance of kernel to use.
 
     Returns:
-    kernel (1d array): 1D numpy kernel.
+    kernel (1d array): 1D numpy kernel, centred on zero.
     """
 
     if n is None:
         n = np.ceil(sig * 4)
+    n = int(n)
 
     points = np.arange(-n, n + 1)
 
