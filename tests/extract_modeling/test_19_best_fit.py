@@ -171,3 +171,20 @@ def test_the_choice_is_handed_to_the_analysis_notebook(comparison, progress_file
     update_progress(str(progress_file), "model_path", best)
     recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
     assert recorded["model_path"] == best
+
+
+def test_the_summary_reports_each_distance_under_its_own_name(comparison, project):
+    """8. What the returned summary says about the two duration matches.
+
+    Beside the chosen model the cell returns how far the closest model's
+    median and mean durations sit from the changepoints'. Each has to be its
+    own number, the one the stats file written beside the models implies.
+    """
+    chosen, project = comparison
+    stats = pd.read_csv(project / "models" / STATS)
+
+    median = (stats["model_median"] - stats["pc_median"]).abs().min()
+    mean = (stats["model_mean"] - stats["pc_mean"]).abs().min()
+
+    assert chosen["min duration median match (seconds)"] == pytest.approx(median, rel=1e-6)
+    assert chosen["min duration mean match (seconds)"] == pytest.approx(mean, rel=1e-6)
