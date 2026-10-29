@@ -166,18 +166,11 @@ def test_a_missing_config_is_reported_before_the_search(tmp_path, chosen):
 
 
 @pytest.mark.skipif(not os.path.isdir("/tmp"), reason="no /tmp on this platform")
-@pytest.mark.xfail(
-    reason="extract_found_sessions discards any recording whose absolute path "
-    "contains '/tmp/', which is the only mention of /tmp in moseq2-extract and "
-    "guards nothing the package creates"
-)
 def test_recordings_under_tmp_are_extracted(chosen):
     """4. Where a project lives is not the cell's business.
 
-    A user whose recordings sit under ``/tmp``, or under any path with a
-    ``tmp`` component such as ``/data/tmp/pilot``, watches the cell find them,
-    discard all of them, and print ``Extractions Complete.`` Nothing is
-    extracted and nothing says so.
+    Recordings under ``/tmp``, or under any path with a ``tmp`` component
+    such as ``/data/tmp/pilot``, are extracted like any others.
     """
     with tempfile.TemporaryDirectory(dir="/tmp") as tmp:
         root = build_fake_project(Path(tmp) / "project")
