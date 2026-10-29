@@ -183,24 +183,56 @@ def run_manual_KW_test(
                 / n_per_group[i]
         )
 
-    # h-statistic
-    h_all = 12.0 / (N_m * (N_m + 1)) * ssbn - 3 * (N_m + 1)
-    h_all /= KW_tie_correct
-    p_vals = stats.chi2.sf(h_all, df=dof)
+    # h-statistic; a syllable with one value in every session has none, and run_kruskal gives it p = 1
+    with np.errstate(divide="ignore", invalid="ignore"):
+        h_all = 12.0 / (N_m * (N_m + 1)) * ssbn - 3 * (N_m + 1)
+        h_all /= KW_tie_correct
+        p_vals = stats.chi2.sf(h_all, df=dof)
 
     # check that results agree
     p_i = np.random.randint(n_perm)
     s_i = np.random.randint(N_s)
-    kr = stats.kruskal(
-        *np.array_split(
-            merged_usages_all[perm[p_i, :], s_i], np.cumsum(n_per_group[:-1])
+    if np.ptp(merged_usages_all[:, s_i]) > 0:
+        kr = stats.kruskal(
+            *np.array_split(
+                merged_usages_all[perm[p_i, :], s_i], np.cumsum(n_per_group[:-1])
+            )
         )
-    )
-    assert (kr.statistic == h_all[p_i, s_i]) & (
-            kr.pvalue == p_vals[p_i, s_i]
-    ), "manual KW is incorrect"
+        assert (kr.statistic == h_all[p_i, s_i]) & (
+                kr.pvalue == p_vals[p_i, s_i]
+        ), "manual KW is incorrect"
 
     return h_all, real_ranks, X_ties
+
+
+def _kruskal_h_permutations(values, labels, group_names, perm):
+    """
+    Compute the Kruskal-Wallis H of one syllable for each permutation, over the sessions that used it.
+
+    Args:
+    values (1D array): the syllable's statistic in every session; NaN where a session never used it.
+    labels (1D array): each session's group.
+    group_names (pd.Index): the groups, in the order their sessions appear.
+    perm (2D array): n_perm x sessions permutations of all sessions; each row restricted to the sessions
+        that used the syllable is a uniform permutation of them.
+
+    Returns:
+    h (1D array): one H statistic per permutation.
+    """
+
+    observed = ~np.isnan(values)
+    n = int(observed.sum())
+    ranks = np.full(len(values), np.nan)
+    ranks[observed] = stats.rankdata(values[observed])
+
+    counts = [int(np.sum(observed & (labels == group))) for group in group_names]
+    counts = [count for count in counts if count > 0]
+    edges = np.insert(np.cumsum(counts), 0, 0)
+
+    perm_ranks = ranks[perm[observed[perm]].reshape(len(perm), n)]
+    ssbn = sum(perm_ranks[:, edges[i]:edges[i + 1]].sum(1) ** 2 / counts[i] for i in range(len(counts)))
+    h = 12.0 / (n * (n + 1)) * ssbn - 3 * (n + 1)
+    return h / stats.tiecorrect(ranks[observed])
 
 
 def plot_H_stat_significance(df_k_real, h_all, N_s):
@@ -284,7 +316,13 @@ def run_kruskal(
     cum_group_idx = np.insert(np.cumsum(n_per_group), 0, 0)
     num_groups = len(group_names)
 
-    df_only_usage = grouped_data[range(max_syllable)]
+    # NaN marks a session that never used a syllable. The vectorized permutations run on every
+    # syllable with the gaps filled; syllables with gaps are then recomputed over the sessions
+    # that used them, so complete syllables keep exactly the values they always had.
+    values = grouped_data[range(max_syllable)].values
+    group_labels = grouped_data.group.values
+    incomplete = np.isnan(values).any(axis=0)
+    df_only_usage = grouped_data[range(max_syllable)].fillna(0)
     merged_usages_all = df_only_usage.values
 
     N_m, N_s = merged_usages_all.shape
@@ -300,18 +338,29 @@ def run_kruskal(
         seed=seed,
     )
 
-    df_k_real = pd.DataFrame(
-        [
-            stats.kruskal(
-                *np.array_split(merged_usages_all[:, s_i], np.cumsum(n_per_group[:-1]))
-            )
-            for s_i in range(N_s)
-        ]
-    )
+    # each syllable compares the groups that used it, over the sessions that did; fewer than two
+    # such groups, or one value everywhere, leaves nothing to test and gives p = 1
+    kruskal_results, untestable = [], np.zeros(N_s, dtype=bool)
+    for s_i in range(N_s):
+        samples = [values[(group_labels == group) & ~np.isnan(values[:, s_i]), s_i] for group in group_names]
+        samples = [sample for sample in samples if len(sample) > 0]
+        if len(samples) < 2 or np.ptp(np.concatenate(samples)) == 0:
+            untestable[s_i] = True
+            kruskal_results.append((0.0, 1.0))
+        else:
+            kruskal_results.append(tuple(stats.kruskal(*samples)))
+    df_k_real = pd.DataFrame(kruskal_results, columns=["statistic", "pvalue"])
+
+    p_perm = ((h_all > df_k_real.statistic.values).sum(0) + 1) / n_perm
+    perm = np.random.RandomState(seed=seed).rand(n_perm, N_m).argsort(-1)  # the draw run_manual_KW_test made
+    for s_i in np.flatnonzero(incomplete & ~untestable):
+        h_null = _kruskal_h_permutations(values[:, s_i], group_labels, group_names, perm)
+        p_perm[s_i] = ((h_null > df_k_real.statistic[s_i]).sum() + 1) / n_perm
+    p_perm[untestable] = 1.0
 
     # https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html
     df_k_real["p_adj"] = multipletests(
-        ((h_all > df_k_real.statistic.values).sum(0) + 1) / n_perm,
+        p_perm,
         alpha=thresh,
         method=mc_method,
     )[1]
@@ -326,7 +375,7 @@ def run_kruskal(
         null_zs_within_group,
         real_zs_within_group,
     ) = dunns_z_test_permute_within_group_pairs(
-        grouped_data, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm
+        grouped_data, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm, values=values
     )
 
     # Compute p-values from Dunn's z-score statistics
@@ -410,6 +459,8 @@ def compute_pvalues_for_group_pairs(
         p_vals_allperm[pair] = (
                                        (null_zs[pair] > real_zs_within_group[pair]).sum(0) + 1
                                ) / n_perm
+        # a pair with no z for a syllable (a group never used it, or one value everywhere) cannot be compared
+        p_vals_allperm[pair][np.isnan(real_zs_within_group[pair])] = 1.0
 
     # summarize into df
     df_pval = pd.DataFrame(p_vals_allperm)
@@ -421,7 +472,7 @@ def compute_pvalues_for_group_pairs(
 
 
 def dunns_z_test_permute_within_group_pairs(
-        df_usage, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm
+        df_usage, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm, values=None
 ):
     """
     Run Dunn's z-test statistic on combinations of all group pairs, handling pre-computed tied ranks.
@@ -435,6 +486,9 @@ def dunns_z_test_permute_within_group_pairs(
     group_names (pd.Index): Index list of unique group names.
     rnd (np.random.RandomState): Pseudo-random number generator.
     n_perm (int): Number of permuted samples to generate.
+    values (np.array): sessions x syllables statistic with NaN where a session never used a syllable; those
+        syllables are recomputed over the sessions that used them, and a pair with a group that never used
+        a syllable gets a NaN z for it.
 
     Returns:
     null_zs_within_group (dict): dict of group pair keys paired with vector of Dunn's z-test statistics of the null hypothesis.
@@ -452,7 +506,8 @@ def dunns_z_test_permute_within_group_pairs(
 
         n_mice = is_i.sum() + is_j.sum()
 
-        ranks_perm = real_ranks[(is_i | is_j)][rnd.rand(n_perm, n_mice).argsort(-1)]
+        perm = rnd.rand(n_perm, n_mice).argsort(-1)
+        ranks_perm = real_ranks[(is_i | is_j)][perm]
         diff = np.abs(
             ranks_perm[:, : is_i.sum(), :].mean(1)
             - ranks_perm[:, is_i.sum():, :].mean(1)
@@ -467,8 +522,35 @@ def dunns_z_test_permute_within_group_pairs(
 
         # add to dict
         pair = (i_n, j_n)
-        null_zs_within_group[pair] = diff / np.sqrt((A - X_ties) * B)
-        real_zs_within_group[pair] = real_diff / np.sqrt((A - X_ties) * B)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            null_zs_within_group[pair] = diff / np.sqrt((A - X_ties) * B)
+            real_zs_within_group[pair] = real_diff / np.sqrt((A - X_ties) * B)
+
+        if values is None:
+            continue
+        # a syllable some sessions never used: ranks, sizes and ties over the sessions that did,
+        # with the same permutations restricted to them
+        pair_rows = np.flatnonzero((is_i | is_j).values)
+        n_i_rows = int(is_i.sum())
+        for s in np.flatnonzero(np.isnan(values).any(axis=0)):
+            column = values[:, s]
+            observed = ~np.isnan(column)
+            pair_observed = observed[pair_rows]
+            n_i, n_j = int(pair_observed[:n_i_rows].sum()), int(pair_observed[n_i_rows:].sum())
+            n = int(observed.sum())
+            if n_i == 0 or n_j == 0 or np.ptp(column[observed]) == 0:
+                null_zs_within_group[pair][:, s] = np.nan
+                real_zs_within_group[pair][s] = np.nan
+                continue
+            ranks = np.full(len(column), np.nan)
+            ranks[observed] = stats.rankdata(column[observed])
+            pair_ranks = ranks[pair_rows]
+            scale = np.sqrt((n * (n + 1.0) / 12.0 - get_tie_correction(pd.Series(column[observed]), n))
+                            * (1.0 / n_i + 1.0 / n_j))
+            permuted = pair_ranks[perm[pair_observed[perm]].reshape(n_perm, n_i + n_j)]
+            null_zs_within_group[pair][:, s] = np.abs(permuted[:, :n_i].mean(1) - permuted[:, n_i:].mean(1)) / scale
+            kept = pair_ranks[pair_observed]
+            real_zs_within_group[pair][s] = np.abs(kept[:n_i].mean() - kept[n_i:].mean()) / scale
 
     return null_zs_within_group, real_zs_within_group
 

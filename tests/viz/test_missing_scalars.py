@@ -13,7 +13,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from moseq2_viz.model.stat import bootstrap_group_means, mann_whitney, ttest, ztest
+import scipy.stats
+
+from moseq2_viz.model.stat import bootstrap_group_means, mann_whitney, run_kruskal, ttest, ztest
 
 SESSIONS = 10
 
@@ -27,7 +29,7 @@ def stats(used, durations):
     rng = np.random.default_rng(0)
     rows = []
     syllables = sorted({s for _, s in used} | {s for _, s in durations})
-    for group in ("a", "b"):
+    for group in sorted({g for g, _ in used}):
         for i in range(SESSIONS):
             for s in syllables:
                 if i in used.get((group, s), ()):
@@ -81,3 +83,32 @@ def test_one_observed_session_against_many_is_tested():
                   durations={("a", 0): 0.5, ("b", 0): 0.9, ("a", 1): 0.5, ("b", 1): 0.5})
     result = ttest(table, "a", "b", statistic="duration", max_syllable=2)
     assert 0 < result.loc[0, "pvalue"] < 1
+
+
+def observed_durations(table, group, syllable):
+    rows = table[(table.group == group) & (table.syllable == syllable)]
+    return rows.duration.dropna().to_numpy()
+
+
+def test_kruskal_wallis_uses_each_syllables_observed_sessions():
+    table = five_syllables()
+    df_k, _, sig = run_kruskal(table, statistic="duration", max_syllable=5, n_perm=2000)
+    observed = [observed_durations(table, group, 1) for group in ("a", "b")]
+    assert df_k.loc[1, "statistic"] == pytest.approx(scipy.stats.kruskal(*observed).statistic)
+    assert 0 in sig[("a", "b")] and 4 in sig[("a", "b")]
+    assert 1 not in sig[("a", "b")]
+    assert df_k.loc[[2, 3], "p_adj"].eq(1.0).all()
+
+
+def test_a_group_that_never_used_a_syllable_is_left_out_of_its_comparison():
+    """Group c never used syllable 0, so syllable 0 is compared between a and b only."""
+    everyone = range(SESSIONS)
+    table = stats(
+        used={("a", 0): everyone, ("b", 0): everyone, ("a", 1): everyone, ("b", 1): everyone, ("c", 1): everyone},
+        durations={("a", 0): 0.5, ("b", 0): 0.6, ("a", 1): 0.5, ("b", 1): 0.5, ("c", 1): 0.5},
+    )
+    df_k, _, sig = run_kruskal(table, statistic="duration", max_syllable=2, n_perm=2000)
+    observed = [observed_durations(table, group, 0) for group in ("a", "b")]
+    assert df_k.loc[0, "statistic"] == pytest.approx(scipy.stats.kruskal(*observed).statistic)
+    assert 0 in sig[("a", "b")]
+    assert 0 not in sig[("a", "c")] and 0 not in sig[("b", "c")]
