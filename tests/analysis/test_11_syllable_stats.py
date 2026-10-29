@@ -188,3 +188,38 @@ def test_the_cached_dataframe_the_cell_asks_for_exists(analysis_paths, labeled):
     ``df_info_path`` for them to read back.
     """
     assert Path(analysis_paths["df_info_path"]).exists()
+
+
+#: A scalar some sessions have no value for: a session that never used a
+#: syllable has no duration for it.
+SCALAR = "duration"
+
+
+def test_a_scalar_of_an_unused_syllable_stays_missing(viewer):
+    """10. Never used is not measured at zero.
+
+    Usage of a syllable a session never used is 0; its duration was never
+    measured, so it stays missing and each syllable's test runs on the
+    sessions that used it.
+    """
+    unused = viewer.df["usage"] == 0
+    assert unused.any(), "every session used every syllable; nothing to check"
+    assert viewer.df.loc[unused, SCALAR].isna().all()
+    assert (viewer.df.loc[unused, "usage"] == 0).all()
+
+
+@pytest.mark.parametrize("test", TESTS)
+def test_each_test_runs_on_a_scalar_with_unused_syllables(viewer, labeled, test):
+    marked = viewer.run_selected_hypothesis_test(
+        test, SCALAR, viewer.ctrl_dropdown.value, viewer.exp_dropdown.value
+    )
+    assert all(0 <= syllable < labeled for syllable in marked)
+
+
+@pytest.mark.parametrize("sort", [SCALAR, "difference"])
+def test_the_plot_builds_for_a_scalar_with_unused_syllables(viewer, sort):
+    viewer.interactive_syll_stats_grapher(
+        SCALAR, sort, "group", "SEM", viewer.session_sel.value,
+        viewer.ctrl_dropdown.value, viewer.exp_dropdown.value, hyp_test="Mann-Whitney",
+    )
+    assert viewer.stat_fig is not None
