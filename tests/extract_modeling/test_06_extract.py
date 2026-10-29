@@ -415,10 +415,6 @@ def test_the_preview_movie_is_h264(extracted):
         assert (codec, pix_fmt) == ("h264", "yuv420p"), name
 
 
-@pytest.mark.xfail(
-    reason="the movie is written without -movflags +faststart, so its moov atom "
-    "is appended after the frame data"
-)
 def test_the_preview_movie_starts_without_reading_all_of_it(extracted):
     """16b. The index belongs at the front.
 
