@@ -75,7 +75,7 @@ def count_missing_mouse_frames(scalar_df):
 
 def count_frames_with_small_areas(scalar_df):
     """
-    Count the number of frames where the mouse area is smaller than 2 standard deviations of all mouse areas.
+    Count the number of frames where the mouse area is more than 2 standard deviations below the mean mouse area.
 
     Args:
     scalar_df (pd.DataFrame): dataframe that contains frame by frame scalar and syllable data (moseq_df/scalar_df)
@@ -84,7 +84,7 @@ def count_frames_with_small_areas(scalar_df):
     corrupt_frames (int): Number of frames where the recorded mouse area is too small
     """
 
-    return (scalar_df["area_px"] < 2 * scalar_df["area_px"].std()).sum()
+    return (scalar_df["area_px"] < scalar_df["area_px"].mean() - 2 * scalar_df["area_px"].std()).sum()
 
 
 def count_stationary_frames(scalar_df):
