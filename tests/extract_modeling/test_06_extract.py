@@ -232,27 +232,23 @@ def test_quitting_the_prompt_extracts_nothing(tmp_path, chosen, monkeypatch):
     assert chosen == []
 
 
-@pytest.mark.xfail(
-    reason="the prompt passes what was typed to literal_eval, which raises on "
-    "anything that is not a Python literal before the invalid-input branch is "
-    "reached"
-)
-def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch):
-    """7. A typo at the prompt should cost a user one more line, not the cell.
+@pytest.mark.parametrize("typo", ["first", "1,x", "1 2"])
+def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch, capsys, typo):
+    """7. A typo at the prompt costs a user one more line, not the cell.
 
-    The prompt loops until it gets something it understands, and prints
-    ``Invalid input. Try again or press q to quit.`` for an empty answer. A
-    non-empty answer that is not a number never reaches that branch: it goes to
-    ``literal_eval`` and raises out of the cell.
+    An answer that is not a number, a list or a range prints ``Invalid input.
+    Try again or press q to quit.`` and asks again, and nothing from it carries
+    over into the next answer.
     """
     root = build_fake_project(tmp_path / "project")
-    answers = iter(["first", "q"])
+    answers = iter([typo, "2"])
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
 
     extract_found_sessions(
         str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
     )
-    assert chosen == []
+    assert chosen == [str(root / RECORDINGS[1] / "depth.avi")]
+    assert "Invalid input. Try again or press q to quit." in capsys.readouterr().out
 
 
 def test_the_slurm_branch_writes_a_script_and_submits_nothing(
