@@ -72,3 +72,12 @@ def test_a_group_with_one_observed_session_bootstraps_without_nan():
                   durations={("a", 0): 0.5, ("b", 0): 0.6, ("a", 1): 0.5, ("b", 1): 0.5})
     boots = bootstrap_group_means(table, "a", "b", statistic="duration", max_syllable=2)
     assert np.isfinite(boots["b"]).all()
+
+
+def test_one_observed_session_against_many_is_tested():
+    """A t-test of one session's duration against ten has a p-value."""
+    everyone = range(SESSIONS)
+    table = stats(used={("a", 0): everyone, ("b", 0): [0], ("a", 1): everyone, ("b", 1): everyone},
+                  durations={("a", 0): 0.5, ("b", 0): 0.9, ("a", 1): 0.5, ("b", 1): 0.5})
+    result = ttest(table, "a", "b", statistic="duration", max_syllable=2)
+    assert 0 < result.loc[0, "pvalue"] < 1

@@ -588,13 +588,15 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
         group: grouped_data.loc[grouped_data.group == group, range(max_syllable)].values
         for group in (group1, group2)
     }
-    # a syllable with one value in every session has nothing to rank, and gets p = 1
-    constant = _untestable(values[group1], values[group2])
-    df_mw_real = pd.DataFrame(
-        [MannwhitneyuResult(len(values[group1]) * len(values[group2]) / 2.0, 1.0) if constant[i]
-         else mannwhitneyu(values[group1][:, i], values[group2][:, i])
-         for i in range(max_syllable)]
-    )
+    # each syllable is ranked over the sessions that used it; one a group never used,
+    # or with one value everywhere, has nothing to rank and gets p = 1
+    untestable = _untestable(values[group1], values[group2])
+    results = []
+    for i in range(max_syllable):
+        x, y = values[group1][:, i], values[group2][:, i]
+        x, y = x[~np.isnan(x)], y[~np.isnan(y)]
+        results.append(MannwhitneyuResult(len(x) * len(y) / 2.0, 1.0) if untestable[i] else mannwhitneyu(x, y))
+    df_mw_real = pd.DataFrame(results)
     return get_sig_syllables(df_mw_real, verbose=verbose, **kwargs)
 
 
@@ -648,11 +650,16 @@ def ttest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     groups = (group1, group2)
     usages = {k: group_stat.loc[k].values for k in groups}
     # run t-test
-    df_t = pd.DataFrame(
-        stats.ttest_ind(usages[group1], usages[group2]), index=["t", "pvalue"]
-    ).T
-    # a syllable with one value in every session has no difference to test, and gets p = 1
+    # each syllable is tested over the sessions that used it; scipy warns about the
+    # syllables with too few, which get p = 1 below
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = stats.ttest_ind(usages[group1], usages[group2], nan_policy="omit")
+    df_t = pd.DataFrame(result, index=["t", "pvalue"]).T
+    # a syllable a group never used, with one value everywhere, or too few sessions for a
+    # t statistic has nothing to test, and gets p = 1
     df_t.loc[_untestable(usages[group1], usages[group2]), "pvalue"] = 1.0
+    df_t["pvalue"] = df_t["pvalue"].fillna(1.0)
     return get_sig_syllables(df_t, verbose=verbose, **kwargs)
 
 
