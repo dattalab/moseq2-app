@@ -1,9 +1,12 @@
-"""Finding the arena floor when no plane can be fit.
+"""Fitting the arena floor with RANSAC.
 
 ``plane_ransac`` fits the floor from the background pixels inside
 ``bg_roi_depth_range``, keeping only flat pixels when the gradient filter is
-on. When too few pixels survive the filter, or no candidate plane covers
-enough of them, the error names the config keys that decide the outcome.
+on. Its candidate planes come from its own seeded generator, so the same
+background gives the same floor every time and the rest of the program's
+random draws are left alone. When too few pixels survive the filter, or no
+candidate plane covers enough of them, the error names the config keys that
+decide the outcome.
 """
 
 from __future__ import annotations
@@ -28,3 +31,28 @@ def test_a_floor_no_plane_fits_names_the_depth_range():
     floor = np.random.uniform(655, 745, (30, 40))
     with pytest.raises(ValueError, match='"bg_roi_depth_range" \\(650, 750\\)'):
         plane_ransac(floor, noise_tolerance=1)
+
+
+def floor():
+    y, x = np.mgrid[:30, :40]
+    return 700 + 0.3 * x - 0.2 * y + np.random.RandomState(3).normal(0, 2, (30, 40))
+
+
+def test_the_same_background_gives_the_same_floor():
+    """Two fits of one image agree exactly, whatever was drawn in between."""
+    first = plane_ransac(floor(), iters=30)
+    np.random.seed(1)
+    np.random.random(100)
+    second = plane_ransac(floor(), iters=30)
+    for a, b in zip(first, second):
+        np.testing.assert_array_equal(a, b)
+
+
+def test_fitting_leaves_the_global_random_state_alone():
+    """Code that draws random numbers after the fit draws what it would have."""
+    np.random.seed(84)
+    before = np.random.get_state()
+    plane_ransac(floor(), iters=30)
+    after = np.random.get_state()
+    assert before[0] == after[0] and before[2:] == after[2:]
+    np.testing.assert_array_equal(before[1], after[1])
