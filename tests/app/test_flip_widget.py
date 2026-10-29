@@ -49,3 +49,11 @@ def test_the_last_frame_is_corrected_like_the_rest(session):
     with h5py.File(path) as f:
         np.testing.assert_array_equal(f["frames"][-1], np.rot90(original[-1], 2))
         assert f["scalars/angle"][-1] == pytest.approx(np.pi)
+
+
+def test_each_chunk_corrects_its_own_angles(session):
+    """A flagged frame's angle moves by pi once, whichever chunk it falls in."""
+    subject, path, _ = session
+    correct(subject, chunk_size=4)
+    with h5py.File(path) as f:
+        np.testing.assert_allclose(f["scalars/angle"][()], np.pi)
