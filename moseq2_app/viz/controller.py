@@ -26,7 +26,7 @@ from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
-from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_position_heatmaps, get_syllable_pdfs)
+from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syllable_pdfs)
 
 yml = yaml.YAML()
 yml.indent(mapping=3, offset=2)
@@ -84,11 +84,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.model_path = model_path
         self.sorted_index = get_sorted_index(index_file)
 
-        # Syllable Info DataFrame path
-        output_dir = os.path.dirname(save_path)
-        self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
-        self.scalar_df_output = os.path.join(output_dir, 'moseq_scalar_dataframe.parquet')
-
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
@@ -98,20 +93,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if os.path.exists(save_path):
             self.syll_info = read_yaml(save_path)
             if len(self.syll_info) != max_sylls:
-                # Delete previously saved parquet
-                if os.path.exists(self.df_output_file):
-                    os.remove(self.df_output_file)
-
                 self.syll_info = _initialize_syll_info_dict(max_sylls)
 
             for i in range(max_sylls):
                 if 'group_info' not in self.syll_info[i]:
                     self.syll_info[i]['group_info'] = {}
         else:
-            # Delete previously saved parquet
-            if os.path.exists(self.df_output_file):
-                os.remove(self.df_output_file)
-
             self.syll_info = _initialize_syll_info_dict(max_sylls)
 
             # Write to file
@@ -202,17 +189,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
         Populate syllable information dict with usage and scalar information.
         """
 
-        if not os.path.exists(self.df_output_file):
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            df = df.astype(dict(SubjectName=str, SessionName=str))
-            # print('Writing main syllable info to parquet')
-            # df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
-            # scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
-        else:
-            print('Loading parquet files')
-            df = pd.read_parquet(self.df_output_file, engine='fastparquet')
+        # Compute a syllable summary Dataframe containing usage-based
+        # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
+        df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
+        df = df.astype(dict(SubjectName=str, SessionName=str))
 
         # Get all unique groups in df
         self.groups = df.group.unique()
@@ -405,19 +385,17 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
-    def __init__(self, config_data, index_path, df_path, model_path, syll_info, output_dir, get_pdfs, load_parquet):
+    def __init__(self, config_data, index_path, model_path, syll_info, output_dir, get_pdfs):
         """
         Initialize class object context parameters.
 
         Args:
         config_data (dict): Configuration parameters for creating crowd movies.
         index_path (str): Path to loaded index file.
-        df_path (str): Path to pre-computed parquet file with syllable df info.
         model_path (str): Path to loaded model.
         syll_info (dict): Dict object containing labeled syllable information.
         output_dir (str): Path to directory to store crowd movies.
         get_pdfs (bool): Generate position heatmaps for the corresponding crowd movie grouping
-        load_parquet (bool): Indicates to load previously saved syllable data.
         """
 
         super().__init__()
@@ -425,8 +403,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data = config_data
         self.index_path = index_path
         self.model_path = model_path
-        self.df_path = df_path
-        self.scalar_df_path = os.path.join(os.path.dirname(df_path), 'moseq_scalar_dataframe.parquet')
 
         self.get_pdfs = get_pdfs
 
@@ -443,12 +419,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         self.output_dir = output_dir
         self.max_sylls = len(syll_info)
-
-        if load_parquet:
-            if df_path is not None and not os.path.exists(df_path):
-                self.df_path = None
-        else:
-            self.df_path = None
 
         # Prepare current context's base session syllable info dict
         self.session_dict = {i: {'session_info': {}} for i in range(self.max_sylls)}
@@ -554,18 +524,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         """
         Populate session-based syllable information dict with usage and scalar information.
         """
-        if self.df_path is not None and os.path.exists(self.df_path):
-            print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='fastparquet')
-            if not os.path.exists(self.scalar_df_path):
-                self.scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
-                # self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
-            else:
-                self.scalar_df = pd.read_parquet(self.scalar_df_path)
-        else:
-            print('Syllable DataFrame not found. Computing and saving syllable statistics...')
-            df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            # self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
+        print('Computing syllable statistics...')
+        df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         if self.get_pdfs:
             # Compute syllable position PDFs

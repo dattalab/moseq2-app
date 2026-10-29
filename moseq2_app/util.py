@@ -150,7 +150,7 @@ def setup_model_folders(progress_paths):
     progress_paths (dict): dictionary of notebook progress paths.
 
     Returns:
-    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
+    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info and crowd_dir
     """
     # find all the models in the model master path
     models = glob(join(progress_paths['base_model_path'], '*.p'))
@@ -181,7 +181,7 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
 
     Args:
     desired_model (str): file name of the desired specific model
-    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info, syll_info_df and crowd_dir
+    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info and crowd_dir
     progress_filepath (str): path to progress.yaml
 
     Returns:
@@ -196,7 +196,6 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
     progress_paths = update_progress(progress_filepath, 'plot_path', join(model_dict[desired_model]['model_session_path'], 'plots/'))
     progress_paths = update_progress(progress_filepath, 'crowd_dir', join(model_dict[desired_model]['model_session_path'], 'crowd_movies/'))
     progress_paths = update_progress(progress_filepath, 'syll_info', join(model_dict[desired_model]['model_session_path'], 'syll_info.yaml'))
-    progress_paths = update_progress(progress_filepath, 'df_info_path', join(model_dict[desired_model]['model_session_path'], 'syll_df.parquet'))
 
     return progress_paths
 

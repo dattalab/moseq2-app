@@ -2,7 +2,6 @@
 Main interactive model syllable statistics results application functionality.
 """
 
-import os
 import io
 import base64
 import warnings
@@ -25,7 +24,7 @@ from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_tran
 
 class InteractiveSyllableStats(SyllableStatWidgets):
 
-    def __init__(self, index_path, model_path, df_path, info_path, max_sylls, load_parquet):
+    def __init__(self, index_path, model_path, info_path, max_sylls):
         """
         Initialize the main data inputted into the current context
 
@@ -34,7 +33,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         model_path (str): Path to trained model file.
         info_path (str): Path to syllable information file.
         max_sylls (int): Maximum number of syllables to plot.
-        load_parquet (bool): Indicates to load previously loaded data
         """
 
         super().__init__()
@@ -43,18 +41,6 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.info_path = info_path
         self.max_sylls = max_sylls
         self.index_path = index_path
-        self.df_path = df_path
-
-        # If user inputs load_parquet=True in main.py function label_syllables()
-        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
-        # to load the data from.
-        if load_parquet:
-            if df_path is not None:
-                if not os.path.exists(df_path):
-                    self.df_path = None
-        else:
-            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
-            self.df_path = None
 
         self.df = None
 
@@ -151,18 +137,8 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         if self.max_sylls is None:
             self.max_sylls = max_sylls
 
-        # if load_parquet=True, and self.df_path points to an existing parquet file,
-        # then the syllable statistics DataFrame will be loaded from the parquet file.
-        # otherwise, the DataFrame is computed from scratch
-        if self.df_path is not None:
-            print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='fastparquet')
-            if len(df.syllable.unique()) < self.max_sylls:
-                print('Requested more syllables than the parquet file holds, recomputing requested dataset.')
-                df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
-        else:
-            print('Syllable DataFrame not found. Computing syllable statistics...')
-            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
+        print('Computing syllable statistics...')
+        df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
@@ -283,7 +259,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
-    def __init__(self, model_path, index_path, info_path, df_path, max_sylls, plot_vertically, load_parquet):
+    def __init__(self, model_path, index_path, info_path, max_sylls, plot_vertically):
         """
         Initialize variables for interactive transition graph.
 
@@ -299,20 +275,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         self.model_path = model_path
         self.index_path = index_path
         self.info_path = info_path
-        self.df_path = df_path
         self.max_sylls = max_sylls
         self.plot_vertically = plot_vertically
-
-        # If user inputs load_parquet=True in main.py function label_syllables()
-        # then the self.df_path will be set to the inputted df_path (pointing to a pre-existing parquet file)
-        # to load the data from.
-        if load_parquet:
-            if df_path is not None:
-                if not os.path.exists(df_path):
-                    self.df_path = None
-        else:
-            # If load_parquet=False, self.df_path will be set to None to compute the DataFrame from scratch
-            self.df_path = None
 
         # Load Model
         self.model_fit = parse_model_results(model_path)
@@ -402,12 +366,8 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
                     encoded = base64.b64encode(video)
                     self.syll_info[k]['crowd_movie_path'] = encoded.decode('ascii')
 
-            if self.df_path is not None:
-                print('Loading parquet files')
-                df = pd.read_parquet(self.df_path, engine='fastparquet')
-            else:
-                print('Syllable DataFrame not found. Creating new dataframe and computing syllable statistics...')
-                df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
+            print('Computing syllable statistics...')
+            df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
             self.df = df
 
             # Get groups and matching session uuids
