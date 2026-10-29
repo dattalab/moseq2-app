@@ -34,6 +34,25 @@ yml.indent(mapping=3, offset=2)
 def _initialize_syll_info_dict(max_sylls):
     return {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in range(max_sylls)}
 
+def _syllable_pdf(group_syll_pdfs, groupby, group, syllable):
+    """
+    Find one grouping's position heatmap for one syllable.
+
+    Args:
+    group_syll_pdfs (pandas.DataFrame): mean heatmaps from get_syllable_pdfs, one row per grouping and syllable,
+        with columns groupby, 'syllable' and 'pdf'.
+    groupby (str): the column naming the groupings, 'group' or 'SessionName'.
+    group (str): the grouping to look up.
+    syllable (int): the syllable number.
+
+    Returns:
+    pdf (numpy.ndarray or None): the heatmap, or None when that grouping never used the syllable.
+    """
+
+    match = group_syll_pdfs[(group_syll_pdfs[groupby] == group) & (group_syll_pdfs['syllable'] == syllable)]['pdf']
+    return match.iloc[0] if len(match) > 0 else None
+
+
 class SyllableLabeler(SyllableLabelerWidgets):
 
     def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, 
@@ -657,7 +676,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                                                 groupby=cm_source,
                                                 syllable_key='syllable')[0].drop('syllable', axis=1).reset_index()
             for group in g_iter:
-                grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs[cm_source] == group]['pdf']
+                grouped_syll_dict[group]['pdf'] = _syllable_pdf(group_syll_pdfs, cm_source, group, syll_number)
 
         # Remove previously displayed data
         clear_output()
@@ -688,14 +707,11 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Convert crowd movie metadata to HTML table
             if self.get_pdfs:
                 group_info = pd.DataFrame(syll_info_df.drop('pdf', axis=0)[group_name]).to_html()
-                try:
-                    # The 'pdf' key is pointing to the outputted syllable-position heatmap for each grouping.
-                    group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
-                except Exception as e:
-                    # If a group does not express this syllable, then a empty heatmap will be generated in it's place.
-                    group_syllable_pdf = np.zeros((50, 50))
-                    if len(cm_path) == 0:
-                        continue
+                # the syllable-position heatmap for this grouping; one that never used the
+                # syllable has no heatmap and no crowd movie, and is left out of the comparison
+                group_syllable_pdf = syll_info_df[group_name]['pdf']
+                if not isinstance(group_syllable_pdf, np.ndarray) or len(cm_path) == 0:
+                    continue
 
                 pdf_fig = self.get_pdf_plot(group_syllable_pdf, group_name)
 
