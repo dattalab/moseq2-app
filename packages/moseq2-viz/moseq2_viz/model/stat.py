@@ -1,6 +1,7 @@
 """
 Functions for statistical tests for analyzing model results.
 """
+import warnings
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -21,14 +22,17 @@ def get_session_mean_df(df, statistic="usage", max_syllable=40):
     max_syllable (int): the index of the maximum number of syllables to include
 
     Returns:
-    df_pivot (pandas.DataFrame): Mean syllable statistic per session.
+    df_pivot (pandas.DataFrame): Mean syllable statistic per session, one column per syllable below max_syllable.
+    A session that never used a syllable has a usage of 0 and a missing (NaN) value for every other statistic.
     """
 
     df_pivot = (
         df[df.syllable < max_syllable]
             .pivot_table(index=["group", "uuid"], columns="syllable", values=statistic)
-            .replace(np.nan, 0)
+            .reindex(columns=range(max_syllable))
     )
+    if statistic == "usage":
+        df_pivot = df_pivot.fillna(0)
 
     return df_pivot
 
@@ -38,15 +42,26 @@ def bootstrap_me(usages, n_iters=10000):
     Bootstrap the inputted stat data using random sampling with replacement.
 
     Args:
-    usages (np.array): Data to bootstrap
+    usages (np.array): sessions x syllables; NaN marks a session that never used the syllable
     n_iters (int): Number of samples to return.
 
     Returns:
-    boots (np.array): Bootstrapped input array of shape
+    boots (np.array): n_iters x syllables bootstrapped means, each syllable resampled from the sessions that used it (NaN where none did)
     """
 
     n_mice = usages.shape[0]
-    return np.nanmean(usages[np.random.choice(n_mice, size=(n_mice, n_iters))], axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        boots = np.nanmean(usages[np.random.choice(n_mice, size=(n_mice, n_iters))], axis=0)
+
+    # a syllable some sessions never used is resampled from the sessions that did
+    for s in np.flatnonzero(np.isnan(usages).any(axis=0)):
+        observed = usages[~np.isnan(usages[:, s]), s]
+        if observed.size == 0:
+            boots[:, s] = np.nan
+        else:
+            boots[:, s] = observed[np.random.choice(observed.size, size=(observed.size, n_iters))].mean(0)
+    return boots
 
 
 def ztest_vect(d1, d2):
@@ -168,24 +183,56 @@ def run_manual_KW_test(
                 / n_per_group[i]
         )
 
-    # h-statistic
-    h_all = 12.0 / (N_m * (N_m + 1)) * ssbn - 3 * (N_m + 1)
-    h_all /= KW_tie_correct
-    p_vals = stats.chi2.sf(h_all, df=dof)
+    # h-statistic; a syllable with one value in every session has none, and run_kruskal gives it p = 1
+    with np.errstate(divide="ignore", invalid="ignore"):
+        h_all = 12.0 / (N_m * (N_m + 1)) * ssbn - 3 * (N_m + 1)
+        h_all /= KW_tie_correct
+        p_vals = stats.chi2.sf(h_all, df=dof)
 
     # check that results agree
     p_i = np.random.randint(n_perm)
     s_i = np.random.randint(N_s)
-    kr = stats.kruskal(
-        *np.array_split(
-            merged_usages_all[perm[p_i, :], s_i], np.cumsum(n_per_group[:-1])
+    if np.ptp(merged_usages_all[:, s_i]) > 0:
+        kr = stats.kruskal(
+            *np.array_split(
+                merged_usages_all[perm[p_i, :], s_i], np.cumsum(n_per_group[:-1])
+            )
         )
-    )
-    assert (kr.statistic == h_all[p_i, s_i]) & (
-            kr.pvalue == p_vals[p_i, s_i]
-    ), "manual KW is incorrect"
+        assert (kr.statistic == h_all[p_i, s_i]) & (
+                kr.pvalue == p_vals[p_i, s_i]
+        ), "manual KW is incorrect"
 
     return h_all, real_ranks, X_ties
+
+
+def _kruskal_h_permutations(values, labels, group_names, perm):
+    """
+    Compute the Kruskal-Wallis H of one syllable for each permutation, over the sessions that used it.
+
+    Args:
+    values (1D array): the syllable's statistic in every session; NaN where a session never used it.
+    labels (1D array): each session's group.
+    group_names (pd.Index): the groups, in the order their sessions appear.
+    perm (2D array): n_perm x sessions permutations of all sessions; each row restricted to the sessions
+        that used the syllable is a uniform permutation of them.
+
+    Returns:
+    h (1D array): one H statistic per permutation.
+    """
+
+    observed = ~np.isnan(values)
+    n = int(observed.sum())
+    ranks = np.full(len(values), np.nan)
+    ranks[observed] = stats.rankdata(values[observed])
+
+    counts = [int(np.sum(observed & (labels == group))) for group in group_names]
+    counts = [count for count in counts if count > 0]
+    edges = np.insert(np.cumsum(counts), 0, 0)
+
+    perm_ranks = ranks[perm[observed[perm]].reshape(len(perm), n)]
+    ssbn = sum(perm_ranks[:, edges[i]:edges[i + 1]].sum(1) ** 2 / counts[i] for i in range(len(counts)))
+    h = 12.0 / (n * (n + 1)) * ssbn - 3 * (n + 1)
+    return h / stats.tiecorrect(ranks[observed])
 
 
 def plot_H_stat_significance(df_k_real, h_all, N_s):
@@ -269,7 +316,13 @@ def run_kruskal(
     cum_group_idx = np.insert(np.cumsum(n_per_group), 0, 0)
     num_groups = len(group_names)
 
-    df_only_usage = grouped_data[range(max_syllable)]
+    # NaN marks a session that never used a syllable. The vectorized permutations run on every
+    # syllable with the gaps filled; syllables with gaps are then recomputed over the sessions
+    # that used them, so complete syllables keep exactly the values they always had.
+    values = grouped_data[range(max_syllable)].values
+    group_labels = grouped_data.group.values
+    incomplete = np.isnan(values).any(axis=0)
+    df_only_usage = grouped_data[range(max_syllable)].fillna(0)
     merged_usages_all = df_only_usage.values
 
     N_m, N_s = merged_usages_all.shape
@@ -285,18 +338,30 @@ def run_kruskal(
         seed=seed,
     )
 
-    df_k_real = pd.DataFrame(
-        [
-            stats.kruskal(
-                *np.array_split(merged_usages_all[:, s_i], np.cumsum(n_per_group[:-1]))
-            )
-            for s_i in range(N_s)
-        ]
-    )
+    # each syllable compares the groups that used it, over the sessions that did; fewer than two
+    # such groups, or one value everywhere, leaves nothing to test and gives p = 1
+    kruskal_results, untestable = [], np.zeros(N_s, dtype=bool)
+    for s_i in range(N_s):
+        samples = [values[(group_labels == group) & ~np.isnan(values[:, s_i]), s_i] for group in group_names]
+        samples = [sample for sample in samples if len(sample) > 0]
+        if len(samples) < 2 or np.ptp(np.concatenate(samples)) == 0:
+            untestable[s_i] = True
+            kruskal_results.append((0.0, 1.0))
+        else:
+            kruskal_results.append(tuple(stats.kruskal(*samples)))
+    df_k_real = pd.DataFrame(kruskal_results, columns=["statistic", "pvalue"])
+
+    # a permutation p-value counts the permutations at least as extreme as the data, ties included
+    p_perm = ((h_all >= df_k_real.statistic.values).sum(0) + 1) / (n_perm + 1)
+    perm = np.random.RandomState(seed=seed).rand(n_perm, N_m).argsort(-1)  # the draw run_manual_KW_test made
+    for s_i in np.flatnonzero(incomplete & ~untestable):
+        h_null = _kruskal_h_permutations(values[:, s_i], group_labels, group_names, perm)
+        p_perm[s_i] = ((h_null >= df_k_real.statistic[s_i]).sum() + 1) / (n_perm + 1)
+    p_perm[untestable] = 1.0
 
     # https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html
     df_k_real["p_adj"] = multipletests(
-        ((h_all > df_k_real.statistic.values).sum(0) + 1) / n_perm,
+        p_perm,
         alpha=thresh,
         method=mc_method,
     )[1]
@@ -311,7 +376,7 @@ def run_kruskal(
         null_zs_within_group,
         real_zs_within_group,
     ) = dunns_z_test_permute_within_group_pairs(
-        grouped_data, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm
+        grouped_data, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm, values=values
     )
 
     # Compute p-values from Dunn's z-score statistics
@@ -392,9 +457,12 @@ def compute_pvalues_for_group_pairs(
 
     p_vals_allperm = {}
     for pair in combinations(group_names, 2):
+        # permutations at least as extreme as the data, ties included
         p_vals_allperm[pair] = (
-                                       (null_zs[pair] > real_zs_within_group[pair]).sum(0) + 1
-                               ) / n_perm
+                                       (null_zs[pair] >= real_zs_within_group[pair]).sum(0) + 1
+                               ) / (n_perm + 1)
+        # a pair with no z for a syllable (a group never used it, or one value everywhere) cannot be compared
+        p_vals_allperm[pair][np.isnan(real_zs_within_group[pair])] = 1.0
 
     # summarize into df
     df_pval = pd.DataFrame(p_vals_allperm)
@@ -406,7 +474,7 @@ def compute_pvalues_for_group_pairs(
 
 
 def dunns_z_test_permute_within_group_pairs(
-        df_usage, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm
+        df_usage, vc, real_ranks, X_ties, N_m, group_names, rnd, n_perm, values=None
 ):
     """
     Run Dunn's z-test statistic on combinations of all group pairs, handling pre-computed tied ranks.
@@ -420,6 +488,9 @@ def dunns_z_test_permute_within_group_pairs(
     group_names (pd.Index): Index list of unique group names.
     rnd (np.random.RandomState): Pseudo-random number generator.
     n_perm (int): Number of permuted samples to generate.
+    values (np.array): sessions x syllables statistic with NaN where a session never used a syllable; those
+        syllables are recomputed over the sessions that used them, and a pair with a group that never used
+        a syllable gets a NaN z for it.
 
     Returns:
     null_zs_within_group (dict): dict of group pair keys paired with vector of Dunn's z-test statistics of the null hypothesis.
@@ -437,7 +508,8 @@ def dunns_z_test_permute_within_group_pairs(
 
         n_mice = is_i.sum() + is_j.sum()
 
-        ranks_perm = real_ranks[(is_i | is_j)][rnd.rand(n_perm, n_mice).argsort(-1)]
+        perm = rnd.rand(n_perm, n_mice).argsort(-1)
+        ranks_perm = real_ranks[(is_i | is_j)][perm]
         diff = np.abs(
             ranks_perm[:, : is_i.sum(), :].mean(1)
             - ranks_perm[:, is_i.sum():, :].mean(1)
@@ -452,8 +524,35 @@ def dunns_z_test_permute_within_group_pairs(
 
         # add to dict
         pair = (i_n, j_n)
-        null_zs_within_group[pair] = diff / np.sqrt((A - X_ties) * B)
-        real_zs_within_group[pair] = real_diff / np.sqrt((A - X_ties) * B)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            null_zs_within_group[pair] = diff / np.sqrt((A - X_ties) * B)
+            real_zs_within_group[pair] = real_diff / np.sqrt((A - X_ties) * B)
+
+        if values is None:
+            continue
+        # a syllable some sessions never used: ranks, sizes and ties over the sessions that did,
+        # with the same permutations restricted to them
+        pair_rows = np.flatnonzero((is_i | is_j).values)
+        n_i_rows = int(is_i.sum())
+        for s in np.flatnonzero(np.isnan(values).any(axis=0)):
+            column = values[:, s]
+            observed = ~np.isnan(column)
+            pair_observed = observed[pair_rows]
+            n_i, n_j = int(pair_observed[:n_i_rows].sum()), int(pair_observed[n_i_rows:].sum())
+            n = int(observed.sum())
+            if n_i == 0 or n_j == 0 or np.ptp(column[observed]) == 0:
+                null_zs_within_group[pair][:, s] = np.nan
+                real_zs_within_group[pair][s] = np.nan
+                continue
+            ranks = np.full(len(column), np.nan)
+            ranks[observed] = stats.rankdata(column[observed])
+            pair_ranks = ranks[pair_rows]
+            scale = np.sqrt((n * (n + 1.0) / 12.0 - get_tie_correction(pd.Series(column[observed]), n))
+                            * (1.0 / n_i + 1.0 / n_j))
+            permuted = pair_ranks[perm[pair_observed[perm]].reshape(n_perm, n_i + n_j)]
+            null_zs_within_group[pair][:, s] = np.abs(permuted[:, :n_i].mean(1) - permuted[:, n_i:].mean(1)) / scale
+            kept = pair_ranks[pair_observed]
+            real_zs_within_group[pair][s] = np.abs(kept[:n_i].mean() - kept[n_i:].mean()) / scale
 
     return null_zs_within_group, real_zs_within_group
 
@@ -486,19 +585,26 @@ def run_pairwise_stats(df, group1, group2, test_type="mw", verbose=False, **kwar
 MannwhitneyuResult = namedtuple("MannwhitneyuResult", ("statistic", "pvalue"))
 
 
-def _one_value_everywhere(x, y):
+def _untestable(*groups):
     """
-    Find the syllables on which every session of both groups holds the same value.
+    Find the syllables a group comparison cannot evaluate.
 
     Args:
-    x (2D array): sessions x syllables for the first group.
-    y (2D array): sessions x syllables for the second group.
+    groups (2D arrays): sessions x syllables for each group; NaN marks a session that never used the syllable.
 
     Returns:
-    (1D bool array): one entry per syllable, True where there is no difference to test.
+    (1D bool array): one entry per syllable, True where a group has no session that used it or every
+    observed value is the same, so there is no difference to test.
     """
 
-    return np.all(x == x[:1], axis=0) & np.all(y == x[:1], axis=0)
+    empty = np.zeros(groups[0].shape[1], dtype=bool)
+    for values in groups:
+        empty |= np.isnan(values).all(axis=0)
+    observed = np.concatenate(groups, axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        spread = np.nanmax(observed, axis=0) - np.nanmin(observed, axis=0)
+    return empty | ~(spread > 0)
 
 
 def mannwhitneyu(x, y):
@@ -566,13 +672,15 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
         group: grouped_data.loc[grouped_data.group == group, range(max_syllable)].values
         for group in (group1, group2)
     }
-    # a syllable with one value in every session has nothing to rank, and gets p = 1
-    constant = _one_value_everywhere(values[group1], values[group2])
-    df_mw_real = pd.DataFrame(
-        [MannwhitneyuResult(len(values[group1]) * len(values[group2]) / 2.0, 1.0) if constant[i]
-         else mannwhitneyu(values[group1][:, i], values[group2][:, i])
-         for i in range(max_syllable)]
-    )
+    # each syllable is ranked over the sessions that used it; one a group never used,
+    # or with one value everywhere, has nothing to rank and gets p = 1
+    untestable = _untestable(values[group1], values[group2])
+    results = []
+    for i in range(max_syllable):
+        x, y = values[group1][:, i], values[group2][:, i]
+        x, y = x[~np.isnan(x)], y[~np.isnan(y)]
+        results.append(MannwhitneyuResult(len(x) * len(y) / 2.0, 1.0) if untestable[i] else mannwhitneyu(x, y))
+    df_mw_real = pd.DataFrame(results)
     return get_sig_syllables(df_mw_real, verbose=verbose, **kwargs)
 
 
@@ -597,6 +705,11 @@ def ztest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     boots = bootstrap_group_means(df, group1, group2, statistic, max_syllable)
     # do a ztest on the bootstrap distributions of your 2 conditions
     pvals_ztest_boots = ztest_vect(boots[group1], boots[group2])
+    # a group with fewer than two sessions that used a syllable gives a bootstrap with no spread,
+    # which says nothing about its variance, so that syllable has nothing to test and gets p = 1
+    group_stat = get_session_mean_df(df, statistic, max_syllable)
+    too_few = (group_stat.loc[group1].notna().sum(0).values < 2) | (group_stat.loc[group2].notna().sum(0).values < 2)
+    pvals_ztest_boots[too_few] = 1.0
     df_z = pd.DataFrame(pvals_ztest_boots, columns=["pvalue"])
     return get_sig_syllables(df_z, verbose=verbose, **kwargs)
 
@@ -624,11 +737,16 @@ def ttest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     groups = (group1, group2)
     usages = {k: group_stat.loc[k].values for k in groups}
     # run t-test
-    df_t = pd.DataFrame(
-        stats.ttest_ind(usages[group1], usages[group2]), index=["t", "pvalue"]
-    ).T
-    # a syllable with one value in every session has no difference to test, and gets p = 1
-    df_t.loc[_one_value_everywhere(usages[group1], usages[group2]), "pvalue"] = 1.0
+    # each syllable is tested over the sessions that used it; scipy warns about the
+    # syllables with too few, which get p = 1 below
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = stats.ttest_ind(usages[group1], usages[group2], nan_policy="omit")
+    df_t = pd.DataFrame(result, index=["t", "pvalue"]).T
+    # a syllable a group never used, with one value everywhere, or too few sessions for a
+    # t statistic has nothing to test, and gets p = 1
+    df_t.loc[_untestable(usages[group1], usages[group2]), "pvalue"] = 1.0
+    df_t["pvalue"] = df_t["pvalue"].fillna(1.0)
     return get_sig_syllables(df_t, verbose=verbose, **kwargs)
 
 

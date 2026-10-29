@@ -167,9 +167,10 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = df.merge(info_df, on='syllable')
         self.df['SubjectName'] = self.df['SubjectName'].astype(str)
         self.df['SessionName'] = self.df['SessionName'].astype(str)
-        # When syllable usage is 0, the scalars will have nan affecting the interactive stat plot
-        # Since syllable usage is 0, the nan in scalars will be filled with 0
-        self.df.fillna(0, inplace=True)
+        # A session that never used a syllable has usage 0 and no value for its scalars; those stay
+        # missing, so each syllable's tests and error bars use the sessions that used it.
+        text = self.df.select_dtypes(include='object').columns
+        self.df[text] = self.df[text].fillna('')
 
     def run_selected_hypothesis_test(self, hyp_test_name, stat, ctrl_group, exp_group):
         """
@@ -236,7 +237,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         sig_sylls = []
 
         # Get current dataFrame to plot
-        df = self.df.fillna(0)
+        df = self.df
 
         # Handle names to query DataFrame with
         stat = self.dropdown_mapping[stat.lower()]
