@@ -447,6 +447,37 @@ def select_strel(string='e', size=(10, 10)):
 
     return strel
 
+#: Nominal depth field of view in degrees (horizontal, vertical) for each depth frame size a
+#: supported camera writes: the Kinect v2, and the Azure Kinect and Orbbec Femto narrow
+#: (75 x 65) and wide (120 x 120) modes, binned and unbinned. The wide modes are fisheye, so
+#: a pinhole conversion of them is approximate away from the image centre.
+_DEPTH_FIELD_OF_VIEW = {
+    (512, 424): (70.6, 60),
+    (640, 576): (75, 65),
+    (320, 288): (75, 65),
+    (512, 512): (120, 120),
+    (1024, 1024): (120, 120),
+}
+
+
+def _depth_camera_geometry(resolution):
+    """
+    Pick the frame size and nominal field of view to convert a recording's pixels to mm with.
+
+    Args:
+    resolution (tuple): (width, height) of the raw depth frames
+
+    Returns:
+    resolution (tuple): the frame size to convert with; a size no supported camera writes is converted as a Kinect v2 frame
+    field_of_view (tuple): nominal (horizontal, vertical) field of view in degrees
+    """
+
+    resolution = tuple(int(n) for n in resolution)
+    if resolution not in _DEPTH_FIELD_OF_VIEW:
+        resolution = (512, 424)
+    return resolution, _DEPTH_FIELD_OF_VIEW[resolution]
+
+
 def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), true_depth=673.1):
     """
     Converts x, y coordinates in pixel space to mm.
