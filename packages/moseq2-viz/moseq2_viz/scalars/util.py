@@ -42,7 +42,7 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     Args:
     coords (list): list of [x,y] pixel coordinate lists.
     resolution (tuple): video frame size.
-    field_of_view (tuple): camera focal lengths.
+    field_of_view (tuple): nominal (horizontal, vertical) field of view of the depth camera, in degrees
     true_depth (float): detected distance between depth camera and bucket floor.
 
     Returns:

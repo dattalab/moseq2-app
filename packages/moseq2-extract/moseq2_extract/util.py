@@ -485,7 +485,7 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     Args:
     coords (list): list of x,y pixel coordinates
     resolution (tuple): image dimensions
-    field_of_view (tuple): width and height scaling params
+    field_of_view (tuple): nominal (horizontal, vertical) field of view of the depth camera, in degrees
     true_depth (float): detected true depth
 
     Returns:
