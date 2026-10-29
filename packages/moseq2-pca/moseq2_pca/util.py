@@ -145,17 +145,18 @@ def gaussian_kernel1d(n=None, sig=3):
     Get 1D gaussian kernel.
 
     Args:
-    n (int): window size.
+    n (int): half-width of the window in samples, rounded down to a whole sample.
     sig (int): variance of kernel to use.
 
     Returns:
-    kernel (1d array): 1D numpy kernel.
+    kernel (1d array): 1D numpy kernel, centred on zero.
     """
 
     if n is None:
         n = np.ceil(sig * 4)
+    n = int(n)
 
-    points = np.arange(-n, n)
+    points = np.arange(-n, n + 1)
 
     kernel = np.exp(-(points**2.0) / (2.0 * sig**2.0))
     kernel /= np.sum(kernel)
@@ -660,7 +661,9 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
     Args:
     scores (numpy.ndarray): nframes * rows * columns
     k (int): klags - Lag to use for derivative calculation.
-    sigma (int): Standard deviation of gaussian smoothing filter.
+    sigma (float): Half-width of the smoothing window in frames, rounded down to whole frames. The Gaussian inside it
+    has a standard deviation of 1.5 frames. Also sets how many frames are trimmed from each end of the changepoint
+    curve (6 * sigma).
     peak_height (float): user-defined peak Changepoint length.
     peak_neighbors (int): number of peaks in the CP curve.
     baseline (bool): normalize data.
