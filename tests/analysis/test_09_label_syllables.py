@@ -270,18 +270,11 @@ def test_the_dropdown_opens_on_the_first_syllable(analysis_paths, labeled, displ
     assert list(dropdown.options)[0].startswith("0 - ")
 
 
-@pytest.mark.xfail(
-    reason="interactive_syllable_labeler_wrapper defines on_syll_change and "
-    "registers it with output.observe after its own return statement, so "
-    "neither ever runs. Nothing is lost by it: interactive_output already "
-    "redraws the view when the dropdown changes."
-)
 def test_the_wrapper_runs_everything_it_contains():
-    """12. Statements the function can never reach.
+    """12. Nothing in the wrapper sits after its return.
 
-    The last thing in the wrapper is a handler meant to redraw the view
-    when a user picks a different syllable, together with the call that
-    registers it. Both sit after the function has returned.
+    ``interactive_output`` redraws the view when a user picks a different
+    syllable, so the wrapper needs no handler of its own for that.
     """
     import ast
     import inspect
