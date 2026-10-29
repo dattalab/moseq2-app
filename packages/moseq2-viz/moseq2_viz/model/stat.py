@@ -21,14 +21,17 @@ def get_session_mean_df(df, statistic="usage", max_syllable=40):
     max_syllable (int): the index of the maximum number of syllables to include
 
     Returns:
-    df_pivot (pandas.DataFrame): Mean syllable statistic per session.
+    df_pivot (pandas.DataFrame): Mean syllable statistic per session, one column per syllable below max_syllable.
+    A session that never used a syllable has a usage of 0 and a missing (NaN) value for every other statistic.
     """
 
     df_pivot = (
         df[df.syllable < max_syllable]
             .pivot_table(index=["group", "uuid"], columns="syllable", values=statistic)
-            .replace(np.nan, 0)
+            .reindex(columns=range(max_syllable))
     )
+    if statistic == "usage":
+        df_pivot = df_pivot.fillna(0)
 
     return df_pivot
 
