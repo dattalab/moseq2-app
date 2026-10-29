@@ -482,7 +482,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     print(f'Extraction Progress: {num_extracted} out of {len(path_dict)} session(s) extracted')
 
     info_print = f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress)} items finished'
-    if sum(pca_progress.values()) == len(pca_progress):
+    if sum(pca_progress.values()) != len(pca_progress):
         _items = ", ".join(key for key, v in pca_progress.items() if not v)
         append_print = f': {_items} left'
         info_print += append_print
