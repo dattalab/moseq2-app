@@ -91,10 +91,11 @@ def compute_and_graph_grouped_TMs(config_data, labels, label_group, group):
                                         headless=True)
     # manually add legend for the difference graph
     if len(group) >1:
-        legend_elements = [Line2D([0], [0], color='b', lw=2, label= f'Up-regulated transition'),
-                           Line2D([0], [0], color='r', lw=2, label= f'Down-regulated transition'),
-                           Line2D([0], [0], marker='o', color='w', label=f'Up-regulated usage',markerfacecolor='w', markeredgecolor = 'b', markersize=10),
-                           Line2D([0], [0], marker='o', color='w', label=f'Down-regulated usage',markerfacecolor='w', markeredgecolor = 'r', markersize=10)]
+        # difference panels are titled 'b - a', and blue means higher in b
+        legend_elements = [Line2D([0], [0], color='b', lw=2, label='Transition more likely in the first group of the panel title'),
+                           Line2D([0], [0], color='r', lw=2, label='Transition less likely in the first group of the panel title'),
+                           Line2D([0], [0], marker='o', color='w', label='Usage higher in the first group of the panel title', markerfacecolor='w', markeredgecolor='b', markersize=10),
+                           Line2D([0], [0], marker='o', color='w', label='Usage lower in the first group of the panel title', markerfacecolor='w', markeredgecolor='r', markersize=10)]
         plt.legend(handles = legend_elements, loc='upper left')
 
     return plt

@@ -721,9 +721,8 @@ def get_minmax_tp(edge_width, diff=False, signed_weights=None):
             return 0, 0
         return min(values), max(values)
 
-    # Classify up/down by the SIGNED weight. edge_width is built with abs(), so
-    # filtering it by `< 0` previously matched nothing and the down-regulated
-    # legend always displayed 0.
+    # Split the two directions by the signed weight: edge_width is built with abs(),
+    # so its sign carries no direction.
     down = [abs(w) for w in weights.values() if w < 0]
     up = [w for w in weights.values() if w > 0]
 
@@ -755,7 +754,8 @@ def get_difference_legend_items(plot, edge_width, group_name, signed_weights=Non
     r_circle = plot.scatter(marker='circle', line_color='red', fill_color='white')
     b_circle = plot.scatter(marker='circle', line_color='blue', fill_color='white')
 
-    G1 = group_name.split('-')[0]
+    # difference graphs are titled 'b - a': blue is higher in b, red lower
+    first, _, second = group_name.partition(' - ')
 
     min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True, signed_weights=signed_weights)
 
@@ -766,17 +766,17 @@ def get_difference_legend_items(plot, edge_width, group_name, signed_weights=Non
     max_up_line = plot.line(line_color='blue', line_width=abs(max_up_tp) * DIFF_EDGE_WIDTH_SCALE)
 
     diff_main_items = [
-        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[b_circle]),
-        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[r_circle]),
-        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[b_line]),
-        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[r_line]),
+        LegendItem(label=f"Usage higher in {first} than {second}", renderers=[b_circle]),
+        LegendItem(label=f"Usage lower in {first} than {second}", renderers=[r_circle]),
+        LegendItem(label=f"Transition more likely in {first} than {second}", renderers=[b_line]),
+        LegendItem(label=f"Transition less likely in {first} than {second}", renderers=[r_line]),
     ]
 
     diff_width_items = [
-        LegendItem(label=f"Min Up-regulated P(transition): {min_up_tp:.4f}", renderers=[min_up_line]),
-        LegendItem(label=f"Max Up-regulated P(transition): {max_up_tp:.4f}", renderers=[max_up_line]),
-        LegendItem(label=f"Min Down-regulated P(transition): {min_down_tp:.4f}", renderers=[min_down_line]),
-        LegendItem(label=f"Max Down-regulated P(transition): {max_down_tp:.4f}", renderers=[max_down_line]),
+        LegendItem(label=f"Thinnest blue edge: {first} higher by {min_up_tp:.4f}", renderers=[min_up_line]),
+        LegendItem(label=f"Thickest blue edge: {first} higher by {max_up_tp:.4f}", renderers=[max_up_line]),
+        LegendItem(label=f"Thinnest red edge: {first} lower by {min_down_tp:.4f}", renderers=[min_down_line]),
+        LegendItem(label=f"Thickest red edge: {first} lower by {max_down_tp:.4f}", renderers=[max_down_line]),
     ]
 
     return diff_main_items, diff_width_items
