@@ -28,6 +28,7 @@ of the cell finds them on disk and reuses them.
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 import ipywidgets as widgets
@@ -306,3 +307,61 @@ def test_the_wrapper_runs_everything_it_contains():
     assert not returns or returns[-1] == len(body) - 1, (
         f"{len(body) - 1 - returns[-1]} statements follow the return"
     )
+
+
+@pytest.fixture(scope="module")
+def moved(tmp_path_factory, analysis_project, labeled):
+    """The labelled project copied elsewhere, holding movies a user might have.
+
+    The copy's label file still points at the original's movies, so opening
+    the labeller in the copy reads its crowd-movie directory afresh. Two
+    things are put in that directory first: one movie renamed the way
+    moseq2-viz named them before late 2020, with a space where the
+    underscore now is, and an .mp4 that is not a crowd movie at all.
+
+    Returns the copy's label file as the cell left it, its crowd-movie
+    directory, and the renamed movie.
+    """
+    root = tmp_path_factory.mktemp("moved")
+    shutil.copytree(analysis_project, root, dirs_exist_ok=True)
+    progress = root / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(root)))
+    paths = read_yaml(str(progress))
+
+    crowd = Path(paths["crowd_dir"])
+    first = next(m for m in crowd.glob("*.mp4") if int(MOVIE_NAME.search(m.name)["sorted_id"]) == 0)
+    ids = MOVIE_NAME.search(first.name)
+    older = crowd / (
+        f"syllable_sorted-id-{int(ids['sorted_id'])} ({ids['sort_type']})"
+        f"_original-id-{int(ids['original_id'])}.mp4"
+    )
+    first.rename(older)
+    (crowd / "notes.mp4").write_bytes(b"not a crowd movie")
+
+    label_syllables(paths, **LABELLING)
+    return read_yaml(paths["syll_info"]), crowd, older
+
+
+def test_every_syllable_finds_its_movie_beside_an_unrelated_one(moved, labeled):
+    """13. A crowd-movie directory can hold files the cell did not write.
+
+    Each syllable's movie is found by reading its ids out of the filename,
+    and a file whose name carries none is passed over rather than read.
+    """
+    syll_info, crowd, _ = moved
+    for syllable in range(labeled):
+        movie = Path(syll_info[syllable]["crowd_movie_path"])
+        assert movie.parent == crowd, f"syllable {syllable} still points at {movie}"
+        assert movie.exists(), f"syllable {syllable} points at {movie}, which is not there"
+        assert movie.name != "notes.mp4"
+
+
+def test_a_movie_named_by_an_older_moseq2_viz_is_found(moved):
+    """14. Projects keep the crowd movies they were given.
+
+    moseq2-viz put a space before the sort type until late 2020 and an
+    underscore since. A project whose movies predate the change still has
+    them under the old name.
+    """
+    syll_info, _, older = moved
+    assert Path(syll_info[0]["crowd_movie_path"]) == older

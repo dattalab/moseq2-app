@@ -366,10 +366,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
         info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
 
         if set(crowd_movie_paths) != set(info_cm_paths):
-            exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d{1,3}).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d{1,3})')
+            exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d+).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d+)')
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                match_groups = exp.search(cm).groupdict()
+                match = exp.search(cm)
+                if match is None:
+                    continue
+                match_groups = match.groupdict()
                 match_groups = {k: int(v) if v.isdigit() else v for k, v in match_groups.items()}
                 sorted_num = match_groups['sorted_id']
                 if sorted_num in self.syll_info:
