@@ -149,6 +149,21 @@ def test_the_percentage_behind_a_flag_is_printed(reviewable):
     ), f"no percentage behind the flag:\n{printed}"
 
 
+
+def test_a_directory_named_for_mp4_does_not_hide_recordings(tmp_path, extracted):
+    """7. The report finds every recording wherever the project is kept.
+
+    Each recording's .h5 and .yaml are found by swapping its .mp4's
+    extension, and nothing else in the path is the extension.
+    """
+    root = tmp_path / "mp4_archive" / "project"
+    shutil.copytree(extracted, root)
+    flagged = re.search(r"(\d+)/(\d+) were flagged with warning\(s\)\.", report(root))
+
+    assert flagged, "no count in the report"
+    assert int(flagged.group(2)) == len(RECORDINGS)
+
+
 def section(printed, recording):
     """The part of the report belonging to one recording."""
     blocks = printed.split("Session: ")
