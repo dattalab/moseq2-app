@@ -16,7 +16,7 @@ import moseq2_extract.io.video
 import moseq2_extract.extract.roi
 from os.path import exists, join, dirname
 from moseq2_extract.io.image import read_image, write_image
-from moseq2_extract.util import convert_pxs_to_mm, strided_app
+from moseq2_extract.util import _depth_camera_geometry, convert_pxs_to_mm, strided_app
 from moseq2_extract.extract.flip_classifier import (
     load_flip_classifier,
     is_legacy_pickle_failure,
@@ -537,7 +537,8 @@ def _area_px_to_mm2(area_px, px_to_mm):
     return area_px * px_to_mm[:, 0] * px_to_mm[:, 1]
 
 
-def compute_scalars(frames, track_features, min_height=10, max_height=100, true_depth=673.1):
+def compute_scalars(frames, track_features, min_height=10, max_height=100, true_depth=673.1,
+                    resolution=(512, 424)):
     """
     Compute extracted scalars.
 
@@ -547,6 +548,7 @@ def compute_scalars(frames, track_features, min_height=10, max_height=100, true_
     min_height (float): minimum height of the mouse
     max_height (float): maximum height of the mouse
     true_depth (float): detected true depth
+    resolution (tuple): (width, height) of the raw depth frames, which picks the camera field of view the mm scalars use
 
     Returns:
     features (dict): dictionary of scalars
@@ -575,9 +577,12 @@ def compute_scalars(frames, track_features, min_height=10, max_height=100, true_
         'velocity_theta': np.zeros((nframes,)),
     }
 
-    # Get mm centroid
-    centroid_mm = convert_pxs_to_mm(track_features['centroid'], true_depth=true_depth)
-    centroid_mm_shift = convert_pxs_to_mm(track_features['centroid'] + 1, true_depth=true_depth)
+    # Get mm centroid, with the field of view of the camera that writes this frame size
+    resolution, field_of_view = _depth_camera_geometry(resolution)
+    centroid_mm = convert_pxs_to_mm(track_features['centroid'], resolution=resolution,
+                                    field_of_view=field_of_view, true_depth=true_depth)
+    centroid_mm_shift = convert_pxs_to_mm(track_features['centroid'] + 1, resolution=resolution,
+                                          field_of_view=field_of_view, true_depth=true_depth)
 
     # Based on the centroid of the mouse, get the mm_to_px conversion
     px_to_mm = np.abs(centroid_mm_shift - centroid_mm)
