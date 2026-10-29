@@ -316,12 +316,11 @@ def print_validation_results(scalar_df, status_dicts):
         for k1, v1 in print_dict[k].items():
             if k1 != 'metadata':
                 # scalar anomaly flag
-                if v1:
+                if isinstance(v1, float) and v1:
+                    x = f'{k1} flag raised: {v1*100:.2f}%'
+                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}')
+                elif v1:
                     x = f'{k1} flag raised'
                     print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}')
-                # all the other flags
-                elif isinstance(v1, float):
-                    x = f'{k1} flag raised: {v1*100:.2f}%'
-                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}') 
         # I assume this is printing a new line
         print()
