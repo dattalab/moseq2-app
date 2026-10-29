@@ -395,7 +395,7 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
     )(function)
     function = click.option(
         "--movie-dtype",
-        default="<i2",
+        default="<u2",
         help="Data type for raw frames read in for extraction",
     )(function)
     function = click.option(

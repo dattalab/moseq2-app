@@ -148,14 +148,14 @@ def test_every_recording_gets_the_same_parameters(arena):
         } == reference, f"{name} was detected differently"
 
 
-def test_saved_parameters_differ_from_the_configuration_in_two_places(arena, configured):
+def test_saved_parameters_differ_from_the_configuration_in_one_place(arena, configured):
     """4. Everything that separates a recording's parameters from the project's.
 
     ``detect_and_set_camera_parameters`` reads each recording and may override
     the depth and filter parameters for the camera it finds. For these kinect2
-    recordings it corrects one thing: the raw depth video holds unsigned
-    16-bit samples, and the generated config says signed. The other difference
-    comes from saving, which marks the depth range as manually set.
+    recordings the generated config already matches, including the unsigned
+    16-bit samples of the raw depth video. The one difference comes from
+    saving, which marks the depth range as manually set.
 
     Nothing else moves, which is why the walkthrough's own session config
     holds the generated defaults: there was nothing in it that needed tuning.
@@ -166,8 +166,7 @@ def test_saved_parameters_differ_from_the_configuration_in_two_places(arena, con
     differing = {
         key for key in saved if key not in PATH_KEYS and config.get(key) != saved[key]
     }
-    assert differing == {"movie_dtype", "manual_set_depth_range"}
-    assert (config["movie_dtype"], saved["movie_dtype"]) == ("<i2", "<u2")
+    assert differing == {"manual_set_depth_range"}
 
 
 def test_the_configuration_points_at_the_parameter_file(arena, configured, progress_file):
