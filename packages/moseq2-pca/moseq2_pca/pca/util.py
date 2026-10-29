@@ -304,7 +304,7 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
                 # Reshape the data to 2D matrix
                 frames = frames.reshape(-1, frames.shape[1] * frames.shape[2])
 
-                timestamps = get_timestamps(f, frames, fps)
+                timestamps = get_timestamps(f, f[h5_path], fps)
                 copy_metadatas_to_scores(f, f_scores, uuid)
 
             # Compute scores
@@ -431,7 +431,7 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
 
                 with h5py.File(h5s_batch[file_idx], mode='r') as f:
                     # Load timestamps
-                    timestamps = get_timestamps(f, frames, fps)
+                    timestamps = get_timestamps(f, f[h5_path], fps)
                     copy_metadatas_to_scores(f, f_scores, uuids_batch[file_idx])
 
                 # Insert NaNs in missing frames in scores array
