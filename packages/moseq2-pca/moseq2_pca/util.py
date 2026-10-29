@@ -688,6 +688,9 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
     normed_df[:, k // 2:-k // 2] = (normed_df[:, k:] - normed_df[:, :-k])**2
 
     normed_df[nanidx] = np.nan
+    # frames outside the lag window have no squared difference
+    normed_df[:, :k // 2] = np.nan
+    normed_df[:, -k // 2:] = np.nan
     if sigma is not None and sigma > 0:
         edge = int(6 * sigma)
         if edge > 0:
