@@ -1,7 +1,7 @@
 """Cell 11: compare the groups, syllable by syllable.
 
     from moseq2_app.main import interactive_syllable_stats
-    interactive_syllable_stats(progress_paths, max_syllable=max_syllables, load_parquet=True)
+    interactive_syllable_stats(progress_paths, max_syllable=max_syllables)
 
 The cell the experiment is read out of. It plots a statistic for every
 syllable, sorted however a user asks, with the groups side by side and
@@ -31,9 +31,7 @@ import pytest
 from moseq2_app.main import interactive_syllable_stats
 from moseq2_app.stat.controller import InteractiveSyllableStats
 
-#: What the cell asks for. ``load_parquet`` tells the widget it may reuse
-#: a cached dataframe rather than rebuilding it from the recordings.
-VIEWER = {"load_parquet": True}
+from conftest import LABELLING
 
 #: Every hypothesis test the widget offers, by the name on the dropdown.
 TESTS = ("KW & Dunn's", "Z-Test", "T-Test", "Mann-Whitney")
@@ -49,10 +47,8 @@ def viewer(analysis_paths, labeled):
     return InteractiveSyllableStats(
         index_path=analysis_paths["index_file"],
         model_path=analysis_paths["model_path"],
-        df_path=analysis_paths["df_info_path"],
         info_path=analysis_paths["syll_info"],
         max_sylls=labeled,
-        load_parquet=VIEWER["load_parquet"],
     )
 
 
@@ -72,7 +68,7 @@ def significant(viewer):
 
 def test_the_cell_displays_the_controls_and_the_plot(analysis_paths, labeled, displayed):
     """1. What a user is given: a reset, the controls, and the figure."""
-    assert interactive_syllable_stats(analysis_paths, max_syllable=labeled, **VIEWER) is None
+    assert interactive_syllable_stats(analysis_paths, max_syllable=labeled) is None
 
     assert [type(obj).__name__ for obj in displayed.objects] == ["Button", "VBox", "Output"]
     assert displayed.one(widgets.Button).description == "Clear Output"
@@ -173,21 +169,32 @@ def test_an_unknown_test_name_is_refused(viewer):
         )
 
 
-@pytest.mark.xfail(
-    reason="the cell asks for the cached dataframe by setting load_parquet=True, "
-    "and the progress file names it, but the two lines that would write it in "
-    "SyllableLabeler.get_mean_syllable_info are commented out. Every run of "
-    "cells 11 and 14 rebuilds it from the recordings instead."
-)
-def test_the_cached_dataframe_the_cell_asks_for_exists(analysis_paths, labeled):
-    """9. What ``load_parquet=True`` is supposed to save.
+@pytest.mark.parametrize("cell", [9, 11, 14])
+def test_a_dataframe_left_by_an_older_version_is_not_read(analysis_paths, labeled, displayed, cell):
+    """9. The syllable table is built from the recordings every time.
 
-    Building the syllable dataframe means reading every recording's
-    scalars and joining them against the model's labels. Cells 11 and 14
-    each do it, and cell 9 was to have written the result once under
-    ``df_info_path`` for them to read back.
+    Releases before 2023 saved it as ``syll_df.parquet`` in the model's
+    folder, and their progress files name it as ``df_info_path``. A file
+    left there holds an older version's columns and whichever model was
+    current then, so no cell reads it, and ``load_parquet``, which older
+    copies of the notebook still pass, changes nothing.
     """
-    assert Path(analysis_paths["df_info_path"]).exists()
+    from moseq2_app.main import interactive_transition_graph, label_syllables
+
+    leftover = Path(analysis_paths["model_session_path"]) / "syll_df.parquet"
+    leftover.write_bytes(b"written by an older moseq2-app")
+    paths = {**analysis_paths, "df_info_path": str(leftover)}
+    try:
+        if cell == 9:
+            label_syllables(paths, **LABELLING)
+        elif cell == 11:
+            interactive_syllable_stats(paths, max_syllable=labeled, load_parquet=True)
+        else:
+            interactive_transition_graph(
+                paths, max_syllables=labeled, plot_vertically=True, load_parquet=True
+            )
+    finally:
+        leftover.unlink(missing_ok=True)
 
 
 #: A scalar some sessions have no value for: a session that never used a

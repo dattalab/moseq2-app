@@ -222,8 +222,7 @@ def labeled(analysis_project, analysis_paths):
     session = analysis_paths["model_session_path"]
 
     update_progress(progress_file, "crowd_dir", join(session, "crowd_movies/"))
-    update_progress(progress_file, "syll_info", join(session, "syll_info.yaml"))
-    paths = update_progress(progress_file, "df_info_path", join(session, "syll_df.parquet"))
+    paths = update_progress(progress_file, "syll_info", join(session, "syll_info.yaml"))
 
     return label_syllables(paths, **LABELLING)
 

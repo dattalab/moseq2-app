@@ -33,7 +33,6 @@ DERIVED = {
     "plot_path": "cells 8 and 12 save their figures there",
     "crowd_dir": "cell 9 writes one movie per syllable into it",
     "syll_info": "cell 9 writes the labels a user types into it",
-    "df_info_path": "cells 9, 11 and 14 cache the syllable dataframe there",
 }
 
 
@@ -72,7 +71,7 @@ def test_the_model_is_copied_into_its_folder_and_left_where_it_was(
 
 
 def test_the_progress_file_now_names_everything_the_later_cells_write(analysis_paths):
-    """3. The four output paths, and the model they belong to."""
+    """3. The three output paths, and the model they belong to."""
     missing = {k: why for k, why in DERIVED.items() if k not in analysis_paths}
     assert not missing, f"cell 2 did not record: {missing}"
 

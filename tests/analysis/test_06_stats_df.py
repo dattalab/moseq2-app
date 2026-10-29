@@ -14,9 +14,8 @@ much of that session was this syllable, how long its bouts ran, and what
 the mouse's speed, size and posture were while it was performing it.
 
 Every remaining cell reads this table. The dendrogram clusters its
-scalars, the fingerprint plots them, the hypothesis tests in cell 11
-compare its usages between groups, and cells 11 and 14 cache it to
-parquet.
+scalars, the fingerprint plots them, and the hypothesis tests in cell 11
+compare its usages between groups.
 
 ``count`` is the one real choice. ``usage`` counts how often a syllable
 *started*, ``frames`` how many frames it occupied, and they rank syllables
@@ -175,8 +174,8 @@ def test_the_table_records_which_labelling_it_was_built_from(stats_df):
     The cell renames whichever label column it was given to ``syllable``,
     so by itself the result does not say whether syllable 0 is the most
     used, the most frequent by frames, or the model's own numbering.
-    Cells 9, 11 and 14 cache this table to parquet and read it back, which
-    is where a mismatch would otherwise go unnoticed.
+    Cell 7 exports this table to csv, and this column is what tells a
+    reader of that file which numbering it holds.
     """
     assert stats_df["syllable key"].unique().tolist() == [STATISTICS["syllable_key"]]
 
