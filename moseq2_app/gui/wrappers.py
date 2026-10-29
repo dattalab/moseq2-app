@@ -7,7 +7,7 @@ import shutil
 import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
-from IPython.display import display, clear_output
+from IPython.display import display
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
                                    compute_syllable_explained_variance)
@@ -84,20 +84,6 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
     display(labeler.clear_button, labeler.syll_select, output)
     return max_sylls
-
-    def on_syll_change(change):
-        """
-        select a different syllable number from the Dropdown menu
-
-        Args:
-        change (ipywidget DropDown select event): User changes current value of DropDownMenu
-        """
-
-        clear_output(wait=True)
-        display(labeler.syll_select, output)
-
-    # Update view when user selects new syllable from DropDownMenu
-    output.observe(on_syll_change, names='value')
 
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
                                                df_path=None, get_pdfs=True, load_parquet=False):
