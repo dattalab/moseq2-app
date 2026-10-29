@@ -635,10 +635,10 @@ def feature_hampel_filter(features, centroid_hampel_span=None, centroid_hampel_s
 
     Args:
     features (dict): dictionary of video features
-    centroid_hampel_span (int): Centroid Hampel Span Filtering Kernel Size
-    centroid_hampel_sig (int): Centroid Hampel Signal Filtering Kernel Size
-    angle_hampel_span (int): Angle Hampel Span Filtering Kernel Size
-    angle_hampel_sig (int): Angle Hampel Span Filtering Kernel Size
+    centroid_hampel_span (int): window size in frames for the centroid filter; 0 or None turns it off
+    centroid_hampel_sig (float): standard deviations (1.4826 x the window's median absolute deviation) beyond which a centroid coordinate is replaced by the window median
+    angle_hampel_span (int): window size in frames for the angle filter; 0 or None turns it off
+    angle_hampel_sig (float): standard deviations (1.4826 x the window's median absolute deviation) beyond which an angle is replaced by the window median
 
     Returns:
     features (dict): filtered version of input dict.
