@@ -344,24 +344,21 @@ def test_filter_sizes_are_read_as_python_literals(scratch, typed, expected):
 
 
 @pytest.mark.parametrize("typed", ["3 by 3", "", "three"])
-@pytest.mark.xfail(
-    reason="the text is passed to eval() with a fallback for a value of the "
-    "wrong type but none for text that does not parse"
+@pytest.mark.parametrize(
+    ("box", "key", "fallback"),
+    [("spatial_filter", "spatial_filter_size", [3]), ("temporal_filter", "temporal_filter_size", [0])],
 )
-def test_a_filter_size_that_is_not_python_falls_back(scratch, typed):
-    """Text that makes no sense as a filter size should fall back, as a value
-    of the wrong type already does.
+def test_a_filter_size_that_is_not_python_falls_back(scratch, typed, box, key, fallback):
+    """Text that makes no sense as a filter size falls back, as a value of the
+    wrong type does, and the save goes ahead.
 
-    What happens instead is that the exception comes out of the button
-    callback: ``SyntaxError`` for prose or for an empty box, ``NameError`` for
-    a bare word. A notebook shows it as a traceback under the widget and the
-    save does not happen. Clearing the box is the likeliest way to reach it.
+    Clearing the box is the likeliest way to reach it.
     """
     _, data, buttons = open_widget(scratch)
-    data.spatial_filter = typed
+    setattr(data, box, typed)
     click(buttons["Save session parameters"])
 
-    assert parameters(scratch / "session_config.yaml", data.path)["spatial_filter_size"] == [3]
+    assert parameters(scratch / "session_config.yaml", data.path)[key] == fallback
 
 
 @pytest.mark.xfail(

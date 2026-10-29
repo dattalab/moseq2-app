@@ -125,7 +125,11 @@ class ArenaMaskWidget:
         session['noise_tolerance'] = self.session_data.noise_tolerance
         session['pixel_format'] = self.session_data.pixel_format
         # some simple cleanup for the spatial filter. Maybe should be more sophisticated? or move to the data class?
-        spatial_filter = eval(self.session_data.spatial_filter)
+        try:
+            spatial_filter = eval(self.session_data.spatial_filter)
+        except Exception:
+            # text that is not a value at all takes the same fallback as a value of the wrong type
+            spatial_filter = None
         if isinstance(spatial_filter, (int, float)):
             spatial_filter = [int(spatial_filter)]
         elif not isinstance(spatial_filter, (list, tuple)):
@@ -133,7 +137,11 @@ class ArenaMaskWidget:
             spatial_filter = [3]
         session['spatial_filter_size'] = spatial_filter
 
-        temporal_filter = eval(self.session_data.temporal_filter)
+        try:
+            temporal_filter = eval(self.session_data.temporal_filter)
+        except Exception:
+            # text that is not a value at all takes the same fallback as a value of the wrong type
+            temporal_filter = None
         if isinstance(temporal_filter, (int, float)):
             temporal_filter = [int(temporal_filter)]
         elif not isinstance(temporal_filter, (list, tuple)):
