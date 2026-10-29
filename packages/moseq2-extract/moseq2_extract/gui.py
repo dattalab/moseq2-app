@@ -180,9 +180,7 @@ def extract_found_sessions(
         tmp = recursive_find_unextracted_dirs(input_dir, extension=ex, skip_checks=True)
         to_extract += [e for e in tmp if e.endswith(ex)]
 
-    # filter out any incorrectly returned sessions
-    temp = sorted([sess_dir for sess_dir in to_extract if "/tmp/" not in sess_dir])
-    to_extract = get_selected_sessions(temp, extract_all)
+    to_extract = get_selected_sessions(sorted(to_extract), extract_all)
 
     # read in the config file
     config_data = read_yaml(config_file)
