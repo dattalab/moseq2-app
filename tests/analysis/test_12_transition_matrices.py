@@ -7,7 +7,8 @@
     group = list(set(label_group))
     trans_mats, usages = get_group_trans_mats(model_data['labels'], label_group, group,
                                               max_syllables, normalize=normalize)
-    fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True)
+    fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True, squeeze=False)
+    ax = ax[0]
     ...
     fig.savefig(join(progress_paths['plot_path'], f'{normalize}_transition_matrix.{ext}'))
 
@@ -214,22 +215,19 @@ def test_the_figure_is_named_after_what_it_shows(figure):
     assert (plots / f"{NORMALIZE}_transition_matrix.png").exists()
 
 
-@pytest.mark.xfail(
-    reason="plt.subplots(1, 1) returns a bare Axes rather than an array of one, "
-    "and the cell indexes ax[i], so a pilot experiment with a single condition "
-    "dies with TypeError: 'Axes' object is not subscriptable"
-)
 def test_an_experiment_with_one_condition_still_plots(
     analysis_paths, labeled, transitions, tmp_path
 ):
     """9. The first thing anyone runs is a pilot.
 
     A project with one group is the normal starting point: a handful of
-    animals, no comparison yet, just a look at what the model found.
-    Every cell before this one handles it. This one builds its axes from
-    the number of groups and then assumes there is more than one.
+    animals, no comparison yet, just a look at what the model found. The
+    cell draws its one matrix and saves the figure.
     """
     one_group = transitions["group"][:1]
     matrices = transitions["trans_mats"][:1]
 
-    draw_matrices(matrices, one_group, labeled, NORMALIZE, str(tmp_path))
+    drawn = draw_matrices(matrices, one_group, labeled, NORMALIZE, str(tmp_path))
+
+    assert [axis.get_title() for axis in drawn.axes if axis.get_title()] == list(one_group)
+    assert (tmp_path / f"{FIGURE}.png").exists()
