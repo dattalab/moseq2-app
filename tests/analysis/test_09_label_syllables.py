@@ -98,22 +98,16 @@ def syllable_coverage(model_path):
 def test_the_number_is_where_the_curve_crosses_the_threshold(analysis_paths, labeled):
     """2. What the returned number is, exactly.
 
-    It is the position on the cumulative usage curve at which the
-    requested share is first reached, counting from zero: everything
-    below it falls short and it is the first that does not.
+    It is the fewest syllables, best used first, that reach the requested
+    share of the cumulative usage curve: that many reach it and one fewer
+    falls short.
     """
     coverage = syllable_coverage(analysis_paths["model_path"])
 
-    assert coverage[labeled] >= LABELLING["n_explained"]
-    assert coverage[labeled - 1] < LABELLING["n_explained"]
+    assert coverage[labeled - 1] >= LABELLING["n_explained"]
+    assert coverage[labeled - 2] < LABELLING["n_explained"]
 
 
-@pytest.mark.xfail(
-    reason="the number returned is the index at which the curve crosses the "
-    "threshold, and every later cell uses it as a count. Keeping that many "
-    "syllables keeps the ones below the crossing, which by construction fall "
-    "short of the requested share; one more would be needed to reach it."
-)
 def test_the_syllables_actually_kept_cover_what_was_asked_for(analysis_paths, labeled):
     """3. What a user believes they set.
 
