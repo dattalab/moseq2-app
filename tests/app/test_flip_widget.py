@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from moseq2_app.flip import widget
+from video import count_frames
 
 NFRAMES = 12
 
@@ -57,3 +58,19 @@ def test_each_chunk_corrects_its_own_angles(session):
     correct(subject, chunk_size=4)
     with h5py.File(path) as f:
         np.testing.assert_allclose(f["scalars/angle"][()], np.pi)
+
+
+def test_overlapping_chunks_correct_each_frame_once(session):
+    """A frame shared by two chunks is rotated and its angle moved only once."""
+    subject, path, original = session
+    correct(subject, chunk_size=5, chunk_overlap=2)
+    with h5py.File(path) as f:
+        np.testing.assert_array_equal(f["frames"][()], np.rot90(original, 2, axes=(1, 2)))
+        np.testing.assert_allclose(f["scalars/angle"][()], np.pi)
+
+
+def test_overlapping_chunks_write_each_frame_to_the_movie_once(session):
+    """The flipped movie holds one frame per extracted frame."""
+    subject, path, _ = session
+    correct(subject, chunk_size=5, chunk_overlap=2, write_movie=True)
+    assert count_frames(str(path).replace(".h5", "_flipped.mp4")) == NFRAMES
