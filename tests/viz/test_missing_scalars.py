@@ -15,7 +15,9 @@ import pytest
 
 import scipy.stats
 
-from moseq2_viz.model.stat import bootstrap_group_means, mann_whitney, run_kruskal, ttest, ztest
+from moseq2_viz.model.stat import (
+    bootstrap_group_means, compute_pvalues_for_group_pairs, mann_whitney, run_kruskal, ttest, ztest,
+)
 
 SESSIONS = 10
 
@@ -112,3 +114,42 @@ def test_a_group_that_never_used_a_syllable_is_left_out_of_its_comparison():
     assert df_k.loc[0, "statistic"] == pytest.approx(scipy.stats.kruskal(*observed).statistic)
     assert 0 in sig[("a", "b")]
     assert 0 not in sig[("a", "c")] and 0 not in sig[("b", "c")]
+
+
+def one_session_each(a_duration, b_duration):
+    """Syllable 0 used by one session in each group; syllable 1, used by everyone, keeps every session."""
+    everyone = range(SESSIONS)
+    return stats(used={("a", 0): [0], ("b", 0): [0], ("a", 1): everyone, ("b", 1): everyone},
+                 durations={("a", 0): a_duration, ("b", 0): b_duration, ("a", 1): 0.5, ("b", 1): 0.5})
+
+
+def test_one_session_against_one_is_not_a_certain_difference():
+    """Two single sessions cannot show a difference: every permutation ties, and one session has no spread."""
+    table = one_session_each(0.7, 0.97)
+    df_k, _, sig = run_kruskal(table, statistic="duration", max_syllable=2, n_perm=999)
+    assert df_k.loc[0, "p_adj"] == 1.0 and 0 not in sig[("a", "b")]
+    assert ztest(table, "a", "b", statistic="duration", max_syllable=2).loc[0, "pvalue"] == 1.0
+
+
+def test_a_one_session_group_is_not_read_as_having_no_variance():
+    """One session in a against ten in b: the z-test cannot estimate a's spread."""
+    everyone = range(SESSIONS)
+    table = stats(used={("a", 0): [0], ("b", 0): everyone, ("a", 1): everyone, ("b", 1): everyone},
+                  durations={("a", 0): 0.9, ("b", 0): 0.5, ("a", 1): 0.5, ("b", 1): 0.5})
+    assert ztest(table, "a", "b", statistic="duration", max_syllable=2).loc[0, "pvalue"] == 1.0
+
+
+def test_the_smallest_permutation_p_value_is_one_over_permutations_plus_one():
+    """An observed statistic no permutation reaches gives p = 1 / (n_perm + 1)."""
+    everyone = range(SESSIONS)
+    table = stats(used={("a", 0): everyone, ("b", 0): everyone}, durations={("a", 0): 0.5, ("b", 0): 0.9})
+    df_k, _, _ = run_kruskal(table, statistic="duration", max_syllable=1, n_perm=99)
+    assert df_k.loc[0, "p_adj"] == pytest.approx(1 / 100)
+
+
+def test_dunn_p_values_count_permutations_that_tie():
+    """A pair whose every permuted z equals the observed one has p = 1."""
+    real = {("a", "b"): np.array([1.0])}
+    null = {("a", "b"): np.ones((99, 1))}
+    p_adj, _ = compute_pvalues_for_group_pairs(real, null, pd.DataFrame({"is_sig": [True]}), ["a", "b"], n_perm=99)
+    assert p_adj[("a", "b")].iloc[0] == 1.0

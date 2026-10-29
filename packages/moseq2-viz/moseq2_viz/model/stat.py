@@ -351,11 +351,12 @@ def run_kruskal(
             kruskal_results.append(tuple(stats.kruskal(*samples)))
     df_k_real = pd.DataFrame(kruskal_results, columns=["statistic", "pvalue"])
 
-    p_perm = ((h_all > df_k_real.statistic.values).sum(0) + 1) / n_perm
+    # a permutation p-value counts the permutations at least as extreme as the data, ties included
+    p_perm = ((h_all >= df_k_real.statistic.values).sum(0) + 1) / (n_perm + 1)
     perm = np.random.RandomState(seed=seed).rand(n_perm, N_m).argsort(-1)  # the draw run_manual_KW_test made
     for s_i in np.flatnonzero(incomplete & ~untestable):
         h_null = _kruskal_h_permutations(values[:, s_i], group_labels, group_names, perm)
-        p_perm[s_i] = ((h_null > df_k_real.statistic[s_i]).sum() + 1) / n_perm
+        p_perm[s_i] = ((h_null >= df_k_real.statistic[s_i]).sum() + 1) / (n_perm + 1)
     p_perm[untestable] = 1.0
 
     # https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html
@@ -456,9 +457,10 @@ def compute_pvalues_for_group_pairs(
 
     p_vals_allperm = {}
     for pair in combinations(group_names, 2):
+        # permutations at least as extreme as the data, ties included
         p_vals_allperm[pair] = (
-                                       (null_zs[pair] > real_zs_within_group[pair]).sum(0) + 1
-                               ) / n_perm
+                                       (null_zs[pair] >= real_zs_within_group[pair]).sum(0) + 1
+                               ) / (n_perm + 1)
         # a pair with no z for a syllable (a group never used it, or one value everywhere) cannot be compared
         p_vals_allperm[pair][np.isnan(real_zs_within_group[pair])] = 1.0
 
@@ -703,8 +705,11 @@ def ztest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     boots = bootstrap_group_means(df, group1, group2, statistic, max_syllable)
     # do a ztest on the bootstrap distributions of your 2 conditions
     pvals_ztest_boots = ztest_vect(boots[group1], boots[group2])
-    # a syllable a group never used has nothing to compare, and gets p = 1
-    pvals_ztest_boots[np.isnan(boots[group1]).all(0) | np.isnan(boots[group2]).all(0)] = 1.0
+    # a group with fewer than two sessions that used a syllable gives a bootstrap with no spread,
+    # which says nothing about its variance, so that syllable has nothing to test and gets p = 1
+    group_stat = get_session_mean_df(df, statistic, max_syllable)
+    too_few = (group_stat.loc[group1].notna().sum(0).values < 2) | (group_stat.loc[group2].notna().sum(0).values < 2)
+    pvals_ztest_boots[too_few] = 1.0
     df_z = pd.DataFrame(pvals_ztest_boots, columns=["pvalue"])
     return get_sig_syllables(df_z, verbose=verbose, **kwargs)
 
