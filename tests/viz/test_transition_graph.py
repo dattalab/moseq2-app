@@ -29,3 +29,27 @@ def test_difference_nodes_are_sized_and_coloured_by_their_own_usage():
     assert list(graph.nodes) == [3, 5]
     np.testing.assert_allclose(node_sizes, [0.1, 0.05])
     assert node_colours == ["b", "r"]
+
+
+def test_the_difference_legend_names_the_direction_each_colour_means():
+    """Blue is higher in the first group of a 'b - a' panel title, red is lower."""
+    from moseq2_viz.model.trans_graph import compute_and_graph_grouped_TMs
+
+    labels = [np.tile([0, 0, 2, 2, 1, 1, 2, 2], 50), np.tile([0, 0, 1, 1, 2, 2], 60)]
+    fig = compute_and_graph_grouped_TMs(
+        {"max_syllable": 3, "normalize": "bigram", "scale_node_by_usage": True},
+        labels, ["a", "b"], ["a", "b"],
+    )
+    assert "b - a" in [ax.get_title() for ax in fig.axes]
+
+    legend = fig.legends[0]
+    colours = {
+        text.get_text(): (handle.get_color(), handle.get_markeredgecolor())
+        for handle, text in zip(legend.legend_handles, legend.get_texts())
+    }
+    assert colours == {
+        "Transition more likely in the first group of the panel title": ("b", "b"),
+        "Transition less likely in the first group of the panel title": ("r", "r"),
+        "Usage higher in the first group of the panel title": ("w", "b"),
+        "Usage lower in the first group of the panel title": ("w", "r"),
+    }
