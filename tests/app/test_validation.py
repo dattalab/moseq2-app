@@ -13,6 +13,7 @@ import pandas as pd
 
 from moseq2_app.roi.validation import (
     check_timestamp_error_percentage,
+    count_frames_with_small_areas,
     count_stationary_frames,
 )
 
@@ -37,3 +38,13 @@ def test_integer_timestamps_are_rescaled_like_float_ones():
     assert check_timestamp_error_percentage(milliseconds) == check_timestamp_error_percentage(
         milliseconds.astype(float)
     )
+
+
+def test_small_areas_are_counted_against_the_recordings_own_mean():
+    """A frame is small when its area is two standard deviations under the mean.
+
+    Measuring the same mouse in units five times larger flags the same frames.
+    """
+    areas = pd.DataFrame({"area_px": [100.0] * 19 + [70.0]})
+    assert count_frames_with_small_areas(areas) == 1
+    assert count_frames_with_small_areas(areas * 5) == 1
