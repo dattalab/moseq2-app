@@ -661,7 +661,9 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
     Args:
     scores (numpy.ndarray): nframes * rows * columns
     k (int): klags - Lag to use for derivative calculation.
-    sigma (int): Standard deviation of gaussian smoothing filter.
+    sigma (float): Half-width of the smoothing window in frames, rounded down to whole frames. The Gaussian inside it
+    has a standard deviation of 1.5 frames. Also sets how many frames are trimmed from each end of the changepoint
+    curve (6 * sigma).
     peak_height (float): user-defined peak Changepoint length.
     peak_neighbors (int): number of peaks in the CP curve.
     baseline (bool): normalize data.
