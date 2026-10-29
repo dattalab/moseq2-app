@@ -248,7 +248,7 @@ def get_training_data_splits(split_frac, data_dict):
     Split the data into a training and held out dataset by splitting each session by some fraction `percent_split`.
 
     Args:
-    split_frac (float): fraction to split each session into training data, leaving the rest as validation data.
+    split_frac (float): fraction of each session, taken from its end, held out as validation data; the frames before it are the training data.
     data_dict (OrderedDict): dict of uuid-PC Score key-value pairs for all data included in the model.
 
     Returns:
@@ -256,15 +256,16 @@ def get_training_data_splits(split_frac, data_dict):
     validation_data (OrderedDict): the split percentage of the validation data
     """
 
+    if not 0 < split_frac < 1:
+        raise ValueError('split_frac must be strictly between 0 and 1')
+
     training_data = OrderedDict()
     validation_data = OrderedDict()
 
     for k, v in data_dict.items():
-        # Splitting data by test set
-        training_X, testing_X = (
-            v[: int(len(v) * split_frac)],
-            v[-int(len(v) * split_frac) :],
-        )
+        # Hold out the end of the session, sized as sklearn's train_test_split(test_size=split_frac) sized it
+        n_train = len(v) - int(np.ceil(len(v) * split_frac))
+        training_X, testing_X = v[:n_train], v[n_train:]
 
         # Setting training data key-value pair
         training_data[k] = training_X
