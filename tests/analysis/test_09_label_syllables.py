@@ -197,11 +197,6 @@ def test_the_movies_play_in_a_browser(movies):
         assert (codec, pix_fmt) == ("h264", "yuv420p"), movie.name
 
 
-@pytest.mark.xfail(
-    reason="crowd movies are written without -movflags +faststart, so the moov "
-    "atom is appended after the frame data. Same defect as the extraction "
-    "preview movie in the modeling notebook."
-)
 def test_the_movies_start_without_reading_all_of_them(movies):
     """8. The index belongs at the front.
 
