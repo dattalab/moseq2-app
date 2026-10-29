@@ -173,8 +173,8 @@ def make_session_status_dicts(paths):
             continue
 
         # get yaml metadata
-        yamlpath = v.replace('.mp4', '.yaml')
-        h5path = v.replace('.mp4', '.h5')
+        yamlpath = v[:-4] + '.yaml'
+        h5path = v[:-4] + '.h5'
 
         if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')
