@@ -78,7 +78,7 @@ def compute_syllable_explained_variance(model, save_dir=os.getcwd(), n_explained
     ax.set_xlabel('Number of Syllables to Include')
     ax.set_ylabel('Explained Variance Percentage')
 
-    plt.plot(cumulative_explanation)
+    plt.plot(np.arange(1, len(cumulative_explanation) + 1), cumulative_explanation)
     plt.axvline(max_sylls, color='k')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
