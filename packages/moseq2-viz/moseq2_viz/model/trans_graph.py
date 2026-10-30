@@ -461,7 +461,7 @@ def make_transition_graphs(trans_mats, usages, group, group_names, usage_kwargs,
 
         # set node sizes according to usages
         if usages is not None:
-            node_size = [usages[i][k] * usage_scale for k in pos.keys()][:len(graph.nodes)]
+            node_size = [usages[i][k] * usage_scale for k in graph.nodes]
             node_sizes.append(node_size)
         else:
             node_size = 400
@@ -537,7 +537,7 @@ def draw_graph(graph, width, pos, node_color,
     width (list): list of edge widths corresponding to each graph's edges.
     pos (nx.Layout): nx.Layout type object holding position coordinates for the nodes.
     node_color (list): list of node colors for each graph.
-    node_sizes (int or list): list of node sizes for each graph.
+    node_size (int or list): one size for every node, or one per node in the order of graph.nodes.
     node_edge_colors (list): list of node edge colors for each graph.
     ax (mpl.pyplot.axis): axis to draw graphs on.
     arrows (bool): whether to draw arrow edges
@@ -549,13 +549,6 @@ def draw_graph(graph, width, pos, node_color,
     """
 
     # Draw nodes and edges on matplotlib figure
-    # reconstruct node_size list to match the sorted node labels
-    if isinstance(node_size, list):
-        node_size_dict = {}
-        for i,v in enumerate(node_size):
-            node_size_dict[i]=v
-        node_size = [node_size_dict.get(n) if node_size_dict.get(n) else 0 for n in graph.nodes]
-    
     nx.draw(graph, pos=pos, with_labels=True, font_size=font_size, alpha=1,
             width=width, edgecolors=node_edge_colors, ax=ax, cmap='jet',
             node_size=node_size, node_color=node_color, arrows=arrows,
