@@ -494,7 +494,7 @@ class ArenaMaskView(Viewer):
         # TODO: add flip classifier
         flip_classifier_smoothing = _link_data(pn.widgets.NumberInput, "flip_classifier_smoothing", height=40)
         tracking_model_flag = _link_data(pn.widgets.Checkbox, "tracking_model_flag", height=20)
-        tracking_model_mask_thresh = _link_data(pn.widgets.NumberInput, "tracking_model_mask_thresh", height=40)
+        tracking_model_mask_thresh = _link_data(pn.widgets.FloatInput, "tracking_model_mask_thresh", height=40)
 
         cable_filters = _link_data(pn.widgets.IntInput, "cable_filters", height=40)
         cable_filter_shape = _link_data(pn.widgets.Select, "cable_filter_shape", height=40)

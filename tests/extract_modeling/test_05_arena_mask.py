@@ -383,3 +383,22 @@ def test_the_weight_boxes_accept_a_decimal(scratch):
     ):
         boxes[label].value = 0.5
         assert boxes[label].value == 0.5, label
+
+
+def test_the_tracking_likelihood_threshold_accepts_a_decimal(scratch):
+    """The tracking model's mouse likelihood threshold is a ``param.Number``
+    too. The shipped config spells it ``-16``, and a user who enables the
+    tracking model can type ``-16.5`` into it.
+    """
+    import panel as pn
+
+    widget, _, _ = open_widget(scratch)
+    layout = widget.view.__panel__()
+    boxes = {
+        b.name: b
+        for b in layout.select(pn.widgets.IntInput) + layout.select(pn.widgets.FloatInput)
+    }
+
+    box = boxes["Tracking model mouse likelihood threshold"]
+    box.value = -16.5
+    assert box.value == -16.5
