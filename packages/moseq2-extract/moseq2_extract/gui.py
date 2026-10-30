@@ -93,6 +93,8 @@ def get_selected_sessions(to_extract, extract_all):
                         parse_input(s)
                     for i in selected_sess_idx:
                         if i not in excluded_sess_idx:
+                            if not 1 <= i <= len(to_extract):
+                                raise ValueError(f"there is no recording {i}")
                             ret_extract.append(to_extract[i - 1])
                 elif len(sessions) > 0:
                     parse_input(sessions)
@@ -107,9 +109,10 @@ def get_selected_sessions(to_extract, extract_all):
                 else:
                     print("Invalid input. Try again or press q to quit.")
             except (ValueError, SyntaxError):
-                # an answer that is not a number, a list or a range
+                # an answer that is not a number, a list or a range, or names a recording not listed
                 selected_sess_idx.clear()
                 excluded_sess_idx.clear()
+                ret_extract.clear()
                 print("Invalid input. Try again or press q to quit.")
     else:
         return to_extract

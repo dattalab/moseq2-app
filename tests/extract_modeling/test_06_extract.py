@@ -232,13 +232,14 @@ def test_quitting_the_prompt_extracts_nothing(tmp_path, chosen, monkeypatch):
     assert chosen == []
 
 
-@pytest.mark.parametrize("typo", ["first", "1,x", "1 2"])
+@pytest.mark.parametrize("typo", ["first", "1,x", "1 2", "1,9", "9,1", "1,0"])
 def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch, capsys, typo):
     """7. A typo at the prompt costs a user one more line, not the cell.
 
-    An answer that is not a number, a list or a range prints ``Invalid input.
-    Try again or press q to quit.`` and asks again, and nothing from it carries
-    over into the next answer.
+    An answer that is not a number, a list or a range, or a list naming a
+    recording that is not on it, prints ``Invalid input. Try again or press q
+    to quit.`` and asks again, and nothing from it carries over into the next
+    answer.
     """
     root = build_fake_project(tmp_path / "project")
     answers = iter([typo, "2"])
