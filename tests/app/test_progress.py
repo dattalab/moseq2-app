@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 
-from moseq2_app.gui.progress import find_progress
+from moseq2_app.gui.progress import find_progress, get_session_paths
 
 
 def test_the_latest_model_is_the_one_chosen(tmp_path):
@@ -27,3 +27,28 @@ def test_the_latest_model_is_the_one_chosen(tmp_path):
         pca_dirname=str(tmp_path),
     )
     assert find_progress(progress)["model_path"] == str(new)
+
+
+def test_a_project_under_a_flipped_directory_lists_its_sessions(tmp_path):
+    """Only the movies flip correction writes, ``*_flipped.mp4``, are told apart as flipped.
+
+    The progress and QC cells list a project's recordings and extractions with
+    ``get_session_paths``. A project kept under a directory with "flipped" in
+    its name still has two recordings, two extractions and two flipped movies.
+    """
+    project = tmp_path / "flipped_mice" / "project"
+    for session in ("s0", "s1"):
+        proc = project / session / "proc"
+        proc.mkdir(parents=True)
+        (project / session / "depth.dat").write_bytes(b"")
+        (project / session / "metadata.json").write_text("{}")
+        (proc / "results_00.mp4").write_bytes(b"")
+        (proc / "results_00_flipped.mp4").write_bytes(b"")
+
+    raw = get_session_paths(str(project))
+    extracted = get_session_paths(str(project), extracted=True)
+    flipped = get_session_paths(str(project), extracted=True, flipped=True)
+
+    assert raw == {s: str(project / s / "depth.dat") for s in ("s0", "s1")}
+    assert extracted == {s: str(project / s / "proc" / "results_00.mp4") for s in ("s0", "s1")}
+    assert flipped == {s: str(project / s / "proc" / "results_00_flipped.mp4") for s in ("s0", "s1")}
