@@ -34,9 +34,10 @@ def test_difference_nodes_are_sized_and_coloured_by_their_own_usage():
 def test_group_nodes_are_sized_by_their_own_usage(monkeypatch):
     """Each group panel draws a node at the usage of the syllable it stands for.
 
-    The panels keep only syllables with an edge above the threshold, here 1,
-    3 and 5 of six, so a node's position among the drawn nodes is not its
-    syllable number.
+    The panels keep only syllables with an edge above the threshold, here 0,
+    1, 3 and 5 of six, and draw them in the order their edges come, 0, 5, 1,
+    3. A node's position among the drawn nodes is therefore neither its
+    syllable number nor its rank among the syllables drawn.
     """
     import matplotlib
 
@@ -54,9 +55,9 @@ def test_group_nodes_are_sized_by_their_own_usage(monkeypatch):
 
     monkeypatch.setattr(nx, "draw", record)
     a = np.zeros((6, 6))
-    a[1, 3] = a[3, 5] = a[5, 1] = 0.3
+    a[0, 5] = a[1, 0] = a[5, 3] = 0.3
     b = a.copy()
-    b[3, 5] = 0.6
+    b[5, 3] = 0.6
     usage_a = {0: 0.40, 1: 0.25, 2: 0.15, 3: 0.10, 4: 0.06, 5: 0.04}
     usage_b = {0: 0.40, 1: 0.05, 2: 0.15, 3: 0.30, 4: 0.06, 5: 0.04}
 
@@ -65,7 +66,7 @@ def test_group_nodes_are_sized_by_their_own_usage(monkeypatch):
     )
 
     for (nodes, sizes), usage in zip(drawn[:2], (usage_a, usage_b)):
-        assert sorted(nodes) == [1, 3, 5]
+        assert sorted(nodes) == [0, 1, 3, 5] and nodes != sorted(nodes)
         np.testing.assert_allclose(sizes, [usage[node] for node in nodes])
 
 
