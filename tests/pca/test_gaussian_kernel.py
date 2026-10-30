@@ -40,3 +40,13 @@ def test_smoothing_keeps_a_frame_at_its_own_time(kwargs):
     smoothed = gauss_smooth(impulse(), **kwargs)
     assert np.argmax(smoothed) == IMPULSE
     assert np.dot(np.arange(smoothed.size), smoothed) == pytest.approx(IMPULSE)
+
+
+def test_the_changepoint_default_window_is_seven_frames():
+    """A half-width of 3.5 frames rounds down to 3: seven taps, -3 to 3.
+
+    The changepoint yardstick was calibrated on a seven-frame window.
+    Rounding up or to nearest would give nine and move every default
+    changepoint.
+    """
+    assert len(gaussian_kernel1d(n=3.5, sig=1.5)) == 7
