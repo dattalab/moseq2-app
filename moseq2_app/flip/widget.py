@@ -256,8 +256,6 @@ class FlipClassifierWidget:
                         raise RuntimeError(f'Flip correction of {key} did not finish, so some of its frames are '
                                            'already rotated. Re-extract this session before applying the flip '
                                            'classifier again.')
-                    f.attrs['flip_correction'] = 'in progress'
-                    f.flush()
 
                     output_movie = path.replace('.h5', '_flipped.mp4')
                     session_movie = write_movie
@@ -277,7 +275,13 @@ class FlipClassifierWidget:
                             pending[-chunk_overlap:] = False
                         flip_indices = np.where(flips & pending)
                         committed[batch_indices[pending]] = True
-    
+
+                        # The classifier loads in the first get_flips call, so a bad classifier fails
+                        # above with the session untouched; the marker goes on just before the first write.
+                        if batch_number == 0:
+                            f.attrs['flip_correction'] = 'in progress'
+                            f.flush()
+
                         # rewrite the frames with the newly classified orientation
                         frame_batch[flip_indices] = np.rot90(f[frame_path][batch][flip_indices], k=2, axes=(1, 2))
                         f[frame_path][batch] = frame_batch
