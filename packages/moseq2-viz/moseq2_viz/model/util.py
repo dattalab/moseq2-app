@@ -24,6 +24,23 @@ from moseq2_viz.util import load_changepoint_distribution
 from cytoolz import curry, valmap, compose, complement, itemmap, keyfilter
 
 
+def _cumulative_usage_percentage(labels):
+    """
+    Return the cumulative percentage of syllable usage, syllable by syllable, over every state the labels use.
+
+    Args:
+    labels (list): list of syllable frame-labels for each session, relabeled by usage.
+
+    Returns:
+    (np.array): cumulative usage percentage after each syllable.
+    """
+
+    n_states = int(max(np.max(l) for l in labels)) + 1
+    syllable_usages = list(get_syllable_usages(labels, max_syllable=n_states, count='usage').values())
+    cumulative_explanation = np.cumsum(syllable_usages / sum(syllable_usages))
+    return 100 * cumulative_explanation / np.max(cumulative_explanation)
+
+
 def get_num_syllables_for_coverage(labels, n_explained=99):
     """
     Return the number of syllables needed to explain n_explained percent of all frames.
@@ -36,9 +53,7 @@ def get_num_syllables_for_coverage(labels, n_explained=99):
     int: number of syllables needed to reach the coverage threshold.
     """
 
-    syllable_usages = list(get_syllable_usages(labels, count='usage').values())
-    cumulative_explanation = np.cumsum(syllable_usages / sum(syllable_usages))
-    cumulative_explanation = 100 * cumulative_explanation / np.max(cumulative_explanation)
+    cumulative_explanation = _cumulative_usage_percentage(labels)
     return int(np.argwhere(cumulative_explanation >= n_explained)[0][0]) + 1
 
 
@@ -57,9 +72,7 @@ def compute_syllable_explained_variance(model, save_dir=os.getcwd(), n_explained
     max_sylls = get_num_syllables_for_coverage(model['labels'], n_explained=n_explained)
     print(f'Number of syllables explaining {n_explained}% variance: {max_sylls}')
 
-    syllable_usages = list(get_syllable_usages(model['labels'], count='usage').values())
-    cumulative_explanation = np.cumsum(syllable_usages / sum(syllable_usages))
-    cumulative_explanation = 100 * cumulative_explanation / np.max(cumulative_explanation)
+    cumulative_explanation = _cumulative_usage_percentage(model['labels'])
 
     fig, ax = plt.subplots(1)
     ax.set_xlabel('Number of Syllables to Include')
