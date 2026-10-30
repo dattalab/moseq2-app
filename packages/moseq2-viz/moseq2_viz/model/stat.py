@@ -37,6 +37,26 @@ def get_session_mean_df(df, statistic="usage", max_syllable=40):
     return df_pivot
 
 
+def _at_least_as_extreme(null, observed):
+    """
+    Mark the permuted statistics that are at least as large as the observed one, ties included.
+
+    A permutation that ties the observed statistic in exact arithmetic can be computed through a
+    different sum and land a few units in the last place below it. As in scipy.stats.permutation_test,
+    a permuted statistic within 100 machine epsilons of the observed one, relative to it, is a tie.
+
+    Args:
+    null (np.array): permuted statistics.
+    observed (float or np.array): observed statistic, broadcastable against null; NaN matches nothing.
+
+    Returns:
+    (np.array): boolean array shaped like null.
+    """
+
+    gamma = 100 * np.finfo(np.float64).eps * np.abs(observed)
+    return null >= observed - gamma
+
+
 def bootstrap_me(usages, n_iters=10000):
     """
     Bootstrap the inputted stat data using random sampling with replacement.
@@ -352,11 +372,11 @@ def run_kruskal(
     df_k_real = pd.DataFrame(kruskal_results, columns=["statistic", "pvalue"])
 
     # a permutation p-value counts the permutations at least as extreme as the data, ties included
-    p_perm = ((h_all >= df_k_real.statistic.values).sum(0) + 1) / (n_perm + 1)
+    p_perm = (_at_least_as_extreme(h_all, df_k_real.statistic.values).sum(0) + 1) / (n_perm + 1)
     perm = np.random.RandomState(seed=seed).rand(n_perm, N_m).argsort(-1)  # the draw run_manual_KW_test made
     for s_i in np.flatnonzero(incomplete & ~untestable):
         h_null = _kruskal_h_permutations(values[:, s_i], group_labels, group_names, perm)
-        p_perm[s_i] = ((h_null >= df_k_real.statistic[s_i]).sum() + 1) / (n_perm + 1)
+        p_perm[s_i] = (_at_least_as_extreme(h_null, df_k_real.statistic[s_i]).sum() + 1) / (n_perm + 1)
     p_perm[untestable] = 1.0
 
     # https://www.statsmodels.org/dev/generated/statsmodels.stats.multitest.multipletests.html
@@ -459,7 +479,7 @@ def compute_pvalues_for_group_pairs(
     for pair in combinations(group_names, 2):
         # permutations at least as extreme as the data, ties included
         p_vals_allperm[pair] = (
-                                       (null_zs[pair] >= real_zs_within_group[pair]).sum(0) + 1
+                                       _at_least_as_extreme(null_zs[pair], real_zs_within_group[pair]).sum(0) + 1
                                ) / (n_perm + 1)
         # a pair with no z for a syllable (a group never used it, or one value everywhere) cannot be compared
         p_vals_allperm[pair][np.isnan(real_zs_within_group[pair])] = 1.0
