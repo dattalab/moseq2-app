@@ -153,17 +153,51 @@ jobs:
           MPLBACKEND: Agg
         run: pytest -q -m network
 
+  # A Docker image, a fresh WSL distribution or a bare server has none of the
+  # desktop libraries the runners above come with. This job installs into one
+  # and starts every command-line tool, which is the first thing such a user
+  # does.
+  bare-linux:
+    name: bare Linux
+    runs-on: ubuntu-latest
+    container: python:3.12-slim
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pipeline from this checkout
+        run: |
+          python -m pip install \
+            ./packages/moseq2-extract \
+            ./packages/moseq2-pca \
+            ./packages/moseq2-model \
+            ./packages/moseq2-viz \
+            .
+
+      - name: Record the resolution
+        run: python -m pip freeze
+
+      - name: Start every command-line tool
+        run: |
+          moseq2-extract --version
+          moseq2-pca --version
+          moseq2-model --version
+          moseq2-viz --version
+          python -c "import moseq2_app"
+
   # The check the repository requires before merging. It passes only when the
-  # suite passed, whichever Pythons this run chose to test, and the network
-  # tests passed wherever they ran. A matrix whose size depends on the event
-  # cannot be named in a required check; this job can.
+  # suite and the bare-Linux install passed, whichever Pythons this run chose
+  # to test, and the network tests passed wherever they ran. A matrix whose
+  # size depends on the event cannot be named in a required check; this job
+  # can.
   tests:
     name: tests
     if: always()
-    needs: [suite, network]
+    needs: [suite, network, bare-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Require the suite to have passed
         run: |
           test "${{ needs.suite.result }}" = success
+          test "${{ needs.bare-linux.result }}" = success
           case "${{ needs.network.result }}" in success|skipped) ;; *) exit 1 ;; esac
