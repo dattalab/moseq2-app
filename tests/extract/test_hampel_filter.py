@@ -56,3 +56,27 @@ def test_the_angle_filter_runs_without_the_centroid_filter():
         centroid_hampel_span=0, angle_hampel_span=5, angle_hampel_sig=3,
     )["orientation"]
     assert filtered[JUMP] < 1
+
+
+@pytest.mark.parametrize("track", ["centroid", "orientation"])
+@pytest.mark.parametrize("deviation, kept", [(7.5, True), (10.0, False)], ids=["3.75 MADs", "5 MADs"])
+def test_sig_counts_standard_deviations_not_median_absolute_deviations(track, deviation, kept):
+    """At sig = 3 a value is replaced beyond 3 x 1.4826 = 4.45 MADs from its window's median.
+
+    The track alternates 1, -1, so the window around the jump holds 1, -1,
+    the jump, -1, 1: median 1, MAD 2. A jump 3.75 MADs above the median is
+    within 3 standard deviations and stays; one 5 MADs above is replaced.
+    The centroid's x and the angle are filtered the same way.
+    """
+    values = np.where(np.arange(FRAMES) % 2 == 0, 1.0, -1.0)
+    values[JUMP] = 1 + deviation
+    features = {"centroid": np.zeros((FRAMES, 2)), "orientation": np.zeros(FRAMES)}
+    if track == "centroid":
+        features["centroid"][:, 0] = values
+        filtered = feature_hampel_filter(features, centroid_hampel_span=5, centroid_hampel_sig=3, angle_hampel_span=0)
+        result = filtered["centroid"][JUMP, 0]
+    else:
+        features["orientation"] = values
+        filtered = feature_hampel_filter(features, centroid_hampel_span=0, angle_hampel_span=5, angle_hampel_sig=3)
+        result = filtered["orientation"][JUMP]
+    assert result == (1 + deviation if kept else 1.0)
