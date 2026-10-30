@@ -4,6 +4,7 @@ Wrapper functions for all the functionality included in moseq2-app.
 
 import os
 import shutil
+import numpy as np
 import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
@@ -67,6 +68,11 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     if max_syllables is None:
         max_sylls = compute_syllable_explained_variance(model, fig_dir, n_explained=n_explained)
     else:
+        n_used = len({s for labels in model['labels'] for s in np.unique(labels) if s >= 0})
+        if max_syllables > n_used:
+            raise ValueError(f'max_syllables is {max_syllables}, but this model uses {n_used} syllables. Set '
+                             f'max_syllables to {n_used} or fewer, or to None to choose the number from '
+                             'explained_variance.')
         max_sylls = max_syllables
 
     # Make initial syllable information dict

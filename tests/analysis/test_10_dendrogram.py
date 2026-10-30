@@ -148,3 +148,31 @@ def test_the_distances_are_a_symmetric_comparison_of_every_pair(analysis_paths, 
     off_diagonal = distances[~np.eye(labeled, dtype=bool)]
     assert (off_diagonal > 0).all(), "two syllables are indistinguishable"
     assert np.isfinite(distances).all()
+
+
+def test_a_label_file_naming_more_syllables_than_the_tree_still_draws(analysis_paths, labeled, tmp_path):
+    """8. The tree takes the names of the syllables it draws.
+
+    Cell 9 keeps every name a user typed, including names for syllables
+    beyond the count it was last opened at, so the label file can hold
+    more entries than the tree has leaves.
+    """
+    import matplotlib.pyplot as plt
+
+    from moseq2_app.util import write_yaml
+    from moseq2_viz.util import read_yaml
+
+    syll_info = read_yaml(analysis_paths["syll_info"])
+    for syllable in syll_info:
+        syll_info[syllable]["label"] = f"name {syllable}"
+    info = tmp_path / "syll_info.yaml"
+    write_yaml(syll_info, str(info))
+    fewer = labeled - 4
+    paths = {**analysis_paths, "syll_info": str(info), "plot_path": str(tmp_path / "plots")}
+
+    plt.close("all")
+    show_dendrogram(paths, max_syllable=fewer, color_by_cluster=False)
+    labels = [tick.get_text() for tick in plt.gcf().axes[0].get_xticklabels()]
+    plt.close("all")
+
+    assert sorted(labels) == sorted(f"name {syllable}-{syllable}" for syllable in range(fewer))

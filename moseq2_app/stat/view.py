@@ -1308,14 +1308,6 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
         max_syllable (int, optional): _description_. Defaults to 40.
         color_by_cluster (bool, optional): _description_. Defaults to False.
     """
-    # if there is syll info, load syllable description
-    if exists(syll_info_path):
-        syll_info = read_yaml(syll_info_path)
-        syll_info = pd.DataFrame(syll_info).T.sort_index()
-        labels = (syll_info['label']+"-" +syll_info.index.astype(str)).to_numpy()
-    else:
-        labels = None
-
     # set color_threshold = None to color the clusters based on threshold
     # described here: https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.dendrogram.html
     if color_by_cluster:
@@ -1329,6 +1321,14 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
     X = get_behavioral_distance(sorted_index, model_path, max_syllable=max_syllable, distances='ar[init]')['ar[init]']
     # need to run squareform on X because linkage expects a 1-d array
     Z = linkage(squareform(X), 'complete')
+
+    # if there is syll info, name each leaf by its syllable's label. The file can hold
+    # entries for more or fewer syllables than the tree draws.
+    if exists(syll_info_path):
+        syll_info = read_yaml(syll_info_path)
+        labels = np.array([f"{syll_info.get(i, {}).get('label', '')}-{i}" for i in range(len(X))])
+    else:
+        labels = None
 
     # plot the dendrogram
     sns.set_style('whitegrid', {'axes.grid' : False})

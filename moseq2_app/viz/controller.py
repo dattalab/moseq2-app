@@ -31,8 +31,8 @@ from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syl
 yml = yaml.YAML()
 yml.indent(mapping=3, offset=2)
 
-def _initialize_syll_info_dict(max_sylls):
-    return {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in range(max_sylls)}
+def _blank_syll_entry():
+    return {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}}
 
 def _syllable_pdf(group_syll_pdfs, groupby, group, syllable):
     """
@@ -90,20 +90,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
         if not set(model_uuids).issubset(set(index_uuids)):
             print('Error: Some model UUIDs were not found in the provided index file.')
 
-        if os.path.exists(save_path):
-            self.syll_info = read_yaml(save_path)
-            if len(self.syll_info) != max_sylls:
-                self.syll_info = _initialize_syll_info_dict(max_sylls)
-
-            for i in range(max_sylls):
-                if 'group_info' not in self.syll_info[i]:
-                    self.syll_info[i]['group_info'] = {}
-        else:
-            self.syll_info = _initialize_syll_info_dict(max_sylls)
-
-            # Write to file
-            with open(self.save_path, 'w') as f:
-                yml.dump(self.syll_info, f)
+        # The label file can hold entries for more or fewer syllables than are offered now, since the
+        # count depends on explained_variance, a typed max_syllables and the moseq2-viz version. Each
+        # syllable offered shows its saved entry, or a blank one, and the entries for syllables not
+        # offered are written back unchanged.
+        saved = (read_yaml(save_path) or {}) if os.path.exists(save_path) else {}
+        self.syll_info = {i: {**_blank_syll_entry(), **saved.get(i, {}), 'group_info': {}} for i in range(max_sylls)}
+        self.unshown_syll_info = {k: v for k, v in saved.items() if k not in self.syll_info}
 
         # Initialize button callbacks
         self.next_button.on_click(self.on_next)
@@ -144,7 +137,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Write to file
         with open(self.save_path, 'w') as f:
-            yml.dump(tmp, f)
+            yml.dump({**tmp, **self.unshown_syll_info}, f)
 
         if curr_syll is not None:
             # Update the syllable dropdown options
@@ -379,9 +372,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
                     sd['crowd_movie_path'] = cm
                     self.syll_info[sorted_num] = {**sd, **match_groups}
 
-        # Write to file
-        with open(self.save_path, 'w+') as f:
-            yml.dump(self.syll_info, f)
+        self.write_syll_info()
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
 

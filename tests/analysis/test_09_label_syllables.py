@@ -347,3 +347,147 @@ def test_a_movie_named_by_an_older_moseq2_viz_is_found(moved):
     """
     syll_info, _, older = moved
     assert Path(syll_info[0]["crowd_movie_path"]) == older
+
+
+def _walk(widget):
+    """Every widget inside ``widget``, depth first, itself included."""
+    yield widget
+    for child in getattr(widget, "children", ()):
+        yield from _walk(child)
+
+
+def _labeller_controls(display):
+    """The labelling view's name box and Save button, from what the cell drew."""
+    view = display.of_type(widgets.AppLayout)[-1]
+    name = next(
+        w for w in _walk(view.right_sidebar)
+        if isinstance(w, widgets.Text) and w.placeholder == "Syllable Name"
+    )
+    save = next(
+        w for w in display.of_type(widgets.HBox)
+        for w in w.children
+        if isinstance(w, widgets.Button) and w.description == "Save Setting"
+    )
+    return name, save
+
+
+def _typed(syllable):
+    return {"label": f"name {syllable}", "desc": f"what syllable {syllable} looks like"}
+
+
+@pytest.fixture(scope="module")
+def relabelled(tmp_path_factory, analysis_project, labeled):
+    """A labelled project reopened at a different syllable count, twice.
+
+    A user labels fewer syllables than the cell would settle on, by typing
+    a count. They then reopen the labeller at the cell's own count, which
+    is also what upgrading does to a project whose count moved with the
+    version, and after that at a count lower than the one they labelled.
+    At the lower count they rename the first syllable and save.
+
+    Returns the count labelled, the label file and the dropdown's options
+    after each reopening, and the label file after the save.
+    """
+    from moseq2_app.util import write_yaml
+
+    from widgets import capture_display
+
+    root = tmp_path_factory.mktemp("relabelled")
+    shutil.copytree(analysis_project, root, dirs_exist_ok=True)
+    progress = root / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(root)))
+    paths = read_yaml(str(progress))
+
+    typed = labeled - 3
+    lower = typed - 4
+    seen = {}
+    with pytest.MonkeyPatch.context() as patch:
+        display = capture_display(patch)
+
+        label_syllables(paths, **{**LABELLING, "max_syllables": typed})
+        syll_info = read_yaml(paths["syll_info"])
+        for syllable in range(typed):
+            syll_info[syllable].update(_typed(syllable))
+        write_yaml(syll_info, paths["syll_info"])
+
+        for name, count in (("raised", None), ("lowered", lower)):
+            display.clear()
+            label_syllables(paths, **{**LABELLING, "max_syllables": count})
+            dropdown = display.of_type(widgets.Dropdown)[-1]
+            seen[name] = read_yaml(paths["syll_info"]), list(dropdown.options)
+
+        name, save = _labeller_controls(display)
+        name.value = "renamed"
+        save.click()
+        seen["saved"] = read_yaml(paths["syll_info"])
+
+    return typed, lower, seen, paths
+
+
+def test_raising_the_count_keeps_every_typed_label(relabelled, labeled):
+    """15. Reopening the labeller at a higher count adds blanks, nothing else.
+
+    A project labelled under a version that settled on one syllable fewer
+    is reopened here with one more. Every name and description already
+    typed is shown and kept on disk, and only the syllables new to the
+    count arrive blank.
+    """
+    typed, _, seen, _ = relabelled
+    on_disk, options = seen["raised"]
+
+    assert len(options) == labeled
+    for syllable in range(typed):
+        assert {k: on_disk[syllable][k] for k in ("label", "desc")} == _typed(syllable), syllable
+        assert options[syllable] == f"{syllable} - name {syllable}"
+    for syllable in range(typed, labeled):
+        assert on_disk[syllable]["label"] == "" and on_disk[syllable]["desc"] == ""
+
+
+def test_lowering_the_count_hides_labels_without_deleting_them(relabelled):
+    """16. The syllables left out are left alone on disk.
+
+    Offering fewer syllables is a choice about what to look at now. The
+    names typed for the syllables beyond it stay in the file, so raising
+    the count again brings them back.
+    """
+    typed, lower, seen, _ = relabelled
+    on_disk, options = seen["lowered"]
+
+    assert options == [f"{syllable} - name {syllable}" for syllable in range(lower)]
+    for syllable in range(typed):
+        assert {k: on_disk[syllable][k] for k in ("label", "desc")} == _typed(syllable), syllable
+
+
+def test_saving_writes_the_shown_syllables_and_keeps_the_rest(relabelled, labeled):
+    """17. A save at a lower count changes only what was edited.
+
+    Saving writes the syllables the labeller is showing back to the file.
+    Entries for syllables beyond the count are written back exactly as
+    they were read.
+    """
+    typed, _, seen, _ = relabelled
+    before, _ = seen["lowered"]
+    after = seen["saved"]
+
+    assert after[0]["label"] == "renamed"
+    assert sorted(after) == sorted(before) == list(range(labeled))
+    for syllable in range(1, labeled):
+        assert after[syllable] == before[syllable], syllable
+
+
+def test_a_count_beyond_what_the_model_uses_is_refused(relabelled, analysis_paths):
+    """18. There is nothing to label past the model's last syllable.
+
+    Every syllable the labeller offers is one the recordings contain. A
+    typed count larger than the number the model used is refused with the
+    number it can be, and the label file is not touched.
+    """
+    *_, paths = relabelled
+    model = parse_model_results(analysis_paths["model_path"])
+    used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
+    before = Path(paths["syll_info"]).read_bytes()
+
+    with pytest.raises(ValueError, match=rf"\b{used}\b"):
+        label_syllables(paths, **{**LABELLING, "max_syllables": used + 1})
+
+    assert Path(paths["syll_info"]).read_bytes() == before
