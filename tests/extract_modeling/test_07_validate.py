@@ -154,9 +154,10 @@ def test_a_directory_named_for_mp4_does_not_hide_recordings(tmp_path, extracted)
     """7. The report finds every recording wherever the project is kept.
 
     Each recording's .h5 and .yaml are found by swapping its .mp4's
-    extension, and nothing else in the path is the extension.
+    extension, and nothing else in the path is the extension, not even a
+    directory whose name ends in .mp4.
     """
-    root = tmp_path / "mp4_archive" / "project"
+    root = tmp_path / "clips.mp4" / "project"
     shutil.copytree(extracted, root)
     flagged = re.search(r"(\d+)/(\d+) were flagged with warning\(s\)\.", report(root))
 
