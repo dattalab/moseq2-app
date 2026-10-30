@@ -239,10 +239,11 @@ def test_quitting_the_prompt_extracts_nothing(tmp_path, chosen, monkeypatch):
 def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch, capsys, typo):
     """7. A typo at the prompt costs a user one more line, not the cell.
 
-    An answer that is not a number, a list or a range, or a list naming a
-    recording that is not on it, prints ``Invalid input. Try again or press q
-    to quit.`` and asks again, and nothing from it carries over into the next
-    answer.
+    An answer that is not a number, a list or a range, or names a recording
+    that is not on the list, prints a line naming what it could not use,
+    ending ``Try again or press q to quit.``, and asks again. Nothing from it
+    carries over into the next answer. ``tests/extract/test_session_prompt.py``
+    holds every kind of answer.
     """
     root = build_fake_project(tmp_path / "project")
     answers = iter([typo, "2"])
@@ -252,7 +253,8 @@ def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch, capsy
         str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
     )
     assert chosen == [str(root / RECORDINGS[1] / "depth.avi")]
-    assert "Invalid input. Try again or press q to quit." in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert 'Invalid input "' in printed and "Try again or press q to quit." in printed
 
 
 def test_the_slurm_branch_writes_a_script_and_submits_nothing(
