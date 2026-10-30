@@ -52,3 +52,20 @@ def test_a_project_under_a_flipped_directory_lists_its_sessions(tmp_path):
     assert raw == {s: str(project / s / "depth.dat") for s in ("s0", "s1")}
     assert extracted == {s: str(project / s / "proc" / "results_00.mp4") for s in ("s0", "s1")}
     assert flipped == {s: str(project / s / "proc" / "results_00_flipped.mp4") for s in ("s0", "s1")}
+
+
+def test_a_project_under_a_depth_directory_lists_only_its_depth_recordings(tmp_path):
+    """A recording is a .dat or .avi file with "depth" in its name.
+
+    A session can hold other movies beside its depth recording, such as
+    ``ir.avi``. A project kept under a directory with "depth" in its name
+    still lists one recording per session.
+    """
+    project = tmp_path / "depth_study" / "project"
+    for session in ("s0", "s1"):
+        (project / session).mkdir(parents=True)
+        (project / session / "depth.avi").write_bytes(b"")
+        (project / session / "ir.avi").write_bytes(b"")
+        (project / session / "rgb.avi").write_bytes(b"")
+
+    assert get_session_paths(str(project)) == {s: str(project / s / "depth.avi") for s in ("s0", "s1")}
