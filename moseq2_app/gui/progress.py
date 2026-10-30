@@ -130,14 +130,15 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
             if flipped:
                 files = sorted(glob(path + ext))
             else:
-                files = [f for f in sorted(glob(path + ext)) if 'flipped' not in f]
+                files = [f for f in sorted(glob(path + ext)) if not basename(f).endswith(f'_flipped.{ext}')]
         else:
             data_dir = data_dir.strip()
             if os.path.isdir(data_dir):
                 if flipped:
                     files = sorted(glob(os.path.join(data_dir, path + ext)))
                 else:
-                    files = [f for f in sorted(glob(os.path.join(data_dir, path + ext))) if 'flipped' not in f]
+                    files = [f for f in sorted(glob(os.path.join(data_dir, path + ext)))
+                             if not basename(f).endswith(f'_flipped.{ext}')]
             else:
                 print('directory not found, try again.')
         if ext in ("dat", "avi"):
