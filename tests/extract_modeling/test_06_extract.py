@@ -183,6 +183,7 @@ def test_recordings_under_tmp_are_extracted(chosen):
     ("typed", "expected"),
     [
         ("1,3", [RECORDINGS[0], RECORDINGS[2]]),
+        ("1,4", [RECORDINGS[0], RECORDINGS[3]]),
         ("1-2", RECORDINGS[:2]),
         ("e1-2", RECORDINGS[2:]),
     ],
@@ -192,10 +193,12 @@ def test_selecting_a_subset_of_recordings(tmp_path, chosen, monkeypatch, typed, 
 
     With ``extract_all=False`` the cell lists the recordings and asks. Commas
     pick individual ones, a hyphen gives an inclusive range, and an ``e``
-    prefix excludes a range instead. The indices shown are one-based.
+    prefix excludes a range instead. The indices shown are one-based. An
+    answer the prompt refused would be followed by ``q``, extracting nothing.
     """
     root = build_fake_project(tmp_path / "project")
-    monkeypatch.setattr("builtins.input", lambda *_: typed)
+    answers = iter([typed, "q"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
 
     extract_found_sessions(
         str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
