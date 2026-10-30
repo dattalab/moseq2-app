@@ -113,6 +113,33 @@ def test_a_run_that_did_not_finish_is_refused(session, monkeypatch):
         np.testing.assert_array_equal(f["frames"][()], half_corrected)
 
 
+def test_a_classifier_that_cannot_be_loaded_leaves_the_session_correctable(session, monkeypatch):
+    """A failure before the first frame changes does not lock the session.
+
+    The classifier file is loaded inside the first chunk's call, so a
+    mistyped path or an old-format classifier fails there, with nothing
+    yet rotated. Once the classifier is fixed, the same session is
+    corrected as if the first attempt had not happened.
+    """
+    subject, path, original = session
+
+    def cannot_load(values, **kwargs):
+        raise OSError("Unable to open file (file signature not found)")
+
+    monkeypatch.setattr(widget, "get_flips", cannot_load)
+    with pytest.raises(OSError, match="file signature"):
+        correct(subject, chunk_size=4)
+    with h5py.File(path) as f:
+        np.testing.assert_array_equal(f["frames"][()], original)
+        assert "flip_correction" not in f.attrs
+
+    monkeypatch.setattr(widget, "get_flips", lambda values, **kw: np.ones(len(values), dtype=bool))
+    correct(subject, chunk_size=4)
+    with h5py.File(path) as f:
+        np.testing.assert_array_equal(f["frames"][()], np.rot90(original, 2, axes=(1, 2)))
+        np.testing.assert_allclose(f["scalars/angle"][()], np.pi)
+
+
 def test_a_movie_that_cannot_be_written_does_not_stop_the_correction(session, monkeypatch):
     """Every frame is still corrected when the preview movie fails."""
     subject, path, original = session
