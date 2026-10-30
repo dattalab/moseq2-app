@@ -26,13 +26,32 @@ from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
-from moseq2_viz.scalars.util import (scalars_to_dataframe, compute_syllable_position_heatmaps, get_syllable_pdfs)
+from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syllable_pdfs)
 
 yml = yaml.YAML()
 yml.indent(mapping=3, offset=2)
 
-def _initialize_syll_info_dict(max_sylls):
-    return {i: {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}} for i in range(max_sylls)}
+def _blank_syll_entry():
+    return {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}}
+
+def _syllable_pdf(group_syll_pdfs, groupby, group, syllable):
+    """
+    Find one grouping's position heatmap for one syllable.
+
+    Args:
+    group_syll_pdfs (pandas.DataFrame): mean heatmaps from get_syllable_pdfs, one row per grouping and syllable,
+        with columns groupby, 'syllable' and 'pdf'.
+    groupby (str): the column naming the groupings, 'group' or 'SessionName'.
+    group (str): the grouping to look up.
+    syllable (int): the syllable number.
+
+    Returns:
+    pdf (numpy.ndarray or None): the heatmap, or None when that grouping never used the syllable.
+    """
+
+    match = group_syll_pdfs[(group_syll_pdfs[groupby] == group) & (group_syll_pdfs['syllable'] == syllable)]['pdf']
+    return match.iloc[0] if len(match) > 0 else None
+
 
 class SyllableLabeler(SyllableLabelerWidgets):
 
@@ -65,39 +84,19 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.model_path = model_path
         self.sorted_index = get_sorted_index(index_file)
 
-        # Syllable Info DataFrame path
-        output_dir = os.path.dirname(save_path)
-        self.df_output_file = os.path.join(output_dir, 'syll_df.parquet')
-        self.scalar_df_output = os.path.join(output_dir, 'moseq_scalar_dataframe.parquet')
-
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
         if not set(model_uuids).issubset(set(index_uuids)):
             print('Error: Some model UUIDs were not found in the provided index file.')
 
-        if os.path.exists(save_path):
-            self.syll_info = read_yaml(save_path)
-            if len(self.syll_info) != max_sylls:
-                # Delete previously saved parquet
-                if os.path.exists(self.df_output_file):
-                    os.remove(self.df_output_file)
-
-                self.syll_info = _initialize_syll_info_dict(max_sylls)
-
-            for i in range(max_sylls):
-                if 'group_info' not in self.syll_info[i]:
-                    self.syll_info[i]['group_info'] = {}
-        else:
-            # Delete previously saved parquet
-            if os.path.exists(self.df_output_file):
-                os.remove(self.df_output_file)
-
-            self.syll_info = _initialize_syll_info_dict(max_sylls)
-
-            # Write to file
-            with open(self.save_path, 'w') as f:
-                yml.dump(self.syll_info, f)
+        # The label file can hold entries for more or fewer syllables than are offered now, since the
+        # count depends on explained_variance, a typed max_syllables and the moseq2-viz version. Each
+        # syllable offered shows its saved entry, or a blank one, and the entries for syllables not
+        # offered are written back unchanged.
+        saved = (read_yaml(save_path) or {}) if os.path.exists(save_path) else {}
+        self.syll_info = {i: {**_blank_syll_entry(), **saved.get(i, {}), 'group_info': {}} for i in range(max_sylls)}
+        self.unshown_syll_info = {k: v for k, v in saved.items() if k not in self.syll_info}
 
         # Initialize button callbacks
         self.next_button.on_click(self.on_next)
@@ -138,7 +137,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         # Write to file
         with open(self.save_path, 'w') as f:
-            yml.dump(tmp, f)
+            yml.dump({**tmp, **self.unshown_syll_info}, f)
 
         if curr_syll is not None:
             # Update the syllable dropdown options
@@ -183,17 +182,10 @@ class SyllableLabeler(SyllableLabelerWidgets):
         Populate syllable information dict with usage and scalar information.
         """
 
-        if not os.path.exists(self.df_output_file):
-            # Compute a syllable summary Dataframe containing usage-based
-            # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
-            df, scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            df = df.astype(dict(SubjectName=str, SessionName=str))
-            # print('Writing main syllable info to parquet')
-            # df.to_parquet(self.df_output_file, engine='fastparquet', compression='gzip')
-            # scalar_df.to_parquet(self.scalar_df_output, compression='gzip')
-        else:
-            print('Loading parquet files')
-            df = pd.read_parquet(self.df_output_file, engine='fastparquet')
+        # Compute a syllable summary Dataframe containing usage-based
+        # sorted/relabeled syllable usage and duration information from [0, max_syllable) inclusive
+        df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
+        df = df.astype(dict(SubjectName=str, SessionName=str))
 
         # Get all unique groups in df
         self.groups = df.group.unique()
@@ -245,12 +237,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         self.set_button.button_style = 'primary'
 
-        # Set current widget values
-        if len(syllables['label']) > 0:
-            self.lbl_name_input.value = syllables['label']
-
-        if len(syllables['desc']) > 0:
-            self.desc_input.value = syllables['desc']
+        # Set current widget values, blank for a syllable with no label yet
+        self.lbl_name_input.value = syllables['label']
+        self.desc_input.value = syllables['desc']
 
         # Update label
         self.cm_lbl.text = f'Crowd Movie {self.syll_select.index + 1}/{len(self.syll_select.options)}'
@@ -355,7 +344,11 @@ class SyllableLabeler(SyllableLabelerWidgets):
             # get existing crowd movie paths
             crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
 
-        if len(crowd_movie_paths) < self.max_sylls:
+        # a movie is matched to its syllable by the ids in its name; any other .mp4 is not a crowd movie
+        exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d+).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d+)')
+        movie_ids = {int(match['sorted_id']) for match in map(exp.search, crowd_movie_paths) if match is not None}
+
+        if any(i not in movie_ids for i in range(self.max_sylls)):
             print('Crowd movie list is incomplete. Generating movies...')
             config_data = self.set_default_cm_parameters(config_data)
 
@@ -366,10 +359,12 @@ class SyllableLabeler(SyllableLabelerWidgets):
         info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
 
         if set(crowd_movie_paths) != set(info_cm_paths):
-            exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d{1,3}).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d{1,3})')
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
-                match_groups = exp.search(cm).groupdict()
+                match = exp.search(cm)
+                if match is None:
+                    continue
+                match_groups = match.groupdict()
                 match_groups = {k: int(v) if v.isdigit() else v for k, v in match_groups.items()}
                 sorted_num = match_groups['sorted_id']
                 if sorted_num in self.syll_info:
@@ -377,25 +372,21 @@ class SyllableLabeler(SyllableLabelerWidgets):
                     sd['crowd_movie_path'] = cm
                     self.syll_info[sorted_num] = {**sd, **match_groups}
 
-        # Write to file
-        with open(self.save_path, 'w+') as f:
-            yml.dump(self.syll_info, f)
+        self.write_syll_info()
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
-    def __init__(self, config_data, index_path, df_path, model_path, syll_info, output_dir, get_pdfs, load_parquet):
+    def __init__(self, config_data, index_path, model_path, syll_info, output_dir, get_pdfs):
         """
         Initialize class object context parameters.
 
         Args:
         config_data (dict): Configuration parameters for creating crowd movies.
         index_path (str): Path to loaded index file.
-        df_path (str): Path to pre-computed parquet file with syllable df info.
         model_path (str): Path to loaded model.
         syll_info (dict): Dict object containing labeled syllable information.
         output_dir (str): Path to directory to store crowd movies.
         get_pdfs (bool): Generate position heatmaps for the corresponding crowd movie grouping
-        load_parquet (bool): Indicates to load previously saved syllable data.
         """
 
         super().__init__()
@@ -403,8 +394,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data = config_data
         self.index_path = index_path
         self.model_path = model_path
-        self.df_path = df_path
-        self.scalar_df_path = os.path.join(os.path.dirname(df_path), 'moseq_scalar_dataframe.parquet')
 
         self.get_pdfs = get_pdfs
 
@@ -421,12 +410,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         self.output_dir = output_dir
         self.max_sylls = len(syll_info)
-
-        if load_parquet:
-            if df_path is not None and not os.path.exists(df_path):
-                self.df_path = None
-        else:
-            self.df_path = None
 
         # Prepare current context's base session syllable info dict
         self.session_dict = {i: {'session_info': {}} for i in range(self.max_sylls)}
@@ -532,18 +515,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         """
         Populate session-based syllable information dict with usage and scalar information.
         """
-        if self.df_path is not None and os.path.exists(self.df_path):
-            print('Loading parquet files')
-            df = pd.read_parquet(self.df_path, engine='fastparquet')
-            if not os.path.exists(self.scalar_df_path):
-                self.scalar_df = scalars_to_dataframe(self.sorted_index, model_path=self.model_path)
-                # self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
-            else:
-                self.scalar_df = pd.read_parquet(self.scalar_df_path)
-        else:
-            print('Syllable DataFrame not found. Computing and saving syllable statistics...')
-            df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
-            # self.scalar_df.to_parquet(self.scalar_df_path, compression='gzip')
+        print('Computing syllable statistics...')
+        df, self.scalar_df = merge_labels_with_scalars(self.sorted_index, self.model_path)
 
         if self.get_pdfs:
             # Compute syllable position PDFs
@@ -654,7 +627,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
                                                 groupby=cm_source,
                                                 syllable_key='syllable')[0].drop('syllable', axis=1).reset_index()
             for group in g_iter:
-                grouped_syll_dict[group]['pdf'] = group_syll_pdfs[group_syll_pdfs[cm_source] == group]['pdf']
+                grouped_syll_dict[group]['pdf'] = _syllable_pdf(group_syll_pdfs, cm_source, group, syll_number)
 
         # Remove previously displayed data
         clear_output()
@@ -685,14 +658,11 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
             # Convert crowd movie metadata to HTML table
             if self.get_pdfs:
                 group_info = pd.DataFrame(syll_info_df.drop('pdf', axis=0)[group_name]).to_html()
-                try:
-                    # The 'pdf' key is pointing to the outputted syllable-position heatmap for each grouping.
-                    group_syllable_pdf = syll_info_df[group_name]['pdf'].iloc[self.cm_syll_select.index]
-                except Exception as e:
-                    # If a group does not express this syllable, then a empty heatmap will be generated in it's place.
-                    group_syllable_pdf = np.zeros((50, 50))
-                    if len(cm_path) == 0:
-                        continue
+                # the syllable-position heatmap for this grouping; one that never used the
+                # syllable has no heatmap and no crowd movie, and is left out of the comparison
+                group_syllable_pdf = syll_info_df[group_name]['pdf']
+                if not isinstance(group_syllable_pdf, np.ndarray) or len(cm_path) == 0:
+                    continue
 
                 pdf_fig = self.get_pdf_plot(group_syllable_pdf, group_name)
 

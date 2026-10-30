@@ -37,3 +37,9 @@ def index_is_at_the_front(path):
     """
     data = open(path, "rb").read()
     return data.find(b"moov") < data.find(b"mdat")
+
+
+def count_frames(path):
+    """How many frames a video holds, counted by decoding them."""
+    with av.open(str(path)) as container:
+        return sum(1 for _ in container.decode(video=0))

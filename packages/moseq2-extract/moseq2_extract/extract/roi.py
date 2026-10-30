@@ -47,6 +47,7 @@ def plane_ransac(
     in_ratio=0.1,
     progress_bar=False,
     mask=None,
+    seed=0,
     **kwargs,
 ):
     """
@@ -60,6 +61,8 @@ def plane_ransac(
     in_ratio (float): fraction of points required to consider a plane fit good
     progress_bar (bool): display progress bar
     mask (numpy.ndarray): boolean mask to find region to use
+    seed (int or None): local hypothesis-sampling seed; defaults to reproducible 0.
+        None draws fresh entropy without consuming NumPy's global RNG.
     kwargs (dict): dictionary containing extra keyword arguments from moseq2_extract.proc.get_roi()
 
     Returns:
@@ -92,6 +95,14 @@ def plane_ransac(
     )
     coords = coords.T
 
+    if len(coords) < 3:
+        raise ValueError(
+            f'Too few datapoints remain after the gradient filter -- data point count: {len(coords)}. '
+            'Raise "bg_roi_gradient_threshold" or set "bg_roi_gradient_filter" to False.'
+        )
+
+    best_plane = None
+    rng = np.random.RandomState(seed)
     best_dist = np.inf
     best_num = 0
 
@@ -99,7 +110,7 @@ def plane_ransac(
 
     for _ in tqdm(range(iters), disable=not progress_bar, desc="Finding plane"):
 
-        sel = coords[np.random.choice(coords.shape[0], 3, replace=True)]
+        sel = coords[rng.choice(coords.shape[0], 3, replace=True)]
         tmp_plane = plane_fit3(sel)
 
         if np.all(np.isnan(tmp_plane)):
@@ -117,6 +128,13 @@ def plane_ransac(
             best_dist = np.mean(dist)
             best_num = ninliers
             best_plane = tmp_plane
+
+    if best_plane is None:
+        raise ValueError(
+            f'Could not fit a plane to the arena floor: no candidate plane had more than {in_ratio:.0%} of the points '
+            f'within "noise_tolerance" ({noise_tolerance} mm). '
+            f'Check that "bg_roi_depth_range" {tuple(bg_roi_depth_range)} brackets the floor depth.'
+        )
 
     # fit the plane to our x,y,z coordinates
     coords = np.vstack((xx.ravel(), yy.ravel(), depth_image.ravel())).T

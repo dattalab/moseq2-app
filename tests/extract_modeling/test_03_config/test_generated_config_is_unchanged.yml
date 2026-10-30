@@ -59,7 +59,7 @@ min_height: 10
 model_smoothing_clips:
 - 0
 - 0
-movie_dtype: <i2
+movie_dtype: <u2
 noise_tolerance: 30
 num_frames: null
 output_dir: proc

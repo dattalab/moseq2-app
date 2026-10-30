@@ -84,16 +84,8 @@ def test_selection_maps_to_the_published_classifier(selection, tmp_path, recorde
     assert destination == str(tmp_path / filename)
 
 
-@pytest.mark.xfail(
-    reason="the selection is used as a plain list index, so a negative value "
-    "wraps to the end of the list instead of being rejected"
-)
 def test_a_negative_selection_is_rejected(tmp_path, recorded_download):
-    """There is no classifier at a negative index.
-
-    What happens instead is that `-1` quietly fetches the Azure classifier,
-    which is a long way from what a user asking for it meant.
-    """
+    """There is no classifier at a negative index, so `-1` fetches nothing."""
     config = tmp_path / "config.yaml"
     config.write_text("flip_classifier: null\n")
 
@@ -110,6 +102,25 @@ def test_a_selection_past_the_end_raises(tmp_path, recorded_download):
     with pytest.raises(IndexError):
         download_flip_command(str(tmp_path), str(config), selection=len(FLIP_FILES))
     assert recorded_download == []
+
+
+def test_the_prompt_asks_again_for_a_number_it_does_not_list(
+    tmp_path, recorded_download, monkeypatch, capsys
+):
+    """With no selection the menu is printed and a number is asked for.
+
+    A number with no classifier behind it, negative or past the end, is asked
+    for again, the same as text that is not a number.
+    """
+    config = tmp_path / "config.yaml"
+    config.write_text("flip_classifier: null\n")
+    answers = iter(["-1", str(len(FLIP_FILES)), "1"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+
+    download_flip_command(str(tmp_path), str(config), selection=None)
+
+    assert recorded_download == [(BASE + FLIP_FILES[1][1], str(tmp_path / FLIP_FILES[1][1]))]
+    assert capsys.readouterr().out.count("Please enter a valid number listed above") == 2
 
 
 def test_the_config_records_the_downloaded_classifier(tmp_path, recorded_download):

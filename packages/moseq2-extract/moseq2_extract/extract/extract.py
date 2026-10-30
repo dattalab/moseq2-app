@@ -107,6 +107,9 @@ def extract_chunk(
     parameters (dict): mean and covariance estimates for each frame (if em_tracking=True), otherwise None.
     """
 
+    # (width, height) of the raw frames, before the ROI crop, for converting pixels to mm
+    resolution = (chunk.shape[2], chunk.shape[1])
+
     if bground is not None:
         # Perform background subtraction
         if not kwargs.get('graduate_walls', False):
@@ -237,6 +240,7 @@ def extract_chunk(
             min_height=min_height,
             max_height=max_height,
             true_depth=true_depth,
+            resolution=resolution,
         )
     else:
         # Computing scalars from filtered data
@@ -246,6 +250,7 @@ def extract_chunk(
             min_height=min_height,
             max_height=max_height,
             true_depth=true_depth,
+            resolution=resolution,
         )
 
     # Store all results in a dictionary

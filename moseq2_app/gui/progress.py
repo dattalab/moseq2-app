@@ -11,7 +11,7 @@ from moseq2_app._yaml import write_yaml as _write_yaml
 from operator import add
 from functools import reduce
 from toolz import compose, complement
-from moseq2_viz.util import read_yaml
+from moseq2_viz.util import get_sorted_index, read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
 
@@ -130,18 +130,19 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
             if flipped:
                 files = sorted(glob(path + ext))
             else:
-                files = [f for f in sorted(glob(path + ext)) if 'flipped' not in f]
+                files = [f for f in sorted(glob(path + ext)) if not basename(f).endswith(f'_flipped.{ext}')]
         else:
             data_dir = data_dir.strip()
             if os.path.isdir(data_dir):
                 if flipped:
                     files = sorted(glob(os.path.join(data_dir, path + ext)))
                 else:
-                    files = [f for f in sorted(glob(os.path.join(data_dir, path + ext))) if 'flipped' not in f]
+                    files = [f for f in sorted(glob(os.path.join(data_dir, path + ext)))
+                             if not basename(f).endswith(f'_flipped.{ext}')]
             else:
                 print('directory not found, try again.')
         if ext in ("dat", "avi"):
-            files = [f for f in files if f"ir.{ext}" != f and "depth" in f]
+            files = [f for f in files if "depth" in basename(f)]
         sessions += files
 
     if len(sessions) == 0:
@@ -286,7 +287,7 @@ def find_progress(base_progress):
     models = glob(join(base_dir, '**/*.p'), recursive=True)
 
     if len(models) > 1:
-        models = sorted(models, key=os.path.getmtime)
+        models = sorted(models, key=os.path.getmtime, reverse=True)
         print(f'More than 1 model found. Setting model path to latest generated model: {models[0]}')
     # avoid models not found
     if len(models) > 0:
@@ -437,8 +438,8 @@ def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
     for k, v in path_dict.items():
         extracted_path = e_path_dict.get(k, v)
         extracted = False
-        if '.mp4' in extracted_path:
-            yaml_path = extracted_path.replace('mp4', 'yaml')
+        if extracted_path.endswith('.mp4'):
+            yaml_path = extracted_path[:-4] + '.yaml'
             if check_completion_status(yaml_path):
                 extracted = True
                 num_extracted += 1
@@ -482,7 +483,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     print(f'Extraction Progress: {num_extracted} out of {len(path_dict)} session(s) extracted')
 
     info_print = f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress)} items finished'
-    if sum(pca_progress.values()) == len(pca_progress):
+    if sum(pca_progress.values()) != len(pca_progress):
         _items = ", ".join(key for key, v in pca_progress.items() if not v)
         append_print = f': {_items} left'
         info_print += append_print
@@ -510,25 +511,36 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
 
 def progress_path_sanity_check(progress_paths, progress_filepath='./progress.yaml'):
     """
-    check whether all relevant paths are correct in the progress file.
+    Check that every file the analysis notebook reads is where the progress file says.
+
+    Covers the model, the folder of models, the index and the config named in the progress
+    file, and the PCA scores and each session's extraction results named in the index. Prints
+    one line per missing path and nothing when all of them exist.
 
     Args:
         progress_paths (dict): dictionary of the progress paths.
-        progress_filepath (str, optional): path to progress.yaml file. Defaults to './progress.yaml'.
+        progress_filepath (str, optional): path to progress.yaml file. Not read; accepted so that
+            notebooks which pass it still run.
     """
-    # necessary paths to check for the analysis pipeline
-    must_have_paths = ['base_dir', 'config_file', 'index_file', 'train_data_dir', 'pca_dirname', 
-                       'scores_filename', 'scores_path', 'changepoints_path']
-    
-    # keywords that should be in the paths
-    keywords = [abspath(dirname(progress_filepath)), 'config.yaml', 'moseq2-index.yaml', 'aggregate_results', '_pca',
-            'pca_scores','pca_scores.h5', 'changepoints']
-    # zip the necessary paths and keywords for checking
-    must_have_paths = dict(zip(must_have_paths, keywords))
+    missing = []
+    for key in ['base_model_path', 'model_path', 'index_file', 'config_file']:
+        path = progress_paths.get(key)
+        if not path or not exists(path):
+            missing.append((key, path))
 
-    # sanity check for discrepancies
-    for key, value in must_have_paths.items():
-        if value not in progress_paths.get(key, ''):
-            print(f'Please check and correct the path in {key}. The default path should contain {value}')
-            print('File names are not default values, please check if this is intentional')
-            print('=' * 20)
+    index_file = progress_paths.get('index_file')
+    if index_file and exists(index_file):
+        try:
+            sorted_index = get_sorted_index(index_file)
+        except Exception as error:
+            print(f'Please check the index file {index_file}, which could not be read: {error}')
+        else:
+            if not exists(sorted_index['pca_path']):
+                missing.append((f'pca_path in {index_file}', sorted_index['pca_path']))
+            for uuid, entry in sorted_index['files'].items():
+                session = entry.get('metadata', {}).get('SessionName', uuid)
+                if not exists(entry['path'][0]):
+                    missing.append((f'session {session} in {index_file}', entry['path'][0]))
+
+    for where, path in missing:
+        print(f'Please check and correct the path in {where}. {path} does not exist.')

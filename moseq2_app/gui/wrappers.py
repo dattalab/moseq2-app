@@ -4,10 +4,11 @@ Wrapper functions for all the functionality included in moseq2-app.
 
 import os
 import shutil
+import numpy as np
 import ipywidgets as widgets
 from moseq2_viz.util import read_yaml
 from ipywidgets import interactive_output
-from IPython.display import display, clear_output
+from IPython.display import display
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_viz.model.util import (relabel_by_usage, parse_model_results,
                                    compute_syllable_explained_variance)
@@ -67,6 +68,11 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     if max_syllables is None:
         max_sylls = compute_syllable_explained_variance(model, fig_dir, n_explained=n_explained)
     else:
+        n_used = len({s for labels in model['labels'] for s in np.unique(labels) if s >= 0})
+        if max_syllables > n_used:
+            raise ValueError(f'max_syllables is {max_syllables}, but this model uses {n_used} syllables. Set '
+                             f'max_syllables to {n_used} or fewer, or to None to choose the number from '
+                             'explained_variance.')
         max_sylls = max_syllables
 
     # Make initial syllable information dict
@@ -85,22 +91,8 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     display(labeler.clear_button, labeler.syll_select, output)
     return max_sylls
 
-    def on_syll_change(change):
-        """
-        select a different syllable number from the Dropdown menu
-
-        Args:
-        change (ipywidget DropDown select event): User changes current value of DropDownMenu
-        """
-
-        clear_output(wait=True)
-        display(labeler.syll_select, output)
-
-    # Update view when user selects new syllable from DropDownMenu
-    output.observe(on_syll_change, names='value')
-
 def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
-                                               df_path=None, get_pdfs=True, load_parquet=False):
+                                               get_pdfs=True):
     """
     launch an interactive crowd movie comparison application.
 
@@ -110,17 +102,15 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     model_path (str): path to trained model containing syllable labels.
     syll_info_path (str): path to syllable information file containing syllable labels
     output_dir (str): path to directory to store crowd movies
-    df_path (str): optional path to pre-existing syllable information to plot
     get_pdfs (bool): indicates whether to compute and display position heatmaps
-    load_parquet (bool): Indicates to load previously saved syllable data.
     """
 
     config_data = read_yaml(config_filepath)
     syll_info = read_yaml(syll_info_path)
 
-    cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path, df_path=df_path,
+    cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path,
                                       model_path=model_path, syll_info=syll_info, output_dir=output_dir,
-                                      get_pdfs=get_pdfs, load_parquet=load_parquet)
+                                      get_pdfs=get_pdfs)
 
     out = interactive_output(cm_compare.crowd_movie_preview, {'syllable': cm_compare.cm_syll_select,
                                                               'groupby': cm_compare.cm_sources_dropdown,
@@ -128,8 +118,8 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     display(cm_compare.clear_button, out)
 
 
-def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path, df_path=None, 
-                                              max_syllables=None, plot_vertically=False, load_parquet=False):
+def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
+                                              max_syllables=None, plot_vertically=False):
     """
     prepare the data for the interactive graphing function.
 
@@ -137,16 +127,13 @@ def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
     model_path (str): Path to trained model.
     index_path (str): Path to index file contained trained data metadata.
     info_path (str): Path to user-labeled syllable information file.
-    df_path (str): Path to pre-saved syllable information.
     max_syllables (int or None): Limit maximum number of displayed syllables.
-    load_parquet (bool): Indicates to load previously saved data.
     """
 
     # Initialize Transition Graph data structure
     i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index_path=index_path,
-                                               info_path=info_path, df_path=df_path,
-                                               max_sylls=max_syllables, plot_vertically=plot_vertically,
-                                               load_parquet=load_parquet)
+                                               info_path=info_path,
+                                               max_sylls=max_syllables, plot_vertically=plot_vertically)
 
     # Make graphs
     out = interactive_output(i_trans_graph.interactive_transition_graph_helper,

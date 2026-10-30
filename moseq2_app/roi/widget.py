@@ -125,7 +125,11 @@ class ArenaMaskWidget:
         session['noise_tolerance'] = self.session_data.noise_tolerance
         session['pixel_format'] = self.session_data.pixel_format
         # some simple cleanup for the spatial filter. Maybe should be more sophisticated? or move to the data class?
-        spatial_filter = eval(self.session_data.spatial_filter)
+        try:
+            spatial_filter = eval(self.session_data.spatial_filter)
+        except Exception:
+            # text that is not a value at all takes the same fallback as a value of the wrong type
+            spatial_filter = None
         if isinstance(spatial_filter, (int, float)):
             spatial_filter = [int(spatial_filter)]
         elif not isinstance(spatial_filter, (list, tuple)):
@@ -133,7 +137,11 @@ class ArenaMaskWidget:
             spatial_filter = [3]
         session['spatial_filter_size'] = spatial_filter
 
-        temporal_filter = eval(self.session_data.temporal_filter)
+        try:
+            temporal_filter = eval(self.session_data.temporal_filter)
+        except Exception:
+            # text that is not a value at all takes the same fallback as a value of the wrong type
+            temporal_filter = None
         if isinstance(temporal_filter, (int, float)):
             temporal_filter = [int(temporal_filter)]
         elif not isinstance(temporal_filter, (list, tuple)):
@@ -452,12 +460,12 @@ class ArenaMaskView(Viewer):
         mask_shape = _link_data(pn.widgets.Select, "mask_shape", height=40)
         dilation_kernel = _link_data(pn.widgets.IntSlider, "dilation_kernel", step=1, height=40)
 
-        mask_weight1 = _link_data(pn.widgets.NumberInput, "mask_weight1", height=45)
-        mask_weight2 = _link_data(pn.widgets.NumberInput, "mask_weight2", height=45)
-        mask_weight3 = _link_data(pn.widgets.NumberInput, "mask_weight3", height=45)
+        mask_weight1 = _link_data(pn.widgets.FloatInput, "mask_weight1", height=45)
+        mask_weight2 = _link_data(pn.widgets.FloatInput, "mask_weight2", height=45)
+        mask_weight3 = _link_data(pn.widgets.FloatInput, "mask_weight3", height=45)
 
         mask_index = _link_data(pn.widgets.IntInput, "mask_index", height=45)
-        noise_tolerance = _link_data(pn.widgets.NumberInput, "noise_tolerance", height=45)
+        noise_tolerance = _link_data(pn.widgets.FloatInput, "noise_tolerance", height=45)
 
         adv_arena_mask = pn.Column(
             mask_index,
@@ -486,7 +494,7 @@ class ArenaMaskView(Viewer):
         # TODO: add flip classifier
         flip_classifier_smoothing = _link_data(pn.widgets.NumberInput, "flip_classifier_smoothing", height=40)
         tracking_model_flag = _link_data(pn.widgets.Checkbox, "tracking_model_flag", height=20)
-        tracking_model_mask_thresh = _link_data(pn.widgets.NumberInput, "tracking_model_mask_thresh", height=40)
+        tracking_model_mask_thresh = _link_data(pn.widgets.FloatInput, "tracking_model_mask_thresh", height=40)
 
         cable_filters = _link_data(pn.widgets.IntInput, "cable_filters", height=40)
         cable_filter_shape = _link_data(pn.widgets.Select, "cable_filter_shape", height=40)

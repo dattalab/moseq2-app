@@ -31,7 +31,7 @@ def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
     # Check if the timestamps are in milliseconds based on the mean difference amount
     if np.mean(diff) > 10:
         # rescale the timestamps to seconds
-        diff /= scaling_factor
+        diff = diff / scaling_factor
 
     # Find the average time difference between frames.
     avgTime = np.mean(diff)
@@ -75,7 +75,7 @@ def count_missing_mouse_frames(scalar_df):
 
 def count_frames_with_small_areas(scalar_df):
     """
-    Count the number of frames where the mouse area is smaller than 2 standard deviations of all mouse areas.
+    Count the number of frames where the mouse area is more than 2 standard deviations below the mean mouse area.
 
     Args:
     scalar_df (pd.DataFrame): dataframe that contains frame by frame scalar and syllable data (moseq_df/scalar_df)
@@ -84,7 +84,7 @@ def count_frames_with_small_areas(scalar_df):
     corrupt_frames (int): Number of frames where the recorded mouse area is too small
     """
 
-    return (scalar_df["area_px"] < 2 * scalar_df["area_px"].std()).sum()
+    return (scalar_df["area_px"] < scalar_df["area_px"].mean() - 2 * scalar_df["area_px"].std()).sum()
 
 
 def count_stationary_frames(scalar_df):
@@ -98,8 +98,8 @@ def count_stationary_frames(scalar_df):
     motionless_frames (int): Number of frames where the mouse is not moving
     """
     
-    # subtract 1 because first frame is always 0mm/s
-    return (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1
+    # the first frame has no previous position, so its speed is 0, or NaN when it has no mouse
+    return int((scalar_df["velocity_2d_mm"].iloc[1:] < 0.1).sum())
 
 
 def get_scalar_df(path_dict):
@@ -120,8 +120,8 @@ def get_scalar_df(path_dict):
         if not v.endswith('.mp4'):
             continue
         # Get relevant extraction paths
-        h5path = v.replace('mp4', 'h5')
-        yamlpath = v.replace('mp4', 'yaml')
+        h5path = v[:-4] + '.h5'
+        yamlpath = v[:-4] + '.yaml'
 
         if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')
@@ -173,8 +173,8 @@ def make_session_status_dicts(paths):
             continue
 
         # get yaml metadata
-        yamlpath = v.replace('.mp4', '.yaml')
-        h5path = v.replace('.mp4', '.h5')
+        yamlpath = v[:-4] + '.yaml'
+        h5path = v[:-4] + '.h5'
 
         if not exists(yamlpath):
             print(f'No valid yaml path for session: {k}')
@@ -316,12 +316,11 @@ def print_validation_results(scalar_df, status_dicts):
         for k1, v1 in print_dict[k].items():
             if k1 != 'metadata':
                 # scalar anomaly flag
-                if v1:
+                if isinstance(v1, float) and v1:
+                    x = f'{k1} flag raised: {v1*100:.2f}%'
+                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}')
+                elif v1:
                     x = f'{k1} flag raised'
                     print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}')
-                # all the other flags
-                elif isinstance(v1, float):
-                    x = f'{k1} flag raised: {v1*100:.2f}%'
-                    print(f'\t{bcolors.WARNING}Warning: {x}{bcolors.ENDC}') 
         # I assume this is printing a new line
         print()

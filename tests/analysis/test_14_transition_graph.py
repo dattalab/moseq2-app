@@ -2,7 +2,7 @@
 
     from moseq2_app.main import interactive_transition_graph
     interactive_transition_graph(progress_paths, max_syllables=max_syllables,
-                                 plot_vertically=True, load_parquet=True)
+                                 plot_vertically=True)
 
 Cell 12's matrices drawn as networks: a node per syllable, sized by how
 much it is used, an edge per transition, weighted by how likely it is.
@@ -29,7 +29,7 @@ from moseq2_app.main import interactive_transition_graph
 from moseq2_app.stat.controller import InteractiveTransitionGraph
 
 #: What the cell asks for.
-GRAPH = {"plot_vertically": True, "load_parquet": True}
+GRAPH = {"plot_vertically": True}
 
 
 @pytest.fixture(scope="module")
@@ -39,7 +39,6 @@ def graph(analysis_paths, labeled):
         model_path=analysis_paths["model_path"],
         index_path=analysis_paths["index_file"],
         info_path=analysis_paths["syll_info"],
-        df_path=analysis_paths["df_info_path"],
         max_sylls=labeled,
         **GRAPH,
     )

@@ -48,4 +48,3 @@ build
 
 # nox session environments
 .nox/
-.pytest-tmp/

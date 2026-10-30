@@ -224,7 +224,10 @@ class _VideoWriter:
     """
 
     def __init__(self, filename, codec, pix_fmt, frame_size, fps, threads):
-        self.container = av.open(str(filename), "w")
+        # The mp4 index goes ahead of the frames, so a browser can show the
+        # first frame and seek without fetching the whole file. Other
+        # containers ignore the flag.
+        self.container = av.open(str(filename), "w", container_options={"movflags": "+faststart"})
         # A rate is a rational, and callers hand this one in as whatever
         # their config or CLI made of it: an int, a float from a `type=float`
         # option, or a string from a yaml file. 1000 is enough denominator

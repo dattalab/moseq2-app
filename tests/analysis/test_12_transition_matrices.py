@@ -7,9 +7,10 @@
     group = list(set(label_group))
     trans_mats, usages = get_group_trans_mats(model_data['labels'], label_group, group,
                                               max_syllables, normalize=normalize)
-    fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True)
+    fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True, squeeze=False)
+    ax = ax[0]
     ...
-    fig.savefig(join(progress_paths['plot_path'], f'{normalize}_tansition_matrix.{ext}'))
+    fig.savefig(join(progress_paths['plot_path'], f'{normalize}_transition_matrix.{ext}'))
 
 Usage says how often a syllable happens; this says what it follows and
 what follows it. Two groups can use the same syllables equally often and
@@ -24,8 +25,7 @@ of what follows that syllable, ``columns`` the distribution of what
 precedes it.
 
 The cell is written out longhand in the notebook rather than called, so
-the tests transcribe it. That is also why its two defects are the
-notebook's rather than the library's.
+the tests run its plotting half as the shipped notebook has it.
 """
 
 from __future__ import annotations
@@ -43,41 +43,37 @@ from moseq2_viz.model.trans_graph import (
 )
 from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 
+from cells import ANALYSIS, code_cell
+
 #: The normalization the cell ships with.
 NORMALIZE = "bigram"
 
-#: What the cell names the figure. The spelling is the notebook's.
-FIGURE = f"{NORMALIZE}_tansition_matrix"
+#: What the cell names the figure.
+FIGURE = f"{NORMALIZE}_transition_matrix"
 
 
 def draw_matrices(trans_mats, group, max_syllables, normalize, plot_path):
-    """The cell's plotting half, transcribed.
+    """The cell's plotting half, run from the shipped notebook.
 
-    Kept in one place so the test for a single-group experiment runs the
-    same code as the test for the figure.
+    Everything from ``plt.subplots`` on, given the matrices and groups the
+    first half computes. Kept in one place so the test for a single-group
+    experiment runs the same code as the test for the figure.
     """
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True)
-    title_map = dict(bigram="Bigram", columns="Incoming", rows="Outgoing")
-
-    color_lim = max([x.max() for x in trans_mats])
-
-    for i, g in enumerate(group):
-        h = ax[i].imshow(
-            trans_mats[i][:max_syllables, :max_syllables], cmap="cubehelix", vmax=color_lim
-        )
-        if i == 0:
-            ax[i].set_ylabel("Incoming syllable")
-        cb = fig.colorbar(h, ax=ax[i], fraction=0.046, pad=0.04)
-        cb.set_label(f"{title_map[normalize]} transition probability")
-        ax[i].set_xlabel("Outgoing syllable")
-        ax[i].set_title(g)
-
-    os.makedirs(plot_path, exist_ok=True)
-    for ext in ("pdf", "png"):
-        fig.savefig(join(plot_path, f"{normalize}_tansition_matrix.{ext}"))
-    return fig
+    source = code_cell(ANALYSIS, 12)
+    namespace = {
+        "plt": plt,
+        "os": os,
+        "join": join,
+        "trans_mats": trans_mats,
+        "group": group,
+        "max_syllables": max_syllables,
+        "normalize": normalize,
+        "progress_paths": {"plot_path": plot_path},
+    }
+    exec(source[source.index("fig, ax = plt.subplots("):], namespace)
+    return namespace["fig"]
 
 
 @pytest.fixture(scope="module")
@@ -209,37 +205,29 @@ def test_the_figure_is_written_large_enough_and_is_not_blank(figure, image):
     assert pixels.std() > 5, "the figure has no contrast"
 
 
-@pytest.mark.xfail(
-    reason="the cell writes `{normalize}_tansition_matrix`, so the figure a user "
-    "goes looking for under `transition` is not there"
-)
 def test_the_figure_is_named_after_what_it_shows(figure):
     """8. A user finds this file by its name.
 
-    Everything else the notebook writes is named for what it holds. This
-    one is misspelled, so it does not turn up beside the others and a
-    search for it finds nothing.
+    Everything else the notebook writes is named for what it holds, and a
+    search for ``transition`` finds this one beside the others.
     """
     _, plots = figure
     assert (plots / f"{NORMALIZE}_transition_matrix.png").exists()
 
 
-@pytest.mark.xfail(
-    reason="plt.subplots(1, 1) returns a bare Axes rather than an array of one, "
-    "and the cell indexes ax[i], so a pilot experiment with a single condition "
-    "dies with TypeError: 'Axes' object is not subscriptable"
-)
 def test_an_experiment_with_one_condition_still_plots(
     analysis_paths, labeled, transitions, tmp_path
 ):
     """9. The first thing anyone runs is a pilot.
 
     A project with one group is the normal starting point: a handful of
-    animals, no comparison yet, just a look at what the model found.
-    Every cell before this one handles it. This one builds its axes from
-    the number of groups and then assumes there is more than one.
+    animals, no comparison yet, just a look at what the model found. The
+    cell draws its one matrix and saves the figure.
     """
     one_group = transitions["group"][:1]
     matrices = transitions["trans_mats"][:1]
 
-    draw_matrices(matrices, one_group, labeled, NORMALIZE, str(tmp_path))
+    drawn = draw_matrices(matrices, one_group, labeled, NORMALIZE, str(tmp_path))
+
+    assert [axis.get_title() for axis in drawn.axes if axis.get_title()] == list(one_group)
+    assert (tmp_path / f"{FIGURE}.png").exists()

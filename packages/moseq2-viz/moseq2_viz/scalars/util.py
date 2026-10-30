@@ -42,7 +42,7 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     Args:
     coords (list): list of [x,y] pixel coordinate lists.
     resolution (tuple): video frame size.
-    field_of_view (tuple): camera focal lengths.
+    field_of_view (tuple): nominal (horizontal, vertical) field of view of the depth camera, in degrees
     true_depth (float): detected distance between depth camera and bucket floor.
 
     Returns:
@@ -58,10 +58,10 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     xhat = coords[:, 0] - cx
     yhat = coords[:, 1] - cy
 
-    fw = resolution[0] / (2 * np.deg2rad(field_of_view[0] / 2))
-    fh = resolution[1] / (2 * np.deg2rad(field_of_view[1] / 2))
+    fw = resolution[0] / (2 * np.tan(np.deg2rad(field_of_view[0] / 2)))
+    fh = resolution[1] / (2 * np.tan(np.deg2rad(field_of_view[1] / 2)))
 
-    new_coords = np.zeros_like(coords)
+    new_coords = np.zeros_like(coords, dtype=np.float64)
     new_coords[:, 0] = true_depth * xhat / fw
     new_coords[:, 1] = true_depth * yhat / fh
 
@@ -156,7 +156,7 @@ def convert_legacy_scalars(old_features, force: bool = False, true_depth: float 
     copy_keys = ('width', 'length', 'area')
     for key in copy_keys:
         # first try to grab _px key, then default to old version name
-        features[f'{key}_px'] = get(f'{key}_px', old_features, old_features[key])
+        features[f'{key}_px'] = old_features[f'{key}_px'] if f'{key}_px' in old_features else old_features[key]
 
     if 'height_ave_mm' in old_features.keys():
         features['height_ave_mm'] = old_features['height_ave_mm']
@@ -165,7 +165,7 @@ def convert_legacy_scalars(old_features, force: bool = False, true_depth: float 
 
     features['width_mm'] = features['width_px'] * px_to_mm[:, 1]
     features['length_mm'] = features['length_px'] * px_to_mm[:, 0]
-    features['area_mm'] = features['area_px'] * px_to_mm.mean(axis=1)
+    features['area_mm'] = features['area_px'] * px_to_mm.prod(axis=1)
 
     features['angle'] = old_features['angle']
 

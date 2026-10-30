@@ -3,8 +3,8 @@ GUI front-end operations accessible from a jupyter notebook.
 """
 
 import os
+import re
 from moseq2_extract._yaml import write_yaml
-from ast import literal_eval
 from os.path import dirname, basename, exists, join
 from moseq2_extract.util import read_yaml
 from moseq2_extract.io.image import read_tiff_files
@@ -24,6 +24,55 @@ from moseq2_extract.util import (
 from moseq2_extract.cli import batch_extract
 
 
+_SELECTION_ITEM = re.compile(r"(e?)\s*(\d+)(?:\s*-\s*(\d+))?", re.IGNORECASE)
+
+
+def _parse_session_selection(answer, n_sessions):
+    """
+    Turn an answer at the session prompt into the session numbers it selects.
+
+    The answer is a comma separated list of items. Each item is a session number
+    "N", an inclusive range "N-M", or either of those prefixed with "e" to leave
+    those sessions out. Without an item that selects sessions, the answer starts
+    from all of them. Sessions are numbered from 1.
+
+    Args:
+    answer (str): what the user typed.
+    n_sessions (int): number of sessions listed.
+
+    Returns:
+    selected (list): session numbers in the order first named, each once.
+
+    Raises:
+    ValueError: naming the item that is not a number or a range, names a session
+    that is not listed or runs backwards, or the answer if it leaves no sessions.
+    """
+    items = [item.strip() for item in answer.split(",") if item.strip()]
+    if not items:
+        raise ValueError("Invalid input.")
+
+    selected, excluded = [], set()
+    for item in items:
+        match = _SELECTION_ITEM.fullmatch(item)
+        if match is None:
+            raise ValueError(f'Invalid input "{item}": not a number or a range.')
+        first, last = int(match[2]), int(match[3] or match[2])
+        for number in (first, last):
+            if not 1 <= number <= n_sessions:
+                raise ValueError(f'Invalid input "{item}": there is no session {number}.')
+        if first > last:
+            raise ValueError(f'Invalid input "{item}": a range runs from the lower number to the higher.')
+        if match[1]:
+            excluded.update(range(first, last + 1))
+        else:
+            selected += [n for n in range(first, last + 1) if n not in selected]
+
+    selected = [n for n in selected or range(1, n_sessions + 1) if n not in excluded]
+    if not selected:
+        raise ValueError(f'Invalid input "{answer.strip()}": that leaves no sessions to extract.')
+    return selected
+
+
 def get_selected_sessions(to_extract, extract_all):
     """
     Return either selected sessions to extract, or all the sessions given user input, the function will
@@ -35,39 +84,6 @@ def get_selected_sessions(to_extract, extract_all):
     Returns:
     to_extract (list): new list of selected sessions to extract.
     """
-
-    selected_sess_idx, excluded_sess_idx, ret_extract = [], [], []
-
-    def parse_input(s):
-        """
-        Parse user input for specifically numbered sessions, ranges of sessions,
-        and/or sessions to exclude.
-
-        Args:
-        s (str): User input session indices.
-        """
-        if "e" not in s and "-" not in s:
-            if isinstance(literal_eval(s), int):
-                selected_sess_idx.append(int(s))
-        elif "e" not in s and "-" in s:
-            ss = s.split("-")
-            if isinstance(literal_eval(ss[0]), int) and isinstance(
-                literal_eval(ss[1]), int
-            ):
-                for i in range(int(ss[0]), int(ss[1]) + 1):
-                    selected_sess_idx.append(i)
-        elif "e" in s:
-            ss = s.strip("e ")
-            if "-" not in ss:
-                if isinstance(literal_eval(ss), int):
-                    excluded_sess_idx.append(int(ss))
-            else:
-                ssd = ss.split("-")
-                if isinstance(literal_eval(ssd[0]), int) and isinstance(
-                    literal_eval(ssd[1]), int
-                ):
-                    for i in range(int(ssd[0]), int(ssd[1]) + 1):
-                        excluded_sess_idx.append(i)
 
     if len(to_extract) > 1 and not extract_all:
         for i, sess in enumerate(to_extract):
@@ -81,34 +97,16 @@ def get_selected_sessions(to_extract, extract_all):
             'You can also exclude a range by prefixing the range selection with the letter "e"; e.g.: "e1-5".'
         )
         print("Press q to quit.")
-        while len(ret_extract) == 0:
+        while True:
             sessions = input("Input your selected sessions to extract: ")
-            if "q" in sessions.lower():
+            if sessions.strip().lower() == "q":
                 return []
-            if "," in sessions:
-                selection = sessions.split(",")
-                for s in selection:
-                    s = s.strip()
-                    parse_input(s)
-                for i in selected_sess_idx:
-                    if i not in excluded_sess_idx:
-                        ret_extract.append(to_extract[i - 1])
-            elif len(sessions) > 0:
-                parse_input(sessions)
-                if len(selected_sess_idx) > 0:
-                    iters = selected_sess_idx
-                else:
-                    iters = range(1, len(to_extract) + 1)
-                for i in iters:
-                    if i not in excluded_sess_idx:
-                        if i - 1 < len(to_extract):
-                            ret_extract.append(to_extract[i - 1])
-            else:
-                print("Invalid input. Try again or press q to quit.")
+            try:
+                return [to_extract[n - 1] for n in _parse_session_selection(sessions, len(to_extract))]
+            except ValueError as error:
+                print(f"{error} Try again or press q to quit.")
     else:
         return to_extract
-
-    return ret_extract
 
 
 @filter_warnings
@@ -180,9 +178,7 @@ def extract_found_sessions(
         tmp = recursive_find_unextracted_dirs(input_dir, extension=ex, skip_checks=True)
         to_extract += [e for e in tmp if e.endswith(ex)]
 
-    # filter out any incorrectly returned sessions
-    temp = sorted([sess_dir for sess_dir in to_extract if "/tmp/" not in sess_dir])
-    to_extract = get_selected_sessions(temp, extract_all)
+    to_extract = get_selected_sessions(sorted(to_extract), extract_all)
 
     # read in the config file
     config_data = read_yaml(config_file)

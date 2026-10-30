@@ -28,6 +28,7 @@ of the cell finds them on disk and reuses them.
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 import ipywidgets as widgets
@@ -97,22 +98,16 @@ def syllable_coverage(model_path):
 def test_the_number_is_where_the_curve_crosses_the_threshold(analysis_paths, labeled):
     """2. What the returned number is, exactly.
 
-    It is the position on the cumulative usage curve at which the
-    requested share is first reached, counting from zero: everything
-    below it falls short and it is the first that does not.
+    It is the fewest syllables, best used first, that reach the requested
+    share of the cumulative usage curve: that many reach it and one fewer
+    falls short.
     """
     coverage = syllable_coverage(analysis_paths["model_path"])
 
-    assert coverage[labeled] >= LABELLING["n_explained"]
-    assert coverage[labeled - 1] < LABELLING["n_explained"]
+    assert coverage[labeled - 1] >= LABELLING["n_explained"]
+    assert coverage[labeled - 2] < LABELLING["n_explained"]
 
 
-@pytest.mark.xfail(
-    reason="the number returned is the index at which the curve crosses the "
-    "threshold, and every later cell uses it as a count. Keeping that many "
-    "syllables keeps the ones below the crossing, which by construction fall "
-    "short of the requested share; one more would be needed to reach it."
-)
 def test_the_syllables_actually_kept_cover_what_was_asked_for(analysis_paths, labeled):
     """3. What a user believes they set.
 
@@ -202,11 +197,6 @@ def test_the_movies_play_in_a_browser(movies):
         assert (codec, pix_fmt) == ("h264", "yuv420p"), movie.name
 
 
-@pytest.mark.xfail(
-    reason="crowd movies are written without -movflags +faststart, so the moov "
-    "atom is appended after the frame data. Same defect as the extraction "
-    "preview movie in the modeling notebook."
-)
 def test_the_movies_start_without_reading_all_of_them(movies):
     """8. The index belongs at the front.
 
@@ -280,18 +270,11 @@ def test_the_dropdown_opens_on_the_first_syllable(analysis_paths, labeled, displ
     assert list(dropdown.options)[0].startswith("0 - ")
 
 
-@pytest.mark.xfail(
-    reason="interactive_syllable_labeler_wrapper defines on_syll_change and "
-    "registers it with output.observe after its own return statement, so "
-    "neither ever runs. Nothing is lost by it: interactive_output already "
-    "redraws the view when the dropdown changes."
-)
 def test_the_wrapper_runs_everything_it_contains():
-    """12. Statements the function can never reach.
+    """12. Nothing in the wrapper sits after its return.
 
-    The last thing in the wrapper is a handler meant to redraw the view
-    when a user picks a different syllable, together with the call that
-    registers it. Both sit after the function has returned.
+    ``interactive_output`` redraws the view when a user picks a different
+    syllable, so the wrapper needs no handler of its own for that.
     """
     import ast
     import inspect
@@ -306,3 +289,325 @@ def test_the_wrapper_runs_everything_it_contains():
     assert not returns or returns[-1] == len(body) - 1, (
         f"{len(body) - 1 - returns[-1]} statements follow the return"
     )
+
+
+@pytest.fixture(scope="module")
+def moved(tmp_path_factory, analysis_project, labeled):
+    """The labelled project copied elsewhere, holding movies a user might have.
+
+    The copy's label file still points at the original's movies, so opening
+    the labeller in the copy reads its crowd-movie directory afresh. Two
+    things are put in that directory first: one movie renamed the way
+    moseq2-viz named them before late 2020, with a space where the
+    underscore now is, and an .mp4 that is not a crowd movie at all.
+
+    Returns the copy's label file as the cell left it, its crowd-movie
+    directory, and the renamed movie.
+    """
+    root = tmp_path_factory.mktemp("moved")
+    shutil.copytree(analysis_project, root, dirs_exist_ok=True)
+    progress = root / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(root)))
+    paths = read_yaml(str(progress))
+
+    crowd = Path(paths["crowd_dir"])
+    first = next(m for m in crowd.glob("*.mp4") if int(MOVIE_NAME.search(m.name)["sorted_id"]) == 0)
+    ids = MOVIE_NAME.search(first.name)
+    older = crowd / (
+        f"syllable_sorted-id-{int(ids['sorted_id'])} ({ids['sort_type']})"
+        f"_original-id-{int(ids['original_id'])}.mp4"
+    )
+    first.rename(older)
+    (crowd / "notes.mp4").write_bytes(b"not a crowd movie")
+
+    label_syllables(paths, **LABELLING)
+    return read_yaml(paths["syll_info"]), crowd, older
+
+
+def test_every_syllable_finds_its_movie_beside_an_unrelated_one(moved, labeled):
+    """13. A crowd-movie directory can hold files the cell did not write.
+
+    Each syllable's movie is found by reading its ids out of the filename,
+    and a file whose name carries none is passed over rather than read.
+    """
+    syll_info, crowd, _ = moved
+    for syllable in range(labeled):
+        movie = Path(syll_info[syllable]["crowd_movie_path"])
+        assert movie.parent == crowd, f"syllable {syllable} still points at {movie}"
+        assert movie.exists(), f"syllable {syllable} points at {movie}, which is not there"
+        assert movie.name != "notes.mp4"
+
+
+def test_a_movie_named_by_an_older_moseq2_viz_is_found(moved):
+    """14. Projects keep the crowd movies they were given.
+
+    moseq2-viz put a space before the sort type until late 2020 and an
+    underscore since. A project whose movies predate the change still has
+    them under the old name.
+    """
+    syll_info, _, older = moved
+    assert Path(syll_info[0]["crowd_movie_path"]) == older
+
+
+def _walk(widget):
+    """Every widget inside ``widget``, depth first, itself included."""
+    yield widget
+    for child in getattr(widget, "children", ()):
+        yield from _walk(child)
+
+
+def _labeller_controls(display):
+    """The labelling view's name box and Save button, from what the cell drew."""
+    view = display.of_type(widgets.AppLayout)[-1]
+    name = next(
+        w for w in _walk(view.right_sidebar)
+        if isinstance(w, widgets.Text) and w.placeholder == "Syllable Name"
+    )
+    save = next(
+        w for w in display.of_type(widgets.HBox)
+        for w in w.children
+        if isinstance(w, widgets.Button) and w.description == "Save Setting"
+    )
+    return name, save
+
+
+def _typed(syllable):
+    return {"label": f"name {syllable}", "desc": f"what syllable {syllable} looks like"}
+
+
+@pytest.fixture(scope="module")
+def relabelled(tmp_path_factory, analysis_project, labeled):
+    """A labelled project reopened at a different syllable count, twice.
+
+    A user labels fewer syllables than the cell would settle on, by typing
+    a count. They then reopen the labeller at the cell's own count, which
+    is also what upgrading does to a project whose count moved with the
+    version, and after that at a count lower than the one they labelled.
+    At the lower count they rename the first syllable and save.
+
+    Returns the count labelled, the label file and the dropdown's options
+    after each reopening, and the label file after the save.
+    """
+    from moseq2_app.util import write_yaml
+
+    from widgets import capture_display
+
+    root = tmp_path_factory.mktemp("relabelled")
+    shutil.copytree(analysis_project, root, dirs_exist_ok=True)
+    progress = root / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(root)))
+    paths = read_yaml(str(progress))
+
+    typed = labeled - 3
+    lower = typed - 4
+    seen = {}
+    with pytest.MonkeyPatch.context() as patch:
+        display = capture_display(patch)
+
+        label_syllables(paths, **{**LABELLING, "max_syllables": typed})
+        syll_info = read_yaml(paths["syll_info"])
+        for syllable in range(typed):
+            syll_info[syllable].update(_typed(syllable))
+        write_yaml(syll_info, paths["syll_info"])
+
+        for name, count in (("raised", None), ("lowered", lower)):
+            display.clear()
+            label_syllables(paths, **{**LABELLING, "max_syllables": count})
+            dropdown = display.of_type(widgets.Dropdown)[-1]
+            seen[name] = read_yaml(paths["syll_info"]), list(dropdown.options)
+
+        name, save = _labeller_controls(display)
+        name.value = "renamed"
+        save.click()
+        seen["saved"] = read_yaml(paths["syll_info"])
+
+    return typed, lower, seen, paths
+
+
+def test_raising_the_count_keeps_every_typed_label(relabelled, labeled):
+    """15. Reopening the labeller at a higher count adds blanks, nothing else.
+
+    A project labelled under a version that settled on one syllable fewer
+    is reopened here with one more. Every name and description already
+    typed is shown and kept on disk, and only the syllables new to the
+    count arrive blank.
+    """
+    typed, _, seen, _ = relabelled
+    on_disk, options = seen["raised"]
+
+    assert len(options) == labeled
+    for syllable in range(typed):
+        assert {k: on_disk[syllable][k] for k in ("label", "desc")} == _typed(syllable), syllable
+        assert options[syllable] == f"{syllable} - name {syllable}"
+    for syllable in range(typed, labeled):
+        assert on_disk[syllable]["label"] == "" and on_disk[syllable]["desc"] == ""
+
+
+def test_lowering_the_count_hides_labels_without_deleting_them(relabelled):
+    """16. The syllables left out are left alone on disk.
+
+    Offering fewer syllables is a choice about what to look at now. The
+    names typed for the syllables beyond it stay in the file, so raising
+    the count again brings them back.
+    """
+    typed, lower, seen, _ = relabelled
+    on_disk, options = seen["lowered"]
+
+    assert options == [f"{syllable} - name {syllable}" for syllable in range(lower)]
+    for syllable in range(typed):
+        assert {k: on_disk[syllable][k] for k in ("label", "desc")} == _typed(syllable), syllable
+
+
+def test_saving_writes_the_shown_syllables_and_keeps_the_rest(relabelled, labeled):
+    """17. A save at a lower count changes only what was edited.
+
+    Saving writes the syllables the labeller is showing back to the file.
+    Entries for syllables beyond the count are written back exactly as
+    they were read.
+    """
+    typed, _, seen, _ = relabelled
+    before, _ = seen["lowered"]
+    after = seen["saved"]
+
+    assert after[0]["label"] == "renamed"
+    assert sorted(after) == sorted(before) == list(range(labeled))
+    for syllable in range(1, labeled):
+        assert after[syllable] == before[syllable], syllable
+
+
+def test_a_count_beyond_what_the_model_uses_is_refused(relabelled, analysis_paths):
+    """18. There is nothing to label past the model's last syllable.
+
+    Every syllable the labeller offers is one the recordings contain. A
+    typed count larger than the number the model used is refused with the
+    number it can be, and the label file is not touched.
+    """
+    *_, paths = relabelled
+    model = parse_model_results(analysis_paths["model_path"])
+    used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
+    before = Path(paths["syll_info"]).read_bytes()
+
+    with pytest.raises(ValueError, match=rf"\b{used}\b"):
+        label_syllables(paths, **{**LABELLING, "max_syllables": used + 1})
+
+    assert Path(paths["syll_info"]).read_bytes() == before
+
+
+def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
+    tmp_path, analysis_project, labeled, monkeypatch
+):
+    """19. A crowd-movie directory missing a syllable's movie is regenerated.
+
+    The cell checks that every syllable it offers has a movie before it
+    reuses the directory. A file that is not a crowd movie, such as a
+    stray notes.mp4, does not stand in for the one that is missing.
+    """
+    from moseq2_app.viz import controller
+
+    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
+    progress = tmp_path / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
+    paths = read_yaml(str(progress))
+
+    crowd = Path(paths["crowd_dir"])
+    last = next(m for m in crowd.glob("*.mp4") if int(MOVIE_NAME.search(m.name)["sorted_id"]) == labeled - 1)
+    last.unlink()
+    (crowd / "notes.mp4").write_bytes(b"not a crowd movie")
+
+    made = []
+
+    def make_movies(index_file, model_path, output_dir, config_data):
+        made.append(output_dir)
+        shutil.copy(next(crowd.glob("syllable_*.mp4")), last)
+        return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
+
+    monkeypatch.setattr(controller, "make_crowd_movies_wrapper", make_movies)
+    label_syllables(paths, **LABELLING)
+
+    assert made, "the movies were not regenerated"
+    movie = Path(read_yaml(paths["syll_info"])[labeled - 1]["crowd_movie_path"])
+    assert movie == last and movie.exists(), movie
+
+
+def test_an_unlabelled_syllable_picked_from_the_list_shows_blank_boxes(
+    tmp_path, analysis_project, labeled, monkeypatch
+):
+    """20. Each syllable shows its own label, or blank boxes if it has none.
+
+    A project labelled at a lower count is reopened at the cell's own, so
+    the last syllables have no label yet. Picking one of them from the
+    list after a labelled one shows empty boxes, and pressing Next without
+    typing leaves it unlabelled rather than giving it the other's name.
+    """
+    from moseq2_app.util import write_yaml
+
+    from widgets import capture_display
+
+    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
+    progress = tmp_path / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
+    paths = read_yaml(str(progress))
+    display = capture_display(monkeypatch)
+
+    typed = labeled - 3
+    label_syllables(paths, **{**LABELLING, "max_syllables": typed})
+    syll_info = read_yaml(paths["syll_info"])
+    for syllable in range(typed):
+        syll_info[syllable].update(_typed(syllable))
+    write_yaml(syll_info, paths["syll_info"])
+
+    display.clear()
+    label_syllables(paths, **LABELLING)
+    dropdown = display.of_type(widgets.Dropdown)[-1]
+    view = display.of_type(widgets.AppLayout)[-1]
+    name, desc = (
+        next(w for w in _walk(view.right_sidebar) if isinstance(w, widgets.Text) and w.placeholder == placeholder)
+        for placeholder in ("Syllable Name", "Short description of behavior")
+    )
+    next_button = next(
+        w for w in display.of_type(widgets.HBox)
+        for w in w.children
+        if isinstance(w, widgets.Button) and w.description == "Next"
+    )
+
+    blank = labeled - 2
+    assert (name.value, desc.value) == (_typed(0)["label"], _typed(0)["desc"])
+    dropdown.index = blank
+    assert (name.value, desc.value) == ("", "")
+
+    next_button.click()
+    assert {k: read_yaml(paths["syll_info"])[blank][k] for k in ("label", "desc")} == {"label": "", "desc": ""}
+
+
+def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_project, labeled, monkeypatch):
+    """21. Every syllable the model used can be labelled.
+
+    The largest count the cell takes is the number of syllables the model
+    used. Typing it opens the labeller with that many syllables, after
+    making the crowd movies the project does not have yet.
+    """
+    from moseq2_app.viz import controller
+
+    from widgets import capture_display
+
+    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
+    progress = tmp_path / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
+    paths = read_yaml(str(progress))
+    model = parse_model_results(paths["model_path"])
+    used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
+
+    crowd = Path(paths["crowd_dir"])
+    template = next(crowd.glob("syllable_*.mp4"))
+
+    def make_movies(index_file, model_path, output_dir, config_data):
+        have = {int(MOVIE_NAME.search(m.name)["sorted_id"]) for m in crowd.glob("syllable_*.mp4")}
+        for syllable in set(range(config_data["max_syllable"])) - have:
+            shutil.copy(template, crowd / f"syllable_sorted-id-{syllable}_(usage)_original-id-{syllable}.mp4")
+        return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
+
+    monkeypatch.setattr(controller, "make_crowd_movies_wrapper", make_movies)
+    display = capture_display(monkeypatch)
+
+    assert label_syllables(paths, **{**LABELLING, "max_syllables": used}) == used
+    assert len(display.of_type(widgets.Dropdown)[-1].options) == used

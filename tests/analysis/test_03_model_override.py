@@ -33,7 +33,6 @@ MOVED = (
     "plot_path",
     "crowd_dir",
     "syll_info",
-    "df_info_path",
 )
 
 

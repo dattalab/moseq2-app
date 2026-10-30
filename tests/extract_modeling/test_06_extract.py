@@ -166,18 +166,11 @@ def test_a_missing_config_is_reported_before_the_search(tmp_path, chosen):
 
 
 @pytest.mark.skipif(not os.path.isdir("/tmp"), reason="no /tmp on this platform")
-@pytest.mark.xfail(
-    reason="extract_found_sessions discards any recording whose absolute path "
-    "contains '/tmp/', which is the only mention of /tmp in moseq2-extract and "
-    "guards nothing the package creates"
-)
 def test_recordings_under_tmp_are_extracted(chosen):
     """4. Where a project lives is not the cell's business.
 
-    A user whose recordings sit under ``/tmp``, or under any path with a
-    ``tmp`` component such as ``/data/tmp/pilot``, watches the cell find them,
-    discard all of them, and print ``Extractions Complete.`` Nothing is
-    extracted and nothing says so.
+    Recordings under ``/tmp``, or under any path with a ``tmp`` component
+    such as ``/data/tmp/pilot``, are extracted like any others.
     """
     with tempfile.TemporaryDirectory(dir="/tmp") as tmp:
         root = build_fake_project(Path(tmp) / "project")
@@ -190,6 +183,7 @@ def test_recordings_under_tmp_are_extracted(chosen):
     ("typed", "expected"),
     [
         ("1,3", [RECORDINGS[0], RECORDINGS[2]]),
+        ("1,4", [RECORDINGS[0], RECORDINGS[3]]),
         ("1-2", RECORDINGS[:2]),
         ("e1-2", RECORDINGS[2:]),
     ],
@@ -199,10 +193,12 @@ def test_selecting_a_subset_of_recordings(tmp_path, chosen, monkeypatch, typed, 
 
     With ``extract_all=False`` the cell lists the recordings and asks. Commas
     pick individual ones, a hyphen gives an inclusive range, and an ``e``
-    prefix excludes a range instead. The indices shown are one-based.
+    prefix excludes a range instead. The indices shown are one-based. An
+    answer the prompt refused would be followed by ``q``, extracting nothing.
     """
     root = build_fake_project(tmp_path / "project")
-    monkeypatch.setattr("builtins.input", lambda *_: typed)
+    answers = iter([typed, "q"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
 
     extract_found_sessions(
         str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
@@ -239,27 +235,26 @@ def test_quitting_the_prompt_extracts_nothing(tmp_path, chosen, monkeypatch):
     assert chosen == []
 
 
-@pytest.mark.xfail(
-    reason="the prompt passes what was typed to literal_eval, which raises on "
-    "anything that is not a Python literal before the invalid-input branch is "
-    "reached"
-)
-def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch):
-    """7. A typo at the prompt should cost a user one more line, not the cell.
+@pytest.mark.parametrize("typo", ["first", "1,x", "1 2", "1,9", "9,1", "1,0"])
+def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch, capsys, typo):
+    """7. A typo at the prompt costs a user one more line, not the cell.
 
-    The prompt loops until it gets something it understands, and prints
-    ``Invalid input. Try again or press q to quit.`` for an empty answer. A
-    non-empty answer that is not a number never reaches that branch: it goes to
-    ``literal_eval`` and raises out of the cell.
+    An answer that is not a number, a list or a range, or names a recording
+    that is not on the list, prints a line naming what it could not use,
+    ending ``Try again or press q to quit.``, and asks again. Nothing from it
+    carries over into the next answer. ``tests/extract/test_session_prompt.py``
+    holds every kind of answer.
     """
     root = build_fake_project(tmp_path / "project")
-    answers = iter(["first", "q"])
+    answers = iter([typo, "2"])
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
 
     extract_found_sessions(
         str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
     )
-    assert chosen == []
+    assert chosen == [str(root / RECORDINGS[1] / "depth.avi")]
+    printed = capsys.readouterr().out
+    assert 'Invalid input "' in printed and "Try again or press q to quit." in printed
 
 
 def test_the_slurm_branch_writes_a_script_and_submits_nothing(
@@ -426,10 +421,6 @@ def test_the_preview_movie_is_h264(extracted):
         assert (codec, pix_fmt) == ("h264", "yuv420p"), name
 
 
-@pytest.mark.xfail(
-    reason="the movie is written without -movflags +faststart, so its moov atom "
-    "is appended after the frame data"
-)
 def test_the_preview_movie_starts_without_reading_all_of_it(extracted):
     """16b. The index belongs at the front.
 

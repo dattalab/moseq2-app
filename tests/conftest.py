@@ -28,19 +28,6 @@ from fixtures import fetch_analysis_bundle, fetch_raw_sessions
 from widgets import capture_display
 
 
-def pytest_configure(config):
-    """Keep the suite's scratch directories off ``/tmp``.
-
-    ``extract_found_sessions`` discards every recording whose path contains
-    ``/tmp/`` before extracting anything, so a project under pytest's default
-    temporary directory extracts nothing while reporting that it finished.
-    Anchoring the base directory to the rootdir keeps the pipeline fixtures
-    out of that filter's way. An explicit ``--basetemp`` still wins.
-    """
-    if config.option.basetemp is None:
-        config.option.basetemp = str(Path(config.rootpath) / ".pytest-tmp")
-
-
 @pytest.fixture
 def displayed(monkeypatch):
     """Capture whatever moseq2-app hands to ``display()`` during this test."""
@@ -235,8 +222,7 @@ def labeled(analysis_project, analysis_paths):
     session = analysis_paths["model_session_path"]
 
     update_progress(progress_file, "crowd_dir", join(session, "crowd_movies/"))
-    update_progress(progress_file, "syll_info", join(session, "syll_info.yaml"))
-    paths = update_progress(progress_file, "df_info_path", join(session, "syll_df.parquet"))
+    paths = update_progress(progress_file, "syll_info", join(session, "syll_info.yaml"))
 
     return label_syllables(paths, **LABELLING)
 

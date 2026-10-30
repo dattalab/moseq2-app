@@ -584,6 +584,12 @@ def get_parameter_strings(config_data):
     if config_data["ncpus"] > 0:
         parameters += f'--ncpus {config_data["ncpus"]} '
 
+    # Forward only options already supported by the learn-model CLI.
+    for key in ('nlags', 'whiten', 'alpha', 'gamma', 'var_name',
+                'hold_out_seed', 'noise_level', 'percent_split'):
+        if config_data.get(key) is not None:
+            parameters += f'--{key.replace(chr(95), chr(45))} {config_data[key]} '
+
     # Handle possible Slurm batch functionality
     prefix = ""
     if config_data["cluster_type"] == "slurm":

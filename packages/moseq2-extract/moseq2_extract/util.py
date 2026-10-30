@@ -447,6 +447,37 @@ def select_strel(string='e', size=(10, 10)):
 
     return strel
 
+#: Nominal depth field of view in degrees (horizontal, vertical) for each depth frame size a
+#: supported camera writes: the Kinect v2, and the Azure Kinect and Orbbec Femto narrow
+#: (75 x 65) and wide (120 x 120) modes, binned and unbinned. The wide modes are fisheye, so
+#: a pinhole conversion of them is approximate away from the image centre.
+_DEPTH_FIELD_OF_VIEW = {
+    (512, 424): (70.6, 60),
+    (640, 576): (75, 65),
+    (320, 288): (75, 65),
+    (512, 512): (120, 120),
+    (1024, 1024): (120, 120),
+}
+
+
+def _depth_camera_geometry(resolution):
+    """
+    Pick the frame size and nominal field of view to convert a recording's pixels to mm with.
+
+    Args:
+    resolution (tuple): (width, height) of the raw depth frames
+
+    Returns:
+    resolution (tuple): the frame size to convert with; a size no supported camera writes is converted as a Kinect v2 frame
+    field_of_view (tuple): nominal (horizontal, vertical) field of view in degrees
+    """
+
+    resolution = tuple(int(n) for n in resolution)
+    if resolution not in _DEPTH_FIELD_OF_VIEW:
+        resolution = (512, 424)
+    return resolution, _DEPTH_FIELD_OF_VIEW[resolution]
+
+
 def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), true_depth=673.1):
     """
     Converts x, y coordinates in pixel space to mm.
@@ -454,7 +485,7 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     Args:
     coords (list): list of x,y pixel coordinates
     resolution (tuple): image dimensions
-    field_of_view (tuple): width and height scaling params
+    field_of_view (tuple): nominal (horizontal, vertical) field of view of the depth camera, in degrees
     true_depth (float): detected true depth
 
     Returns:
@@ -471,10 +502,10 @@ def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), t
     xhat = coords[:, 0] - cx
     yhat = coords[:, 1] - cy
 
-    fw = resolution[0] / (2 * np.deg2rad(field_of_view[0] / 2))
-    fh = resolution[1] / (2 * np.deg2rad(field_of_view[1] / 2))
+    fw = resolution[0] / (2 * np.tan(np.deg2rad(field_of_view[0] / 2)))
+    fh = resolution[1] / (2 * np.tan(np.deg2rad(field_of_view[1] / 2)))
 
-    new_coords = np.zeros_like(coords)
+    new_coords = np.zeros_like(coords, dtype=np.float64)
     new_coords[:, 0] = true_depth * xhat / fw
     new_coords[:, 1] = true_depth * yhat / fh
 
@@ -994,6 +1025,29 @@ def get_bucket_center(img, true_depth, threshold=650):
     cY = int(M["m01"] / M["m00"])
 
     return cX, cY
+
+def _floor_depth(bground_im, cx, cy, half_width=2):
+    """
+    Read the floor depth around the arena centre found by get_bucket_center.
+
+    Args:
+    bground_im (np.ndarray): background image
+    cx (int): x-coordinate of the arena centre
+    cy (int): y-coordinate of the arena centre
+    half_width (int): the patch read is (2 * half_width + 1) pixels square
+
+    Returns:
+    depth (float): median depth of the pixels in the patch that have a reading (a depth of 0 is "no reading")
+    """
+
+    patch = bground_im[max(cy - half_width, 0):cy + half_width + 1, max(cx - half_width, 0):cx + half_width + 1]
+    observed = patch[patch > 0]
+    if observed.size == 0:
+        raise ValueError(
+            'Could not read the floor depth at the arena centre: no pixel near it has a depth reading. '
+            'Set "bg_roi_depth_range" by hand and "manual_set_depth_range" to True.'
+        )
+    return float(np.median(observed))
 
 def make_gradient(width, height, h, k, a, b, theta=0):
     """

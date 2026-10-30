@@ -91,10 +91,11 @@ def compute_and_graph_grouped_TMs(config_data, labels, label_group, group):
                                         headless=True)
     # manually add legend for the difference graph
     if len(group) >1:
-        legend_elements = [Line2D([0], [0], color='r', lw=2, label= f'Up-regulated transistion'),
-                           Line2D([0], [0], color='b', lw=2, label= f'Down-regulated transistion'),
-                           Line2D([0], [0], marker='o', color='w', label=f'Up-regulated usage',markerfacecolor='w', markeredgecolor = 'r', markersize=10),
-                           Line2D([0], [0], marker='o', color='w', label=f'Down-regulated usage',markerfacecolor='w', markeredgecolor = 'b', markersize=10)]
+        # difference panels are titled 'b - a', and blue means higher in b
+        legend_elements = [Line2D([0], [0], color='b', lw=2, label='Transition more likely in the first group of the panel title'),
+                           Line2D([0], [0], color='r', lw=2, label='Transition less likely in the first group of the panel title'),
+                           Line2D([0], [0], marker='o', color='w', label='Usage higher in the first group of the panel title', markerfacecolor='w', markeredgecolor='b', markersize=10),
+                           Line2D([0], [0], marker='o', color='w', label='Usage lower in the first group of the panel title', markerfacecolor='w', markeredgecolor='r', markersize=10)]
         plt.legend(handles = legend_elements, loc='upper left')
 
     return plt
@@ -375,8 +376,8 @@ def make_difference_graphs(trans_mats, usages, group, group_names, usage_kwargs,
                 usages.append(df_usage)
 
                 # get node sizes and colors based on usage differences
-                node_size = np.abs(list(df_usage.values()))[:len(graph.nodes)] * usage_scale
-                node_edge_color = ['b' if x > 0 else 'r' for x in df_usage.values()][:len(graph.nodes)]
+                node_size = np.array([abs(df_usage[node]) for node in graph.nodes]) * usage_scale
+                node_edge_color = ['b' if df_usage[node] > 0 else 'r' for node in graph.nodes]
 
                 node_sizes.append(node_size)
                 node_edge_colors.append(node_edge_color)
@@ -460,7 +461,7 @@ def make_transition_graphs(trans_mats, usages, group, group_names, usage_kwargs,
 
         # set node sizes according to usages
         if usages is not None:
-            node_size = [usages[i][k] * usage_scale for k in pos.keys()][:len(graph.nodes)]
+            node_size = [usages[i][k] * usage_scale for k in graph.nodes]
             node_sizes.append(node_size)
         else:
             node_size = 400
@@ -536,7 +537,7 @@ def draw_graph(graph, width, pos, node_color,
     width (list): list of edge widths corresponding to each graph's edges.
     pos (nx.Layout): nx.Layout type object holding position coordinates for the nodes.
     node_color (list): list of node colors for each graph.
-    node_sizes (int or list): list of node sizes for each graph.
+    node_size (int or list): one size for every node, or one per node in the order of graph.nodes.
     node_edge_colors (list): list of node edge colors for each graph.
     ax (mpl.pyplot.axis): axis to draw graphs on.
     arrows (bool): whether to draw arrow edges
@@ -548,13 +549,6 @@ def draw_graph(graph, width, pos, node_color,
     """
 
     # Draw nodes and edges on matplotlib figure
-    # reconstruct node_size list to match the sorted node labels
-    if isinstance(node_size, list):
-        node_size_dict = {}
-        for i,v in enumerate(node_size):
-            node_size_dict[i]=v
-        node_size = [node_size_dict.get(n) if node_size_dict.get(n) else 0 for n in graph.nodes]
-    
     nx.draw(graph, pos=pos, with_labels=True, font_size=font_size, alpha=1,
             width=width, edgecolors=node_edge_colors, ax=ax, cmap='jet',
             node_size=node_size, node_color=node_color, arrows=arrows,

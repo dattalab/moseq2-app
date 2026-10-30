@@ -134,11 +134,6 @@ def test_an_unflagged_recording_is_not_listed(reviewable):
     assert listed <= set(RECORDINGS)
 
 
-@pytest.mark.xfail(
-    reason="a raised flag holds the percentage as a nonzero float, which is "
-    "truthy, so the branch that prints it is only reachable by 0.0 and the "
-    "number is never shown"
-)
 def test_the_percentage_behind_a_flag_is_printed(reviewable):
     """6. How bad a flag is decides whether a user acts on it.
 
@@ -152,6 +147,22 @@ def test_the_percentage_behind_a_flag_is_printed(reviewable):
     assert re.search(
         r"corrupted flag raised: \d+\.\d\d%", section(printed, RECORDINGS[0])
     ), f"no percentage behind the flag:\n{printed}"
+
+
+
+def test_a_directory_named_for_mp4_does_not_hide_recordings(tmp_path, extracted):
+    """7. The report finds every recording wherever the project is kept.
+
+    Each recording's .h5 and .yaml are found by swapping its .mp4's
+    extension, and nothing else in the path is the extension, not even a
+    directory whose name ends in .mp4.
+    """
+    root = tmp_path / "clips.mp4" / "project"
+    shutil.copytree(extracted, root)
+    flagged = re.search(r"(\d+)/(\d+) were flagged with warning\(s\)\.", report(root))
+
+    assert flagged, "no count in the report"
+    assert int(flagged.group(2)) == len(RECORDINGS)
 
 
 def section(printed, recording):

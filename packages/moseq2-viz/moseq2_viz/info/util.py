@@ -49,7 +49,7 @@ def entropy(labels, truncate_syllable=40, smoothing=1.0, relabel_by="usage"):
 def entropy_rate(
     labels,
     truncate_syllable=40,
-    normalize="row",
+    normalize="rows",
     smoothing=1.0,
     tm_smoothing=1.0,
     relabel_by="usage",
@@ -66,7 +66,7 @@ def entropy_rate(
     relabel_by (str): how to re-order labels. Options are: 'usage', 'frames', or None.
 
     Returns:
-    ent (list): list of entropy rates per syllable label
+    ent (list): the entropy rate of each session, in bits per syllable.
     """
 
     if relabel_by is not None:
@@ -112,8 +112,11 @@ def entropy_rate(
         elif normalize == "columns":
             tm /= tm.sum(axis=0, keepdims=True)
 
+        # each syllable's outgoing entropy, weighted by how often the syllable is used; a syllable
+        # with no outgoing transition (a row of 0/0) has no next step to be uncertain about
         tm_safe = np.where(tm > 0, tm, 1)
-        entropy_rate = -np.sum(tm * np.log2(tm_safe), axis=0)
+        row_entropy = -np.sum(np.where(tm > 0, tm * np.log2(tm_safe), 0), axis=1)
+        entropy_rate = np.sum(usages * row_entropy)
         ent.append(entropy_rate)
 
     return ent

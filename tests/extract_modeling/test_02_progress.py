@@ -226,6 +226,18 @@ def test_an_incomplete_extraction_is_named(tmp_path, capsys):
     assert "is listed as incomplete." in capsys.readouterr().out
 
 
+
+def test_a_directory_named_for_mp4_does_not_hide_extractions(tmp_path, capsys):
+    """An extraction's .yaml is found by swapping its .mp4's extension.
+
+    Nothing else in the path is the extension, however the directories
+    holding the project are named.
+    """
+    path = build_project(tmp_path / "mp4_archive" / "proj", n_extracted=4)
+    check_progress(str(path))
+    assert "Extraction Progress: 4 out of 4 session(s) extracted" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("n_done", [0, 1, 3])
 def test_pca_item_counts(tmp_path, capsys, n_done):
     path = build_project(tmp_path / "proj", pca_items=PCA_ITEMS[:n_done])
@@ -233,22 +245,21 @@ def test_pca_item_counts(tmp_path, capsys, n_done):
     assert f"PCA Progress: {n_done} out of 4 items finished" in capsys.readouterr().out
 
 
-@pytest.mark.xfail(
-    reason="the branch that names outstanding PCA items is guarded by `==` where "
-    "it means `!=`, so it runs only when none are outstanding and always appends "
-    "an empty list"
-)
 def test_a_finished_project_names_nothing_as_outstanding(tmp_path, capsys):
-    """A project with every PCA item done has nothing left to report.
-
-    What it prints instead is `PCA Progress: 4 out of 4 items finished:  left`,
-    with a gap where the names would go.
-    """
+    """A project with every PCA item done has nothing left to report."""
     path = build_project(tmp_path / "proj", pca_items=PCA_ITEMS)
     check_progress(str(path))
     printed = capsys.readouterr().out
     assert "PCA Progress: 4 out of 4 items finished" in printed
     assert "left" not in printed
+
+
+def test_an_unfinished_project_names_what_is_outstanding(tmp_path, capsys):
+    """The PCA line lists the steps a user still has to run."""
+    path = build_project(tmp_path / "proj", pca_items=PCA_ITEMS[:1])
+    check_progress(str(path))
+    printed = capsys.readouterr().out
+    assert f"PCA Progress: 1 out of 4 items finished: {', '.join(PCA_ITEMS[1:])} left" in printed
 
 
 @pytest.mark.parametrize("n_models", [1, 3])

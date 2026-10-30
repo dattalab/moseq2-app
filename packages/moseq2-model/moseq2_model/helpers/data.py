@@ -204,8 +204,11 @@ def prepare_model_metadata(data_dict, data_metadata, config_data):
     whitening_parameters = None
     if config_data["whiten"][0].lower() == "a":
         click.echo("Whitening the training data using the whiten_all function")
-        # in this case, whitening_parameters is a single tuple
-        data_dict, whitening_parameters = whiten_all(data_dict)
+        # in this case, whitening_parameters is a single tuple. The mean and covariance come from
+        # the frames the model trains on, so held-out sessions and validation frames do not shape them.
+        data_dict, whitening_parameters = whiten_all(
+            data_dict, fit_on=_training_frames(data_dict, train, config_data)
+        )
     elif config_data["whiten"][0].lower() == "e":
         click.echo("Whitening the training data using the whiten_each function")
         # in this case, whitening_parameters is a dictionary of parameters
@@ -220,6 +223,26 @@ def prepare_model_metadata(data_dict, data_metadata, config_data):
             data_dict[k] = v + np.random.randn(*v.shape) * config_data["noise_level"]
 
     return data_dict, model_parameters, train, hold_out, whitening_parameters
+
+
+def _training_frames(data_dict, train_list, config_data):
+    """
+    Select the frames the model trains on.
+
+    Args:
+    data_dict (OrderedDict): uuid to PC score key-value pairs for all data included in the model.
+    train_list (list): uuids of the training sessions.
+    config_data (dict): modeling parameters; with hold_out off, a percent_split above 0 keeps the part of
+        each session before its validation frames.
+
+    Returns:
+    training_data (OrderedDict): uuid to PC score key-value pairs of the training frames.
+    """
+
+    training_data = OrderedDict((k, data_dict[k]) for k in train_list)
+    if not config_data["hold_out"] and config_data.get("percent_split", 0) > 0:
+        training_data, _ = get_training_data_splits(config_data["percent_split"] / 100, training_data)
+    return training_data
 
 
 def get_heldout_data_splits(data_dict, train_list, hold_out_list):
@@ -248,7 +271,7 @@ def get_training_data_splits(split_frac, data_dict):
     Split the data into a training and held out dataset by splitting each session by some fraction `percent_split`.
 
     Args:
-    split_frac (float): fraction to split each session into training data, leaving the rest as validation data.
+    split_frac (float): fraction of each session, taken from its end, held out as validation data; the frames before it are the training data.
     data_dict (OrderedDict): dict of uuid-PC Score key-value pairs for all data included in the model.
 
     Returns:
@@ -256,15 +279,16 @@ def get_training_data_splits(split_frac, data_dict):
     validation_data (OrderedDict): the split percentage of the validation data
     """
 
+    if not 0 < split_frac < 1:
+        raise ValueError('split_frac must be strictly between 0 and 1')
+
     training_data = OrderedDict()
     validation_data = OrderedDict()
 
     for k, v in data_dict.items():
-        # Splitting data by test set
-        training_X, testing_X = (
-            v[: int(len(v) * split_frac)],
-            v[-int(len(v) * split_frac) :],
-        )
+        # Hold out the end of the session, sized as sklearn's train_test_split(test_size=split_frac) sized it
+        n_train = len(v) - int(np.ceil(len(v) * split_frac))
+        training_X, testing_X = v[:n_train], v[n_train:]
 
         # Setting training data key-value pair
         training_data[k] = training_X

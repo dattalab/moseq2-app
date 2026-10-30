@@ -26,7 +26,6 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "bokeh>=2.4.2",
-    "fastparquet>=0.4.1",
     "h5py>=2.10.0",
     "holoviews>=1.14.7",
     "ipython>=7.14.0",
@@ -51,10 +50,10 @@ dependencies = [
     # version, and the notebooks carry a directory tree and a config file
     # between steps rather than a return value, so a mixed set is a
     # pipeline whose halves disagree about the files they hand each other.
-    "moseq2-extract==1.4.4",
-    "moseq2-model==1.4.4",
-    "moseq2-pca==1.4.4",
-    "moseq2-viz==1.4.4",
+    "moseq2-extract==1.4.5",
+    "moseq2-model==1.4.5",
+    "moseq2-pca==1.4.5",
+    "moseq2-viz==1.4.5",
     "Cython>=3.0.11",
     "requests>=2.32.3",
 ]

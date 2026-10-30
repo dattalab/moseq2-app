@@ -70,6 +70,10 @@ def get_ci_vect_vectorized(x, n_boots=10000, n_samp=None, function=np.nanmean, p
 
     if isinstance(x, pd.core.series.Series):
         x = x.values
+    x = np.asarray(x)
+    x = x[~np.isnan(x)]
+    if len(x) == 0:
+        return np.array([np.nan, np.nan])
     pct /= 2
     n_vals = len(x)
     if n_samp is None:
@@ -679,13 +683,20 @@ def format_plot(plot):
     plot.xaxis.major_label_text_color = None  # turn off x-axis tick labels leaving space
     plot.yaxis.major_label_text_color = None  # turn off y-axis tick labels leaving space
 
-def get_minmax_tp(edge_width, diff=False):
+EDGE_WIDTH_SCALE = 250
+DIFF_EDGE_WIDTH_SCALE = 400
+
+
+def get_minmax_tp(edge_width, diff=False, signed_weights=None):
     """
     Compute the min and max transition probabilities given the rescaled edge-widths.
 
     Args:
     edge_width (dict): dict of syllables paired with drawn edge widths
     diff (bool): indicates whether to compute min/max transition probs. for up and down-regulated syllables.
+    signed_weights (dict): edge tuple -> signed transition-probability difference.
+        Required when diff=True, because edge_width holds absolute values and so
+        cannot distinguish up- from down-regulated transitions.
 
     Returns:
     min_tp (float): min transition probability (min_down_tp if diff=True)
@@ -694,33 +705,33 @@ def get_minmax_tp(edge_width, diff=False):
     max_up_tp (float): max transition probability in up-regulated syllable
     """
 
-    if not diff:
-        try:
-            min_tp = min(list(edge_width.values())) / 200
-            max_tp = max(list(edge_width.values())) / 200
-        except ValueError:
-            # handle empty list
-            min_tp, max_tp = 0, 0
-        return min_tp, max_tp
+    scale = DIFF_EDGE_WIDTH_SCALE if diff else EDGE_WIDTH_SCALE
+
+    # signed_weights holds the transition probabilities themselves; edge_width
+    # holds those same values already multiplied by `scale` for drawing, so it
+    # has to be divided back down to recover a probability.
+    if signed_weights is not None:
+        weights = dict(signed_weights)
     else:
-        # get min/max down
-        try:
-            min_down_tp = min([e for e in edge_width.values() if e < 0]) / 350
-            max_down_tp = max([e for e in edge_width.values() if e < 0]) / 350
-        except ValueError:
-            # empty list
-            min_down_tp, max_down_tp = 0, 0
+        weights = {k: v / scale for k, v in edge_width.items()}
 
-        # get min/max up
-        try:
-            min_up_tp = min([e for e in edge_width.values() if e > 0]) / 350
-            max_up_tp = max([e for e in edge_width.values() if e > 0]) / 350
-        except ValueError:
-            min_up_tp, max_up_tp = 0, 0
+    if not diff:
+        values = list(weights.values())
+        if not values:
+            return 0, 0
+        return min(values), max(values)
 
-        return min_down_tp, max_down_tp, min_up_tp, max_up_tp
+    # Split the two directions by the signed weight: edge_width is built with abs(),
+    # so its sign carries no direction.
+    down = [abs(w) for w in weights.values() if w < 0]
+    up = [w for w in weights.values() if w > 0]
 
-def get_difference_legend_items(plot, edge_width, group_name):
+    min_down_tp, max_down_tp = (min(down), max(down)) if down else (0, 0)
+    min_up_tp, max_up_tp = (min(up), max(up)) if up else (0, 0)
+
+    return min_down_tp, max_down_tp, min_up_tp, max_up_tp
+
+def get_difference_legend_items(plot, edge_width, group_name, signed_weights=None, groups=None):
     """
     Create the difference graph legend items with the min and max transition probabilities for both the up and down-regulated transition probabilities.
 
@@ -728,6 +739,7 @@ def get_difference_legend_items(plot, edge_width, group_name):
     plot (bokeh.figure): Bokeh plot to add legend to.
     edge_width (dict): Dictionary of edge widths
     group_name (str): Difference graph title.
+    groups (tuple): the two groups compared, first minus second; read from the title when not given.
 
     Returns:
     diff_items (list): List of LegendItem objects to display
@@ -743,28 +755,29 @@ def get_difference_legend_items(plot, edge_width, group_name):
     r_circle = plot.scatter(marker='circle', line_color='red', fill_color='white')
     b_circle = plot.scatter(marker='circle', line_color='blue', fill_color='white')
 
-    G1 = group_name.split('-')[0]
+    # difference graphs are titled 'b - a': blue is higher in b, red lower
+    first, second = groups if groups is not None else group_name.partition(' - ')[::2]
 
-    min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True)
+    min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True, signed_weights=signed_weights)
 
-    min_down_line = plot.line(line_color='red', line_width=min_down_tp * 350)
-    max_down_line = plot.line(line_color='red', line_width=max_down_tp * 350)
+    min_down_line = plot.line(line_color='red', line_width=abs(min_down_tp) * DIFF_EDGE_WIDTH_SCALE)
+    max_down_line = plot.line(line_color='red', line_width=abs(max_down_tp) * DIFF_EDGE_WIDTH_SCALE)
 
-    min_up_line = plot.line(line_color='blue', line_width=min_up_tp * 350)
-    max_up_line = plot.line(line_color='blue', line_width=max_up_tp * 350)
+    min_up_line = plot.line(line_color='blue', line_width=abs(min_up_tp) * DIFF_EDGE_WIDTH_SCALE)
+    max_up_line = plot.line(line_color='blue', line_width=abs(max_up_tp) * DIFF_EDGE_WIDTH_SCALE)
 
     diff_main_items = [
-        LegendItem(label=f"Up-regulated Usage in {G1}", renderers=[b_circle]),
-        LegendItem(label=f"Down-regulated Usage in {G1}", renderers=[r_circle]),
-        LegendItem(label=f"Up-regulated P(transition) in {G1}", renderers=[b_line]),
-        LegendItem(label=f"Down-regulated P(transition) in {G1}", renderers=[r_line]),
+        LegendItem(label=f"Usage higher in {first} than {second}", renderers=[b_circle]),
+        LegendItem(label=f"Usage lower in {first} than {second}", renderers=[r_circle]),
+        LegendItem(label=f"Transition more likely in {first} than {second}", renderers=[b_line]),
+        LegendItem(label=f"Transition less likely in {first} than {second}", renderers=[r_line]),
     ]
 
     diff_width_items = [
-        LegendItem(label=f"Min Up-regulated P(transition): {min_up_tp:.4f}", renderers=[min_up_line]),
-        LegendItem(label=f"Max Up-regulated P(transition): {max_up_tp:.4f}", renderers=[max_up_line]),
-        LegendItem(label=f"Min Down-regulated P(transition): {min_down_tp:.4f}", renderers=[min_down_line]),
-        LegendItem(label=f"Max Down-regulated P(transition): {max_down_tp:.4f}", renderers=[max_down_line]),
+        LegendItem(label=f"Thinnest blue edge: {first} higher by {min_up_tp:.4f}", renderers=[min_up_line]),
+        LegendItem(label=f"Thickest blue edge: {first} higher by {max_up_tp:.4f}", renderers=[max_up_line]),
+        LegendItem(label=f"Thinnest red edge: {first} lower by {min_down_tp:.4f}", renderers=[min_down_line]),
+        LegendItem(label=f"Thickest red edge: {first} lower by {max_down_tp:.4f}", renderers=[max_down_line]),
     ]
 
     return diff_main_items, diff_width_items
@@ -855,10 +868,10 @@ def format_trans_graph_edges(graph, neighbor_edge_colors, difference_graph=False
     # edge colors for difference graphs
     if difference_graph:
         edge_color = {e: 'blue' if graph.edges()[e]['weight'] > 0 else 'red' for e in graph.edges()}
-        edge_width = {e: abs(graph.edges()[e]['weight'] * 400) for e in graph.edges()}
+        edge_width = {e: abs(graph.edges()[e]['weight'] * DIFF_EDGE_WIDTH_SCALE) for e in graph.edges()}
     else:
         edge_color = {e: 'black' for e in graph.edges()}
-        edge_width = {e: graph.edges()[e]['weight'] * 250 for e in graph.edges()}
+        edge_width = {e: graph.edges()[e]['weight'] * EDGE_WIDTH_SCALE for e in graph.edges()}
 
     selected_edge_colors = {e: neighbor_edge_colors[e] for e in graph.edges()}
 
@@ -1122,7 +1135,7 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
 
     return labels
 
-def get_legend_items(plot, edge_width, group_name, difference_graph=False):
+def get_legend_items(plot, edge_width, group_name, difference_graph=False, signed_weights=None, groups=None):
     """
     generate two legend items to describe the transition plots.
 
@@ -1131,6 +1144,7 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
     edge_width (dict): dict of edge tuple(node1, node2) object mapped to float values describing edge widths.
     group_name (str): name of currently plotted group
     difference_graph (bool): indicator for whether the currently plotted graph is a difference graph between two groups.
+    groups (tuple): for a difference graph, the two groups compared, first minus second.
 
     Returns:
     main_legend (bokeh Legend instance): Legend containing colors describing incoming and outgoing transitions.
@@ -1143,8 +1157,8 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
 
     min_tp, max_tp = get_minmax_tp(edge_width, diff=False)
 
-    mink_line = plot.line(line_color='black', line_width=min_tp * 200)
-    maxk_line = plot.line(line_color='black', line_width=max_tp * 200)
+    mink_line = plot.line(line_color='black', line_width=min_tp * EDGE_WIDTH_SCALE)
+    maxk_line = plot.line(line_color='black', line_width=max_tp * EDGE_WIDTH_SCALE)
 
     group_items = [
         LegendItem(label="Incoming Transition", renderers=[o_line]),
@@ -1158,7 +1172,8 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False):
     ]
 
     if difference_graph:
-        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name)
+        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name,
+                                                                  signed_weights=signed_weights, groups=groups)
         group_items += diff_main_items
 
     main_legend = Legend(items=group_items,
@@ -1195,6 +1210,10 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         legend_loc = 'right'
 
     rendered_graphs, plots = [], []
+
+    # make_difference_graphs titles each difference graph 'b - a'; a group name can itself contain ' - '
+    compared = {f'{group[j]} - {group[i]}': (group[j], group[i])
+                for i in range(len(group)) for j in range(i + 1, len(group))}
 
     for i, graph in enumerate(graphs):
 
@@ -1253,7 +1272,9 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         plot.renderers.append(labels)
 
         # get plot legends
-        main_legend, info_legend = get_legend_items(plot, edge_width, group_names[i], difference_graph)
+        main_legend, info_legend = get_legend_items(plot, edge_width, group_names[i], difference_graph,
+                                                    signed_weights={e: graph.edges[e]['weight'] for e in graph.edges},
+                                                    groups=compared.get(group_names[i]))
 
         # add legends to plot
         plot.renderers.append(main_legend)
@@ -1295,14 +1316,6 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
         max_syllable (int, optional): _description_. Defaults to 40.
         color_by_cluster (bool, optional): _description_. Defaults to False.
     """
-    # if there is syll info, load syllable description
-    if exists(syll_info_path):
-        syll_info = read_yaml(syll_info_path)
-        syll_info = pd.DataFrame(syll_info).T.sort_index()
-        labels = (syll_info['label']+"-" +syll_info.index.astype(str)).to_numpy()
-    else:
-        labels = None
-
     # set color_threshold = None to color the clusters based on threshold
     # described here: https://docs.scipy.org/doc/scipy/reference/generated/scipy.cluster.hierarchy.dendrogram.html
     if color_by_cluster:
@@ -1316,6 +1329,14 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
     X = get_behavioral_distance(sorted_index, model_path, max_syllable=max_syllable, distances='ar[init]')['ar[init]']
     # need to run squareform on X because linkage expects a 1-d array
     Z = linkage(squareform(X), 'complete')
+
+    # if there is syll info, name each leaf by its syllable's label. The file can hold
+    # entries for more or fewer syllables than the tree draws.
+    if exists(syll_info_path):
+        syll_info = read_yaml(syll_info_path)
+        labels = np.array([f"{syll_info.get(i, {}).get('label', '')}-{i}" for i in range(len(X))])
+    else:
+        labels = None
 
     # plot the dendrogram
     sns.set_style('whitegrid', {'axes.grid' : False})

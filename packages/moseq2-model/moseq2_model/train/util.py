@@ -235,13 +235,15 @@ def apply_model(model, whitening_params, data_dict, metadata, whiten="all"):
 
 
 # taken from moseq by @mattjj and @alexbw
-def whiten_all(data_dict, center=True):
+def whiten_all(data_dict, center=True, fit_on=None):
     """
     Whiten the PC Scores (with Cholesky decomposition) using all the data to compute the covariance matrix.
 
     Args:
     data_dict (OrderedDict): Training dataset
     center (bool): Indicates whether to center data by subtracting the mean PC score.
+    fit_on (OrderedDict): the data the mean and covariance are estimated from, when only part of data_dict
+        should shape the transform (the training data, with held-out data present); defaults to data_dict.
 
     Returns:
     data_dict (OrderedDict): Whitened training data dictionary
@@ -251,7 +253,8 @@ def whiten_all(data_dict, center=True):
     meancov = lambda x: (x.mean(0), np.cov(x, rowvar=False, bias=1))
     contig = partial(np.require, dtype=np.float64, requirements="C")
 
-    mu, Sigma = meancov(np.concatenate(list(map(non_nan, data_dict.values()))))
+    fit_on = data_dict if fit_on is None else fit_on
+    mu, Sigma = meancov(np.concatenate(list(map(non_nan, fit_on.values()))))
     L = np.linalg.cholesky(Sigma)
 
     offset = 0.0 if center else mu

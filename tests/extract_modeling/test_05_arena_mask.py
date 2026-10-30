@@ -148,14 +148,14 @@ def test_every_recording_gets_the_same_parameters(arena):
         } == reference, f"{name} was detected differently"
 
 
-def test_saved_parameters_differ_from_the_configuration_in_two_places(arena, configured):
+def test_saved_parameters_differ_from_the_configuration_in_one_place(arena, configured):
     """4. Everything that separates a recording's parameters from the project's.
 
     ``detect_and_set_camera_parameters`` reads each recording and may override
     the depth and filter parameters for the camera it finds. For these kinect2
-    recordings it corrects one thing: the raw depth video holds unsigned
-    16-bit samples, and the generated config says signed. The other difference
-    comes from saving, which marks the depth range as manually set.
+    recordings the generated config already matches, including the unsigned
+    16-bit samples of the raw depth video. The one difference comes from
+    saving, which marks the depth range as manually set.
 
     Nothing else moves, which is why the walkthrough's own session config
     holds the generated defaults: there was nothing in it that needed tuning.
@@ -166,8 +166,7 @@ def test_saved_parameters_differ_from_the_configuration_in_two_places(arena, con
     differing = {
         key for key in saved if key not in PATH_KEYS and config.get(key) != saved[key]
     }
-    assert differing == {"movie_dtype", "manual_set_depth_range"}
-    assert (config["movie_dtype"], saved["movie_dtype"]) == ("<i2", "<u2")
+    assert differing == {"manual_set_depth_range"}
 
 
 def test_the_configuration_points_at_the_parameter_file(arena, configured, progress_file):
@@ -345,40 +344,27 @@ def test_filter_sizes_are_read_as_python_literals(scratch, typed, expected):
 
 
 @pytest.mark.parametrize("typed", ["3 by 3", "", "three"])
-@pytest.mark.xfail(
-    reason="the text is passed to eval() with a fallback for a value of the "
-    "wrong type but none for text that does not parse"
+@pytest.mark.parametrize(
+    ("box", "key", "fallback"),
+    [("spatial_filter", "spatial_filter_size", [3]), ("temporal_filter", "temporal_filter_size", [0])],
 )
-def test_a_filter_size_that_is_not_python_falls_back(scratch, typed):
-    """Text that makes no sense as a filter size should fall back, as a value
-    of the wrong type already does.
+def test_a_filter_size_that_is_not_python_falls_back(scratch, typed, box, key, fallback):
+    """Text that makes no sense as a filter size falls back, as a value of the
+    wrong type does, and the save goes ahead.
 
-    What happens instead is that the exception comes out of the button
-    callback: ``SyntaxError`` for prose or for an empty box, ``NameError`` for
-    a bare word. A notebook shows it as a traceback under the widget and the
-    save does not happen. Clearing the box is the likeliest way to reach it.
+    Clearing the box is the likeliest way to reach it.
     """
     _, data, buttons = open_widget(scratch)
-    data.spatial_filter = typed
+    setattr(data, box, typed)
     click(buttons["Save session parameters"])
 
-    assert parameters(scratch / "session_config.yaml", data.path)["spatial_filter_size"] == [3]
+    assert parameters(scratch / "session_config.yaml", data.path)[key] == fallback
 
 
-@pytest.mark.xfail(
-    reason="pn.widgets.NumberInput picks an integer or a float box from the type "
-    "of the value it is handed, and the config spells bg_roi_weights [1, 0.1, 1] "
-    "and noise_tolerance 30, so the whole numbers get integer boxes"
-)
 def test_the_weight_boxes_accept_a_decimal(scratch):
     """Every one of these parameters is declared ``param.Number``, so a user
-    should be able to type ``0.5`` into any of them.
-
-    Three of the four are built as integer spinners and refuse. Which ones is
-    decided by how the shipped config happens to spell the number: ``0.1``
-    arrives as a float and gets a float box, ``1`` and ``30`` arrive as ints
-    and get integer boxes. The two that refuse are the mask area and distance
-    weights, which ``get_roi`` is most sensitive to.
+    can type ``0.5`` into any of them, however the shipped config happens to
+    spell its value (``1`` and ``30`` as well as ``0.1``).
     """
     import panel as pn
 
@@ -397,3 +383,22 @@ def test_the_weight_boxes_accept_a_decimal(scratch):
     ):
         boxes[label].value = 0.5
         assert boxes[label].value == 0.5, label
+
+
+def test_the_tracking_likelihood_threshold_accepts_a_decimal(scratch):
+    """The tracking model's mouse likelihood threshold is a ``param.Number``
+    too. The shipped config spells it ``-16``, and a user who enables the
+    tracking model can type ``-16.5`` into it.
+    """
+    import panel as pn
+
+    widget, _, _ = open_widget(scratch)
+    layout = widget.view.__panel__()
+    boxes = {
+        b.name: b
+        for b in layout.select(pn.widgets.IntInput) + layout.select(pn.widgets.FloatInput)
+    }
+
+    box = boxes["Tracking model mouse likelihood threshold"]
+    box.value = -16.5
+    assert box.value == -16.5
