@@ -237,12 +237,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         self.set_button.button_style = 'primary'
 
-        # Set current widget values
-        if len(syllables['label']) > 0:
-            self.lbl_name_input.value = syllables['label']
-
-        if len(syllables['desc']) > 0:
-            self.desc_input.value = syllables['desc']
+        # Set current widget values, blank for a syllable with no label yet
+        self.lbl_name_input.value = syllables['label']
+        self.desc_input.value = syllables['desc']
 
         # Update label
         self.cm_lbl.text = f'Crowd Movie {self.syll_select.index + 1}/{len(self.syll_select.options)}'
