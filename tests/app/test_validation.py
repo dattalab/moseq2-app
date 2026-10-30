@@ -28,6 +28,16 @@ def test_a_recording_that_never_stops_has_no_stationary_frames():
     assert count_stationary_frames(moving) == 0
 
 
+def test_a_recording_that_starts_without_a_mouse_counts_every_still_frame():
+    """The first frame is left out whatever its speed: zero, or NaN when it has no mouse.
+
+    The frames after it are counted as they are, so two still frames are two.
+    """
+    for first in (0.0, float("nan")):
+        recording = pd.DataFrame({"velocity_2d_mm": [first, 0.0, 0.0, 1.0]})
+        assert count_stationary_frames(recording) == 2, first
+
+
 def test_integer_timestamps_are_rescaled_like_float_ones():
     """Millisecond timestamps are rescaled to seconds before the rate is measured.
 

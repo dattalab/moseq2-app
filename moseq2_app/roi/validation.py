@@ -98,8 +98,8 @@ def count_stationary_frames(scalar_df):
     motionless_frames (int): Number of frames where the mouse is not moving
     """
     
-    # subtract 1 because first frame is always 0mm/s
-    return max(0, (scalar_df["velocity_2d_mm"] < 0.1).sum() - 1)
+    # the first frame has no previous position, so its speed is 0, or NaN when it has no mouse
+    return int((scalar_df["velocity_2d_mm"].iloc[1:] < 0.1).sum())
 
 
 def get_scalar_df(path_dict):
