@@ -6,8 +6,9 @@ chunks, asks the classifier which frames face the wrong way, rotates those
 frames by 180 degrees in place and adds pi to their recorded angle. Because
 the change is made in place, each extraction records in its own file that
 the correction ran, and a later run skips it. The suite walks neither the
-notebook nor the widget, so it is tested here directly. The classifier itself is replaced by one that flags every frame,
-which makes the correction a plain function of the frame index.
+notebook nor the widget, so it is tested here directly. The classifier itself is replaced by a stand-in.
+Most tests flag every frame, which makes the correction a plain function of the frame index;
+one flags every other frame by what the frame holds.
 """
 
 from __future__ import annotations
@@ -68,6 +69,22 @@ def test_overlapping_chunks_correct_each_frame_once(session):
     with h5py.File(path) as f:
         np.testing.assert_array_equal(f["frames"][()], np.rot90(original, 2, axes=(1, 2)))
         np.testing.assert_allclose(f["scalars/angle"][()], np.pi)
+
+
+def test_only_the_frames_the_classifier_flags_are_corrected(session, monkeypatch):
+    """Frames flagged as facing the wrong way are rotated and their angle moved; the rest are left alone.
+
+    The stand-in flags each frame by the number painted into it, so a frame
+    is flagged the same way whichever chunk it falls in.
+    """
+    subject, path, original = session
+    monkeypatch.setattr(widget, "get_flips", lambda values, **kw: values.max(axis=(1, 2)) % 2 == 1)
+    flagged = original.max(axis=(1, 2)) % 2 == 1
+    correct(subject, chunk_size=5, chunk_overlap=2)
+    with h5py.File(path) as f:
+        expected = np.where(flagged[:, None, None], np.rot90(original, 2, axes=(1, 2)), original)
+        np.testing.assert_array_equal(f["frames"][()], expected)
+        np.testing.assert_allclose(f["scalars/angle"][()], np.where(flagged, np.pi, 0))
 
 
 def test_overlapping_chunks_write_each_frame_to_the_movie_once(session):
