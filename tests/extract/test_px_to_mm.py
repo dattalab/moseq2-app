@@ -81,14 +81,19 @@ def test_an_unknown_frame_size_is_converted_as_a_kinect_v2_frame():
     np.testing.assert_allclose(mm_per_pixel((640, 480)), mm_per_pixel((512, 424)))
 
 
-def test_extraction_measures_a_frame_with_the_camera_that_wrote_it():
+@pytest.mark.parametrize(
+    "compute_raw_scalars", [False, True], ids=["filtered frames", "raw frames (--compute-raw-scalars)"]
+)
+def test_extraction_measures_a_frame_with_the_camera_that_wrote_it(compute_raw_scalars):
     """``extract_chunk`` passes the raw frame size on to ``compute_scalars``.
 
     640 x 576 is an Azure Kinect or Femto frame in narrow mode. The size is
     taken before the arena crop, so the mouse's millimetres use that
     camera's field of view, 75 x 65 degrees, not the Kinect v2's 70.6 x 60.
     The mouse here lies along the x axis, so its length is measured in x
-    pixels and its width in y pixels.
+    pixels and its width in y pixels. Scalars are measured on the filtered
+    frames, or on the raw ones with ``--compute-raw-scalars``, and both use
+    the same camera.
     """
     from moseq2_extract.extract.extract import extract_chunk
     from moseq2_extract.util import get_strels
@@ -109,7 +114,7 @@ def test_extraction_measures_a_frame_with_the_camera_that_wrote_it():
 
     scalars = extract_chunk(
         chunk, roi=roi, bground=bground, true_depth=floor, min_height=10, max_height=100,
-        centroid_hampel_span=0, angle_hampel_span=0, **strels,
+        centroid_hampel_span=0, angle_hampel_span=0, compute_raw_scalars=compute_raw_scalars, **strels,
     )["scalars"]
 
     azure_narrow = floor * 2 * np.tan(np.deg2rad(np.array([75.0, 65.0]) / 2)) / np.array([width, height])
