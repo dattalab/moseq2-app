@@ -527,3 +527,53 @@ def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
     assert made, "the movies were not regenerated"
     movie = Path(read_yaml(paths["syll_info"])[labeled - 1]["crowd_movie_path"])
     assert movie == last and movie.exists(), movie
+
+
+def test_an_unlabelled_syllable_picked_from_the_list_shows_blank_boxes(
+    tmp_path, analysis_project, labeled, monkeypatch
+):
+    """20. Each syllable shows its own label, or blank boxes if it has none.
+
+    A project labelled at a lower count is reopened at the cell's own, so
+    the last syllables have no label yet. Picking one of them from the
+    list after a labelled one shows empty boxes, and pressing Next without
+    typing leaves it unlabelled rather than giving it the other's name.
+    """
+    from moseq2_app.util import write_yaml
+
+    from widgets import capture_display
+
+    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
+    progress = tmp_path / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
+    paths = read_yaml(str(progress))
+    display = capture_display(monkeypatch)
+
+    typed = labeled - 3
+    label_syllables(paths, **{**LABELLING, "max_syllables": typed})
+    syll_info = read_yaml(paths["syll_info"])
+    for syllable in range(typed):
+        syll_info[syllable].update(_typed(syllable))
+    write_yaml(syll_info, paths["syll_info"])
+
+    display.clear()
+    label_syllables(paths, **LABELLING)
+    dropdown = display.of_type(widgets.Dropdown)[-1]
+    view = display.of_type(widgets.AppLayout)[-1]
+    name, desc = (
+        next(w for w in _walk(view.right_sidebar) if isinstance(w, widgets.Text) and w.placeholder == placeholder)
+        for placeholder in ("Syllable Name", "Short description of behavior")
+    )
+    next_button = next(
+        w for w in display.of_type(widgets.HBox)
+        for w in w.children
+        if isinstance(w, widgets.Button) and w.description == "Next"
+    )
+
+    blank = labeled - 2
+    assert (name.value, desc.value) == (_typed(0)["label"], _typed(0)["desc"])
+    dropdown.index = blank
+    assert (name.value, desc.value) == ("", "")
+
+    next_button.click()
+    assert {k: read_yaml(paths["syll_info"])[blank][k] for k in ("label", "desc")} == {"label": "", "desc": ""}
