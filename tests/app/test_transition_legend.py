@@ -117,3 +117,17 @@ def test_a_group_name_with_a_spaced_hyphen_is_named_whole(monkeypatch):
     labels = panels["WT - saline - KO"]
     assert "Usage higher in WT - saline than KO" in labels, labels
     assert "Thickest blue edge: WT - saline higher by 0.0200" in labels, labels
+
+
+def test_the_drawn_difference_legend_tells_the_directions_apart(monkeypatch):
+    """The notebook's graph hands the legend each edge's signed difference.
+
+    Edge widths on a difference graph are sizes, so only the signed
+    weights say which edges went down. Drawn through the notebook's own
+    path, the red entries carry the edge that is lower in b.
+    """
+    panels = draw(monkeypatch, ("a", "b"), {(0, 1): -0.01, (1, 2): 0.02})
+
+    labels = panels["b - a"]
+    assert "Thinnest red edge: b lower by 0.0100" in labels, labels
+    assert "Thickest blue edge: b higher by 0.0200" in labels, labels
