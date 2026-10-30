@@ -58,3 +58,14 @@ def test_small_areas_are_counted_against_the_recordings_own_mean():
     areas = pd.DataFrame({"area_px": [100.0] * 19 + [70.0]})
     assert count_frames_with_small_areas(areas) == 1
     assert count_frames_with_small_areas(areas * 5) == 1
+
+
+def test_a_frame_is_small_from_two_standard_deviations_under_the_mean():
+    """Areas with mean 100 and standard deviation 4: 94 is 1.5 below, 90 is 2.5 below.
+
+    Fourteen frames at 100 and one each at 94, 106, 90 and 110 give exactly
+    that mean and standard deviation, so only 90 is counted.
+    """
+    areas = pd.DataFrame({"area_px": [100.0] * 14 + [94.0, 106.0, 90.0, 110.0]})
+    assert areas["area_px"].mean() == 100 and areas["area_px"].std() == 4
+    assert count_frames_with_small_areas(areas) == 1
