@@ -61,3 +61,59 @@ def test_a_difference_legend_names_both_groups():
         "Thinnest red edge: b lower by 0.0100",
         "Thickest red edge: b lower by 0.0100",
     ]
+
+
+def draw(monkeypatch, groups, differences):
+    """Draw two groups and their difference the way the notebook's transition-graph cell does.
+
+    ``differences`` maps each edge to its signed difference, second group
+    minus first; the group graphs share one edge set. Returns the legend
+    labels of each panel, keyed by the panel's title.
+    """
+    from bokeh.models import Legend
+
+    from moseq2_app.stat import view
+
+    shown = []
+    monkeypatch.setattr(view, "show", shown.append)
+
+    nodes = sorted({n for edge in differences for n in edge})
+    group_graph = nx.DiGraph()
+    group_graph.add_weighted_edges_from((u, v, 0.05) for u, v in differences)
+    difference = nx.DiGraph()
+    difference.add_weighted_edges_from((u, v, w) for (u, v), w in differences.items())
+    pos = nx.circular_layout(nodes)
+    usage = dict.fromkeys(nodes, 1 / len(nodes))
+    scalar = {key: [dict.fromkeys(nodes, 1.0)] * 3
+              for key in ("duration", "speeds_2d", "speeds_3d", "heights", "dists")}
+    syll_info = {n: {"label": f"s{n}", "desc": "", "crowd_movie_path": ""} for n in nodes}
+    title = f"{groups[1]} - {groups[0]}"
+
+    view.plot_interactive_transition_graph(
+        [group_graph, group_graph.copy(), difference], pos, list(groups), [*groups, title],
+        [usage, usage, dict.fromkeys(nodes, 0.01)], syll_info, [], [], scalars=scalar,
+    )
+
+    panels = {}
+    for child in shown[0].children:
+        plot = child[0]
+        panels[plot.title.text] = [
+            item.label.value
+            for legend in plot.renderers if isinstance(legend, Legend)
+            for item in legend.items
+        ]
+    return panels
+
+
+def test_a_group_name_with_a_spaced_hyphen_is_named_whole(monkeypatch):
+    """The difference legend names the groups it compares, not pieces of its title.
+
+    The title of a difference panel joins the two group names with " - ",
+    so a group named "WT - saline" makes the title "WT - saline - KO",
+    which reads three ways. The legend takes the names themselves.
+    """
+    panels = draw(monkeypatch, ("KO", "WT - saline"), {(0, 1): -0.01, (1, 2): 0.02})
+
+    labels = panels["WT - saline - KO"]
+    assert "Usage higher in WT - saline than KO" in labels, labels
+    assert "Thickest blue edge: WT - saline higher by 0.0200" in labels, labels

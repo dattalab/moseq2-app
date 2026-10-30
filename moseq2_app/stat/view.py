@@ -731,7 +731,7 @@ def get_minmax_tp(edge_width, diff=False, signed_weights=None):
 
     return min_down_tp, max_down_tp, min_up_tp, max_up_tp
 
-def get_difference_legend_items(plot, edge_width, group_name, signed_weights=None):
+def get_difference_legend_items(plot, edge_width, group_name, signed_weights=None, groups=None):
     """
     Create the difference graph legend items with the min and max transition probabilities for both the up and down-regulated transition probabilities.
 
@@ -739,6 +739,7 @@ def get_difference_legend_items(plot, edge_width, group_name, signed_weights=Non
     plot (bokeh.figure): Bokeh plot to add legend to.
     edge_width (dict): Dictionary of edge widths
     group_name (str): Difference graph title.
+    groups (tuple): the two groups compared, first minus second; read from the title when not given.
 
     Returns:
     diff_items (list): List of LegendItem objects to display
@@ -755,7 +756,7 @@ def get_difference_legend_items(plot, edge_width, group_name, signed_weights=Non
     b_circle = plot.scatter(marker='circle', line_color='blue', fill_color='white')
 
     # difference graphs are titled 'b - a': blue is higher in b, red lower
-    first, _, second = group_name.partition(' - ')
+    first, second = groups if groups is not None else group_name.partition(' - ')[::2]
 
     min_down_tp, max_down_tp, min_up_tp, max_up_tp = get_minmax_tp(edge_width, diff=True, signed_weights=signed_weights)
 
@@ -1134,7 +1135,7 @@ def get_node_labels(plots, graph_renderer, rendered_graphs, graph, node_indices)
 
     return labels
 
-def get_legend_items(plot, edge_width, group_name, difference_graph=False, signed_weights=None):
+def get_legend_items(plot, edge_width, group_name, difference_graph=False, signed_weights=None, groups=None):
     """
     generate two legend items to describe the transition plots.
 
@@ -1143,6 +1144,7 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False, signe
     edge_width (dict): dict of edge tuple(node1, node2) object mapped to float values describing edge widths.
     group_name (str): name of currently plotted group
     difference_graph (bool): indicator for whether the currently plotted graph is a difference graph between two groups.
+    groups (tuple): for a difference graph, the two groups compared, first minus second.
 
     Returns:
     main_legend (bokeh Legend instance): Legend containing colors describing incoming and outgoing transitions.
@@ -1170,7 +1172,8 @@ def get_legend_items(plot, edge_width, group_name, difference_graph=False, signe
     ]
 
     if difference_graph:
-        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name, signed_weights=signed_weights)
+        diff_main_items, info_items = get_difference_legend_items(plot, edge_width, group_name,
+                                                                  signed_weights=signed_weights, groups=groups)
         group_items += diff_main_items
 
     main_legend = Legend(items=group_items,
@@ -1207,6 +1210,10 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
         legend_loc = 'right'
 
     rendered_graphs, plots = [], []
+
+    # make_difference_graphs titles each difference graph 'b - a'; a group name can itself contain ' - '
+    compared = {f'{group[j]} - {group[i]}': (group[j], group[i])
+                for i in range(len(group)) for j in range(i + 1, len(group))}
 
     for i, graph in enumerate(graphs):
 
@@ -1266,7 +1273,8 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
 
         # get plot legends
         main_legend, info_legend = get_legend_items(plot, edge_width, group_names[i], difference_graph,
-                                                    signed_weights={e: graph.edges[e]['weight'] for e in graph.edges})
+                                                    signed_weights={e: graph.edges[e]['weight'] for e in graph.edges},
+                                                    groups=compared.get(group_names[i]))
 
         # add legends to plot
         plot.renderers.append(main_legend)
