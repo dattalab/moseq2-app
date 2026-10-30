@@ -12,18 +12,21 @@ import pickle
 
 import h5py
 import numpy as np
+import pytest
 
 from moseq2_app.flip import train
 
 
-def test_the_reported_size_is_the_size_of_the_training_set(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("dtype", [np.uint8, np.uint16])
+def test_the_reported_size_is_the_size_of_the_training_set(tmp_path, monkeypatch, capsys, dtype):
     """A user reads this number to decide whether training will fit in memory.
 
-    It is the size of the array that gets saved, whatever its dtype.
+    It is the size of the array that gets saved, whatever its dtype: with two
+    bytes a pixel it is twice the number of pixels.
     """
     session, index = tmp_path / "session.h5", tmp_path / "flip-training-frame-ranges.p"
     with h5py.File(session, "w") as f:
-        f["frames"] = np.zeros((500, 80, 80), dtype=np.uint8)
+        f["frames"] = np.zeros((500, 80, 80), dtype=dtype)
     with index.open("wb") as f:
         pickle.dump(({"session": str(session)}, {"session": [(False, slice(None))]}), f)
     monkeypatch.setattr(train, "clean_frames", lambda frames, *a, **kw: frames)
