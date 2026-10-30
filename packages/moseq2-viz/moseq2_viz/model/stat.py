@@ -602,6 +602,22 @@ def run_pairwise_stats(df, group1, group2, test_type="mw", verbose=False, **kwar
         return ttest(df, group1, group2, verbose=verbose, **kwargs)
 
 
+def _check_groups(df, *groups):
+    """
+    Raise a ValueError naming a group the table does not have, and the groups it does.
+
+    Args:
+    df (pandas.DataFrame): dataframe that contains syllable statistics per session (mean_df/stats_df)
+    groups (str): the names of the groups to compare.
+    """
+
+    present = set(df.group.unique())
+    for group in groups:
+        if group not in present:
+            names = ", ".join(sorted(map(str, present)))
+            raise ValueError(f"Group '{group}' is not in the data. Its groups are: {names}.")
+
+
 MannwhitneyuResult = namedtuple("MannwhitneyuResult", ("statistic", "pvalue"))
 
 
@@ -685,6 +701,7 @@ def mann_whitney(df, group1, group2, statistic="usage", max_syllable=40, verbose
     df_mw_real (pandas.DataFrame): DataFrame containing Mann-Whitney U corrected results.
     exclude_sylls (list): list of syllables that were excluded via multiple comparisons test.
     """
+    _check_groups(df, group1, group2)
     # get mean grouped data
     grouped_data = get_session_mean_df(df, statistic, max_syllable).reset_index()
 
@@ -722,6 +739,7 @@ def ztest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     pvals_ztest_boots (np.array): Computed array of p-values
     syllables_to_include (list): List of significant syllables after multiple corrections.
     """
+    _check_groups(df, group1, group2)
     boots = bootstrap_group_means(df, group1, group2, statistic, max_syllable)
     # do a ztest on the bootstrap distributions of your 2 conditions
     pvals_ztest_boots = ztest_vect(boots[group1], boots[group2])
@@ -752,6 +770,7 @@ def ttest(df, group1, group2, statistic="usage", max_syllable=40, verbose=False,
     p (np.array): Computed array of p-values
     syllables_to_include (list): List of significant syllables after multiple corrections.
     """
+    _check_groups(df, group1, group2)
     # get separated group variables
     group_stat = get_session_mean_df(df, statistic, max_syllable)
     groups = (group1, group2)
