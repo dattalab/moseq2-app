@@ -347,7 +347,11 @@ class SyllableLabeler(SyllableLabelerWidgets):
             # get existing crowd movie paths
             crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
 
-        if len(crowd_movie_paths) < self.max_sylls:
+        # a movie is matched to its syllable by the ids in its name; any other .mp4 is not a crowd movie
+        exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d+).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d+)')
+        movie_ids = {int(match['sorted_id']) for match in map(exp.search, crowd_movie_paths) if match is not None}
+
+        if any(i not in movie_ids for i in range(self.max_sylls)):
             print('Crowd movie list is incomplete. Generating movies...')
             config_data = self.set_default_cm_parameters(config_data)
 
@@ -358,7 +362,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
 
         if set(crowd_movie_paths) != set(info_cm_paths):
-            exp = re.compile(r'.*sorted-id-(?P<sorted_id>\d+).\((?P<sort_type>\w+)\)_original-id-(?P<original_id>\d+)')
             for cm in crowd_movie_paths:
                 # Parse paths to get corresponding syllable number
                 match = exp.search(cm)

@@ -491,3 +491,39 @@ def test_a_count_beyond_what_the_model_uses_is_refused(relabelled, analysis_path
         label_syllables(paths, **{**LABELLING, "max_syllables": used + 1})
 
     assert Path(paths["syll_info"]).read_bytes() == before
+
+
+def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
+    tmp_path, analysis_project, labeled, monkeypatch
+):
+    """19. A crowd-movie directory missing a syllable's movie is regenerated.
+
+    The cell checks that every syllable it offers has a movie before it
+    reuses the directory. A file that is not a crowd movie, such as a
+    stray notes.mp4, does not stand in for the one that is missing.
+    """
+    from moseq2_app.viz import controller
+
+    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
+    progress = tmp_path / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
+    paths = read_yaml(str(progress))
+
+    crowd = Path(paths["crowd_dir"])
+    last = next(m for m in crowd.glob("*.mp4") if int(MOVIE_NAME.search(m.name)["sorted_id"]) == labeled - 1)
+    last.unlink()
+    (crowd / "notes.mp4").write_bytes(b"not a crowd movie")
+
+    made = []
+
+    def make_movies(index_file, model_path, output_dir, config_data):
+        made.append(output_dir)
+        shutil.copy(next(crowd.glob("syllable_*.mp4")), last)
+        return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
+
+    monkeypatch.setattr(controller, "make_crowd_movies_wrapper", make_movies)
+    label_syllables(paths, **LABELLING)
+
+    assert made, "the movies were not regenerated"
+    movie = Path(read_yaml(paths["syll_info"])[labeled - 1]["crowd_movie_path"])
+    assert movie == last and movie.exists(), movie
