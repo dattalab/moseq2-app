@@ -577,3 +577,37 @@ def test_an_unlabelled_syllable_picked_from_the_list_shows_blank_boxes(
 
     next_button.click()
     assert {k: read_yaml(paths["syll_info"])[blank][k] for k in ("label", "desc")} == {"label": "", "desc": ""}
+
+
+def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_project, labeled, monkeypatch):
+    """21. Every syllable the model used can be labelled.
+
+    The largest count the cell takes is the number of syllables the model
+    used. Typing it opens the labeller with that many syllables, after
+    making the crowd movies the project does not have yet.
+    """
+    from moseq2_app.viz import controller
+
+    from widgets import capture_display
+
+    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
+    progress = tmp_path / "progress.yaml"
+    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
+    paths = read_yaml(str(progress))
+    model = parse_model_results(paths["model_path"])
+    used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
+
+    crowd = Path(paths["crowd_dir"])
+    template = next(crowd.glob("syllable_*.mp4"))
+
+    def make_movies(index_file, model_path, output_dir, config_data):
+        have = {int(MOVIE_NAME.search(m.name)["sorted_id"]) for m in crowd.glob("syllable_*.mp4")}
+        for syllable in set(range(config_data["max_syllable"])) - have:
+            shutil.copy(template, crowd / f"syllable_sorted-id-{syllable}_(usage)_original-id-{syllable}.mp4")
+        return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
+
+    monkeypatch.setattr(controller, "make_crowd_movies_wrapper", make_movies)
+    display = capture_display(monkeypatch)
+
+    assert label_syllables(paths, **{**LABELLING, "max_syllables": used}) == used
+    assert len(display.of_type(widgets.Dropdown)[-1].options) == used
