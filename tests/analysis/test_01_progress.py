@@ -175,9 +175,16 @@ def _break(progress, root, what):
     from moseq2_viz.util import read_yaml
 
     broken = dict(progress)
-    if what == "model":
-        broken["model_path"] = str(root / "models" / "gone.p")
-        return broken, "gone.p"
+    named_in_progress = {
+        "model": ("model_path", root / "models" / "gone.p"),
+        "models folder": ("base_model_path", root / "gone-models"),
+        "index": ("index_file", root / "gone-index.yaml"),
+        "config": ("config_file", root / "gone-config.yaml"),
+    }
+    if what in named_in_progress:
+        key, path = named_in_progress[what]
+        broken[key] = str(path)
+        return broken, path.name
 
     index = read_yaml(progress["index_file"])
     if what == "pca":
@@ -192,7 +199,7 @@ def _break(progress, root, what):
     return broken, missing
 
 
-@pytest.mark.parametrize("what", ["model", "pca", "session"])
+@pytest.mark.parametrize("what", ["model", "models folder", "index", "config", "pca", "session"])
 def test_the_sanity_check_notices_an_input_that_is_gone(analysis_progress, analysis_project, capsys, what):
     """6. What the cell's comment promises: ``# check all necessary paths exist``.
 
@@ -206,7 +213,7 @@ def test_the_sanity_check_notices_an_input_that_is_gone(analysis_progress, analy
     try:
         progress_path_sanity_check(broken, str(analysis_project / "progress.yaml"))
     finally:
-        if what != "model":
+        if what in ("pca", "session"):
             Path(broken["index_file"]).unlink()
 
     printed = capsys.readouterr().out
