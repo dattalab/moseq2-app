@@ -5,7 +5,6 @@
     progress_paths = update_progress(progress_filepath, 'pca_dirname', pca_dirname)
 
     with update_config(progress_paths['config_file']) as config_data:
-        config_data['camera_type'] = 'k2'
         config_data['overwrite_pca'] = False
         config_data['gaussfilter_space'] = (1.5, 1)
         config_data['medfilter_space'] = [0]

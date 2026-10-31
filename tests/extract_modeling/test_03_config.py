@@ -15,12 +15,17 @@ they presented.
 The full-config baseline below is therefore the alarm for that whole class of
 problem. A dependency that changes any default turns it red on purpose.
 
-One thing the names hide: the ``camera_type`` argument does not set the
-config's ``camera_type`` key, which is ``'auto'`` either way. The argument
-only overrides three depth and filter parameters, and only for azure.
+This cell is the one place the notebook asks for the camera. ``'azure'``
+(an Azure Kinect or an Orbbec Femto) writes ``camera_type: azure`` and that
+camera's depth range, filters and crop, the same as ``moseq2-extract
+generate-config --camera-type azure``; ``'k2'`` leaves ``camera_type: auto``,
+so extraction tells the camera from the file. Later cells read the key and
+never set it.
 """
 
 from __future__ import annotations
+
+import re
 
 import pytest
 
@@ -28,11 +33,17 @@ from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_extract.gui import generate_config_command
 from moseq2_extract.util import read_yaml
 
+from cells import code_cell
+
+EXTRACT = "MoSeq2-Extract-Modeling-Notebook.ipynb"
+
 #: The only keys `camera_type='azure'` changes.
 AZURE_OVERRIDES = {
     "bg_roi_depth_range": [550, 650],
     "spatial_filter_size": [5],
     "tail_filter_size": [15, 15],
+    "crop_size": [120, 120],
+    "camera_type": "azure",
 }
 
 #: What a config value is allowed to be once written and read back.
@@ -63,7 +74,7 @@ def test_generated_config_is_unchanged(tmp_path, data_regression):
     data_regression.check(generate(tmp_path / "config.yaml", camera_type="k2"))
 
 
-def test_azure_changes_exactly_three_parameters(tmp_path):
+def test_azure_changes_exactly_its_parameters(tmp_path):
     """2. The azure branch's whole contract."""
     k2 = generate(tmp_path / "k2.yaml", camera_type="k2")
     azure = generate(tmp_path / "azure.yaml", camera_type="azure")
@@ -78,15 +89,16 @@ def test_azure_changes_exactly_three_parameters(tmp_path):
         assert azure[key] == expected
 
 
-def test_camera_type_argument_does_not_set_the_camera_type_key(tmp_path):
-    """The argument and the key share a name and are unrelated.
+def test_the_camera_chosen_here_is_the_one_the_config_records(tmp_path):
+    """Later cells read ``camera_type``, so the choice made here has to land in it."""
+    assert generate(tmp_path / "k2.yaml", camera_type="k2")["camera_type"] == "auto"
+    assert generate(tmp_path / "azure.yaml", camera_type="azure")["camera_type"] == "azure"
 
-    Captured because it is surprising: a user who passes 'k2' and then reads
-    the config finds 'auto'. The notebook sets the key by hand later.
-    """
-    for camera_type in ("k2", "azure"):
-        config = generate(tmp_path / f"{camera_type}.yaml", camera_type=camera_type)
-        assert config["camera_type"] == "auto"
+
+@pytest.mark.parametrize("cell", [5, 13], ids=["arena", "pca"])
+def test_later_cells_do_not_reset_the_camera(cell):
+    """A later cell that assigned ``camera_type`` would undo the choice made here."""
+    assert not re.search(r"config_data\['camera_type'\]\s*=(?!=)", code_cell(EXTRACT, cell))
 
 
 def test_every_value_is_a_plain_yaml_type(tmp_path):
