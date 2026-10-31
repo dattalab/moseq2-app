@@ -157,6 +157,17 @@ def test_only_the_named_extensions_are_searched(tmp_path, chosen):
     assert len(chosen) == len(RECORDINGS)
 
 
+def test_the_nidaq_stream_is_not_a_recording(tmp_path, chosen):
+    """With its NI-DAQ stream on, the Kinect v2 app writes ``nidaq.dat`` beside
+    ``depth.dat``; only the depth file is a recording."""
+    root = build_fake_project(tmp_path / "project", extension=".dat")
+    for name in RECORDINGS:
+        (root / name / "nidaq.dat").touch()
+    extract_found_sessions(str(root), str(root / "config.yaml"), [".dat"])
+
+    assert chosen == sorted(str(root / name / "depth.dat") for name in RECORDINGS)
+
+
 def test_a_missing_config_is_reported_before_the_search(tmp_path, chosen):
     """3. The cell's one explicit error."""
     root = build_fake_project(tmp_path / "project")

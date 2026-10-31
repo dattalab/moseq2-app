@@ -82,11 +82,11 @@ def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi',
     # concatenate all files of different extensions
     files = sorted(reduce(add, files))
 
-    def is_ir_file(f):
-        return 'ir.avi' in basename(f) or 'ir.dat' in basename(f)
+    def is_not_depth(f):
+        return 'ir.avi' in basename(f) or 'ir.dat' in basename(f) or basename(f) == 'nidaq.dat'
 
-    # remove IR videos
-    files = filter(complement(is_ir_file), files)
+    # remove IR videos and the NI-DAQ stream the Kinect v2 app records beside depth.dat
+    files = filter(complement(is_not_depth), files)
 
     # remove any folder that doesn't have a metadata.json file
     files = list(filter(compose(_has_metadata, dirname), files))

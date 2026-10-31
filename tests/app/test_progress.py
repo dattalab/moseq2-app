@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 
-from moseq2_app.gui.progress import find_progress, get_session_paths
+from moseq2_app.gui.progress import find_progress, get_session_paths, get_sessions
 
 
 def test_the_latest_model_is_the_one_chosen(tmp_path):
@@ -69,3 +69,18 @@ def test_a_project_under_a_depth_directory_lists_only_its_depth_recordings(tmp_p
         (project / session / "rgb.avi").write_bytes(b"")
 
     assert get_session_paths(str(project)) == {s: str(project / s / "depth.avi") for s in ("s0", "s1")}
+
+
+def test_the_arena_tool_takes_the_depth_recording_not_the_nidaq_stream(tmp_path):
+    """With its NI-DAQ stream on, the Kinect v2 app writes ``nidaq.dat`` beside
+    ``depth.dat``. The arena tool keeps one file per session folder, so a
+    second ``.dat`` would replace the recording."""
+    for session in ("s0", "s1"):
+        (tmp_path / session).mkdir()
+        (tmp_path / session / "depth.dat").write_bytes(b"")
+        (tmp_path / session / "nidaq.dat").write_bytes(b"")
+        (tmp_path / session / "metadata.json").write_text("{}")
+
+    assert get_sessions(str(tmp_path), skip_extracted=False) == [
+        str(tmp_path / s / "depth.dat") for s in ("s0", "s1")
+    ]
