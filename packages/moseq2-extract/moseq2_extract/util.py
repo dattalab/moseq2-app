@@ -261,6 +261,10 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
     Read the camera type and info and set the bg_roi_weights to the precomputed values.
     If camera_type is None, function will assume kinect is used.
 
+    Only a setting still at the generic default (the Kinect v2's value, which a generated
+    config holds) or missing is replaced; a value the user changed is kept. ``k2`` is the
+    Kinect v2, as the notebook and moseq2-pca name it.
+
     Args:
     config_data (dict): dictionary containing all input parameters.
     input_file (str): path to raw depth file
@@ -271,6 +275,8 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
 
     # Auto-setting background weights
     camera_type = config_data.get('camera_type')
+    if camera_type == 'k2':
+        camera_type = 'kinect'
     finfo = config_data.get('finfo')
 
     default_parameters = {
@@ -309,16 +315,29 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
             warnings.warn('Extension not recognized, trying default Kinect v2 parameters.')
             detected = 'kinect'
 
-        # set the params
-        config_data.update(**default_parameters[detected])
+        _fill_camera_defaults(config_data, default_parameters[detected], default_parameters['kinect'])
     elif camera_type in default_parameters:
-        # update the config with the corresponding param set
-        config_data.update(**default_parameters[camera_type])
+        _fill_camera_defaults(config_data, default_parameters[camera_type], default_parameters['kinect'])
     else:
         warnings.warn('Warning, make sure the following parameters are set to best handle your camera type: '
                       '"bg_roi_weights", "pixel_format", "movie_dtype"')
 
     return config_data
+
+
+def _fill_camera_defaults(config_data, camera_defaults, generic_defaults):
+    """Set each camera default whose setting is missing or still at the generic default."""
+    for key, value in camera_defaults.items():
+        current = config_data.get(key)
+        if current is None or _same_setting(current, generic_defaults[key]):
+            config_data[key] = value
+
+
+def _same_setting(a, b):
+    """Compare two settings, treating a list read back from yaml and a tuple as equal."""
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return list(a) == list(b)
+    return a == b
 
 def check_filter_sizes(config_data):
     """
