@@ -4,7 +4,6 @@
     progress_paths = update_progress(progress_filepath, 'session_config', session_config_path)
 
     with update_config(progress_paths['config_file']) as config_data:
-        config_data['camera_type'] = 'auto'
         config_data['output_dir'] = 'proc'
 
     ArenaMaskWidget(progress_paths['base_dir'], progress_paths['config_file'],

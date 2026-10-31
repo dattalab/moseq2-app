@@ -130,6 +130,8 @@ def generate_config_command(output_file, camera_type="k2"):
         params["bg_roi_depth_range"] = [550, 650]
         params["spatial_filter_size"] = [5]
         params["tail_filter_size"] = [15, 15]
+        params["crop_size"] = [120, 120]
+        params["camera_type"] = "azure"
 
     # Check if the file already exists, and prompt user if they would like to overwrite pre-existing file
     if exists(output_file):

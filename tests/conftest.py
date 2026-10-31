@@ -291,7 +291,6 @@ def arena(project, progress_file, configured, flipped):
     session_config = project / "session_config.yaml"
     update_progress(str(progress_file), "session_config", str(session_config))
     with update_config(str(configured)) as config:
-        config["camera_type"] = "auto"
         config["output_dir"] = "proc"
 
     widget = ArenaMaskWidget(str(project), str(configured), str(session_config))
@@ -422,7 +421,6 @@ def pca(project, progress_file, configured, grouped):
     pca_dirname = str(project / "_pca") + "/"
     paths = update_progress(str(progress_file), "pca_dirname", pca_dirname)
     with update_config(str(configured)) as config:
-        config["camera_type"] = "k2"
         config["overwrite_pca"] = False
         config["gaussfilter_space"] = (1.5, 1)
         config["medfilter_space"] = [0]
