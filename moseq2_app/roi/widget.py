@@ -15,11 +15,12 @@ from bokeh.models import HoverTool
 from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
 from moseq2_extract.io.video import load_movie_data
-from moseq2_extract.util import select_strel, get_strels
+from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
+from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
 from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config, update_config
-from moseq2_extract.extract.proc import get_bground_im_file, get_roi, apply_roi, threshold_chunk
+from moseq2_extract.extract.proc import get_bground_im_file, apply_roi, threshold_chunk
 
 
 
@@ -179,15 +180,8 @@ class ArenaMaskWidget:
 
         session_config = self.session_config[folder]
 
-        strel_dilate = select_strel(session_config['bg_roi_shape'], tuple(session_config['bg_roi_dilate']))
-        strel_erode = select_strel(session_config['bg_roi_shape'], tuple(session_config['bg_roi_erode']))
-
-        rois, _, = get_roi(background,
-                            **session_config,
-                            strel_dilate=strel_dilate,
-                            strel_erode=strel_erode,
-                            get_all_data=False
-                            )
+        # the function extraction uses, so the saved parameters give extraction this arena
+        rois, background = find_arena_candidates(background, session_config, self._output_dir(folder))
         # add to view
         return background, rois
 
@@ -201,11 +195,10 @@ class ArenaMaskWidget:
         self.set_session_config_vars()
 
         folder = self.session_data.path
-        background = self.get_background(folder)
         session_config = self.session_config[folder]
 
         # TODO: compute mask only if not already done
-        _, rois = self.compute_arena_mask()
+        background, rois = self.compute_arena_mask()
         mask = rois[self.session_data.mask_index]
 
         # get segmented frame
@@ -238,12 +231,16 @@ class ArenaMaskWidget:
             folder = self.session_data.path
         # get full path
         file = self.sessions[folder]
-        # compute background
-        bground = get_bground_im_file(file, frame_stride=1000)
+        # compute background, cached where extraction reads it
+        bground = get_bground_im_file(file, frame_stride=1000, output_dir=self._output_dir(folder))
         # save for recall later
         self.backgrounds[folder] = bground
 
         return self.backgrounds[folder]
+
+    def _output_dir(self, folder):
+        """The folder this recording's extraction writes to."""
+        return session_output_dir(self.sessions[folder], self.session_config[folder].get('output_dir'))
 
 
 # define data class first
