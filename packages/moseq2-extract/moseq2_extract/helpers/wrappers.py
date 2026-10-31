@@ -223,6 +223,72 @@ def generate_index_from_agg_res_wrapper(input_dir):
         write_yaml(index_data, f)
 
 
+def session_output_dir(input_file, output_dir=None):
+    """
+    The folder a recording's extraction writes to, and where its background is cached.
+
+    Args:
+    input_file (str): path to the depth file.
+    output_dir (str): the configured output folder; relative to the recording's folder
+        unless it already names it.
+
+    Returns:
+    (str): path to the output folder.
+    """
+    in_dirname = dirname(input_file)
+    if output_dir is None:
+        return join(in_dirname, "proc")
+    if in_dirname not in output_dir:
+        return join(in_dirname, output_dir)
+    return output_dir
+
+
+def find_arena_candidates(bground_im, config_data, output_dir=None):
+    """
+    Find a recording's candidate arena masks, in the order ``bg_roi_index`` counts them.
+
+    The arena tool and extraction both call this, so a recording's saved parameters give
+    the arena the tool showed.
+
+    Args:
+    bground_im (numpy.ndarray): the recording's background.
+    config_data (dict): the recording's parameters.
+    output_dir (str): where a plane-fit background is saved when ``use_plane_bground`` is set.
+
+    Returns:
+    rois (list): candidate arena masks.
+    bground_im (numpy.ndarray): the background extraction subtracts, which is the plane
+        fit when ``use_plane_bground`` is set.
+    """
+    strel_dilate = select_strel(
+        config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])
+    )
+    strel_erode = select_strel(
+        config_data["bg_roi_shape"], tuple(config_data["bg_roi_erode"])
+    )
+
+    rois, plane = get_roi(
+        bground_im,
+        **config_data,
+        strel_dilate=strel_dilate,
+        strel_erode=strel_erode,
+        get_all_data=False,
+    )
+
+    if config_data["use_plane_bground"]:
+        print("Using plane fit for background...")
+        bground_im = set_bground_to_plane_fit(bground_im, plane, output_dir)
+
+    # Keep the best-ranked ROIs and order them top to bottom
+    if config_data["bg_sort_roi_by_position"]:
+        rois = rois[: config_data["bg_sort_roi_by_position_max_rois"]]
+        rois = [
+            rois[i] for i in np.argsort([np.nonzero(roi)[0].mean() for roi in rois])
+        ]
+
+    return rois, bground_im
+
+
 def get_roi_wrapper(input_file, config_data, output_dir=None):
     """
     Compute ROI given depth file.
@@ -292,31 +358,7 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
     )
 
     print("Getting roi...")
-    strel_dilate = select_strel(
-        config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])
-    )
-    strel_erode = select_strel(
-        config_data["bg_roi_shape"], tuple(config_data["bg_roi_erode"])
-    )
-
-    rois, plane = get_roi(
-        bground_im,
-        **config_data,
-        strel_dilate=strel_dilate,
-        strel_erode=strel_erode,
-        get_all_data=False,
-    )
-
-    if config_data["use_plane_bground"]:
-        print("Using plane fit for background...")
-        bground_im = set_bground_to_plane_fit(bground_im, plane, output_dir)
-
-    # Sort ROIs by largest mean area to later select largest one (bg_roi_index)
-    if config_data["bg_sort_roi_by_position"]:
-        rois = rois[: config_data["bg_sort_roi_by_position_max_rois"]]
-        rois = [
-            rois[i] for i in np.argsort([np.nonzero(roi)[0].mean() for roi in rois])
-        ]
+    rois, bground_im = find_arena_candidates(bground_im, config_data, output_dir)
 
     if type(config_data["bg_roi_index"]) == int:
         config_data["bg_roi_index"] = [config_data["bg_roi_index"]]
@@ -507,11 +549,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     )
 
     # set up the output directory
-    if output_dir is None:
-        output_dir = join(in_dirname, "proc")
-    else:
-        if in_dirname not in output_dir:
-            output_dir = join(in_dirname, output_dir)
+    output_dir = session_output_dir(input_file, output_dir)
 
     if not exists(output_dir):
         os.makedirs(output_dir)

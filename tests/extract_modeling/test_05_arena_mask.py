@@ -41,10 +41,12 @@ from __future__ import annotations
 
 import shutil
 
+import numpy as np
 import pytest
 
 from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_app.roi.widget import ArenaMaskWidget
+from moseq2_app.util import update_config
 from moseq2_extract.util import read_yaml
 
 from test_03_config import plain
@@ -254,6 +256,41 @@ def test_saving_records_the_parameters_as_set(scratch):
     assert saved["crop_size"] == [100, 100]
     assert saved["bg_roi_dilate"] == [12, 12]
     assert saved["bg_roi_weights"] == [2, 0.5, 3]
+
+
+def assert_extraction_cuts_the_arena_shown(widget, data, buttons, root):
+    """Compute and save in the tool, then find the arena the way extraction does,
+    from the saved parameters, and compare it with the one the tool showed."""
+    from moseq2_extract.helpers.wrappers import get_roi_wrapper
+
+    click(buttons["Compute arena mask"])
+    shown = data.images["Arena mask"][data.mask_index]
+    click(buttons["Save session parameters"])
+
+    saved = read_yaml(str(root / "session_config.yaml"))[data.path]
+    recording = widget.sessions[data.path]
+    roi, _, _ = get_roi_wrapper(recording, saved, output_dir=str(root / data.path / "proc"))
+    np.testing.assert_array_equal(roi.astype(bool), shown)
+
+
+def test_tuned_weights_give_extraction_the_arena_the_tool_showed(scratch):
+    """moseq2-extract#174: a user tunes a recording until the tool shows a good
+    arena, and extraction has to cut that arena. Weights of (0, 1, 0) rank a
+    different region of this recording first than the defaults do."""
+    widget, data, buttons = open_widget(scratch)
+    data.mask_weight1, data.mask_weight2, data.mask_weight3 = 0, 1, 0
+    assert_extraction_cuts_the_arena_shown(widget, data, buttons, scratch)
+
+
+def test_sorting_by_position_gives_extraction_the_arena_the_tool_showed(scratch):
+    """``bg_sort_roi_by_position`` has no box in the tool; it comes from the config.
+    Sorting this recording's five best regions top to bottom puts a fragment at
+    the top edge ahead of the floor, and the tool has to show the same order."""
+    with update_config(str(scratch / "config.yaml")) as config_data:
+        config_data["bg_sort_roi_by_position"] = True
+        config_data["bg_sort_roi_by_position_max_rois"] = 5
+    widget, data, buttons = open_widget(scratch)
+    assert_extraction_cuts_the_arena_shown(widget, data, buttons, scratch)
 
 
 def test_saving_leaves_the_other_recordings_alone(scratch):
