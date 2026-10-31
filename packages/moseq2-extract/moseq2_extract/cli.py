@@ -461,7 +461,17 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
 @common_roi_options
 def find_roi(input_file, output_dir, **config_data):
 
+    _typed_depth_range_is_manual(config_data)
     get_roi_wrapper(input_file, config_data, output_dir)
+
+
+def _typed_depth_range_is_manual(config_data):
+    """Use a --bg-roi-depth-range typed on the command line as given, rather than
+    replacing it with the detected range. A range from the config file still
+    follows manual_set_depth_range."""
+    source = click.get_current_context().get_parameter_source("bg_roi_depth_range")
+    if source is click.core.ParameterSource.COMMANDLINE:
+        config_data["manual_set_depth_range"] = True
 
 
 @cli.command(
@@ -482,6 +492,7 @@ def find_roi(input_file, output_dir, **config_data):
 @extract_options
 def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 
+    _typed_depth_range_is_manual(config_data)
     extract_wrapper(
         input_file, output_dir, config_data, num_frames=num_frames, skip=skip_completed
     )
