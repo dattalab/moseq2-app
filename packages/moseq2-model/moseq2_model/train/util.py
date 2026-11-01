@@ -7,7 +7,98 @@ from tqdm.auto import tqdm
 from functools import partial
 from cytoolz import valmap, itemmap
 from collections import OrderedDict, defaultdict
+from jax_moseq.utils import check_for_nans
 from moseq2_model.util import save_arhmm_checkpoint, get_loglikelihoods
+
+
+class ModelNaNError(RuntimeError):
+    """The model held NaNs after a Gibbs sweep, so the fit was stopped.
+
+    The message is built from the attributes when it is read, so a caller that
+    knows more than ``train_model`` (``learn_model_wrapper`` knows the model
+    file that was not written) can set ``dest_file`` before re-raising.
+    """
+
+    def __init__(self, nan_messages, sweep, num_iter, last_checkpoint=None,
+                 dest_file=None):
+        super().__init__()
+        self.nan_messages = list(nan_messages)
+        self.sweep = sweep
+        self.num_iter = num_iter
+        self.last_checkpoint = last_checkpoint
+        self.dest_file = dest_file
+
+    def __str__(self):
+        lines = [
+            f"The model fit stopped after sweep {self.sweep} of {self.num_iter}: "
+            "the model holds NaNs (values that are not a number) in:",
+        ]
+        lines += [f"  - {m}" for m in self.nan_messages]
+        lines += [
+            "Every later sweep would inherit them, so the fit cannot recover and "
+            "its syllables would be meaningless.",
+            "",
+            "No model file was written"
+            + (f" to {self.dest_file}." if self.dest_file else "."),
+        ]
+        if self.last_checkpoint is not None:
+            path, sweep = self.last_checkpoint
+            lines.append(
+                f"The last checkpoint, {path}, saved after sweep {sweep}, holds the "
+                "last state of this fit without NaNs."
+            )
+        else:
+            lines.append(
+                "No checkpoint of this fit was saved before the NaNs appeared "
+                "(checkpoint_freq, --checkpoint-freq on the command line, saves "
+                "one every that many sweeps)."
+            )
+        lines += [
+            "",
+            "This usually comes from the data: sessions with long stretches where "
+            "the mouse is missing from the frame or still, which the extraction "
+            "notebook's QC cell flags, or sessions where the mouse was absorbed into "
+            "the background image and barely appears in the extraction.",
+            "What to do: check those sessions' extractions (the QC cell and each "
+            "session's extraction movie), leave out the bad ones by removing their "
+            "entries from the index file (moseq2-index.yaml), then fit again.",
+        ]
+        return "\n".join(lines)
+
+
+def _leaf(tree, path):
+    for key in path:
+        tree = tree[key]
+    return tree
+
+
+def check_model_for_nans(model, sweep, num_iter, last_checkpoint=None):
+    """Raise ``ModelNaNError`` if the backend's model state holds any NaN.
+
+    Runs ``jax_moseq.utils.check_for_nans`` on the jax-moseq model dictionary,
+    the same check keypoint-moseq makes after each resampling step. A model
+    without a ``model_dict`` (a stand-in in a test) is not checked. For a
+    per-session state array (first axis one entry per session, such as the
+    robust model's ``states/tau``) the message names the sessions holding NaNs.
+    """
+    state = getattr(model, "model_dict", None)
+    if state is None:
+        return
+    any_nans, nan_info, messages = check_for_nans(state)
+    if not any_nans:
+        return
+
+    sessions = list(getattr(model, "_session_order", []))
+    detailed = []
+    for (path, _), message in zip(nan_info, messages):
+        value = _leaf(state, path)
+        if path and path[0] == "states" and sessions and value.shape[0] == len(sessions):
+            per_session = np.isnan(np.asarray(value)).reshape(len(sessions), -1).sum(1)
+            named = [f"{sessions[i]} ({n})" for i, n in enumerate(per_session) if n]
+            message += (", in session " if len(named) == 1 else ", in sessions ") + ", ".join(named)
+        detailed.append(message)
+    raise ModelNaNError(detailed, sweep, num_iter, last_checkpoint)
+
 
 def train_model(
     model,
@@ -22,6 +113,7 @@ def train_model(
     groups=None,
     verbose=False,
     check_every=2,
+    last_checkpoint=None,
 ):
     """
     Train ARHMM for inputted number of iterations.
@@ -39,6 +131,7 @@ def train_model(
     groups (list): list of groups included in modeling used for getting log-likelihoods if verbose is True
     verbose (bool): get log-likelihoods at `check_every` interval
     check_every (int): frequency (iterations) to record model training/validation log-likelihoods during training
+    last_checkpoint (tuple or None): (path, sweep) of the checkpoint the fit resumed from, named if the model goes NaN
 
     Returns:
     model (ARHMM): trained model.
@@ -47,6 +140,10 @@ def train_model(
     iter_lls (list): list of training log-likelihoods for each `check_every` iteration.
     iter_holls (list): list of held-out log-likelihoods for each `check_every` iteration.
     interrupt (bool): flag to notify the caller of this function if a keyboard interrupt happened
+
+    Raises:
+    ModelNaNError: the model held NaNs after a sweep. The progress bar is closed
+        and nothing more is fitted; checkpoints already written stay.
     """
 
     # Checkpointing boolean
@@ -54,7 +151,8 @@ def train_model(
 
     iter_lls, iter_holls = [], []
 
-    for itr in tqdm(range(start, num_iter), **progress_kwargs, desc="Training ARHMM"):
+    progress = tqdm(range(start, num_iter), **progress_kwargs, desc="Training ARHMM")
+    for itr in progress:
         # Resample states, and gracefully return in case of a keyboard interrupt
         try:
             # Positive-definiteness of the residual covariance is maintained by
@@ -74,6 +172,14 @@ def train_model(
                 True,
             )
 
+        # JAX does not raise when a sweep goes numerically wrong; NaNs spread
+        # into every later sweep and would be saved with the model.
+        try:
+            check_model_for_nans(model, itr + 1, num_iter, last_checkpoint)
+        except ModelNaNError:
+            progress.close()
+            raise
+
         summ_stats = {
             "model": model,
             "groups": groups,
@@ -91,7 +197,8 @@ def train_model(
 
         # checkpoint if needed
         if checkpoint and ((itr + 1) % checkpoint_freq == 0):
-            training_checkpoint(model, itr, checkpoint_file)
+            last_checkpoint = (
+                training_checkpoint(model, itr, checkpoint_file), itr + 1)
 
     return (
         model,
@@ -111,6 +218,9 @@ def training_checkpoint(model, itr, checkpoint_file):
     model (ARHMM): Model object being trained.
     itr (itr): Current modeling iteration.
     checkpoint_file (str): Model checkpoint filename.
+
+    Returns:
+    checkpoint_file (str): path the checkpoint was written to.
     """
 
     # Pack the data to save in checkpoint
@@ -126,6 +236,7 @@ def training_checkpoint(model, itr, checkpoint_file):
 
     # Save checkpoint
     save_arhmm_checkpoint(checkpoint_file, save_data)
+    return checkpoint_file
 
 
 def get_model_summary(model, groups, train_data, val_data, separate_trans):
