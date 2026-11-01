@@ -134,7 +134,10 @@ class ArenaMaskWidget:
 
     def set_session_config_vars(self):
         """
-        get session default config variable.
+        Write the values shown in the tool into the current recording's entry.
+
+        It writes exactly the keys in ``moseq2_extract.session_config.ARENA_TOOL_SETTINGS``,
+        which extraction takes from the entry; every other setting comes from config.yaml.
         """
         folder = self.session_data.path
         session = self.session_config[folder]

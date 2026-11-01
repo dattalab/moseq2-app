@@ -6,9 +6,10 @@ happens to equal the option's default (moseq2-extract#24): ``--crop-size 80 80``
 over a config holding ``[120, 120]`` extracts at 80. An option not typed takes
 the config file's value where it has one.
 
-``batch-extract`` run locally extracts each recording from the config file and
-that recording's entry in the session config. The options typed on its command
-line are applied over both, and ``--num-frames`` reaches the extraction
+``batch-extract`` run locally extracts each recording with the settings the
+arena tool sets from that recording's entry in the session config, and every
+other setting from the config file. The options typed on its command line are
+applied over both, and ``--num-frames`` reaches the extraction
 (moseq2-extract#158).
 """
 
@@ -64,7 +65,9 @@ SESSION = "session_1"
 @pytest.fixture
 def project(tmp_path):
     """One recording, a config file and a session config that disagree with
-    the defaults."""
+    the defaults and with each other. ``crop_size`` and ``manual_set_depth_range``
+    are settings the arena tool sets, so the entry's apply; ``frame_trim`` and
+    ``fps`` are not, so the config file's apply."""
     session = tmp_path / SESSION
     session.mkdir()
     (session / "depth.avi").touch()
@@ -88,6 +91,7 @@ def project(tmp_path):
         {
             "cluster_type": "local",
             "crop_size": [90, 90],
+            "frame_trim": [0, 0],
             "fps": 20,
             "session_config_path": str(session_config),
         },
@@ -142,20 +146,22 @@ def test_batch_extract_typed_options_reach_each_recording(project, extracted):
     assert call["num_frames"] == 50
     assert tuple(call["config"]["frame_trim"]) == (10, 10)
     assert tuple(call["config"]["crop_size"]) == (80, 80)
-    # not typed: the session config's value
-    assert call["config"]["fps"] == 15
+    # not typed, and not a setting the arena tool sets: the config file's value
+    assert call["config"]["fps"] == 20
 
 
-def test_batch_extract_without_typed_options_uses_the_session_config(project, extracted):
+def test_batch_extract_without_typed_options_uses_the_session_config_for_the_arena_tool_settings(
+    project, extracted
+):
     root, config = project
     batch(root, config)
 
     call = extracted[0]
     assert call["num_frames"] is None
-    assert tuple(call["config"]["frame_trim"]) == (5, 5)
     assert tuple(call["config"]["crop_size"]) == (120, 120)
-    assert call["config"]["fps"] == 15
     assert call["config"]["manual_set_depth_range"] is False
+    assert tuple(call["config"]["frame_trim"]) == (0, 0)
+    assert call["config"]["fps"] == 20
 
 
 def test_batch_extract_typed_depth_range_is_manual(project, extracted):
@@ -230,21 +236,21 @@ def test_slurm_batch_extract_typed_options_reach_each_recording(project, slurm_e
     assert call["num_frames"] == 50
     assert tuple(call["config"]["frame_trim"]) == (10, 10)
     assert tuple(call["config"]["crop_size"]) == (80, 80)
-    # not typed: the session config's value
-    assert call["config"]["fps"] == 15
+    # not typed, and not a setting the arena tool sets: the config file's value
+    assert call["config"]["fps"] == 20
 
 
-def test_slurm_batch_extract_without_typed_options_uses_the_session_config(
+def test_slurm_batch_extract_without_typed_options_uses_the_session_config_for_the_arena_tool_settings(
     project, slurm_extracted
 ):
     root, config = project
     call = slurm_extracted(root, config)[0]
 
     assert call["num_frames"] is None
-    assert tuple(call["config"]["frame_trim"]) == (5, 5)
     assert tuple(call["config"]["crop_size"]) == (120, 120)
-    assert call["config"]["fps"] == 15
     assert call["config"]["manual_set_depth_range"] is False
+    assert tuple(call["config"]["frame_trim"]) == (0, 0)
+    assert call["config"]["fps"] == 20
 
 
 def test_slurm_batch_extract_typed_depth_range_is_manual(project, slurm_extracted):
