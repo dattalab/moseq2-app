@@ -11,6 +11,10 @@ and where the count came from.
 ``batch-extract``, as it has been since 2018. ``--threads``, which those two
 commands take and do not use, carries no short flag there; it keeps ``-t`` on
 ``convert-raw-to-avi`` and ``copy-slice``, where nothing else claims it.
+
+``-c`` is the short flag of ``--crop-size`` on ``extract`` and
+``batch-extract``. ``batch-extract``'s ``--ncpus``, the CPUs each SLURM job
+requests, has no short flag. No moseq2-extract command defines a flag twice.
 """
 
 from __future__ import annotations
@@ -106,10 +110,25 @@ def test_extract_help_does_not_warn_about_a_duplicate_flag():
     assert duplicate_flag_warnings("extract") == []
 
 
-def test_batch_extract_help_does_not_warn_about_t():
-    """batch-extract's ``-c`` is shared by ``--crop-size`` and ``--ncpus``, a
-    separate matter; only ``-t`` is checked here."""
-    assert [m for m in duplicate_flag_warnings("batch-extract") if "-t " in m] == []
+@pytest.mark.parametrize("command", sorted(extract_cli.cli.commands))
+def test_no_command_warns_about_a_duplicate_flag(command):
+    assert duplicate_flag_warnings(command) == []
+
+
+@pytest.mark.parametrize("command", [extract_cli.extract, extract_cli.batch_extract])
+def test_c_is_the_crop_size_on_extraction_commands(command):
+    args = ["x.dat", "-c", "100", "100"] if command is extract_cli.extract else [".", "-c", "100", "100"]
+    ctx = command.make_context(command.name, args, resilient_parsing=True)
+    assert ctx.params["crop_size"] == (100, 100)
+
+
+def test_batch_extract_ncpus_has_no_short_flag():
+    params = options(extract_cli.batch_extract)
+    assert params["ncpus"].opts == ["--ncpus"] and params["ncpus"].secondary_opts == []
+    ctx = extract_cli.batch_extract.make_context(
+        "batch-extract", [".", "-c", "100", "100"], resilient_parsing=True
+    )
+    assert ctx.params["ncpus"] == 1
 
 
 @pytest.mark.parametrize("command", [extract_cli.extract, extract_cli.batch_extract])
