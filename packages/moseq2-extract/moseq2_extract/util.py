@@ -109,10 +109,13 @@ def set_bground_to_plane_fit(bground_im, plane, output_dir):
     Replaces median-computed background image with plane fit.
     Only occurs if config_data['use_plane_bground'] == True.
 
+    The plane is written to ``plane_bground.tiff``. ``bground.tiff`` in the same folder is the
+    cached median background that the arena is found on, so the plane never replaces it.
+
     Args:
     bground_im (numpy.ndarray): Background image computed via median value in each pixel of depth video.
     plane (numpy.ndarray): Computed ROI Plane using RANSAC.
-    output_dir (str): Path to write updated background image to.
+    output_dir (str): Path to write the plane-fit background image to.
 
     Returns:
     bground_im (numpy.ndarray): The background image.
@@ -124,7 +127,7 @@ def set_bground_to_plane_fit(bground_im, plane, output_dir):
     plane_im = (np.dot(coords.T, plane[:2]) + plane[3]) / -plane[2]
     plane_im = plane_im.reshape(bground_im.shape)
 
-    write_image(join(output_dir, 'bground.tiff'), plane_im, scale=True)
+    write_image(join(output_dir, 'plane_bground.tiff'), plane_im, scale=True)
 
     return plane_im
 

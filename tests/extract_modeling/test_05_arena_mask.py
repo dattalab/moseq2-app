@@ -581,3 +581,156 @@ def test_the_old_argument_is_accepted_ignored_and_explained(unextracted, capsys,
         "only for recordings that have none there yet. Remove overwrite_session_configs "
         "from the cell that opens ArenaMaskWidget."
     ]
+
+
+# ------------------------------------------------- a plane-fit background
+
+#: The recording the plane-fit tests run on.
+STILL_RECORDING = "amphetamine_example_0"
+
+
+def h5_arena_and_frames(results):
+    """What an extraction cut and subtracted: its arena, its frames and its background."""
+    import h5py
+
+    with h5py.File(results, "r") as f:
+        return (
+            f["metadata/extraction/roi"][()].astype(bool),
+            f["frames"][()],
+            f["metadata/extraction/background"][()],
+        )
+
+
+@pytest.fixture(scope="module")
+def plane_run(tmp_path_factory, raw_sessions):
+    """A user with a mouse that sits still sets ``use_plane_bground``, finds the
+    arena in the tool (clicking "Compute arena mask" twice, then "Compute
+    extraction"), saves, runs the extraction cell, and runs it again.
+
+    ``use_plane_bground`` replaces the background extraction subtracts with a
+    plane fit to the floor. The arena is found on the median background, where
+    the floor and the walls differ in depth; on the plane the floor is
+    everywhere, and the arena found there is the whole frame.
+
+    One recording, so the two extractions take seconds. Returns what each step
+    showed or wrote.
+    """
+    from moseq2_extract.gui import extract_found_sessions, generate_config_command
+    from moseq2_extract.io.image import read_image
+
+    root = tmp_path_factory.mktemp("plane") / "project"
+    shutil.copytree(raw_sessions / STILL_RECORDING, root / STILL_RECORDING)
+    config = root / "config.yaml"
+    generate_config_command(str(config), camera_type="k2")
+    with update_config(str(config)) as config_data:
+        config_data["output_dir"] = "proc"
+        config_data["use_plane_bground"] = True
+        config_data["cluster_type"] = "local"
+
+    widget, data, buttons = open_widget(root)
+    proc = root / data.path / "proc"
+    run = {"root": root, "proc": proc, "widget": widget}
+
+    click(buttons["Compute arena mask"])
+    run["first click"] = data.images["Arena mask"][data.mask_index]
+    run["background shown"] = data.images["Background"]
+    click(buttons["Compute arena mask"])
+    run["second click"] = data.images["Arena mask"][data.mask_index]
+
+    # "Compute extraction" finds the arena again before extracting; keep what it found
+    found = []
+    compute_arena_mask = widget.compute_arena_mask
+
+    def recording_compute_arena_mask():
+        background, rois = compute_arena_mask()
+        found.append((background, rois))
+        return background, rois
+
+    widget.compute_arena_mask = recording_compute_arena_mask
+    click(buttons["Compute extraction"])
+    widget.compute_arena_mask = compute_arena_mask
+    run["compute extraction"] = found[-1][1][data.mask_index]
+
+    click(buttons["Save session parameters"])
+    run["saved"] = read_yaml(str(root / "session_config.yaml"))[data.path]
+
+    results = proc / "results_00.h5"
+    extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
+    run["first extraction"] = h5_arena_and_frames(results)
+    run["bground.tiff after the first extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
+    extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
+    run["second extraction"] = h5_arena_and_frames(results)
+    run["bground.tiff after the second extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
+    return run
+
+
+@pytest.fixture(scope="module")
+def median_background(tmp_path_factory, plane_run):
+    """The recording's median background, computed from scratch in an empty
+    folder the way the tool computes it, read back as the cache file holds it."""
+    from moseq2_extract.extract.proc import get_bground_im_file
+    from moseq2_extract.io.image import read_image
+
+    clean = tmp_path_factory.mktemp("median")
+    recording = plane_run["widget"].sessions[STILL_RECORDING]
+    get_bground_im_file(recording, frame_stride=1000, output_dir=str(clean))
+    return read_image(str(clean / "bground.tiff"), scale=True)
+
+
+def test_a_plane_background_finds_the_floor_on_the_first_click(plane_run):
+    """The arena is most of a quarter of the frame, not all of it."""
+    shown = plane_run["first click"]
+    assert 0.20 < shown.mean() < 0.28, f"the arena is {shown.mean():.0%} of the frame"
+
+
+def test_a_plane_background_shows_the_same_arena_on_the_second_click(plane_run):
+    np.testing.assert_array_equal(plane_run["second click"], plane_run["first click"])
+
+
+def test_a_plane_background_gives_compute_extraction_the_arena_shown(plane_run):
+    np.testing.assert_array_equal(plane_run["compute extraction"], plane_run["first click"])
+
+
+def test_a_plane_background_gives_extraction_the_arena_the_tool_showed(plane_run):
+    arena, _, _ = plane_run["first extraction"]
+    np.testing.assert_array_equal(arena, plane_run["first click"])
+
+
+def test_a_plane_background_gives_a_second_extraction_the_same_arena_and_frames(plane_run):
+    first_arena, first_frames, first_background = plane_run["first extraction"]
+    second_arena, second_frames, second_background = plane_run["second extraction"]
+    np.testing.assert_array_equal(second_arena, plane_run["first click"])
+    np.testing.assert_array_equal(second_arena, first_arena)
+    np.testing.assert_array_equal(second_background, first_background)
+    np.testing.assert_array_equal(second_frames, first_frames)
+
+
+def test_a_plane_background_leaves_the_median_in_bground_tiff(plane_run, median_background):
+    """``proc/bground.tiff`` is the cache every later reader takes as the
+    median background, so the plane fit never replaces it."""
+    np.testing.assert_array_equal(plane_run["bground.tiff after the first extraction"], median_background)
+    np.testing.assert_array_equal(plane_run["bground.tiff after the second extraction"], median_background)
+
+
+def test_a_plane_background_is_what_extraction_subtracts(plane_run, median_background):
+    """Extraction subtracts, and records, the plane fit to the floor of the
+    median background with the saved parameters; the tool shows and subtracts
+    the same plane."""
+    from moseq2_extract.extract.proc import get_roi
+    from moseq2_extract.util import select_strel
+
+    params = dict(plane_run["saved"])
+    _, plane = get_roi(
+        median_background,
+        **params,
+        strel_dilate=select_strel(params["bg_roi_shape"], tuple(params["bg_roi_dilate"])),
+        strel_erode=select_strel(params["bg_roi_shape"], tuple(params["bg_roi_erode"])),
+        get_all_data=False,
+    )
+    a, b, c, d = plane
+    yy, xx = np.mgrid[: median_background.shape[0], : median_background.shape[1]]
+    expected = (a * xx + b * yy + d) / -c
+
+    _, _, recorded = plane_run["first extraction"]
+    np.testing.assert_allclose(recorded, expected)
+    np.testing.assert_allclose(plane_run["background shown"], expected)

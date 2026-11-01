@@ -250,7 +250,8 @@ def find_arena_candidates(bground_im, config_data, output_dir=None):
     Args:
     bground_im (numpy.ndarray): the recording's background.
     config_data (dict): the recording's parameters.
-    output_dir (str): where a plane-fit background is saved when ``use_plane_bground`` is set.
+    output_dir (str): where a plane-fit background is saved, as ``plane_bground.tiff``, when
+        ``use_plane_bground`` is set.
 
     Returns:
     rois (list): candidate arena masks.
