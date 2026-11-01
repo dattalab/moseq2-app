@@ -13,7 +13,7 @@ from glob import glob
 import numpy as np
 import urllib.request
 from copy import deepcopy
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from cytoolz import partial
 from moseq2_extract.io.image import write_image
@@ -77,8 +77,7 @@ def copy_h5_metadata_to_yaml_wrapper(input_dir, h5_metadata_path):
             tup[0]["metadata"] = dict(tmp)
 
         new_file = f"{basename(tup[1])}_update.yaml"
-        with open(new_file, "w+") as f:
-            write_yaml(tup[0], f)
+        write_yaml(tup[0], new_file)
 
         if new_file != tup[1]:
             shutil.move(new_file, tup[1])
@@ -123,8 +122,7 @@ def generate_index_wrapper(input_dir, output_file):
     output_dict = build_index_dict(file_with_uuids)
 
     # write out index yaml
-    with open(output_file, "w") as f:
-        write_yaml(output_dict, f)
+    write_yaml(output_dict, output_file)
 
     return output_file
 
@@ -219,8 +217,7 @@ def generate_index_from_agg_res_wrapper(input_dir):
     output_file = os.path.join(os.path.dirname(input_dir), "moseq2-index.yaml")
 
     # write out index yaml
-    with open(output_file, "w") as f:
-        write_yaml(index_data, f)
+    write_yaml(index_data, output_file)
 
 
 def session_output_dir(input_file, output_dir=None):
@@ -617,8 +614,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         print("Skipping...")
         return
 
-    with open(status_filename, "w") as f:
-        write_yaml(status_dict, f)
+    write_yaml(status_dict, status_filename)
 
     # Get Structuring Elements for extraction
     str_els = get_strels(config_data)
@@ -698,8 +694,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     if status_dict["parameters"].get("true_depth") is None:
         # config_data.get('true_depth') is numpy.float64 and yaml.safe_dump can't represent the object
         status_dict["parameters"]["true_depth"] = float(config_data.get("true_depth"))
-    with open(status_filename, "w") as f:
-        write_yaml(status_dict, f)
+    write_yaml(status_dict, status_filename)
 
     return output_dir
 
@@ -775,8 +770,7 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
         config_data = read_yaml(config_file)
         config_data["flip_classifier"] = output_filename
 
-        with open(config_file, "w") as f:
-            write_yaml(config_data, f)
+        write_yaml(config_data, config_file)
     except Exception as e:
         print("Could not update configuration file flip classifier path")
         print("Unexpected error:", e)

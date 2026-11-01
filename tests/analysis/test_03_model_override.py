@@ -44,7 +44,7 @@ def several_models(tmp_path_factory):
     to. These are placeholders: the cell reads no model data, only the name
     on the file.
     """
-    from moseq2_extract._yaml import write_yaml
+    from moseq2_common.yaml import write_yaml
 
     root = tmp_path_factory.mktemp("several_models")
     models = root / "models"

@@ -4,7 +4,7 @@ GUI front-end operations accessible from a jupyter notebook.
 
 import os
 import re
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from os.path import abspath, dirname, basename, exists, join
 from moseq2_extract.util import read_yaml
 from moseq2_extract.io.image import read_tiff_files
@@ -142,14 +142,12 @@ def generate_config_command(output_file, camera_type="k2"):
         )
         if ow.lower() == "y":
             # Updating config file
-            with open(output_file, "w") as f:
-                write_yaml(params, f)
+            write_yaml(params, output_file)
         else:
             return "Configuration file has been retained"
     else:
         print("Creating configuration file.")
-        with open(output_file, "w") as f:
-            write_yaml(params, f)
+        write_yaml(params, output_file)
 
     return "Configuration file has been successfully generated."
 
@@ -324,8 +322,7 @@ def find_roi_command(
     output_dir = join(dirname(input_file), "proc")
     get_roi_wrapper(input_file, config_data, output_dir)
 
-    with open(config_file, "w") as g:
-        write_yaml(config_data, g)
+    write_yaml(config_data, config_file)
 
     images, filenames = read_tiff_files(output_dir)
 

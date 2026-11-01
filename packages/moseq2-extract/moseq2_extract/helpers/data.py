@@ -8,7 +8,7 @@ import shutil
 import tarfile
 import warnings
 import numpy as np
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from cytoolz import keymap
 from importlib.metadata import version
@@ -254,8 +254,7 @@ def copy_manifest_results(manifest, output_dir):
             shutil.copyfile(mp4_path, join(output_dir, f'{v["copy_path"]}.mp4'))
 
         v["yaml_dict"].pop("extraction_metadata", None)
-        with open(f'{join(output_dir, v["copy_path"])}.yaml', "w") as f:
-            write_yaml(v["yaml_dict"], f)
+        write_yaml(v["yaml_dict"], f'{join(output_dir, v["copy_path"])}.yaml')
 
 
 #: The unit of every extraction's ``/timestamps``, also written as the dataset's

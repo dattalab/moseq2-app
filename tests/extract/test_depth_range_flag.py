@@ -14,7 +14,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 
 
 @pytest.fixture
