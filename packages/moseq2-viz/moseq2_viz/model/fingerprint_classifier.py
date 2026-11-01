@@ -78,7 +78,11 @@ def create_fingerprint_dataframe(
     Args:
         scalar_df (pandas.DataFrame): scalar summary dataframe generated from scalars_to_dataframe
         mean_df (pandas.DataFrame): syllable mean dataframe from compute_behavioral_statistics
-        bin_num (int, optional): number of bins for the features. Defaults to None.
+        stat_type (str, optional): has no effect on the fingerprint, which is built from
+            every frame's scalars and each syllable's usage, not from the per-syllable
+            summary statistics. Kept so existing calls run; a value other than "mean"
+            prints a line saying it can be removed.
+        n_bins (int, optional): number of bins for the features. Defaults to None.
         groupby_list (list, optional): the list of levels the fingerprint dataframe should be grouped by. Defaults to ['group', 'uuid'].
 
     Returns:
@@ -86,19 +90,29 @@ def create_fingerprint_dataframe(
         range_dict ([dict]): dictionary that hold min max values of the features
     """
 
+    if stat_type != "mean":
+        print(
+            f"stat_type={stat_type!r} does not change the fingerprint: it is built from "
+            "every frame's scalars and each syllable's usage, not from per-syllable summary "
+            "statistics. Remove stat_type from the create_fingerprint_dataframe call."
+        )
+
     # deep copy the dfs
     scalar_df = scalar_df.copy()
     mean_df = mean_df.copy()
-    # rescale velocity to cm/s
+    # rescale velocity from mm per frame to mm/s, in the frames and in every
+    # summary column derived from them (velocity_2d_mm_mean, _std, _min, ...)
     vel_cols = [c for c in scalars if "velocity" in c]
-    vel_cols_stats = [f"{c}_{stat_type}" for c in scalars if "velocity" in c]
+    summary_vel_cols = [
+        col
+        for col in mean_df.columns
+        if any(col == c or str(col).startswith(f"{c}_") for c in vel_cols)
+    ]
 
     if len(vel_cols) > 0:
         scalar_df[vel_cols] *= 30
-        try:
-            mean_df[vel_cols_stats] *= 30
-        except KeyError:
-            mean_df[vel_cols] *= 30
+    if len(summary_vel_cols) > 0:
+        mean_df[summary_vel_cols] *= 30
 
     # pivot mean_df to be groupby x syllable
     syll_summary = mean_df.pivot_table(
