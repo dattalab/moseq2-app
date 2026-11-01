@@ -165,3 +165,122 @@ def test_batch_extract_typed_depth_range_is_manual(project, extracted):
     call = extracted[0]
     assert tuple(call["config"]["bg_roi_depth_range"]) == (600, 800)
     assert call["config"]["manual_set_depth_range"] is True
+
+
+# batch-extract on SLURM writes one ``moseq2-extract extract`` command per
+# recording into ``extract_out_script`` instead of extracting. The options typed
+# on its command line reach each of those extractions with the same precedence
+# as the local path (moseq2-extract#158). Each test runs the written command
+# through ``extract`` itself, with ``extract_wrapper`` recorded instead of run,
+# so what is checked is what the job would extract with.
+
+
+@pytest.fixture
+def slurm_extracted(monkeypatch, received):
+    """Run ``batch-extract --cluster-type slurm`` without submitting anything,
+    then run each written command through ``extract`` and return what it
+    received: one dict per recording, the config and ``num_frames``."""
+    import shlex
+
+    monkeypatch.setattr(
+        "moseq2_extract.helpers.extract.system",
+        lambda *_: pytest.fail("batch-extract submitted a job"),
+    )
+    nums = []
+    monkeypatch.setattr(
+        extract_cli,
+        "extract_wrapper",
+        lambda f, out, config, num_frames=None, skip=False: (
+            received.append(config),
+            nums.append(num_frames),
+        ),
+    )
+
+    def go(root, config, *typed):
+        batch(root, config, "--cluster-type", "slurm", *typed)
+        script = (root / "extract_out.sh").read_text()
+        lines = [ln for ln in script.splitlines() if ln.strip()]
+        for line in lines:
+            command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
+            run("extract", *shlex.split(command))
+        return [
+            {"config": c, "num_frames": n} for c, n in zip(received, nums)
+        ]
+
+    return go
+
+
+def test_slurm_batch_extract_typed_options_reach_each_recording(project, slurm_extracted):
+    root, config = project
+    calls = slurm_extracted(
+        root,
+        config,
+        "--num-frames",
+        "50",
+        "--frame-trim",
+        "10",
+        "10",
+        "--crop-size",
+        "80",
+        "80",
+    )
+
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["num_frames"] == 50
+    assert tuple(call["config"]["frame_trim"]) == (10, 10)
+    assert tuple(call["config"]["crop_size"]) == (80, 80)
+    # not typed: the session config's value
+    assert call["config"]["fps"] == 15
+
+
+def test_slurm_batch_extract_without_typed_options_uses_the_session_config(
+    project, slurm_extracted
+):
+    root, config = project
+    call = slurm_extracted(root, config)[0]
+
+    assert call["num_frames"] is None
+    assert tuple(call["config"]["frame_trim"]) == (5, 5)
+    assert tuple(call["config"]["crop_size"]) == (120, 120)
+    assert call["config"]["fps"] == 15
+    assert call["config"]["manual_set_depth_range"] is False
+
+
+def test_slurm_batch_extract_typed_depth_range_is_manual(project, slurm_extracted):
+    root, config = project
+    call = slurm_extracted(root, config, "--bg-roi-depth-range", "600", "800")[0]
+
+    assert tuple(call["config"]["bg_roi_depth_range"]) == (600, 800)
+    assert call["config"]["manual_set_depth_range"] is True
+
+
+def test_slurm_batch_extract_typed_options_without_a_session_config(
+    project, slurm_extracted
+):
+    """With no session config, each recording is extracted from the config file,
+    and the typed options still apply over it."""
+    root, config = project
+    write_yaml({"cluster_type": "local", "crop_size": [90, 90], "fps": 20}, str(config))
+
+    call = slurm_extracted(
+        root, config, "--num-frames", "50", "--crop-size", "80", "80"
+    )[0]
+
+    assert call["num_frames"] == 50
+    assert tuple(call["config"]["crop_size"]) == (80, 80)
+    # not typed: the config file's value
+    assert call["config"]["fps"] == 20
+
+
+def test_slurm_batch_extract_without_typed_options_or_session_config(
+    project, slurm_extracted
+):
+    root, config = project
+    write_yaml({"cluster_type": "local", "crop_size": [90, 90], "fps": 20}, str(config))
+
+    call = slurm_extracted(root, config)[0]
+
+    assert call["num_frames"] is None
+    assert tuple(call["config"]["crop_size"]) == (90, 90)
+    assert call["config"]["fps"] == 20

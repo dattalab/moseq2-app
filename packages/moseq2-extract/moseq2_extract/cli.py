@@ -629,7 +629,14 @@ def batch_extract(
         config_data["extensions"] = extensions
         config_data["skip_checks"] = skip_checks
         # run slurm extract will generate a config.yaml in session proc file for slurm
-        run_slurm_extract(input_folder, to_extract, config_data, skip_completed)
+        run_slurm_extract(
+            input_folder,
+            to_extract,
+            config_data,
+            skip_completed,
+            num_frames=num_frames,
+            cli_options=_typed_extract_options(),
+        )
 
 
 @cli.command(

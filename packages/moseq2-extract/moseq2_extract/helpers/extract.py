@@ -237,7 +237,29 @@ def run_local_extract(
             print("could not extract", ext)
 
 
-def run_slurm_extract(input_dir, to_extract, config_data, skip_extracted=False):
+def run_slurm_extract(
+    input_dir,
+    to_extract,
+    config_data,
+    skip_extracted=False,
+    num_frames=None,
+    cli_options=None,
+):
+    """
+    Write one sbatch command per session to extract it on a SLURM cluster, and submit them if run_cmd is set.
+
+    Each session is extracted from the config file, or from its entry in the session config when there is one.
+    Options typed on the command line are applied over either, so each session gets a config.yaml of its own in
+    its output directory whenever there is a session config or a typed option.
+
+    Args:
+    input_dir (str): directory the sessions were found in; extract_out_script is written there.
+    to_extract (list): list of paths to files to extract
+    config_data (dict): batch-extract parameters, including config_file, session_config_path, output_dir and the SLURM settings.
+    skip_extracted (bool): Whether to skip already extracted session.
+    num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
+    cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
+    """
 
     assert (
         "extract_out_script" in config_data
@@ -245,9 +267,19 @@ def run_slurm_extract(input_dir, to_extract, config_data, skip_extracted=False):
     # expand input_dir absolute path
     input_dir = abspath(input_dir)
 
-    # make session_specific config file and save it in proc folder if session config exists
-    if exists(config_data.get("session_config_path", "")):
-        session_configs = read_yaml(config_data["session_config_path"])
+    session_configs = (
+        read_yaml(config_data["session_config_path"])
+        if exists(config_data.get("session_config_path", ""))
+        else None
+    )
+    # each session reads a config.yaml written to its output directory when its
+    # parameters differ from the config file's
+    session_config_files = session_configs is not None or bool(cli_options)
+
+    if session_config_files:
+        base_config = (
+            read_yaml(config_data["config_file"]) if session_configs is None else None
+        )
         for depth_file in to_extract:
             output_dir = join(dirname(depth_file), config_data["output_dir"])
 
@@ -258,9 +290,14 @@ def run_slurm_extract(input_dir, to_extract, config_data, skip_extracted=False):
             # get and write session-specific parameters
             output_file = join(output_dir, "config.yaml")
             session_key = basename(dirname(depth_file))
+            if session_configs is not None:
+                params = session_configs.get(session_key, config_data)
+            else:
+                params = base_config
+            params = {**params, **(cli_options or {})}
 
             with open(output_file, "w") as f:
-                write_yaml(session_configs.get(session_key, config_data), f)
+                write_yaml(params, f)
 
     # Construct sbatch command for slurm
     commands = ""
@@ -274,15 +311,14 @@ def run_slurm_extract(input_dir, to_extract, config_data, skip_extracted=False):
             continue
 
         # set up config file
-        if exists(config_data.get("session_config_path", "")):
+        if session_config_files:
             config_file = join(output_dir, "config.yaml")
         else:
             config_file = config_data["config_file"]
 
         # construct command
-        base_command = (
-            f'moseq2-extract extract --config-file {config_file} {depth_file}; "\n'
-        )
+        frames = f" --num-frames {num_frames}" if num_frames is not None else ""
+        base_command = f'moseq2-extract extract --config-file {config_file}{frames} {depth_file}; "\n'
         prefix = f'sbatch -c {config_data["ncpus"] if config_data["ncpus"] > 0 else 1} --mem={config_data["memory"]} '
         prefix += f'-p {config_data["partition"]} -t {config_data["wall_time"]} --wrap "{config_data["prefix"]}'
         commands += prefix + base_command
