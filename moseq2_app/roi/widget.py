@@ -14,7 +14,7 @@ from panel.viewable import Viewer
 from bokeh.models import HoverTool
 from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings, session_config_key, session_keys
 from moseq2_extract.io.video import load_movie_data
 from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
@@ -73,23 +73,24 @@ class ArenaMaskWidget:
             self.view = None
             return
 
-        # creates session-specific configurations
-        if exists(session_config_path):
-            # this config contains session names as keys and a dict of config parameters as values
-            session_parameters = read_yaml(session_config_path)
-            # recordings with saved parameters keep them; only new ones are detected
-            new_sessions = set(map(lambda f: basename(dirname(f)), sessions)) - set(session_parameters)
-            if len(new_sessions) > 0:
-                for _session in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
-                    full_path = [x for x in sessions if basename(dirname(x)) == _session][0]
-                    session_parameters[_session] = detect_and_set_camera_parameters(
-                        deepcopy(self.config_data), full_path)
-                # write session config with default parameters for new sessions
-                write_yaml(session_parameters, self.session_config_path)
+        # Each session is keyed by its folder's name, or by its folder's path below data_dir when
+        # session folders share a name. Names are told apart across every recording in the
+        # project, extracted or not, so a recording's key does not depend on skip_extracted.
+        everything = sessions if not skip_extracted else find_recordings(data_dir, max_depth=max_depth).recordings
+        keys = session_keys(everything, data_dir)
+        session_parameters = read_yaml(session_config_path) if exists(session_config_path) else {}
+        session_parameters = session_parameters or {}
+        # an entry saved under a path stays where it is; otherwise the key session_keys gives
+        named = {session_config_key(session_parameters, f, by_folder_name=False) or keys[f]: f for f in sessions}
+        self._explain_shared_folder_names(session_parameters, named, everything, data_dir)
 
-        else:
-            session_parameters = {basename(dirname(f)): detect_and_set_camera_parameters(
-                deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
+        # recordings with saved parameters keep them; only new ones are detected
+        new_sessions = [key for key in named if key not in session_parameters]
+        if len(new_sessions) > 0 or not exists(session_config_path):
+            for key in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
+                session_parameters[key] = detect_and_set_camera_parameters(
+                    deepcopy(self.config_data), named[key])
+            # write session config with default parameters for new sessions
             write_yaml(session_parameters, self.session_config_path)
 
         # add session_config path to config.yaml
@@ -98,7 +99,7 @@ class ArenaMaskWidget:
             temp_config_data['session_config_path'] = session_config_path
 
         self.session_config = session_parameters
-        self.sessions = {basename(dirname(f)): f for f in sessions}
+        self.sessions = {key: named[key] for key in sorted(named, key=lambda k: named[k])}
 
         # instantiate ArenaMaskData with the first session in this list
         self.session_data = ArenaMaskData(path=list(self.sessions)[0], controller=self, configs=self.session_config)
@@ -106,6 +107,26 @@ class ArenaMaskWidget:
         self.session_data.set_config_data(list(self.sessions)[0])
 
         self.view = ArenaMaskView(self.session_data)
+
+    def _explain_shared_folder_names(self, session_parameters, named, everything, data_dir):
+        """
+        Say so when session_config.yaml holds parameters under a folder name that session
+        folders share. Those were saved for one of the folders, and which one is not recorded,
+        so each folder shown gets parameters of its own under its path instead.
+        """
+        for name in sorted({basename(dirname(f)) for k, f in named.items()
+                            if k != basename(dirname(f)) and k not in session_parameters}):
+            if name not in session_parameters:
+                continue
+            folders = sorted({dirname(f) for f in everything if basename(dirname(f)) == name})
+            keys = ', '.join(f'"{k}"' for k, f in named.items() if basename(dirname(f)) == name)
+            print(f'{self.session_config_path} holds parameters under "{name}", a folder name that '
+                  f'{" and ".join(folders)} share, so which of them they were saved for is not known. '
+                  f'Each of these folders now has parameters of its own, saved under its path below '
+                  f'{data_dir} ({keys}) and starting from detected values. Check the arena for each '
+                  'of them in the tool below and save. Extraction reads the entries named by path, so '
+                  f'the "{name}" entry is no longer used for these folders and can be deleted from '
+                  f'{self.session_config_path}.')
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         if self.view is not None:

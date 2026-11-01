@@ -363,7 +363,6 @@ def extracted(project, configured, arena):
     extract_found_sessions(
         str(project),
         str(configured),
-        [".avi", ".dat", ".tar.gz"],
         extract_all=True,
         skip_extracted=True,
     )

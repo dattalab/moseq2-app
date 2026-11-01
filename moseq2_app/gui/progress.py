@@ -11,7 +11,9 @@ from moseq2_app._yaml import write_yaml as _write_yaml
 from moseq2_viz.util import get_sorted_index, read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
+from collections import Counter
+from pathlib import PurePath
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS, find_recordings, session_keys
 
 
 def generate_missing_metadata(sess_dir, sess_name):
@@ -59,51 +61,75 @@ def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi',
     return search.recordings
 
 
-def _extracted_paths(data_dir, flipped=False):
+def _movies(folder, flipped):
+    """The movies extraction (or, with flipped, flip correction) wrote in a session folder's proc/."""
+    movies = sorted(glob(join(glob_escape(folder), 'proc', '*.mp4')))
+    return [m for m in movies if basename(m).endswith('_flipped.mp4') == flipped]
+
+
+def _extracted_paths(data_dir, flipped=False, max_depth=DEFAULT_MAX_DEPTH):
     """
-    The movie each extraction wrote, from ``<data_dir>/*/proc/``, keyed by session folder name.
+    The movie each extraction wrote, in the ``proc`` folder beside each recording.
+
+    Recordings are found as the progress cell finds them (``find_recordings``, any recording
+    type, at most max_depth folders below data_dir). A folder one level below data_dir with a
+    ``proc`` folder but no recording left in it is included too, so an extraction whose
+    recording was moved away is still listed. Sessions are named as ``get_session_paths``
+    names them; a proc folder holding more than one movie names each by session and file.
 
     Args:
     data_dir (str): path to directory containing all session folders.
     flipped (bool): return the flip-corrected movies (``*_flipped.mp4``) instead.
+    max_depth (int): how many folders below data_dir to search for recordings.
 
     Returns:
-    path_dict (dict): session directory name keys pair with their respective absolute paths.
+    path_dict (dict): session names paired with the absolute paths of their movies.
     """
-    path = '*/proc/*_flipped.mp4' if flipped else '*/proc/*.mp4'
+    data_dir = abspath(data_dir.strip() or os.getcwd())
+    if not os.path.isdir(data_dir):
+        print(f'{data_dir} is not a folder. Check the path given as the project folder '
+              '(base_dir in the notebook).')
+        return {}
 
-    files = []
-    if len(data_dir) == 0:
-        data_dir = os.getcwd()
-        files = sorted(glob(path))
-    else:
-        data_dir = data_dir.strip()
-        if os.path.isdir(data_dir):
-            files = sorted(glob(os.path.join(data_dir, path)))
-        else:
-            print('directory not found, try again.')
-    if not flipped:
-        files = [f for f in files if not basename(f).endswith('_flipped.mp4')]
-    sessions = files
+    search = find_recordings(data_dir, extensions=RECORDING_EXTENSIONS, max_depth=max_depth)
+    folders = list(dict.fromkeys(dirname(r) for r in search.recordings))
+    folders += [dirname(p) for p in sorted(glob(join(glob_escape(data_dir), '*', 'proc')))
+                if dirname(p) not in folders]
+    names = session_keys([join(f, 'proc') for f in folders], data_dir)
 
-    if len(sessions) == 0:
-        sessions = sorted(glob(join(data_dir, '*.mp4')))
+    path_dict = {}
+    for folder in sorted(folders, key=lambda f: names[join(f, 'proc')]):
+        name = names[join(folder, 'proc')]
+        movies = _movies(folder, flipped)
+        for movie in movies:
+            path_dict[name if len(movies) == 1 else f'{name}/{basename(movie)}'] = movie
 
-    names = [basename(dirname(dirname(sess))) for sess in sessions]
-    if len(set(names)) == len(sessions):
-        return {n: p for n, p in zip(names, sessions)}
-    return {basename(p): p for p in sessions}
+    if not path_dict:
+        # movies kept directly in data_dir, such as a folder of copied extractions
+        path_dict = {basename(p): p for p in sorted(glob(join(glob_escape(data_dir), '*.mp4')))
+                     if basename(p).endswith('_flipped.mp4') == flipped}
+
+    if not path_dict:
+        movie = 'flip-corrected movie (*_flipped.mp4)' if flipped else 'extraction movie (*.mp4)'
+        then = (' and apply the flip classifier to them' if flipped else '')
+        print(f'No extractions found under {data_dir}. Looked for an {movie} in the proc folder beside '
+              f'each of the {len(search.recordings)} recording(s) found down to {max_depth} levels below '
+              f'it, and in {data_dir}. Extract the recordings first{then}, or point this cell at the '
+              'project folder that holds them.')
+    return path_dict
 
 
 def _session_names(data_dir, recordings):
     """
-    Name each recording by its session folder, or by its path below data_dir when two
-    recordings share a folder name (``GroupA/mouse1/depth.dat`` and ``GroupB/mouse1/depth.dat``).
+    Name each recording by its session folder (``session_keys``): the folder's name, or its path
+    below data_dir when two session folders share a name (``GroupA/mouse1`` and ``GroupB/mouse1``).
+    Recordings sharing a folder (several archives) are each named by their own path below data_dir.
     """
-    names = [basename(dirname(r)) for r in recordings]
-    if len(set(names)) == len(names):
-        return names
-    return [os.path.relpath(r, abspath(data_dir)) for r in recordings]
+    keys = session_keys(recordings, data_dir)
+    counts = Counter(keys.values())
+    return [keys[r] if counts[keys[r]] == 1
+            else '/'.join(PurePath(os.path.relpath(r, abspath(data_dir))).parts)
+            for r in recordings]
 
 
 def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mkv', 'avi'],
@@ -115,8 +141,11 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
     folder, at most max_depth folders below data_dir, following symlinked folders. Where it
     looked and what it passed over is printed when it finds nothing or leaves anything out. A
     default metadata.json is written into each session folder that has none, after a warning
-    naming the folder. With extracted=True, the movies extraction wrote in ``<data_dir>/*/proc/``
-    are returned instead.
+    naming the folder. With extracted=True, the movie extraction wrote in the ``proc`` folder
+    beside each recording is returned instead.
+
+    Sessions are named by their folder's name, or by the folder's path below data_dir when two
+    session folders share a name, as ``session_config.yaml`` names them.
 
     Args:
     data_dir (str): path to directory containing all session folders.
@@ -126,11 +155,11 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
     max_depth (int): how many folders below data_dir to search for recordings.
 
     Returns:
-    path_dict (dict): session directory name keys pair with their respective absolute paths.
+    path_dict (dict): session names paired with their respective absolute paths.
     """
 
     if extracted:
-        return _extracted_paths(data_dir, flipped=flipped)
+        return _extracted_paths(data_dir, flipped=flipped, max_depth=max_depth)
 
     data_dir = data_dir.strip() or os.getcwd()
     search = find_recordings(data_dir, extensions=exts, max_depth=max_depth)
