@@ -4,7 +4,7 @@ GUI front-end operations for PCA.
 """
 
 import warnings
-from moseq2_pca._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from os.path import exists, join
 from moseq2_pca.util import read_yaml
 from .cli import train_pca, apply_pca, compute_changepoints

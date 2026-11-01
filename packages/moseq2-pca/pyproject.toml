@@ -46,7 +46,6 @@ dependencies = [
     "opencv-python-headless>=5.0.0.93",
     "pathspec>=1.1.1",
     "psutil>=7.2.2",
-    "ruamel.yaml>=0.19.1",
     "scikit-image>=0.25.2",
     "scikit-learn>=1.7.2",
     "scipy>=1.15.3",

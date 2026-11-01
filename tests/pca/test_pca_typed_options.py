@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_pca.cli as pca_cli
-from moseq2_pca._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 
 
 @pytest.fixture

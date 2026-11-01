@@ -13,7 +13,7 @@ from cytoolz.curried import valmap
 from cytoolz.dicttoolz import dissoc, assoc
 from cytoolz.itertoolz import first, groupby
 from os.path import join, exists, dirname, splitext
-from moseq2_viz._yaml import read_yaml as _read_yaml
+from moseq2_common.yaml import read_yaml as _read_yaml
 
 
 def camel_to_snake(s):

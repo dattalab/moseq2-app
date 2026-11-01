@@ -40,9 +40,6 @@ dependencies = [
     # these rather than through an ffmpeg a user has to install themselves.
     "av>=17.1.0",
     "h5py>=3.16.0",
-    # moseq2_viz._yaml uses the YAML() interface; ruamel dropped the
-    # module-level safe_load/safe_dump in 0.18.
-    "ruamel.yaml>=0.19.1",
     # viz.py passes keepdims to scipy.stats.mode (added in 1.9) so the
     # result keeps the shape it had before the 1.11 default flip.
     "scipy>=1.15.3",

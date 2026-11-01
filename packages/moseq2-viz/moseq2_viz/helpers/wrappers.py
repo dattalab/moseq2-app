@@ -40,7 +40,7 @@ from moseq2_viz.model.util import (
     make_separate_crowd_movies,
     labels_to_changepoints,
 )
-from moseq2_viz._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 
 
 def _make_directories(crowd_movie_path, plot_path):
@@ -121,8 +121,7 @@ def add_group_wrapper(index_file, config_data):
                 index["files"][position]["group"] = config_data["group"]
 
     # Atomically write updated index file
-    with open(new_index_path, "w+") as f:
-        write_yaml(index, f)
+    write_yaml(index, new_index_path)
     shutil.move(new_index_path, index_file)
 
     print("Group(s) added successfully.")
@@ -612,8 +611,7 @@ def copy_h5_metadata_to_yaml_wrapper(input_dir):
 
         # Atomically write updated yaml
         new_file = f"{basename(_yml)}_update.yaml"
-        with open(new_file, "w+") as f:
-            write_yaml(_dict, f)
+        write_yaml(_dict, new_file)
         shutil.move(new_file, _yml)
 
 

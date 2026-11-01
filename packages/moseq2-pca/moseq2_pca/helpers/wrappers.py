@@ -10,7 +10,7 @@ import datetime
 import warnings
 import numpy as np
 import dask.array as da
-from moseq2_pca._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from moseq2_pca.viz import plot_pca_results, changepoint_dist
 from os.path import abspath, join, exists, splitext, basename, dirname
