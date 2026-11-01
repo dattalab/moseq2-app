@@ -278,18 +278,23 @@ def _no_timestamps_message(recording, looked_in, empty=None, where="next to it")
     )
 
 
-def handle_extract_metadata(input_file, dirname):
+def handle_extract_metadata(input_file, dirname, with_source=False):
     """
     Extract metadata and timestamp in the extraction.
 
     Args:
     input_file (str): path to input file to extract
     dirname (str): path to directory where extraction files reside.
+    with_source (bool): also return where the timestamps were read from.
 
     Returns:
     acquisition_metadata (dict): key-value pairs of JSON contents
     timestamps (1D array): the time of every frame, in milliseconds
     tar (bool): indicator for whether the file is compressed.
+    source (str): where the timestamps were read from: the timestamp file's
+        path, ``depth_ts.txt inside <tarball>``, or ``the frame timestamps
+        inside <file>`` for an ``.mkv`` read without a timestamp file.
+        Returned only when ``with_source`` is True.
     """
 
     tar = None
@@ -366,6 +371,8 @@ def handle_extract_metadata(input_file, dirname):
 
     acquisition_metadata = load_metadata(metadata_path)
 
+    if with_source:
+        return acquisition_metadata, timestamps, tar, source
     return acquisition_metadata, timestamps, tar
 
 

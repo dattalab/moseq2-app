@@ -176,12 +176,13 @@ def common_roi_options(function):
     return function
 
 
-def common_avi_options(function):
+def common_avi_options(function, threads_short_flag=True):
     """
     Decorator function for grouping shared video processing parameters.
 
     Args:
     function: Function to add enclosed parameters to as click options.
+    threads_short_flag (bool): whether ``--threads`` also answers to ``-t``.
 
     Returns:
     function: Updated function including shared parameters.
@@ -201,8 +202,9 @@ def common_avi_options(function):
     function = click.option(
         "--delete", is_flag=True, default=False, help="Delete raw file if encoding is sucessful"
     )(function)
+    threads_flags = ("-t", "--threads") if threads_short_flag else ("--threads",)
     function = click.option(
-        "-t", "--threads", type=int, default=8, help="Number of threads for encoding"
+        *threads_flags, type=int, default=8, help="Number of threads for encoding"
     )(function)
     function = click.option(
         "-m",
@@ -213,6 +215,15 @@ def common_avi_options(function):
     )(function)
 
     return function
+
+
+def extraction_avi_options(function):
+    """
+    ``common_avi_options`` for the extraction commands, where ``-t`` is the
+    short flag of ``--temporal-filter-size`` (since 2018) and ``--threads``
+    has none.
+    """
+    return common_avi_options(function, threads_short_flag=False)
 
 
 def extract_options(function):
@@ -488,7 +499,7 @@ def _typed_depth_range_is_manual(config_data):
     help="Platform to train models on",
 )
 @common_roi_options
-@common_avi_options
+@extraction_avi_options
 @extract_options
 def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 
@@ -521,7 +532,7 @@ def _typed_extract_options():
 )
 @click.argument("input-folder", type=click.Path(exists=True, resolve_path=False))
 @common_roi_options
-@common_avi_options
+@extraction_avi_options
 @extract_options
 @click.option(
     "--extensions",

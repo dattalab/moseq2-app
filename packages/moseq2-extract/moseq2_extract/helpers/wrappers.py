@@ -521,9 +521,10 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
 
     # If input file is compressed (tarFile), returns decompressed file path and tar bool indicator.
     # Also gets loads respective metadata dictionary and timestamp array.
-    acquisition_metadata, config_data["timestamps"], config_data["tar"] = (
-        handle_extract_metadata(input_file, in_dirname)
+    acquisition_metadata, config_data["timestamps"], config_data["tar"], timestamp_source = (
+        handle_extract_metadata(input_file, in_dirname, with_source=True)
     )
+    recording = input_file
 
     # updating input_file reference to open tar file object if input file ends with [.tar/.tar.gz]
     if config_data["tar"] is not None:
@@ -535,14 +536,24 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     n_timestamps = len(config_data["timestamps"]) if config_data["timestamps"] is not None else 0
 
     if nframes_from_video is None:
-        warnings.warn(
-            f"Could not determine frame count from the depth video in "
-            f"'{in_dirname}'. This can happen if the video format is "
-            f"unrecognized or the file is empty. Falling back to "
-            f"depth_ts.txt timestamp count ({n_timestamps}). Cannot verify "
-            f"that the depth video and depth_ts.txt have the same length — "
-            f"please check manually."
-        )
+        # An .mkv stores a duration rather than a frame count, and an .avi can
+        # lack one. The timestamps then give the count: an .mkv's own frame
+        # times are the video's frames, a timestamp file's lines are not.
+        if timestamp_source == f"the frame timestamps inside {recording}":
+            print(
+                f"{recording} records no frame count of its own; extracting the "
+                f"{n_timestamps} frames counted from {timestamp_source}."
+            )
+        else:
+            warnings.warn(
+                f"{recording} records no frame count of its own, so extraction "
+                f"takes the {n_timestamps} timestamps in {timestamp_source} as its "
+                f"number of frames. That count cannot be checked against the "
+                f"video. If {timestamp_source} is not this recording's own "
+                f"timestamp file, or the extraction stops early or comes out "
+                f"shorter than the recording, check that the file belongs to "
+                f"{recording}."
+            )
         config_data["finfo"]["nframes"] = n_timestamps
     elif n_timestamps > 0 and nframes_from_video != n_timestamps:
         raise ValueError(
