@@ -283,6 +283,11 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
     config holds) or missing is replaced; a value the user changed is kept. ``k2`` is the
     Kinect v2, as the notebook and moseq2-pca name it.
 
+    Only Azure Kinect and Orbbec Femto cameras write ``.mkv``, so an ``.mkv`` recording
+    gets the Azure settings whatever ``camera_type`` says. Notebooks from 1.4.5 and
+    earlier left ``k2`` or ``auto`` in an Azure project's config; where it says ``k2`` or
+    ``kinect``, a line names the recording and says to set ``camera_type: azure``.
+
     Args:
     config_data (dict): dictionary containing all input parameters.
     input_file (str): path to raw depth file
@@ -292,10 +297,10 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
     """
 
     # Auto-setting background weights
-    camera_type = config_data.get('camera_type')
-    if camera_type == 'k2':
-        camera_type = 'kinect'
+    stated = config_data.get('camera_type')
+    camera_type = 'kinect' if stated == 'k2' else stated
     finfo = config_data.get('finfo')
+    is_mkv = isinstance(input_file, (str, os.PathLike)) and str(input_file).endswith('.mkv')
 
     default_parameters = {
         'kinect': {
@@ -334,6 +339,12 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
             detected = 'kinect'
 
         _fill_camera_defaults(config_data, default_parameters[detected], default_parameters['kinect'])
+    elif camera_type == 'kinect' and is_mkv:
+        _fill_camera_defaults(config_data, default_parameters['azure'], default_parameters['kinect'])
+        used = ', '.join(f'{key} {_setting_text(config_data[key])}' for key in default_parameters['azure'])
+        print(f'{input_file} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras '
+              f'write, but config.yaml says camera_type: {stated} (the Kinect v2). Used the Azure '
+              f'settings for it: {used}. Set camera_type: azure in config.yaml.')
     elif camera_type in default_parameters:
         _fill_camera_defaults(config_data, default_parameters[camera_type], default_parameters['kinect'])
     else:
@@ -349,6 +360,13 @@ def _fill_camera_defaults(config_data, camera_defaults, generic_defaults):
         current = config_data.get(key)
         if current is None or _same_setting(current, generic_defaults[key]):
             config_data[key] = value
+
+
+def _setting_text(value):
+    """A setting as a user would write it in config.yaml: ``[10, 0.1, 1]``, ``gray16be``."""
+    if isinstance(value, (list, tuple)):
+        return f"[{', '.join(str(v) for v in value)}]"
+    return str(value)
 
 
 def _same_setting(a, b):

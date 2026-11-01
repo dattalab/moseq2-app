@@ -9,6 +9,10 @@
         config_data['gaussfilter_space'] = (1.5, 1)
         config_data['medfilter_space'] = [0]
         config_data['medfilter_time'] = [0]
+        if camera_for_pca(config_data.get('camera_type'), progress_paths['train_data_dir'],
+                          progress_paths['base_dir']) == 'azure':
+            config_data['gaussfilter_space'] = (2.25, 1.5)
+            config_data['tailfilter_size'] = (13, 13)
         config_data['nworkers'] = 1
 
     train_pca_command(progress_paths, pca_dirname, pca_filename)
