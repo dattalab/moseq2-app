@@ -16,6 +16,13 @@ from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 
 
+#: How a user gets labels from the widget into training, as every message about
+#: unsaved labels says it.
+SAVE_AND_RETRAIN = (
+    "click Save Labels (or run the notebook's save cell), then run training again"
+)
+
+
 @dataclass
 class CleanParameters:
     prefilter_space: tuple = (3,)
@@ -37,6 +44,12 @@ def create_training_dataset(
         clean_parameters = CleanParameters()
 
     # load trainingdata index
+    if not data_index_path.exists():
+        raise FileNotFoundError(
+            f"No saved flip labels at {data_index_path}: the file does not exist. "
+            "Labels reach training only once they are saved: in the labeling widget, "
+            f"{SAVE_AND_RETRAIN}."
+        )
     with open(data_index_path, "rb") as f:
         session_paths, data_index = pickle.load(f)
 
@@ -51,9 +64,11 @@ def create_training_dataset(
                 frames.append(frames_subset)
     if sum(len(f) for f in frames) == 0:
         raise ValueError(
-            f"No labeled frames in {data_index_path}. Add at least one frame range "
-            "in the labeling widget before training: click Start Range, step to the "
-            "last frame of the range, then click Facing Left or Facing Right."
+            f"No labeled frames in {data_index_path}. Labels reach training only once "
+            "they are saved: if the labeling widget lists ranges under Selected Ranges, "
+            f"{SAVE_AND_RETRAIN}. If it lists none, add a frame range first: click "
+            "Start Range, step to the last frame of the range, then click Facing Left "
+            "or Facing Right, and save."
         )
     frames = np.concatenate(frames, axis=0)
     # rotate frames

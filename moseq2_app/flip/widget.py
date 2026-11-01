@@ -11,6 +11,7 @@ from collections import defaultdict
 from moseq2_extract.extract.proc import get_flips
 from moseq2_extract.util import gen_batch_sequence
 from moseq2_extract.io.video import write_frames_preview
+from moseq2_app.flip.train import SAVE_AND_RETRAIN
 
 
 # Workaround for HoloViews/Bokeh _buffers parameter issue
@@ -73,6 +74,7 @@ class FlipClassifierWidget:
         self.selected_frame_ranges_dict = defaultdict(list)
         self.curr_total_selected_frames = 0
         self.status = pn.pane.HTML('')
+        self.unsaved = False
 
         self.session_select_dropdown = pn.widgets.Select(options=list(self.sessions), name='Session', value=list(self.sessions)[0])
         self.frame_num_slider = pn.widgets.IntSlider(name='Current Frame', start=0, end=1000, step=1, value=1)
@@ -169,13 +171,41 @@ class FlipClassifierWidget:
             self.mark_unsaved()
 
     def mark_unsaved(self):
+        self.unsaved = True
         self.status.object = (
             '<p style="color: red;">You have unsaved changes to your labels. '
             'Hit save when done editing to keep them.</p>'
         )
 
     def mark_saved(self):
+        self.unsaved = False
         self.status.object = '<p style="color: green;">Flip labels saved.</p>'
+
+    def warn_if_unsaved(self):
+        """Warn when training would read labels other than the ones the widget shows.
+
+        Training reads ``training_data_path``, which changes only on a save. A
+        missing file or one without labels stops training with its own message,
+        so the warning is for the case that trains without one: older labels
+        were saved, and the widget has changed since.
+        """
+        path = Path(self.training_data_path)
+        if not self.unsaved or not path.exists():
+            return
+        with open(path, 'rb') as f:
+            _, saved = pickle.load(f)
+        saved_ranges = [r for ranges in saved.values() for _, r in ranges]
+        if not saved_ranges:
+            return
+        shown_ranges = [r for ranges in self.selected_frame_ranges_dict.values() for _, r in ranges]
+        warnings.warn(
+            f'The flip labels have unsaved changes. The widget shows {len(shown_ranges)} range(s) '
+            f'({sum(len(r) for r in shown_ranges)} frames), but training reads only the labels saved in '
+            f'{path}: {len(saved_ranges)} range(s) ({sum(len(r) for r in saved_ranges)} frames), and '
+            f'trains on those. To train on the ranges the widget shows, {SAVE_AND_RETRAIN}.',
+            UserWarning,
+            stacklevel=2,
+        )
 
     def add_range(self, session, left, selected_range):
         """Hold one labeled range and list it under Selected Ranges."""
