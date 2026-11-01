@@ -417,6 +417,34 @@ def get_pca_progress(progress_vars, pca_progress):
 
     return pca_progress
 
+def incomplete_extraction_message(session, recording, yaml_path):
+    """
+    Explain an extraction whose results file says it did not finish.
+
+    extract_wrapper writes results_XX.yaml with complete: False before extracting and sets it True
+    only at the end, so a False left behind means the extraction was stopped partway.
+    run_slurm_extract submits sbatch commands without an output path, so a SLURM job's log is
+    sbatch's default slurm-<job id>.out in the directory the jobs were submitted from.
+
+    Args:
+    session (str): session directory name
+    recording (str): path to the session's depth recording
+    yaml_path (str): path to the extraction's results yaml
+
+    Returns:
+    (str): the message
+    """
+    proc_dir = dirname(yaml_path)
+    return (
+        f"Extraction of {session} started but did not finish: {yaml_path} records it as incomplete. "
+        "An extraction stopped partway leaves this behind, most often because the job or notebook "
+        "kernel running it was stopped, for example killed for running out of memory or for reaching "
+        f"its time limit. Look in {proc_dir} for what it wrote and, if it ran on SLURM, in the job's log, "
+        "slurm-<job id>.out in the directory the extraction jobs were submitted from. "
+        f"Run the extraction again for {recording} to redo it."
+    )
+
+
 def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
     """
     Count the number of fully extracted sessions, and print the session directory names of the incomplete or missing extractions.
@@ -444,7 +472,7 @@ def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
                 extracted = True
                 num_extracted += 1
             else:
-                print(f'Extraction {k} is listed as incomplete.')
+                print(incomplete_extraction_message(k, v, yaml_path))
         if not extracted:
             print('Not yet extracted:', k)
 

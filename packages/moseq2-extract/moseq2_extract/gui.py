@@ -186,8 +186,9 @@ def extract_found_sessions(
     config_data = read_yaml(config_file)
 
     if config_data["cluster_type"] == "local":
-        run_local_extract(to_extract, config_file, skip_extracted)
-        print("Extractions Complete.")
+        # run_local_extract ends with a summary naming each recording that failed
+        if not run_local_extract(to_extract, config_file, skip_extracted):
+            print("Extractions Complete.")
     else:
         # Get default CLI params
         params = {
@@ -334,7 +335,7 @@ def extract_command(
     cli_options (dict): parameters typed on the command line; they take precedence over the config file and the session config.
 
     Returns:
-    (str): String indicating that the extracted is completed.
+    (str or None): path to the output directory, or None if the file was skipped as already extracted.
     """
 
     config_data = read_yaml(config_file)
@@ -353,8 +354,6 @@ def extract_command(
     if output_dir is None:
         output_dir = config_data.get("output_dir", "proc")
 
-    extract_wrapper(
+    return extract_wrapper(
         input_file, output_dir, config_data, num_frames=num_frames, skip=skip
     )
-
-    return "Extraction completed."

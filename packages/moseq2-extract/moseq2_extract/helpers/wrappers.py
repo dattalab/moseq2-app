@@ -492,7 +492,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     extract (function): extraction function state
 
     Returns:
-    output_dir (str): path to directory containing extraction
+    output_dir (str): path to directory containing extraction, or None if the file was skipped as already extracted
     """
     print("Processing:", input_file)
 

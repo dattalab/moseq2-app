@@ -239,9 +239,22 @@ def test_extraction_counts(tmp_path, capsys, state, expected):
 
 
 def test_an_incomplete_extraction_is_named(tmp_path, capsys):
+    """An extraction whose results file says it did not finish was stopped
+    partway, most often by a job or kernel killed for memory or time. The
+    line says so, where to look and how to redo it."""
     path = build_project(tmp_path / "proj", n_extracted=0, n_incomplete=1)
     check_progress(str(path))
-    assert "is listed as incomplete." in capsys.readouterr().out
+    session = tmp_path / "proj" / "session_0"
+    proc = session / "proc"
+    assert (
+        f"Extraction of session_0 started but did not finish: {proc / 'results_00.yaml'} "
+        "records it as incomplete. An extraction stopped partway leaves this behind, most "
+        "often because the job or notebook kernel running it was stopped, for example "
+        "killed for running out of memory or for reaching its time limit. Look in "
+        f"{proc} for what it wrote and, if it ran on SLURM, in the job's log, "
+        "slurm-<job id>.out in the directory the extraction jobs were submitted from. "
+        f"Run the extraction again for {session / 'depth.avi'} to redo it.\n"
+    ) in capsys.readouterr().out
 
 
 

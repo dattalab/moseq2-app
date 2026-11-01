@@ -67,7 +67,8 @@ def modeling_parameters(function):
         "-c",
         type=int,
         default=0,
-        help="Number of cores to use for resampling",
+        help="CPUs each kappa-scan job requests on SLURM (sbatch -c; 8 when 0). "
+        "A single fit uses the CPUs the job or machine gives it; this does not change that.",
     )(function)
     function = click.option(
         "--num-iter",
@@ -224,6 +225,11 @@ def modeling_parameters(function):
 def learn_model(input_file, dest_file, **config_data):
     # Train the ARHMM using PC scores located in the INPUT_FILE, and saves the model to DEST_FILE
 
+    if config_data["ncpus"]:
+        click.echo(
+            "--ncpus sets the CPUs each kappa-scan job requests on SLURM. A single fit "
+            "uses the CPUs the job or machine gives it, and --ncpus does not change that."
+        )
     learn_model_wrapper(input_file, dest_file, config_data)
 
 

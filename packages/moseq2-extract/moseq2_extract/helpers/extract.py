@@ -251,12 +251,16 @@ def run_local_extract(
     output_dir (str): output directory for each session. If None, the config file's output_dir, else "proc".
     cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
 
+    Returns:
+    failures (list): (path, exception) for each recording that could not be extracted, in the order tried.
     """
     from moseq2_extract.gui import extract_command
 
+    failures = []
+    n_skipped = 0
     for ext in tqdm(to_extract, desc="Extracting Sessions"):
         try:
-            extract_command(
+            result = extract_command(
                 ext,
                 output_dir,
                 config_file=config_file,
@@ -267,6 +271,45 @@ def run_local_extract(
         except Exception as e:
             print("Unexpected error:", e)
             print("could not extract", ext)
+            failures.append((ext, e))
+        else:
+            if result is None:
+                n_skipped += 1
+
+    print(extraction_summary(len(to_extract), n_skipped, failures))
+    return failures
+
+
+def extraction_summary(n_recordings, n_skipped, failures):
+    """
+    Summarize a batch of extractions: how many were extracted, and each failure with its error.
+
+    Args:
+    n_recordings (int): number of recordings the batch went through.
+    n_skipped (int): number skipped because they were already extracted; counted as neither extracted nor failed.
+    failures (list): (path, exception) for each recording that could not be extracted.
+
+    Returns:
+    (str): the summary.
+    """
+    n_tried = n_recordings - n_skipped
+    n_extracted = n_tried - len(failures)
+    head = f"Extracted {n_extracted} of {n_tried} recordings"
+    skipped = f"{n_skipped} already extracted and skipped"
+    if not failures:
+        return head + (f" ({skipped})." if n_skipped else ".")
+    head += f"; {len(failures)} failed"
+    lines = [head + (f" ({skipped})." if n_skipped else "."), "Failed:"]
+    for path, error in failures:
+        lines.append(f"  {path}")
+        message = f"{type(error).__name__}: {error}"
+        lines.extend(f"    {line}" for line in message.splitlines())
+    lines.append(
+        "Fix the problem each error names, then run the extraction again. Recordings already "
+        "extracted are skipped when skip_extracted (the notebook) or --skip-completed "
+        "(batch-extract) is set."
+    )
+    return "\n".join(lines)
 
 
 def run_slurm_extract(

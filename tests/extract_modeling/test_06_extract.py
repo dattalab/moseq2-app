@@ -26,10 +26,11 @@ the chain's own extraction, which runs once for the whole suite.
 
 Two things make the cell quieter than it looks. ``run_local_extract`` catches
 every exception a recording raises, prints it and moves to the next, so the
-cell finishes and prints ``Extractions Complete.`` whether or not anything was
-extracted. And the recordings it extracts have already been filtered twice, so
-a project that yields nothing is indistinguishable from one that extracted
-everything. Both mean a test has to look at the files on disk.
+cell finishes without raising; a failure shows only in the summary it prints
+at the end in place of ``Extractions Complete.``. And the recordings it
+extracts have already been filtered twice, so a project that yields nothing is
+indistinguishable from one that extracted everything. Both mean a test has to
+look at the files on disk.
 """
 
 from __future__ import annotations
