@@ -498,6 +498,22 @@ def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
     )
 
 
+def _typed_extract_options():
+    """The extraction options typed on batch-extract's command line, to apply over
+    the config file and each recording's session config. Only options extract
+    itself takes are kept; num_frames and skip_completed are passed separately."""
+    ctx = click.get_current_context()
+    passed_separately = {"input_file", "num_frames", "skip_completed", "config_file", "cluster_type"}
+    names = {p.name for p in extract.params} - passed_separately
+    typed = {
+        k: v
+        for k, v in ctx.params.items()
+        if k in names and ctx.get_parameter_source(k) is click.core.ParameterSource.COMMANDLINE
+    }
+    _typed_depth_range_is_manual(typed)
+    return typed
+
+
 @cli.command(
     name="batch-extract",
     cls=command_with_config("config_file"),
@@ -590,7 +606,15 @@ def batch_extract(
     if config_data["cluster_type"] == "local":
         # the session specific config doesn't get generated in session proc file
         # session specific config direct used in config_data dictionary in extraction from extract_command function
-        run_local_extract(to_extract, config_file, skip_completed)
+        typed = _typed_extract_options()
+        run_local_extract(
+            to_extract,
+            config_file,
+            skip_completed,
+            num_frames=num_frames,
+            output_dir=typed.pop("output_dir", None),
+            cli_options=typed,
+        )
     else:
         # add paramters to config
         config_data["session_config_path"] = (

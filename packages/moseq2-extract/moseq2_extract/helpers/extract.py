@@ -200,7 +200,14 @@ def process_extract_batches(
         video_pipe.communicate()
 
 
-def run_local_extract(to_extract, config_file, skip_extracted=False):
+def run_local_extract(
+    to_extract,
+    config_file,
+    skip_extracted=False,
+    num_frames=None,
+    output_dir=None,
+    cli_options=None,
+):
     """
     Run the extract command on given list of sessions to extract on a local platform.
 
@@ -208,13 +215,23 @@ def run_local_extract(to_extract, config_file, skip_extracted=False):
     to_extract (list): list of paths to files to extract
     config_file (str): path to configuration file containing pre-configured extract and ROI
     skip_extracted (bool): Whether to skip already extracted session.
+    num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
+    output_dir (str): output directory for each session. If None, the config file's output_dir, else "proc".
+    cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
 
     """
     from moseq2_extract.gui import extract_command
 
     for ext in tqdm(to_extract, desc="Extracting Sessions"):
         try:
-            extract_command(ext, None, config_file=config_file, skip=skip_extracted)
+            extract_command(
+                ext,
+                output_dir,
+                config_file=config_file,
+                num_frames=num_frames,
+                skip=skip_extracted,
+                cli_options=cli_options,
+            )
         except Exception as e:
             print("Unexpected error:", e)
             print("could not extract", ext)
