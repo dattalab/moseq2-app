@@ -117,13 +117,25 @@ def train_pca(input_dir, output_dir, output_file, **cli_args):
         combine_new_config(cli_args.get('config_file'), config_data)
     
 
+def _fill_gaps_is_not_an_option(ctx, param, value):
+    """Stop on --fill-gaps, saying why dropped frames are always filled."""
+    if value is not None:
+        raise click.UsageError(
+            f'apply-pca does not take --fill-gaps (given: --fill-gaps {value}). Dropped frames are '
+            'always filled with empty (NaN) rows when a session has timestamps: changepoints and '
+            'the model treat each row of PC scores as one frame step, so leaving the rows out '
+            'would make them assume no frame was dropped. Remove --fill-gaps from the command.',
+            ctx=ctx,
+        )
+
+
 @cli.command(name='apply-pca', cls=command_with_config('config_file'), help='Compute PCA Scores of extraction data given a pre-trained PCA')
 @common_pca_options
 @common_dask_parameters
 @click.option('--output-file', default='pca_scores', type=str, help='Name of h5 file for storing pca results')
 @click.option('--pca-path', default='/components', type=str, help='Path to pca components in h5 file')
 @click.option('--pca-file', default=None, type=click.Path(), help='Path to PCA results')
-@click.option('--fill-gaps', default=True, type=bool, help='Fill dropped frames with nans')
+@click.option('--fill-gaps', hidden=True, expose_value=False, default=None, type=str, callback=_fill_gaps_is_not_an_option)
 @click.option('--fps', default=30, type=int, help='Frames per second (frame rate)')
 @click.option('--detrend-window', default=0, type=float, help="Length of detrend window (in seconds, 0 for no detrending)")
 @click.option('--verbose', '-v', is_flag=True, default=False, help='Print sessions as they are being loaded.')

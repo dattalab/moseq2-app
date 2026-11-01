@@ -9,7 +9,7 @@ from copy import deepcopy
 from os.path import exists
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
-from moseq2_viz.util import h5_to_dict, read_yaml
+from moseq2_viz.util import h5_to_dict, read_timestamps, read_yaml
 
 
 def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
@@ -186,9 +186,13 @@ def make_session_status_dicts(paths):
 
         # read timestamps from h5
         try:
-            timestamps = h5_to_dict(h5path, path='timestamps')['timestamps']
-            # Count dropped frame percentage
-            dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
+            timestamps, unit_recorded = read_timestamps(h5path)
+            # Count dropped frame percentage. A file that records its unit is read in
+            # milliseconds; one that does not is left to the guess from the gaps' size.
+            if unit_recorded:
+                dropped_frames = check_timestamp_error_percentage(timestamps / 1000, fps=30, scaling_factor=1)
+            else:
+                dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
             if dropped_frames >= 0.05:
                 status_dicts[stat_dict['uuid']]['dropped_frames'] = dropped_frames
         except KeyError:

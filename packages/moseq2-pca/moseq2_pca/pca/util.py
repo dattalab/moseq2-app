@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 import dask.array.linalg as lng
 from dask.distributed import as_completed, progress
 from moseq2_pca.util import (clean_frames, insert_nans, read_yaml, get_changepoints, get_rps,
-                             frame_rate_from_timestamps)
+                             frame_rate_from_timestamps, timestamp_unit, TIMESTAMP_UNITS)
 
 
 def mask_data(original_data, mask, new_data):
@@ -101,28 +101,37 @@ def compute_explained_variance(s, nsamples, total_var):
 
 def get_timestamps(f, frames, fps=30):
     """
-    Read the timestamps from a given h5 file.
+    Read the timestamps from a given h5 file, in seconds.
+
+    The unit comes from the timestamps dataset's ``unit`` attribute, which
+    extraction writes; a file without it is read as milliseconds.
 
     Args:
     f (read-open h5py File): open "results_00.h5" h5py.File object in read-mode
     frames (numpy.ndarray): list of 2d frames contained in opened h5 File.
-    fps (int): frames per second.
+    fps (int): frames per second, for a file without timestamps.
 
     Returns:
-    timestamps (numpy.array): array of timestamps for inputted frames variable
+    timestamps (numpy.array): array of timestamps for inputted frames variable, in seconds
     """
 
-    if '/timestamps' in f:
-        # h5 format post v0.1.3
-        timestamps = f['/timestamps'][()] / 1000.0
-    elif '/metadata/timestamps' in f:
-        # h5 format pre v0.1.3
-        timestamps = f['/metadata/timestamps'][()] / 1000.0
-    else:
+    # '/timestamps' is the h5 format post v0.1.3, '/metadata/timestamps' the format before
+    path = next((p for p in ('/timestamps', '/metadata/timestamps') if p in f), None)
+    if path is None:
         print('WARNING: timestamps were not found. Using default frame series-ordering.')
-        timestamps = np.arange(frames.shape[0]) / fps
+        return np.arange(frames.shape[0]) / fps
 
-    return timestamps
+    unit = timestamp_unit(f[path])
+    return f[path][()] / TIMESTAMP_UNITS[unit if unit is not None else 'milliseconds']
+
+
+def get_timestamp_unit(f):
+    """
+    The unit an open extraction h5 records for its timestamps, or None when it
+    records none or has no timestamps.
+    """
+    path = next((p for p in ('/timestamps', '/metadata/timestamps') if p in f), None)
+    return timestamp_unit(f[path]) if path is not None else None
 
 def copy_metadatas_to_scores(f, f_scores, uuid):
     """
@@ -306,6 +315,7 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
                 frames = frames.reshape(-1, frames.shape[1] * frames.shape[2])
 
                 timestamps = get_timestamps(f, f[h5_path], fps)
+                unit = get_timestamp_unit(f)
                 copy_metadatas_to_scores(f, f_scores, uuid)
 
             # Compute scores
@@ -322,9 +332,8 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
                 scores = frames.dot(pca_components.T)
 
             # Insert NaNs into scores array
-            scores, score_idx, _ = insert_nans(
-                data=scores, timestamps=timestamps,
-                fps=frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})'))
+            frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})', unit)
+            scores, score_idx, _ = insert_nans(data=scores, timestamps=timestamps)
 
             # Write scores
             f_scores.create_dataset(f'scores/{uuid}', data=scores,
@@ -434,13 +443,13 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
                 with h5py.File(h5s_batch[file_idx], mode='r') as f:
                     # Load timestamps
                     timestamps = get_timestamps(f, f[h5_path], fps)
+                    unit = get_timestamp_unit(f)
                     copy_metadatas_to_scores(f, f_scores, uuids_batch[file_idx])
 
                 # Insert NaNs in missing frames in scores array
-                scores, score_idx, _ = insert_nans(
-                    data=result, timestamps=timestamps,
-                    fps=frame_rate_from_timestamps(
-                        timestamps, f'{uuids_batch[file_idx]} ({h5s_batch[file_idx]})'))
+                frame_rate_from_timestamps(
+                    timestamps, f'{uuids_batch[file_idx]} ({h5s_batch[file_idx]})', unit)
+                scores, score_idx, _ = insert_nans(data=result, timestamps=timestamps)
 
                 # Write scores
                 f_scores.create_dataset(f'scores/{uuids_batch[file_idx]}', data=scores,
@@ -498,7 +507,7 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
 
         # Load timestamps, and stop here rather than inside the batch if they give no frame rate
         timestamps = get_timestamps(h5p, frames, fps)
-        frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})')
+        frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})', get_timestamp_unit(h5p))
 
         if missing_data and pca_scores is None:
             raise RuntimeError("Need to compute PC scores to impute missing data")

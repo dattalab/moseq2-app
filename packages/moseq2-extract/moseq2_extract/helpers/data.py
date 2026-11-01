@@ -258,6 +258,13 @@ def copy_manifest_results(manifest, output_dir):
             write_yaml(v["yaml_dict"], f)
 
 
+#: The unit of every extraction's ``/timestamps``, also written as the dataset's
+#: ``unit`` attribute. A Kinect v2 ``depth_ts.txt`` is in milliseconds already;
+#: ``timestamps.csv`` and an ``.mkv`` container's own frame times are seconds and
+#: are converted when read.
+TIMESTAMP_UNIT = "milliseconds"
+
+
 def _no_timestamps_message(recording, looked_in, empty=None, where="next to it"):
     """The error for a recording with no per-frame timestamps from any source."""
     places = "\n".join(f"  {place}" for place in looked_in)
@@ -281,7 +288,7 @@ def handle_extract_metadata(input_file, dirname):
 
     Returns:
     acquisition_metadata (dict): key-value pairs of JSON contents
-    timestamps (1D array): list of loaded timestamps
+    timestamps (1D array): the time of every frame, in milliseconds
     tar (bool): indicator for whether the file is compressed.
     """
 
@@ -347,7 +354,8 @@ def handle_extract_metadata(input_file, dirname):
             source = timestamp_path
         timestamps = load_timestamps(timestamp_path, col=0, alternate=alternate_correct)
     else:
-        timestamps = load_timestamps_from_movie(input_file)
+        # the container's frame times are in seconds; extraction writes milliseconds
+        timestamps = np.asarray(load_timestamps_from_movie(input_file)) * 1000
         source = f"the frame timestamps inside {input_file}"
         looked_in = looked_in + [source]
 
@@ -411,6 +419,7 @@ def create_extract_h5(
             data=config_data["timestamps"][first_frame_idx:last_frame_idx],
         )
         h5_file["timestamps"].attrs["description"] = "Depth video timestamps"
+        h5_file["timestamps"].attrs["unit"] = TIMESTAMP_UNIT
 
     # Cropped Frames
     h5_file.create_dataset(
