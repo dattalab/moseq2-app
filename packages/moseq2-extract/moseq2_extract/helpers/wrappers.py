@@ -375,6 +375,40 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
     return roi, bground_im, first_frame
 
 
+class NoFlipClassifierWarning(Warning):
+    """
+    A recording is extracted without a flip classifier. A subclass of Warning
+    rather than UserWarning, so the notebook's filter_warnings does not hide it.
+    """
+
+
+def warn_without_flip_classifier(input_file, config_data):
+    """
+    Warn, once per recording, that a recording is extracted without a flip
+    classifier, so the mouse's heading is known only up to half a turn.
+
+    Args:
+    input_file (str): path to the recording being extracted.
+    config_data (dict): extraction configuration; its 'flip_classifier' is checked.
+    """
+    if config_data.get("flip_classifier"):
+        return
+    warnings.warn(
+        f"Extracting {input_file} without a flip classifier (flip_classifier is "
+        f"{config_data.get('flip_classifier')!r}). The mouse's heading is then "
+        "resolved only up to half a turn for the whole recording: extraction keeps "
+        "it continuous from frame to frame, but nothing decides which end of the "
+        "mouse is its head, so every frame of the recording may face the wrong way. "
+        "To orient the mouse, get a flip classifier that matches your camera and "
+        "mice, either a pre-trained one with `moseq2-extract download-flip-file "
+        "config.yaml` (which writes its path into config.yaml) or one trained in the "
+        "Flip-Classifier-Training-Notebook, and pass it as flip_classifier in the "
+        "config file or with --flip-classifier.",
+        NoFlipClassifierWarning,
+        stacklevel=2,
+    )
+
+
 def validate_flip_classifier(config_data):
     """
     Validate that the flip classifier is compatible with the configured crop size.
@@ -463,6 +497,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     print("Processing:", input_file)
 
     validate_flip_classifier(config_data)
+    warn_without_flip_classifier(input_file, config_data)
 
     # get the basic metadata
 

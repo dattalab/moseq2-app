@@ -7,11 +7,13 @@ timestamps line up on that numbering (moseq2-extract#157).
 
 These run the real extraction on a copy of the suite's 600-frame
 ``saline_example_0`` recording, with its flip classifier, in chunks of 100
-frames. Extraction resolves a mouse's heading within each chunk, starting from
-the chunk's first frame, so two extractions that cut the recording at
-different places can crop the same frame rotated half a turn apart. With
-chunks of 100 and trims of 100, the trimmed extraction's chunks are the
-untrimmed one's, and every kept frame has to come out identical.
+frames. Extraction resolves the mouse's heading only up to half a turn, by
+keeping it continuous from the first extracted frame on, so a trimmed
+extraction, which starts at a later frame, can crop every frame rotated half a
+turn from the untrimmed one. What places each frame and does not depend on the
+heading (its centroid, area, length, width and 2D velocity) has to come out
+identical, and the trimmed extraction's heading has to differ from the
+untrimmed one's by the same amount on every frame.
 """
 
 from __future__ import annotations
@@ -94,12 +96,36 @@ def test_a_trimmed_extraction_holds_only_the_kept_frames(recording, untrimmed, t
     np.testing.assert_array_equal(trimmed["timestamps"], untrimmed["timestamps"][start : NFRAMES - end])
 
 
+# per-frame scalars computed before the crop is rotated, so they do not depend
+# on which way the mouse is taken to face
+HEADING_FREE = [
+    "area_mm", "area_px", "centroid_x_mm", "centroid_x_px", "centroid_y_mm",
+    "centroid_y_px", "length_mm", "length_px", "width_mm", "width_px",
+    "velocity_2d_mm", "velocity_2d_px", "velocity_theta",
+]
+
+
 def test_each_kept_frame_is_the_same_frame_of_the_recording(untrimmed, trimmed):
     """Frame ``i`` of the trimmed extraction is frame ``start + i`` of the untrimmed one."""
     start, end, trimmed = trimmed
     kept = slice(start, NFRAMES - end)
-    np.testing.assert_array_equal(trimmed["frames"], untrimmed["frames"][kept])
-    np.testing.assert_array_equal(trimmed["frames_mask"], untrimmed["frames_mask"][kept])
-    np.testing.assert_array_equal(trimmed["flips"], untrimmed["flips"][kept])
-    for name, values in trimmed["scalars"].items():
-        np.testing.assert_array_equal(values, untrimmed["scalars"][name][kept], err_msg=name)
+    for name in HEADING_FREE:
+        np.testing.assert_array_equal(
+            trimmed["scalars"][name], untrimmed["scalars"][name][kept], err_msg=name
+        )
+
+
+def test_the_trimmed_heading_is_turned_as_a_whole(untrimmed, trimmed):
+    """Before flip correction, the trimmed extraction's heading differs from the
+    untrimmed one's by one fixed amount, a whole number of half turns, on every
+    frame: no chunk boundary turns part of it around."""
+    start, end, trimmed = trimmed
+    kept = slice(start, NFRAMES - end)
+
+    def raw(result, frames=slice(None)):
+        return result["scalars"]["angle"][frames] - np.pi * result["flips"][frames]
+
+    turn = np.exp(1j * (raw(trimmed) - raw(untrimmed, kept)))
+    turn = turn[~np.isnan(turn)]
+    assert np.allclose(turn.imag, 0, atol=1e-6)
+    assert np.all(np.sign(turn.real) == np.sign(turn.real[0]))

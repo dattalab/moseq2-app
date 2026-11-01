@@ -56,6 +56,7 @@ def extract_chunk(
     model_smoothing_clips=(-300, -150),
     tracking_model_init="raw",
     compute_raw_scalars=False,
+    previous_orientation=None,
     **kwargs
 ):
     """
@@ -98,6 +99,9 @@ def extract_chunk(
     model_smoothing_clips (tuple): Model smoothing clips
     tracking_model_init (str): Method for tracking model initialization
     compute_raw_scalars (bool): Compute scalars from unfiltered crop-rotated data.
+    previous_orientation (float): the mouse's orientation (radians, before flip correction) in the last frame
+        with a mouse before this chunk, from the previous chunk's ``unwrapped_orientation``. The chunk's
+        first orientation is resolved against it, so the heading carries across chunks. None starts afresh.
 
     Returns:
     results (dict): dict object containing the following keys:
@@ -107,6 +111,8 @@ def extract_chunk(
     scalars (dict): computed scalars (str) mapped to 1d numpy arrays of length=nframes.
     flips(1d array): list of frame indices where the mouse orientation was flipped.
     parameters (dict): mean and covariance estimates for each frame (if em_tracking=True), otherwise None.
+    unwrapped_orientation (1d array): each frame's orientation made continuous, before filtering and flip
+        correction; NaN where no mouse was found.
     """
 
     # (width, height) of the raw frames, before the ROI crop, for converting pixels to mm
@@ -176,8 +182,17 @@ def extract_chunk(
         progress_bar=progress_bar,
     )
 
+    # The body axis gives the angle only up to half a turn. Make it continuous
+    # from frame to frame, starting from the previous chunk's heading when there
+    # is one, so a recording's heading does not depend on where it is cut.
     incl = ~np.isnan(features["orientation"])
-    features["orientation"][incl] = np.unwrap(features["orientation"][incl] * 2) / 2
+    angles = features["orientation"][incl]
+    if previous_orientation is not None and np.isfinite(previous_orientation):
+        angles = np.unwrap(np.concatenate([[previous_orientation], angles]) * 2)[1:] / 2
+    else:
+        angles = np.unwrap(angles * 2) / 2
+    features["orientation"][incl] = angles
+    unwrapped_orientation = features["orientation"].copy()
 
     # Detect and filter out any mouse-centering outlier frames
     features = feature_hampel_filter(
@@ -263,6 +278,7 @@ def extract_chunk(
         "scalars": scalars,
         "flips": flips,
         "parameters": parameters,
+        "unwrapped_orientation": unwrapped_orientation,
     }
 
     return results
