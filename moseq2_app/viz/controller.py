@@ -632,19 +632,10 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Remove previously displayed data
         clear_output()
 
-        # Get each group's syllable info to display; formatting keys.
-        curr_grouped_syll_dict = {}
-        for group in grouped_syll_dict.keys():
-            curr_grouped_syll_dict[group] = {}
-            for key in grouped_syll_dict[group].keys():
-                if key == 'velocity_2d_mm_mean':
-                    new_key = '2D velocity (mm/s)'
-                    curr_grouped_syll_dict[group][new_key] = grouped_syll_dict[group][key]
-                else:
-                    curr_grouped_syll_dict[group][key] = grouped_syll_dict[group][key]
-
-        # Create syllable info DataFrame
-        syll_info_df = pd.DataFrame(curr_grouped_syll_dict)
+        # Create syllable info DataFrame. Its row names are the display labels
+        # get_mean_group_dict and get_selected_session_syllable_info gave them;
+        # velocities are per-frame means, labelled mm/frame there.
+        syll_info_df = pd.DataFrame(grouped_syll_dict)
 
         # Get currently selected syllable name info
         self.curr_label = self.syll_info[syll_number]['label']
