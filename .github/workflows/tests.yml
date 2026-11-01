@@ -4,9 +4,9 @@ name: tests
 # A run answers one question: does a user on this operating system, with this
 # Python, get the same results as a user on any other?
 #
-# It walks both notebooks cell by cell, and every cell runs through the four
-# packages under packages/, so it is the test for all five. A run installs all
-# five from this checkout and everything else the way a user's install would.
+# It walks both notebooks cell by cell, and every cell runs through the five
+# packages under packages/, so it is the test for all six. A run installs all
+# six from this checkout and everything else the way a user's install would.
 #
 # Pull requests test the oldest and newest supported Pythons on all three
 # operating systems. The release pull request (its branch name starts with
@@ -106,6 +106,7 @@ jobs:
       - name: Install the pipeline from this checkout
         run: |
           python -m pip install \
+            ./packages/moseq2-common \
             ./packages/moseq2-extract \
             ./packages/moseq2-pca \
             ./packages/moseq2-model \
@@ -167,6 +168,7 @@ jobs:
       - name: Install the pipeline from this checkout
         run: |
           python -m pip install \
+            ./packages/moseq2-common \
             ./packages/moseq2-extract \
             ./packages/moseq2-pca \
             ./packages/moseq2-model \
@@ -193,6 +195,7 @@ jobs:
       - name: Install the pipeline from this checkout
         run: |
           python -m pip install \
+            ./packages/moseq2-common \
             ./packages/moseq2-extract \
             ./packages/moseq2-pca \
             ./packages/moseq2-model \

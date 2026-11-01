@@ -9,7 +9,7 @@ upstream release can then install exactly what CI tested:
 
     python -m pip install moseq2-app==<version> -c <file>
 
-The five MoSeq2 packages come from the checkout in CI, so the freeze lists
+The six MoSeq2 packages come from the checkout in CI, so the freeze lists
 them as local paths. The file pins each at its installed version instead,
 which is the version the release publishes. Every other line must be an
 exact ``name==version`` pin; anything else stops here, naming the line,
@@ -22,7 +22,14 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 
-PACKAGES = ("moseq2-app", "moseq2-extract", "moseq2-pca", "moseq2-model", "moseq2-viz")
+PACKAGES = (
+    "moseq2-app",
+    "moseq2-extract",
+    "moseq2-pca",
+    "moseq2-model",
+    "moseq2-viz",
+    "moseq2-common",
+)
 
 PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==(\S+)$")
 NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
@@ -33,14 +40,14 @@ def canonical(name):
 
 
 def constraints(freeze):
-    """The constraint lines for a pip freeze: everything but the five, pinned."""
+    """The constraint lines for a pip freeze: everything but the six, pinned."""
     lines = []
     for raw in freeze.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         # An editable install, as uv prints it, carries a path and no name.
-        # In this repository only the five packages are ever installed so.
+        # In this repository only the six packages are ever installed so.
         if line.startswith("-e "):
             if "moseq2" in line:
                 continue
