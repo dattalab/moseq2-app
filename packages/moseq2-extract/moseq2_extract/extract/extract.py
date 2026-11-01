@@ -26,6 +26,7 @@ def extract_chunk(
     spatial_filter_size=(3,),
     temporal_filter_size=None,
     tail_filter_iters=1,
+    cable_filter_iters=0,
     iters_min=0,
     strel_tail=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
     strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)),
@@ -66,7 +67,8 @@ def extract_chunk(
     spatial_filter_size (tuple): spatial kernel size used in median filtering.
     temporal_filter_size (tuple): temporal kernel size used in median filtering.
     tail_filter_iters (int): number of filtering iterations on mouse tail
-    iters_min (int): minimum tail filtering filter kernel size
+    cable_filter_iters (int): number of erosions with strel_min, to thin a cable out of the frame
+    iters_min (int): the same count under its older name; cable_filter_iters takes precedence when set
     strel_tail (cv2::StructuringElement): filtering kernel size to filter out mouse tail.
     strel_min (cv2::StructuringElement): filtering kernel size to filter mouse body in cable recording cases.
     min_height (int): minimum (mm) distance of mouse to floor.
@@ -136,7 +138,7 @@ def extract_chunk(
         prefilter_time=temporal_filter_size,
         iters_tail=tail_filter_iters,
         strel_tail=strel_tail,
-        iters_min=iters_min,
+        iters_min=cable_filter_iters or iters_min,
         strel_min=strel_min,
         frame_dtype=frame_dtype,
         progress_bar=progress_bar,
