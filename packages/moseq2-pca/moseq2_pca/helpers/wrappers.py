@@ -328,6 +328,12 @@ def compute_changepoints_wrapper(input_dir, config_data, output_dir, output_file
     # Load Principal components, set up changepoint parameter dict, and optionally load reconstructed PCs.
     pca_components, changepoint_params, missing_data, mask_params = load_pcs_for_cp(pca_file, config_data)
 
+    # Missing-data changepoints fill masked pixels from scores times the components,
+    # so every session's frames must be the size the components were trained on
+    if missing_data:
+        check_frames_match_pca(h5s, dicts, pca_components, pca_file,
+                               config_data.get('h5_path', '/frames'))
+
     with dask_messages_to(join(output_dir, 'changepoints.log')):
         # Initialize Dask client
         client, cluster, workers = \

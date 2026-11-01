@@ -8,10 +8,11 @@ work starts.
 
 Training holds every training frame, cleaned and as float32, in the workers'
 memory at once: the mean over all frames has to finish before any frame can
-be centred. A little over what the workers have spills to disk and is slower;
-far over it the disk sets the run time and runs have died partway. So the
-check warns in between and stops far above (more than 4 times), and both
-messages say what to change, with numbers.
+be centred. What does not fit, dask spills to disk at ``dask_cache_path``,
+which is slower but finishes, so the check warns, however far over, with the
+estimate and what to change, in numbers. It stops only when the disk under
+``dask_cache_path`` has less free space than would be spilled, since then the
+run would fail partway.
 
 Each test trains on three small sessions (600 frames of 80 x 80, 15.36 MB as
 float32) with the workers' memory faked, and stops the run where dask would
@@ -77,11 +78,20 @@ def train(sessions, tmp_path, cfg):
 
 
 def memory_warnings(recwarn):
-    return [w for w in recwarn if "the workers have" in str(w.message)]
+    return [w for w in recwarn if "the dask workers have" in str(w.message)]
 
 
 def suggested_subset(message):
     return float(re.search(r"train_on_subset to ([0-9.]+)", message).group(1))
+
+
+def warned(sessions, tmp_path, cfg):
+    """Train, expecting a memory warning and the run to go on to dask; the warning's text."""
+    with pytest.warns(Warning) as record, pytest.raises(ReachedDask):
+        train(sessions, tmp_path, cfg)
+    messages = [str(w.message) for w in record if "the dask workers have" in str(w.message)]
+    assert messages
+    return "\n".join(messages)
 
 
 def suggested_slurm(message):
@@ -110,21 +120,18 @@ def test_a_little_over_warns_and_goes_on(tmp_path, sessions, workers_have):
     assert suggested_slurm(message)
 
 
-def test_far_over_stops_before_anything_runs(tmp_path, sessions, workers_have):
-    """At 5 times what the workers have, most of the data would live on disk: stop now."""
-    workers_have(ESTIMATE / 5)
-    with pytest.raises(RuntimeError) as e:
-        train(sessions, tmp_path, config(tmp_path))
-    message = str(e.value)
-    assert "15.36 MB" in message and "3.07 MB" in message
-    assert not (tmp_path / "_pca" / "pca.yaml").exists()
+def test_far_over_with_disk_room_only_warns(tmp_path, sessions, workers_have):
+    """At 50 times what the workers have, with room on disk for the spill, the run goes on."""
+    workers_have(ESTIMATE / 50)
+    message = warned(sessions, tmp_path, config(tmp_path))
+    assert "15.36 MB" in message and "307.20 kB" in message
+    assert "50.0 times" in message
+    assert suggested_subset(message) < 1
 
 
 def test_the_suggested_subset_fits(tmp_path, sessions, workers_have, recwarn):
     workers_have(ESTIMATE / 5)
-    with pytest.raises(RuntimeError) as e:
-        train(sessions, tmp_path, config(tmp_path))
-    subset = suggested_subset(str(e.value))
+    subset = suggested_subset(warned(sessions, tmp_path, config(tmp_path)))
     with pytest.raises(ReachedDask):
         train(sessions, tmp_path, config(tmp_path, train_on_subset=subset))
     assert not memory_warnings(recwarn)
@@ -132,9 +139,7 @@ def test_the_suggested_subset_fits(tmp_path, sessions, workers_have, recwarn):
 
 def test_the_suggested_slurm_workers_fit(tmp_path, sessions, workers_have, recwarn):
     workers_have(ESTIMATE / 5)
-    with pytest.raises(RuntimeError) as e:
-        train(sessions, tmp_path, config(tmp_path, memory="4MB"))
-    nworkers, memory = suggested_slurm(str(e.value))
+    nworkers, memory = suggested_slurm(warned(sessions, tmp_path, config(tmp_path, memory="4MB")))
     assert memory == "4MB" and nworkers == 5
     with pytest.raises(ReachedDask):
         train(sessions, tmp_path, config(tmp_path, cluster_type="slurm", nworkers=nworkers,
@@ -153,15 +158,28 @@ def test_no_disk_room_to_spill_to_stops(tmp_path, sessions, workers_have, monkey
     message = str(e.value)
     assert "5.12 MB" in message and "1.00 MB free" in message
     assert str(tmp_path / "cache") in message
+    assert suggested_subset(message) < 1
+    assert not (tmp_path / "_pca" / "pca.yaml").exists()
+
+
+def test_far_over_without_disk_room_stops(tmp_path, sessions, workers_have, monkeypatch):
+    """At 5 times, dask would spill 12.29 MB; with 10 MB free the run would fail."""
+    workers_have(ESTIMATE / 5)
+    real = shutil.disk_usage
+    monkeypatch.setattr(shutil, "disk_usage",
+                        lambda path: real(path)._replace(free=10_000_000))
+    with pytest.raises(RuntimeError) as e:
+        train(sessions, tmp_path, config(tmp_path))
+    assert "12.29 MB" in str(e.value) and "10.00 MB free" in str(e.value)
 
 
 def test_slurm_workers_that_are_too_small(tmp_path, sessions, workers_have):
     """On SLURM the workers have nworkers times memory."""
     workers_have(ESTIMATE * 100)
-    with pytest.raises(RuntimeError) as e:
-        train(sessions, tmp_path, config(tmp_path, cluster_type="slurm", nworkers=1, memory="3MB"))
-    assert "15.36 MB" in str(e.value)
-    assert suggested_slurm(str(e.value)) == (6, "3MB")
+    message = warned(sessions, tmp_path, config(tmp_path, cluster_type="slurm", nworkers=1,
+                                                  memory="3MB"))
+    assert "15.36 MB" in message
+    assert suggested_slurm(message) == (6, "3MB")
 
 
 def test_the_estimate_counts_the_subset(tmp_path, sessions, workers_have, recwarn):
@@ -181,7 +199,8 @@ def test_the_notebook_cell_gets_the_same_check(tmp_path, sessions, workers_have)
     write_yaml({"cluster_type": "local", "nworkers": 1, "overwrite_pca_train": True,
                 "dask_cache_path": str(tmp_path / "cache")}, str(config_file))
     progress = {"train_data_dir": str(sessions), "config_file": str(config_file)}
-    with pytest.raises(RuntimeError) as e:
+    with pytest.warns(Warning) as record, pytest.raises(ReachedDask):
         train_pca_command(progress, str(tmp_path / "_pca"), "pca")
-    assert "15.36 MB" in str(e.value)
-    assert suggested_subset(str(e.value)) < 1
+    message = "\n".join(str(w.message) for w in record if "the dask workers have" in str(w.message))
+    assert "15.36 MB" in message
+    assert suggested_subset(message) < 1

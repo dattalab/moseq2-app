@@ -960,17 +960,13 @@ def local_workers(nworkers):
     return nworkers, mem_limit
 
 
-#: Training data above TRAINING_MEMORY_WARN times the workers' memory warns:
-#: dask spills what does not fit to disk, and training is slower. Above
-#: TRAINING_MEMORY_STOP times, train-pca stops before it starts. Past that point
-#: more than three quarters of the data lives on disk and is read back on every
-#: pass of the SVD, so the disk sets the run time. Measured on the test suite's
-#: 20-session bundle (719,372 frames, 18.4 GB as float32) with the dask cache
-#: on a local disk, spilling 9 times over still finished, in about 1.7 times
-#: as long; projects several times over their machine's memory have died hours
-#: in (moseq2-app#193).
+#: Training data above this many times the workers' memory warns: dask spills
+#: what does not fit to disk, and training is slower, by how much depending on
+#: that disk. Measured on the test suite's 20-session bundle (719,372 frames,
+#: 18.4 GB as float32) with the dask cache on a local disk, spilling 9 times
+#: over finished in about 1.7 times as long. However far over, the run stops
+#: only when the disk lacks room for what would be spilled.
 TRAINING_MEMORY_WARN = 1.0
-TRAINING_MEMORY_STOP = 4.0
 
 #: The suggested train_on_subset and SLURM workers aim at this fraction of the
 #: workers' memory, leaving the rest for each worker's own overhead.
@@ -986,7 +982,10 @@ class TrainingMemoryWarning(Warning):
 
 
 class TrainingMemoryError(RuntimeError):
-    """The PCA training data is far larger than the dask workers' memory."""
+    """
+    The PCA training data is larger than the dask workers' memory, and the disk
+    under dask_cache_path cannot hold what dask would spill.
+    """
 
 
 def _format_bytes(n):
@@ -1019,17 +1018,17 @@ def _free_disk(path):
 def check_training_memory(h5s, config_data):
     """
     Before train-pca starts, compare the memory its training data needs with
-    what the dask workers have; warn when it is somewhat more and stop when it
-    is far more, saying how to make it fit.
+    what the dask workers have; warn when it is more, saying how to make it
+    fit, and stop when the disk cannot hold what dask would spill.
 
     Training holds every training frame in the workers' memory at once, as
     float32 after cleaning: the mean over all frames must finish before any
     frame can be centred for the SVD. With missing-data PCA the frame masks are
     held too. When that is more than the workers have, dask spills the excess
     to disk at dask_cache_path, and every pass of the SVD reads it back, so
-    training slows with how much is spilled. Up to TRAINING_MEMORY_STOP times
-    the workers' memory this warns; beyond it, or when the disk lacks room for
-    what would be spilled, it stops.
+    training slows with how much is spilled and how fast that disk is. When the
+    disk lacks room for what would be spilled, the run would fail partway, so
+    it stops before starting.
 
     Args:
     h5s (list): paths to the sessions' extracted h5 files.
@@ -1111,15 +1110,6 @@ def check_training_memory(h5s, config_data):
         f'--nworkers, --memory and --queue.'
     )
 
-    if ratio > TRAINING_MEMORY_STOP:
-        raise TrainingMemoryError(
-            f'{what} Training holds all of its frames in memory at once. Dask can spill what does '
-            f'not fit to disk ({cache}), but beyond {TRAINING_MEMORY_STOP:g} times the workers\' '
-            f'memory most of the data lives on disk and is read back on every pass of the SVD; '
-            f'unless that disk is a fast local one the run takes many hours, and runs this far '
-            f'over have died partway. It has been stopped before starting. To make it fit, do '
-            f'one of these:\n{remedies}'
-        )
     if no_room:
         raise TrainingMemoryError(
             f'{what} Dask would spill about {_format_bytes(spill)} to disk in {cache}, which has '
@@ -1129,8 +1119,10 @@ def check_training_memory(h5s, config_data):
             f'these:\n{remedies}'
         )
     warnings.warn(
-        f'{what} Dask will spill about {_format_bytes(spill)} to disk in {cache}, which makes '
-        f'training slower. To keep it in memory, do one of these:\n{remedies}',
+        f'{what} Dask will spill about {_format_bytes(spill)} to disk in {cache} and read it back '
+        f'on every pass of the SVD, so training is slower, by how much depending on that disk: '
+        f'measured on a fast local disk at about twice as long or less, and on a network or '
+        f'slow disk it can take many hours. To keep it in memory, do one of these:\n{remedies}',
         TrainingMemoryWarning, stacklevel=2,
     )
 
