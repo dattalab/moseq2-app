@@ -17,7 +17,12 @@ from moseq2_extract.helpers.wrappers import (
     aggregate_extract_results_wrapper,
 )
 from moseq2_extract.util import load_found_session_paths, filter_warnings
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
+from moseq2_extract.recordings import (
+    DEFAULT_MAX_DEPTH,
+    RECORDING_EXTENSIONS,
+    find_recordings,
+    session_config_key,
+)
 from moseq2_extract.cli import batch_extract
 
 
@@ -153,18 +158,19 @@ def generate_config_command(output_file, camera_type="k2"):
 def extract_found_sessions(
     input_dir,
     config_file,
-    ext,
+    ext=RECORDING_EXTENSIONS,
     extract_all=True,
     skip_extracted=False,
     max_depth=DEFAULT_MAX_DEPTH,
 ):
     """
-    Find and extract all depth files with specified extensions within input_dir
+    Find and extract the depth recordings within input_dir
 
     Args:
     input_dir (str): path to directory containing all session folders
     config_file (str): path to config file
-    ext (str or list): file extension(s) for depth files to search for
+    ext (str or list): file extension(s) for depth files to search for. Defaults to every type the
+        pipeline reads (.dat, .mkv, .avi, .tar.gz); None means the same.
     extract_all (bool): if True, auto searches for all sessions, else, prompts user to select sessions individually.
     skip_extracted (bool): indicates whether to skip already extracted session.
     max_depth (int): how many folders below input_dir to search for recordings.
@@ -175,7 +181,11 @@ def extract_found_sessions(
         raise IOError(f"Config file {config_file} does not exist")
 
     # every recording is listed; run_local_extract skips the extracted ones when skip_extracted is set
-    search = find_recordings(input_dir, extensions=ext, max_depth=max_depth)
+    search = find_recordings(
+        input_dir,
+        extensions=RECORDING_EXTENSIONS if ext is None else ext,
+        max_depth=max_depth,
+    )
     message = search.report()
     if message:
         print(message)
@@ -347,10 +357,12 @@ def extract_command(
     # Loading individual session config parameters if it exists
     if exists(config_data.get("session_config_path", "")):
         session_configs = read_yaml(config_data["session_config_path"])
-        session_key = basename(dirname(input_file))
+        # keyed by folder name, or by the folder's path below the project where names are shared
+        session_key = session_config_key(session_configs, input_file)
 
         # If key is found, update config_data, otherwise, use default dict
-        config_data = session_configs.get(session_key, config_data)
+        if session_key is not None:
+            config_data = session_configs[session_key]
 
     if cli_options:
         config_data = {**config_data, **cli_options}

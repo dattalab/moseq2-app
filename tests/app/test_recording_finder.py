@@ -206,8 +206,8 @@ def test_an_empty_project_says_where_it_looked_and_what_counts(tmp_path, capsys)
 
 
 def test_a_recording_of_a_type_not_asked_for_is_named(callers, tmp_path, capsys):
-    """The notebook's extraction cell asks for .avi, .dat and .tar.gz, so an
-    Azure .mkv is passed over, and the message says why."""
+    """A notebook from an earlier release asks its extraction cell for .avi,
+    .dat and .tar.gz, so an Azure .mkv is passed over, and the message says why."""
     root = tmp_path / "project"
     mkv = session(root, "azure_0", recording="recording.mkv")
     capsys.readouterr()

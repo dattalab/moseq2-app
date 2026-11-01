@@ -11,6 +11,7 @@ from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import read_yaml
 from moseq2_extract.io.video import load_movie_data, write_frames_preview
 from moseq2_extract.helpers.data import check_completion_status
+from moseq2_extract.recordings import session_config_key
 
 
 def write_extracted_chunk_to_h5(
@@ -364,9 +365,9 @@ def run_slurm_extract(
 
             # get and write session-specific parameters
             output_file = join(output_dir, "config.yaml")
-            session_key = basename(dirname(depth_file))
+            session_key = session_config_key(session_configs, depth_file)
             if session_configs is not None:
-                params = session_configs.get(session_key, config_data)
+                params = session_configs[session_key] if session_key is not None else config_data
             else:
                 params = base_config
             params = {**params, **(cli_options or {})}

@@ -3,17 +3,15 @@
     with update_config(progress_paths['config_file']) as config_data:
         config_data['cluster_type'] = 'local'
 
-    extensions = ['.avi', '.dat', '.tar.gz']
     extract_all = True
 
     extract_found_sessions(progress_paths['base_dir'],
                            progress_paths['config_file'],
-                           extensions,
                            extract_all=extract_all,
                            skip_extracted=skip_extracted)
 
 The heaviest cell, and the one every later cell is built on. It does four
-things: walk the project for depth files with any of the given extensions,
+things: walk the project for depth recordings of every type the pipeline reads,
 narrow that list to what the user wants, dispatch on ``cluster_type``, and
 extract. What it leaves behind is a ``proc`` directory beside each recording
 holding the cropped frames, the scalars computed from them, a preview movie
@@ -51,7 +49,8 @@ from moseq2_extract.util import read_yaml
 from test_03_config import plain
 from test_05_arena_mask import RECORDINGS
 
-#: The extensions the notebook searches for.
+#: The extensions notebooks from earlier releases pass to the cell; a list
+#: passed is still the list searched.
 EXTENSIONS = [".avi", ".dat", ".tar.gz"]
 
 #: What extraction writes beside every recording.

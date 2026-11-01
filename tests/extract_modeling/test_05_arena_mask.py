@@ -17,7 +17,8 @@ sits at a different depth in every rig and often moves between recordings.
 Opening the widget already writes the file: it runs
 ``detect_and_set_camera_parameters`` over each recording that has no saved
 parameters and saves a copy of the configuration under the recording's folder
-name. A recording that has saved parameters keeps them, so running the cell
+name, or under the folder's path below the project when session folders share
+a name. A recording that has saved parameters keeps them, so running the cell
 again shows what was saved. The widget then lets a user look at the floor it
 found, adjust the parameters, and save.
 
