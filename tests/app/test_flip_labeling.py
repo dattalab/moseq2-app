@@ -3,10 +3,11 @@
 The Flip-Classifier-Training notebook opens a labeling widget on the
 ``aggregate_results/`` folder the extraction notebook wrote. A user picks a
 session, moves to a frame, clicks Start Range, steps Forward, and clicks
-Facing Left or Facing Right. Each finished range is written to
-``flip-training-frame-ranges.p`` beside that folder. The next cells save the
-ranges again, read the cleaning parameters from the extraction config, and
-train a classifier on the frames the file names.
+Facing Left or Facing Right. The widget holds each finished range until the
+user clicks Save Labels or runs the save cell, which writes them to
+``flip-training-frame-ranges.p`` beside that folder. The next cells read the
+cleaning parameters from the extraction config and train a classifier on the
+frames the file names, cleaned with those parameters.
 
 These tests run the notebook's own cells, with only the three paths a user
 types replaced, against the extraction chain's output copied into the test's
@@ -128,7 +129,7 @@ def test_a_right_facing_range_is_trained_as_it_was_shown(notebook):
     run_cell(CLEAN, notebook)
     from moseq2_app.flip.train import create_training_dataset
 
-    with np.load(create_training_dataset(widget.training_data_path)) as data:
+    with np.load(create_training_dataset(widget.training_data_path, notebook["clean_dataclass"])) as data:
         trained = data["frames"][:10]
     with h5py.File(widget.sessions[session], "r") as f:
         np.testing.assert_array_equal(trained, f["frames"][5:15])
@@ -286,3 +287,118 @@ def test_ranges_for_a_session_no_longer_shown_are_named(notebook, tmp_path, conf
 
     press(widget.save_button)
     assert saved_ranges(widget) == {session: [(False, 10, 40)]}
+
+
+def test_training_cleans_with_the_config_parameters(notebook, tmp_path, configured):
+    """The cleaning cell reads the config; the training cell cleans with what it read.
+
+    The notebook asks for the extraction's own parameters here, because the
+    classifier is applied to frames extraction cleaned. A config that erodes
+    the mouse twice for a cable gives a training set whose cleaned third is
+    eroded twice too.
+    """
+    import cv2
+    import yaml
+
+    from moseq2_extract.extract.proc import clean_frames
+
+    config = yaml.safe_load(configured.read_text())
+    config["cable_filter_iters"] = 2
+    eroding = tmp_path / "config.yaml"
+    eroding.write_text(yaml.safe_dump(config))
+    notebook["config_path"] = str(eroding)
+
+    widget = notebook["FF"]
+    session = list(widget.sessions)[0]
+    label(widget, session, 5, 15, left=False)
+    run_cell(SAVE, notebook)
+    run_cell(CLEAN, notebook)
+    run_cell(TRAIN, notebook)
+
+    with h5py.File(widget.sessions[session], "r") as f:
+        labeled = f["frames"][5:15]
+    both_ways = np.concatenate((labeled, np.rot90(labeled, 2, axes=(1, 2))), axis=0)
+    expected = clean_frames(
+        np.where(both_ways > config["min_height"], both_ways, 0),
+        config["spatial_filter_size"],
+        config["temporal_filter_size"],
+        strel_tail=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, tuple(config["tail_filter_size"])),
+        iters_tail=config["tail_filter_iters"],
+        strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, tuple(config["cable_filter_size"])),
+        iters_min=2,
+    )
+    with np.load(notebook["train_path"]) as data:
+        np.testing.assert_array_equal(data["frames"][-len(expected) :], expected)
+
+
+#: What every message about unsaved labels tells the user to do.
+SAVE_AND_RETRAIN = "click Save Labels (or run the notebook's save cell), then run training again"
+
+
+def test_training_labels_never_saved_says_to_save(notebook):
+    """Label a range and run training without saving: the ranges file was never written.
+
+    Python's bare ``No such file or directory`` does not say that the ranges
+    on screen reach training only once saved.
+    """
+    widget = notebook["FF"]
+    label(widget, list(widget.sessions)[0], 10, 40, left=False)
+    run_cell(CLEAN, notebook)
+    with pytest.raises(FileNotFoundError) as raised:
+        run_cell(TRAIN, notebook)
+    message = str(raised.value)
+    assert widget.training_data_path in message
+    assert "only once they are saved" in message
+    assert SAVE_AND_RETRAIN in message
+
+
+def test_training_on_an_empty_save_says_to_save(notebook):
+    """Run the save cell before labeling, label a range, run training without saving again.
+
+    The file holds no ranges, so training stops; the message says the ranges on
+    screen are not saved yet, not only to add some.
+    """
+    widget = notebook["FF"]
+    run_cell(SAVE, notebook)
+    label(widget, list(widget.sessions)[0], 10, 40, left=False)
+    run_cell(CLEAN, notebook)
+    with pytest.raises(ValueError) as raised:
+        run_cell(TRAIN, notebook)
+    message = str(raised.value)
+    assert widget.training_data_path in message
+    assert "only once they are saved" in message
+    assert SAVE_AND_RETRAIN in message
+
+
+def test_training_on_older_saved_labels_warns(notebook, recwarn):
+    """Save one range, label another, run training without saving again.
+
+    Training reads the file, so it trains on the saved range alone. It warns
+    that the widget holds unsaved changes and says what it is training on;
+    once the labels are saved, it trains on both and does not warn.
+    """
+    widget = notebook["FF"]
+    session = list(widget.sessions)[0]
+    label(widget, session, 10, 40, left=False)
+    run_cell(SAVE, notebook)
+    label(widget, session, 50, 60, left=True)
+    run_cell(CLEAN, notebook)
+
+    with pytest.warns(UserWarning) as warned:
+        run_cell(TRAIN, notebook)
+    unsaved = [str(w.message) for w in warned if "unsaved" in str(w.message)]
+    assert len(unsaved) == 1
+    message = unsaved[0]
+    assert widget.training_data_path in message
+    assert "2 range(s) (40 frames)" in message
+    assert "1 range(s) (30 frames)" in message
+    assert SAVE_AND_RETRAIN in message
+    with np.load(notebook["train_path"]) as data:
+        assert len(data["frames"]) == 6 * 30
+
+    run_cell(SAVE, notebook)
+    recwarn.clear()
+    run_cell(TRAIN, notebook)
+    assert not [w for w in recwarn if "unsaved" in str(w.message)]
+    with np.load(notebook["train_path"]) as data:
+        assert len(data["frames"]) == 6 * 40

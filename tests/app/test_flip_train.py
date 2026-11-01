@@ -58,3 +58,47 @@ def test_training_cross_validates_and_fits(tmp_path):
     classifier = train.train_classifier(str(data), classifier="RF", n_components=5)
 
     np.testing.assert_array_equal(classifier.predict(frames), flipped)
+
+
+def test_the_cleaned_third_follows_the_cleaning_parameters(tmp_path):
+    """Training cleans with the parameters it is given, cable erosion included.
+
+    Extraction erodes the mouse ``cable_filter_iters`` times before the
+    classifier sees it, so a classifier trained on uneroded frames is applied
+    to frames unlike its training set. With two erosions the cleaned third
+    differs from the defaults' and is what ``clean_frames`` makes with the
+    same settings.
+    """
+    import cv2
+
+    from moseq2_extract.extract.proc import clean_frames
+
+    rng = np.random.default_rng(0)
+    labeled = np.zeros((10, 40, 40), dtype=np.uint8)
+    labeled[:, 12:28, 8:32] = 60
+    labeled += rng.integers(0, 20, size=labeled.shape, dtype=np.uint8)
+    session, index = tmp_path / "session.h5", tmp_path / "flip-training-frame-ranges.p"
+    with h5py.File(session, "w") as f:
+        f["frames"] = labeled
+    with index.open("wb") as f:
+        pickle.dump(({"session": str(session)}, {"session": [(False, range(0, 10))]}), f)
+
+    def cleaned_third(parameters):
+        with np.load(train.create_training_dataset(str(index), parameters)) as data:
+            frames = data["frames"]
+        return frames[2 * len(frames) // 3 :]
+
+    eroded = train.CleanParameters(iters_min=2)
+    both_ways = np.concatenate((labeled, np.rot90(labeled, 2, axes=(1, 2))), axis=0)
+    expected = clean_frames(
+        np.where(both_ways > eroded.height_threshold, both_ways, 0),
+        eroded.prefilter_space,
+        eroded.prefilter_time,
+        strel_tail=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, eroded.strel_tail),
+        iters_tail=eroded.iters_tail,
+        strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, eroded.strel_min),
+        iters_min=2,
+    )
+
+    np.testing.assert_array_equal(cleaned_third(eroded), expected)
+    assert not np.array_equal(cleaned_third(eroded), cleaned_third(None))
