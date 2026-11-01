@@ -11,7 +11,8 @@ import dask.array as da
 from tqdm.auto import tqdm
 import dask.array.linalg as lng
 from dask.distributed import as_completed, progress
-from moseq2_pca.util import (clean_frames, insert_nans, read_yaml, get_changepoints, get_rps)
+from moseq2_pca.util import (clean_frames, insert_nans, read_yaml, get_changepoints, get_rps,
+                             frame_rate_from_timestamps)
 
 
 def mask_data(original_data, mask, new_data):
@@ -321,8 +322,9 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
                 scores = frames.dot(pca_components.T)
 
             # Insert NaNs into scores array
-            scores, score_idx, _ = insert_nans(data=scores, timestamps=timestamps,
-                                               fps=np.round(1 / np.mean(np.diff(timestamps))).astype('int'))
+            scores, score_idx, _ = insert_nans(
+                data=scores, timestamps=timestamps,
+                fps=frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})'))
 
             # Write scores
             f_scores.create_dataset(f'scores/{uuid}', data=scores,
@@ -435,8 +437,10 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
                     copy_metadatas_to_scores(f, f_scores, uuids_batch[file_idx])
 
                 # Insert NaNs in missing frames in scores array
-                scores, score_idx, _ = insert_nans(data=result, timestamps=timestamps,
-                                                   fps=np.round(1 / np.mean(np.diff(timestamps))).astype('int'))
+                scores, score_idx, _ = insert_nans(
+                    data=result, timestamps=timestamps,
+                    fps=frame_rate_from_timestamps(
+                        timestamps, f'{uuids_batch[file_idx]} ({h5s_batch[file_idx]})'))
 
                 # Write scores
                 f_scores.create_dataset(f'scores/{uuids_batch[file_idx]}', data=scores,
@@ -492,8 +496,9 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
         # Load frames
         frames = da.from_array(h5p[h5_path], chunks=chunk_size).astype('float32')
 
-        # Load timestamps
+        # Load timestamps, and stop here rather than inside the batch if they give no frame rate
         timestamps = get_timestamps(h5p, frames, fps)
+        frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})')
 
         if missing_data and pca_scores is None:
             raise RuntimeError("Need to compute PC scores to impute missing data")
@@ -531,7 +536,8 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
         rps = dask.delayed(get_rps, pure=False)(frames, rps=nrps, normalize=True)
 
         # Compute changepoints delayed job
-        cps = dask.delayed(get_changepoints, pure=True)(rps, timestamps=timestamps, **changepoint_params)
+        cps = dask.delayed(get_changepoints, pure=True)(rps, timestamps=timestamps,
+                                                        session=f'{uuid} ({h5})', **changepoint_params)
 
         futures.append(cps)
         uuids.append(uuid)
