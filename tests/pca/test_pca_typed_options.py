@@ -44,3 +44,71 @@ def test_train_pca_rank(typed, expected, tmp_path, received):
     assert result.exit_code == 0, result.output
 
     assert received[0]["rank"] == expected
+
+
+# A config value that is falsy (0, 0.0, False) still replaces the option's
+# default. ``min_height: 0`` keeps every pixel above the floor where the default
+# zeroes those below 10 mm, and ``sigma: 0`` turns off the changepoint
+# smoothing, which ``get_changepoints`` handles as its own case. A typed option
+# still wins over either.
+
+
+@pytest.mark.parametrize(
+    "typed, expected",
+    [((), 0), (("--min-height", "15"), 15), (("--min-height", "10"), 10)],
+    ids=["not-typed", "typed-other", "typed-default"],
+)
+def test_train_pca_zero_min_height_from_config(typed, expected, tmp_path, received):
+    config = tmp_path / "config.yaml"
+    write_yaml({"min_height": 0}, str(config))
+
+    result = CliRunner().invoke(
+        pca_cli.cli,
+        ["train-pca", "-i", str(tmp_path), "-o", str(tmp_path / "_pca"),
+         "--config-file", str(config), *typed],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    assert received[0]["min_height"] == expected
+
+
+@pytest.fixture
+def changepoints_received(monkeypatch):
+    """What ``compute-changepoints`` hands its wrapper, instead of computing."""
+    calls = []
+
+    def record(input_dir, config, output_dir, output_file):
+        calls.append(dict(config))
+        return config
+
+    monkeypatch.setattr(pca_cli, "compute_changepoints_wrapper", record)
+    monkeypatch.setattr(pca_cli, "combine_new_config", lambda *a, **k: None)
+    return calls
+
+
+@pytest.mark.parametrize(
+    "config_values, typed, expected",
+    [
+        ({"sigma": 0, "threshold": 0.0}, (), {"sigma": 0, "threshold": 0.0}),
+        ({"sigma": 0}, ("--sigma", "2"), {"sigma": 2, "threshold": 0.5}),
+        ({"sigma": None}, (), {"sigma": 3.5, "threshold": 0.5}),
+    ],
+    ids=["falsy-config", "typed-over-falsy", "null-config"],
+)
+def test_compute_changepoints_falsy_config(
+    config_values, typed, expected, tmp_path, changepoints_received
+):
+    config = tmp_path / "config.yaml"
+    write_yaml(config_values, str(config))
+
+    result = CliRunner().invoke(
+        pca_cli.cli,
+        ["compute-changepoints", "-i", str(tmp_path), "-o", str(tmp_path / "_pca"),
+         "--config-file", str(config), *typed],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    got = changepoints_received[0]
+    assert {k: got[k] for k in expected} == expected

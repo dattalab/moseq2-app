@@ -53,8 +53,9 @@ def command_with_config(config_file_param_name):
                 config_data['output_file'] = None
 
                 for param, value in ctx.params.items():
-                    # set params to the params in config file when the param is not none
-                    if param in config_data and config_data[param]:
+                    # set params to the params in config file when the param is not none;
+                    # a falsy value such as 0 or False is a setting like any other
+                    if param in config_data and config_data[param] is not None:
                         if type(value) is tuple and type(config_data[param]) is int:
                             ctx.params[param] = tuple([config_data[param]])
                         elif type(value) is tuple:
