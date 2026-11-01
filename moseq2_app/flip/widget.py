@@ -73,9 +73,9 @@ class FlipClassifierWidget:
                 "containing your extracted .h5 files (e.g. the "
                 "aggregate_results/ directory)."
             )
-        # self.selected_frame_ranges_dict = {k: [] for k in self.path_dict}
         self.selected_frame_ranges_dict = defaultdict(list)
         self.curr_total_selected_frames = 0
+        self.status = pn.pane.HTML('')
 
         self.session_select_dropdown = pn.widgets.Select(options=list(self.sessions), name='Session', value=list(self.sessions)[0])
         self.frame_num_slider = pn.widgets.IntSlider(name='Current Frame', start=0, end=1000, step=1, value=1)
@@ -84,6 +84,7 @@ class FlipClassifierWidget:
         self.face_right_button = pn.widgets.Button(name='Facing Right', button_type='success', width=140, visible=False)
         self.selected_ranges = pn.widgets.MultiSelect(name='Selected Ranges', options=[])
         self.delete_selection_button = pn.widgets.Button(name='Delete Selection', button_type='danger')
+        self.save_button = pn.widgets.Button(name='Save Labels', button_type='success')
         self.curr_total_label = pn.pane.Markdown(f'Current Total Selected Frames: {self.curr_total_selected_frames}')
 
         self.facing_info = pn.pane.Markdown('To finish selection, click on direction the animal is facing', visible=False)
@@ -92,7 +93,9 @@ class FlipClassifierWidget:
             self.curr_total_label,
             pn.pane.Markdown('#### Selected Correct Frame Ranges'),
             self.selected_ranges,
-            self.delete_selection_button
+            self.delete_selection_button,
+            self.save_button,
+            self.status,
         )
 
         self.forward_button = pn.widgets.Button(name='Forward', button_type='primary', width=142)
@@ -119,12 +122,76 @@ class FlipClassifierWidget:
         self.face_left_button.on_click(lambda event: self.facing_range_callback(event, True))
         self.face_right_button.on_click(lambda event: self.facing_range_callback(event, False))
         self.delete_selection_button.on_click(self.on_delete_selection_clicked)
+        self.save_button.on_click(lambda event: self.save_frame_ranges())
 
         self.forward_button.on_click(self.advance_frame)
         self.backward_button.on_click(self.rewind_frame)
 
         self.session_select_dropdown.param.watch(self.changed_selected_session, 'value')
         self.session_select_dropdown.value = list(self.sessions)[0]
+
+        self.load_frame_ranges()
+
+    def load_frame_ranges(self):
+        """Show the ranges saved in ``training_data_path``, if there are any.
+
+        Ranges saved for an extraction that is not in ``data_path`` cannot be
+        shown. They stay in the file until the next save, which writes only
+        what the widget shows, so the labels are marked unsaved and the
+        sessions are named.
+        """
+        path = Path(self.training_data_path)
+        if not path.exists():
+            return
+        with open(path, 'rb') as f:
+            saved_paths, saved_ranges = pickle.load(f)
+
+        missing = {}
+        for session, ranges in saved_ranges.items():
+            if not ranges:
+                continue
+            if session not in self.sessions:
+                missing[session] = ranges
+                continue
+            for left, selected_range in ranges:
+                self.add_range(session, left, selected_range)
+
+        if missing:
+            listed = '\n'.join(
+                f'  {session} ({len(ranges)} range(s), {sum(len(r) for _, r in ranges)} frames), '
+                f'saved from {saved_paths.get(session, "an unrecorded path")}'
+                for session, ranges in missing.items()
+            )
+            print(
+                f'{path} holds labeled frame ranges for extractions that are not in {self.data_path}:\n'
+                f'{listed}\n'
+                'They are not shown, and saving the labels removes them from the file. To keep them, '
+                'do not save; set input_dir to the folder that holds those extractions and run the '
+                'cells again.'
+            )
+            self.mark_unsaved()
+
+    def mark_unsaved(self):
+        self.status.object = (
+            '<p style="color: red;">You have unsaved changes to your labels. '
+            'Hit save when done editing to keep them.</p>'
+        )
+
+    def mark_saved(self):
+        self.status.object = '<p style="color: green;">Flip labels saved.</p>'
+
+    def add_range(self, session, left, selected_range):
+        """Hold one labeled range and list it under Selected Ranges."""
+        beginning = 'L' if left else 'R'
+        display_selected_range = f'{beginning} - {selected_range} - {session}'
+
+        self.curr_total_selected_frames += len(selected_range)
+        self.curr_total_label.object = f'Current Total Selected Frames: {self.curr_total_selected_frames}'
+
+        self.selected_frame_ranges_dict[session].append((left, selected_range))
+
+        self.selected_ranges.options = self.selected_ranges.options + [display_selected_range]
+        self.selected_ranges.value = []
 
     def display_frame(self, value):
         if hasattr(self, 'frames'):
@@ -169,20 +236,8 @@ class FlipClassifierWidget:
             self.start_button.button_type = 'primary'
 
     def update_state_on_selected_range(self, left):
-        selected_range = range(self.start, self.stop)
-
-        beginning = 'L' if left else 'R'
-        display_selected_range = f'{beginning} - {selected_range} - {self.session_select_dropdown.value}'
-
-        self.curr_total_selected_frames += len(selected_range)
-        self.curr_total_label.object = f'Current Total Selected Frames: {self.curr_total_selected_frames}'
-
-        self.selected_frame_ranges_dict[self.session_select_dropdown.value].append((left, selected_range))
-
-        self.selected_ranges.options = self.selected_ranges.options + [display_selected_range]
-        self.selected_ranges.value = []
-
-        self.save_frame_ranges()
+        self.add_range(self.session_select_dropdown.value, left, range(self.start, self.stop))
+        self.mark_unsaved()
 
     def on_delete_selection_clicked(self, event):
         selected_range = self.selected_ranges.value
@@ -203,6 +258,7 @@ class FlipClassifierWidget:
 
             self.selected_ranges.options = l
             self.selected_ranges.value = []
+            self.mark_unsaved()
 
     def changed_selected_session(self, event):
         if self.start_button.name == 'Cancel Select':
@@ -224,8 +280,10 @@ class FlipClassifierWidget:
         return pn.Row(self.widgets, self.frame_display)
 
     def save_frame_ranges(self):
+        """Write the ranges the widget shows to ``training_data_path``, replacing what it held."""
         with open(self.training_data_path, 'wb') as f:
             pickle.dump((self.sessions, dict(self.selected_frame_ranges_dict)), f)
+        self.mark_saved()
             
     def apply_flip_classifier(self, clf_path, chunk_size=4000, chunk_overlap=0,
                               smoothing=51, frame_path='frames', fps=30,

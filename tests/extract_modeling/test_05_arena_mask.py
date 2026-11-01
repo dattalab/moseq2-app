@@ -108,12 +108,16 @@ def open_widget(root):
 
 @pytest.fixture
 def scratch(tmp_path, project, arena):
-    """A copy of the project, for tests that change parameters and save.
+    """A copy of the project, for every test that opens the widget.
 
     The chain's own copy holds what the walkthrough saved, and cell 6 extracts
-    from it, so a test that writes different parameters works on its own copy.
-    Copying costs a fraction of a second and the backgrounds come with it
-    already computed.
+    from it. Opening the widget is enough to change that: as the notebook's
+    cell does, it re-detects every recording's parameters and writes them over
+    the session config, which would replace what the walkthrough saved with an
+    unsaved set, before or after the chain's extraction depending on the order
+    the tests run in. So every test that opens the widget works on its own
+    copy. Copying costs a fraction of a second and the backgrounds come with
+    it already computed.
     """
     root = tmp_path / "project"
     shutil.copytree(project, root)
@@ -121,10 +125,15 @@ def scratch(tmp_path, project, arena):
 
 
 def test_every_recording_gets_a_parameter_file(arena, project):
-    """1. The cell's output: one entry per recording, keyed by folder name."""
+    """1. The cell's output: one entry per recording, keyed by folder name.
+
+    A recording is a folder holding a depth video. Later cells add folders of
+    their own to the project (``aggregate_results/``, ``_pca/``, ``models/``),
+    and the shared chain may have reached them before this test runs.
+    """
     saved = read_yaml(str(arena))
     assert sorted(saved) == RECORDINGS
-    assert sorted(p.name for p in project.iterdir() if p.is_dir()) == RECORDINGS
+    assert sorted(p.parent.name for p in project.glob("*/depth.avi")) == RECORDINGS
 
 
 def test_detected_parameters_are_unchanged(arena, data_regression):
@@ -177,17 +186,17 @@ def test_the_configuration_points_at_the_parameter_file(arena, configured, progr
     assert recorded["session_config"] == str(arena)
 
 
-def test_the_widget_offers_four_actions(arena, project):
+def test_the_widget_offers_four_actions(scratch):
     """6. The buttons a user has, by the label each shows."""
-    _, _, buttons = open_widget(project)
+    _, _, buttons = open_widget(scratch)
     assert sorted(buttons) == sorted(ACTIONS)
 
 
-def test_the_selector_lists_every_recording(arena, project):
+def test_the_selector_lists_every_recording(scratch):
     """7. The widget opens on the first recording and can reach them all."""
     import panel as pn
 
-    widget, data, _ = open_widget(project)
+    widget, data, _ = open_widget(scratch)
     selector = widget.view.__panel__().select(pn.widgets.Select)[0]
 
     assert list(selector.options) == RECORDINGS
@@ -195,9 +204,9 @@ def test_the_selector_lists_every_recording(arena, project):
     assert data.param.path.objects == RECORDINGS
 
 
-def test_nothing_is_computed_until_a_button_is_pressed(arena, project):
+def test_nothing_is_computed_until_a_button_is_pressed(scratch):
     """8. Opening the widget reads no frames; the four panels start empty."""
-    _, data, _ = open_widget(project)
+    _, data, _ = open_widget(scratch)
     assert set(data.images) == {
         "Background",
         "Arena mask",
@@ -207,7 +216,7 @@ def test_nothing_is_computed_until_a_button_is_pressed(arena, project):
     assert all(image is None for image in data.images.values())
 
 
-def test_computing_the_arena_mask_finds_the_floor(arena, project):
+def test_computing_the_arena_mask_finds_the_floor(scratch):
     """9. The cell's purpose: a mask covering the arena and nothing else.
 
     ``get_roi`` returns candidate regions ranked by how arena-like they are.
@@ -216,7 +225,7 @@ def test_computing_the_arena_mask_finds_the_floor(arena, project):
     mask itself keeps the check meaningful across OpenCV releases, which
     change region boundaries by a pixel or two.
     """
-    _, data, buttons = open_widget(project)
+    _, data, buttons = open_widget(scratch)
     click(buttons["Compute arena mask"])
 
     background = data.images["Background"]
@@ -293,11 +302,15 @@ def test_sorting_by_position_gives_extraction_the_arena_the_tool_showed(scratch)
 
 
 def test_saving_leaves_the_other_recordings_alone(scratch):
-    """11. A user tunes one recording at a time."""
+    """11. A user tunes one recording at a time.
+
+    Compared with the session config as the open widget left it: opening the
+    widget re-detects every recording's parameters and writes them first.
+    """
     session_config = scratch / "session_config.yaml"
+    _, data, buttons = open_widget(scratch)
     before = plain(read_yaml(str(session_config)))
 
-    _, data, buttons = open_widget(scratch)
     data.depth_range = (600, 700)
     click(buttons["Save session parameters"])
 
