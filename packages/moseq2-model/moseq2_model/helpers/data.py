@@ -14,7 +14,7 @@ from os.path import join, exists, dirname
 from moseq2_model.util import count_frames
 from moseq2_model.train.models import flush_print
 from moseq2_model.train.util import whiten_all, whiten_each
-from moseq2_model._yaml import read_yaml
+from moseq2_common.yaml import read_yaml
 
 
 def process_indexfile(index, data_metadata, default_group="n/a", select_groups=False):

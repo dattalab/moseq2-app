@@ -1,0 +1,40 @@
+[tool.pdm.version]
+source = "file"
+path = "moseq2_common/__init__.py"
+
+[tool.pdm]
+
+[project]
+name = "moseq2-common"
+dynamic = ["version"]
+description = "Code shared by the MoSeq2 packages."
+readme = "README.md"
+authors = [
+    {name = "Datta Lab"},
+]
+license = "LicenseRef-Harvard-Academic-Non-Commercial"
+license-files = ["LICENSE.md"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+# The same floor as the five packages that depend on it, and no ceiling, for
+# the reasons their pyproject.toml files give.
+requires-python = ">=3.10"
+dependencies = [
+    # Each floor is the oldest version the CI suite has passed with.
+
+    "numpy>=2.2.6",
+    "ruamel.yaml>=0.19.1",
+]
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

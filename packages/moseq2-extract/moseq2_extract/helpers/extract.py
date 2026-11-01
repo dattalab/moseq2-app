@@ -3,7 +3,7 @@ Extraction-helper utility functions.
 """
 
 import numpy as np
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from os.path import exists, basename, dirname, join, abspath
 from os import makedirs, system
 from tqdm.auto import tqdm
@@ -372,8 +372,7 @@ def run_slurm_extract(
                 params = base_config
             params = {**params, **(cli_options or {})}
 
-            with open(output_file, "w") as f:
-                write_yaml(params, f)
+            write_yaml(params, output_file)
 
     # Construct sbatch command for slurm
     commands = ""

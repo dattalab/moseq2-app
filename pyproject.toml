@@ -43,15 +43,15 @@ dependencies = [
     "panel>=1.9.4",
     "plotly>=7.1.0",
     "qgridnext>=2.0.4",
-    "ruamel.yaml>=0.19.1",
     "scikit-image>=0.25.2",
     "scikit-learn>=1.7.2",
     "scipy>=1.15.3",
     "seaborn>=0.13.2",
-    # Exact pins, not floors. The five packages release together at one
+    # Exact pins, not floors. The six packages release together at one
     # version, and the notebooks carry a directory tree and a config file
     # between steps rather than a return value, so a mixed set is a
     # pipeline whose halves disagree about the files they hand each other.
+    "moseq2-common==1.4.5",
     "moseq2-extract==1.4.5",
     "moseq2-model==1.4.5",
     "moseq2-pca==1.4.5",

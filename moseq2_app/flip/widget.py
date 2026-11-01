@@ -5,9 +5,8 @@ import panel as pn
 import holoviews as hv
 from tqdm import tqdm
 import numpy as np
-from ruamel.yaml import YAML
 from pathlib import Path
-import ruamel.yaml as yaml
+from moseq2_common.yaml import read_yaml
 from collections import defaultdict
 from moseq2_extract.extract.proc import get_flips
 from moseq2_extract.util import gen_batch_sequence
@@ -46,9 +45,7 @@ _patch_holoviews_stream_update()
 
 
 def _extraction_complete(file_path: Path):
-    yaml = YAML(typ="safe", pure=True)
-    config = yaml.load(file_path.read_text())
-    return config['complete']
+    return read_yaml(file_path)['complete']
 
 
 def _find_extractions(data_path: str):

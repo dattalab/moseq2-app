@@ -4,7 +4,7 @@ CLI for extracting the depth data.
 
 import os
 import click
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from copy import deepcopy
 from moseq2_extract.util import command_with_config, read_yaml
@@ -696,8 +696,7 @@ def generate_config(output_file, camera_type):
         params["crop_size"] = [120, 120]
         params["camera_type"] = "azure"
 
-    with open(output_file, "w") as f:
-        write_yaml(params, f)
+    write_yaml(params, output_file)
 
     print("Successfully generated config file in base directory.")
 

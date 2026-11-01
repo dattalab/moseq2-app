@@ -6,8 +6,7 @@ import os
 import uuid
 import json
 from glob import glob, escape as glob_escape
-import ruamel.yaml as yaml
-from moseq2_app._yaml import write_yaml as _write_yaml
+from moseq2_common.yaml import write_yaml as _write_yaml
 from moseq2_viz.util import get_sorted_index, read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
@@ -187,9 +186,6 @@ def update_progress(progress_file, varK, varV):
     progress (dict): Loaded path dict from the progress yaml file.
     """
 
-    yml = yaml.YAML()
-    yml.indent(mapping=2, offset=2)
-
     progress = read_yaml(progress_file)
 
     if isinstance(varV, str):
@@ -204,8 +200,7 @@ def update_progress(progress_file, varK, varV):
         # update snapshot variable
         progress['snapshot'] = str(uuid.uuid4())
 
-        with open(progress_file, 'w') as f:
-            yml.dump(progress, f)
+        _write_yaml(progress, progress_file)
 
         print(f'Successfully updated progress file with {varK} -> {varV}')
     else:
@@ -309,9 +304,6 @@ def generate_intital_progressfile(filename='progress.yaml'):
     base_progress_vars (dict): Loaded/Found progress variables
     """
 
-    yml = yaml.YAML()
-    yml.indent(mapping=2, offset=2)
-
     base_dir = dirname(filename)
 
     print(f'Generating progress path at: {filename}')
@@ -335,8 +327,7 @@ def generate_intital_progressfile(filename='progress.yaml'):
     # Find progress in given base directory
     base_progress_vars = find_progress(base_progress_vars)
 
-    with open(filename, 'w') as f:
-        yml.dump(base_progress_vars, f)
+    _write_yaml(base_progress_vars, filename)
 
     return base_progress_vars
 

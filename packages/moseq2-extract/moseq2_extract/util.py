@@ -14,7 +14,7 @@ import numpy as np
 from glob import glob
 from copy import deepcopy
 from ruamel.yaml.comments import CommentedSeq
-from moseq2_extract._yaml import read_yaml as _read_yaml
+from moseq2_common.yaml import read_yaml as _read_yaml
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image

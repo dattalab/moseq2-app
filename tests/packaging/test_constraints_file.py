@@ -6,7 +6,7 @@ release workflow attaches one per operating system and Python to the GitHub
 release, so a user whose fresh install breaks can install exactly what CI
 tested with ``python -m pip install moseq2-app==<version> -c <file>``.
 
-The five MoSeq2 packages appear in a CI freeze as local paths (the checkout
+The six MoSeq2 packages appear in a CI freeze as local paths (the checkout
 they were installed from), which are useless to a user, so the file pins each
 at its released version instead. Everything else is pinned exactly as the
 freeze reports it, and a line that cannot be pinned stops the job rather than
@@ -28,19 +28,27 @@ from packaging.requirements import Requirement
 
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / ".github" / "scripts" / "write_constraints.py"
-PACKAGES = ("moseq2-app", "moseq2-extract", "moseq2-pca", "moseq2-model", "moseq2-viz")
+PACKAGES = (
+    "moseq2-app",
+    "moseq2-extract",
+    "moseq2-pca",
+    "moseq2-model",
+    "moseq2-viz",
+    "moseq2-common",
+)
 
 pytestmark = pytest.mark.skipif(
     not (REPO / ".github").is_dir(), reason="the release scripts are not part of the sdist"
 )
 
-#: What pip freeze printed in a CI suite job, cut down: the five packages from
+#: What pip freeze printed in a CI suite job, cut down: the six packages from
 #: the checkout, as pip and uv print local and editable installs, among
 #: ordinary pins.
 FREEZE = """\
 av==17.1.0
 -e file:///home/runner/work/moseq2-app/moseq2-app/packages/moseq2-model
 moseq2-app @ file:///home/runner/work/moseq2-app/moseq2-app
+moseq2-common @ file:///home/runner/work/moseq2-app/moseq2-app/packages/moseq2-common
 moseq2-extract @ file:///home/runner/work/moseq2-app/moseq2-app/packages/moseq2-extract
 moseq2_pca @ file:///D:/a/moseq2-app/moseq2-app/packages/moseq2-pca
 moseq2-viz==1.4.5

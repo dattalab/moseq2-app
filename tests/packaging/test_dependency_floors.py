@@ -1,4 +1,4 @@
-"""Every dependency the five packages declare has a lower bound.
+"""Every dependency the six packages declare has a lower bound.
 
 The floors are the oldest versions the CI suite has passed with. A
 dependency with no floor lets someone installing into an existing
@@ -18,7 +18,14 @@ from importlib.metadata import distribution
 import pytest
 from packaging.requirements import Requirement
 
-PACKAGES = ("moseq2-app", "moseq2-extract", "moseq2-pca", "moseq2-model", "moseq2-viz")
+PACKAGES = (
+    "moseq2-app",
+    "moseq2-extract",
+    "moseq2-pca",
+    "moseq2-model",
+    "moseq2-viz",
+    "moseq2-common",
+)
 
 #: Operators that put a lower bound on the version.
 LOWER_BOUND = {">=", "==", "~=", "==="}

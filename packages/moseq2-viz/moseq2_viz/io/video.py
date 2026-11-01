@@ -17,7 +17,7 @@ from cytoolz.itertoolz import peek, pluck, first
 from cytoolz.dicttoolz import valfilter, merge_with
 from moseq2_viz.model.util import get_syllable_slices
 from cytoolz.curried import get_in, keyfilter, valmap
-from moseq2_viz._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 
 
 def check_video_parameters(index: dict) -> dict:
@@ -106,8 +106,7 @@ def write_crowd_movie_info_file(model_path, model_fit, index_file, output_dir):
     )
 
     # Write metadata info file
-    with open(info_file, "w") as f:
-        write_yaml(info_dict, f)
+    write_yaml(info_dict, info_file)
 
 
 def write_crowd_movies(

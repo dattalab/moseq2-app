@@ -22,7 +22,7 @@ import scipy.signal
 from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
-from moseq2_pca._yaml import read_yaml as _read_yaml, write_yaml
+from moseq2_common.yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
 from dask_jobqueue import SLURMCluster
