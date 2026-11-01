@@ -493,6 +493,25 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     """
     print("Processing:", input_file)
 
+    # The output folder is built from the recording's path; for a tarball,
+    # input_file becomes the opened archive further down.
+    recording = input_file
+    output_dir = session_output_dir(recording, output_dir)
+
+    roi_index = config_data["bg_roi_index"]
+    if isinstance(roi_index, list):
+        roi_index = roi_index[0]
+    output_filename = f"results_{roi_index:02d}"
+    status_filename = join(output_dir, f"{output_filename}.yaml")
+    movie_filename = join(output_dir, f"{output_filename}.mp4")
+    results_filename = join(output_dir, f"{output_filename}.h5")
+
+    # A recording already extracted is skipped before anything about it is
+    # checked: the checks below guard an extraction that is about to run.
+    if skip and check_completion_status(status_filename):
+        print("Skipping...")
+        return
+
     validate_flip_classifier(config_data)
     warn_without_flip_classifier(input_file, config_data)
 
@@ -521,7 +540,6 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     acquisition_metadata, config_data["timestamps"], config_data["tar"], timestamp_source = (
         handle_extract_metadata(input_file, in_dirname, with_source=True)
     )
-    recording = input_file
 
     # updating input_file reference to open tar file object if input file ends with [.tar/.tar.gz]
     if config_data["tar"] is not None:
@@ -594,25 +612,10 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         offset=first_frame_idx,
     )
 
-    # set up the output directory
-    output_dir = session_output_dir(input_file, output_dir)
-
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    # Ensure index is int
-    if isinstance(config_data["bg_roi_index"], list):
-        config_data["bg_roi_index"] = config_data["bg_roi_index"][0]
-
-    output_filename = f'results_{config_data["bg_roi_index"]:02d}'
-    status_filename = join(output_dir, f"{output_filename}.yaml")
-    movie_filename = join(output_dir, f"{output_filename}.mp4")
-    results_filename = join(output_dir, f"{output_filename}.h5")
-
-    # Check if session has already been extracted
-    if check_completion_status(status_filename) and skip:
-        print("Skipping...")
-        return
+    config_data["bg_roi_index"] = roi_index
 
     write_yaml(status_dict, status_filename)
 
