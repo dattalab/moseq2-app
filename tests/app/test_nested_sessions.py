@@ -89,17 +89,18 @@ def open_arena_tool(root):
     return ArenaMaskWidget(str(root), str(root / "config.yaml"), str(root / "session_config.yaml"))
 
 
-def give_each_session_its_own_fps(root):
+def give_each_session_its_own_noise_tolerance(root):
     """Write a ``session_config.yaml`` keyed as the arena tool keys ``GROUPED``
     (see ``test_the_arena_tool_keeps_parameters_for_each_same_named_folder``),
-    with a different ``fps`` for each session, the way a user tuning each
-    recording leaves them different; return the fps by session."""
+    with a different ``noise_tolerance`` (a setting the arena tool saves) for
+    each session, the way a user tuning each recording leaves them different;
+    return the noise tolerance by session."""
     base = read_yaml(str(root / "config.yaml"))
-    fps = {key: 11 + number for number, key in enumerate(sorted(GROUPED))}
-    write_yaml({key: {**base, "fps": value} for key, value in fps.items()}, str(root / "session_config.yaml"))
+    tolerance = {key: 11 + number for number, key in enumerate(sorted(GROUPED))}
+    write_yaml({key: {**base, "noise_tolerance": value} for key, value in tolerance.items()}, str(root / "session_config.yaml"))
     with update_config(str(root / "config.yaml")) as config:
         config["session_config_path"] = str(root / "session_config.yaml")
-    return fps
+    return tolerance
 
 
 # ------------------------------------------------------------------ the extraction cell
@@ -305,16 +306,16 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
     monkeypatch.setattr(
         "moseq2_extract.gui.extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
-            {input_file: config["fps"]}
+            {input_file: config["noise_tolerance"]}
         ),
     )
-    fps = give_each_session_its_own_fps(grouped)
+    tolerance = give_each_session_its_own_noise_tolerance(grouped)
     with update_config(str(grouped / "config.yaml")) as config:
         config["cluster_type"] = "local"
 
     extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
 
-    assert received == {str(grouped / key / "depth.avi"): fps[key] for key in GROUPED}
+    assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}
 
 
 def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch):
@@ -329,17 +330,17 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
         extract_cli,
         "extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
-            {input_file: config["fps"]}
+            {input_file: config["noise_tolerance"]}
         ),
     )
-    fps = give_each_session_its_own_fps(grouped)
+    tolerance = give_each_session_its_own_noise_tolerance(grouped)
     with update_config(str(grouped / "config.yaml")) as config:
         config["cluster_type"] = "slurm"
 
     extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
 
     for key in GROUPED:
-        assert read_yaml(str(grouped / key / "proc" / "config.yaml"))["fps"] == fps[key], key
+        assert read_yaml(str(grouped / key / "proc" / "config.yaml"))["noise_tolerance"] == tolerance[key], key
     script = (grouped / "extract_out.sh").read_text()
     for line in filter(str.strip, script.splitlines()):
         command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
@@ -347,7 +348,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
 
         result = CliRunner().invoke(extract_cli.cli, ["extract", *shlex.split(command)], catch_exceptions=False)
         assert result.exit_code == 0, result.output
-    assert received == {str(grouped / key / "depth.avi"): fps[key] for key in GROUPED}
+    assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}
 
 
 def test_extraction_reads_a_file_keyed_by_folder_name(tmp_path, monkeypatch):
@@ -357,7 +358,7 @@ def test_extraction_reads_a_file_keyed_by_folder_name(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "moseq2_extract.gui.extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
-            {input_file: config["fps"]}
+            {input_file: config["noise_tolerance"]}
         ),
     )
     root = tmp_path / "project"
@@ -366,7 +367,7 @@ def test_extraction_reads_a_file_keyed_by_folder_name(tmp_path, monkeypatch):
     config = root / "config.yaml"
     generate_config_command(str(config), camera_type="k2")
     base = read_yaml(str(config))
-    write_yaml({"mouse1": {**base, "fps": 11}, "mouse2": {**base, "fps": 12}}, str(root / "session_config.yaml"))
+    write_yaml({"mouse1": {**base, "noise_tolerance": 11}, "mouse2": {**base, "noise_tolerance": 12}}, str(root / "session_config.yaml"))
     with update_config(str(config)) as data:
         data["cluster_type"] = "local"
         data["session_config_path"] = str(root / "session_config.yaml")

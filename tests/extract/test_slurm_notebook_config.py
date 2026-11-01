@@ -94,10 +94,14 @@ def test_notebook_slurm_jobs_read_the_config_file(project, jobs):
 
 
 def test_notebook_slurm_jobs_read_the_session_config(project, jobs):
-    """With a session config from the arena tool, each job reads its own entry."""
+    """With a session config from the arena tool, each job reads the settings
+    the tool sets from its own entry, and the others from the config file."""
     root, config = project
     session_config = root / "session_config.yaml"
-    write_yaml({SESSION: {**read_yaml(str(config)), "fps": 15}}, str(session_config))
+    write_yaml(
+        {SESSION: {**read_yaml(str(config)), "fps": 15, "crop_size": [110, 110]}},
+        str(session_config),
+    )
     data = read_yaml(str(config))
     data["session_config_path"] = str(session_config)
     write_yaml(data, str(config))
@@ -105,8 +109,8 @@ def test_notebook_slurm_jobs_read_the_session_config(project, jobs):
     commands, received = jobs(root, config)
 
     assert len(received) == 1
-    assert received[0]["fps"] == 15
-    assert tuple(received[0]["crop_size"]) == (90, 90)
+    assert tuple(received[0]["crop_size"]) == (110, 110)
+    assert received[0]["fps"] == 20
 
 
 def test_notebook_slurm_jobs_for_a_recording_missing_from_the_session_config(

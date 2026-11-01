@@ -8,10 +8,9 @@ from os.path import exists, basename, dirname, join, abspath
 from os import makedirs, system
 from tqdm.auto import tqdm
 from moseq2_extract.extract.extract import extract_chunk
-from moseq2_extract.util import read_yaml
 from moseq2_extract.io.video import load_movie_data, write_frames_preview
 from moseq2_extract.helpers.data import check_completion_status
-from moseq2_extract.recordings import session_config_key
+from moseq2_extract.session_config import recording_configs
 
 
 def write_extracted_chunk_to_h5(
@@ -233,6 +232,29 @@ def process_extract_batches(
         video_pipe.communicate()
 
 
+def _already_extracted(recording, config_data, output_dir=None):
+    """
+    Whether ``extract_wrapper`` would skip this recording as already extracted.
+
+    Args:
+    recording (str): path to the recording.
+    config_data (dict): the settings it is extracted with.
+    output_dir (str): the output folder passed to the extraction, or None for the config's.
+
+    Returns:
+    (bool): True when its results yaml says the extraction finished.
+    """
+    from moseq2_extract.helpers.wrappers import session_output_dir
+
+    if output_dir is None:
+        output_dir = config_data.get("output_dir", "proc")
+    index = config_data.get("bg_roi_index", 0)
+    if isinstance(index, (list, tuple)):
+        index = index[0]
+    folder = session_output_dir(recording, output_dir)
+    return check_completion_status(join(folder, f"results_{index:02d}.yaml"))
+
+
 def run_local_extract(
     to_extract,
     config_file,
@@ -257,6 +279,18 @@ def run_local_extract(
     """
     from moseq2_extract.gui import extract_command
 
+    # which session config values are not used, said once for every recording rather than per recording
+    resolved = recording_configs(config_file, to_extract, cli_options)
+    message = resolved.message(
+        [
+            ext
+            for ext in to_extract
+            if not (skip_extracted and _already_extracted(ext, resolved.configs[ext], output_dir))
+        ]
+    )
+    if message:
+        print(message)
+
     failures = []
     n_skipped = 0
     for ext in tqdm(to_extract, desc="Extracting Sessions"):
@@ -268,6 +302,7 @@ def run_local_extract(
                 num_frames=num_frames,
                 skip=skip_extracted,
                 cli_options=cli_options,
+                explain_settings=False,
             )
         except Exception as e:
             print("Unexpected error:", e)
@@ -324,9 +359,10 @@ def run_slurm_extract(
     """
     Write one sbatch command per session to extract it on a SLURM cluster, and submit them if run_cmd is set.
 
-    Each session is extracted from the config file, or from its entry in the session config when there is one.
-    Options typed on the command line are applied over either, so each session gets a config.yaml of its own in
-    its output directory whenever there is a session config or a typed option.
+    Each session is extracted with the settings ``recording_configs`` resolves: the arena tool's settings from its
+    entry in the session config, every other setting from the config file, and the options typed on the command
+    line over both. Each session gets a config.yaml of its own in its output directory whenever there is a session
+    config or a typed option.
 
     Args:
     input_dir (str): directory the sessions were found in; extract_out_script is written there.
@@ -343,19 +379,27 @@ def run_slurm_extract(
     # expand input_dir absolute path
     input_dir = abspath(input_dir)
 
-    session_configs = (
-        read_yaml(config_data["session_config_path"])
-        if exists(config_data.get("session_config_path", ""))
-        else None
-    )
+    resolved = recording_configs(config_data["config_file"], to_extract, cli_options)
     # each session reads a config.yaml written to its output directory when its
-    # parameters differ from the config file's
-    session_config_files = session_configs is not None or bool(cli_options)
+    # parameters can differ from the config file's
+    session_config_files = exists(resolved.session_config_path) or bool(cli_options)
+
+    message = resolved.message(
+        [
+            depth_file
+            for depth_file in to_extract
+            if not (
+                skip_extracted
+                and check_completion_status(
+                    join(dirname(depth_file), config_data["output_dir"], "results_00.yaml")
+                )
+            )
+        ]
+    )
+    if message:
+        print(message)
 
     if session_config_files:
-        base_config = (
-            read_yaml(config_data["config_file"]) if session_configs is None else None
-        )
         for depth_file in to_extract:
             output_dir = join(dirname(depth_file), config_data["output_dir"])
 
@@ -363,16 +407,9 @@ def run_slurm_extract(
             if not exists(output_dir):
                 makedirs(output_dir)
 
-            # get and write session-specific parameters
-            output_file = join(output_dir, "config.yaml")
-            session_key = session_config_key(session_configs, depth_file)
-            if session_configs is not None:
-                params = session_configs[session_key] if session_key is not None else config_data
-            else:
-                params = base_config
-            params = {**params, **(cli_options or {})}
-
-            write_yaml(params, output_file)
+            # the recording's settings: the arena tool's from its session config entry,
+            # the rest from the config file, typed options over both
+            write_yaml(resolved.configs[depth_file], join(output_dir, "config.yaml"))
 
     # Construct sbatch command for slurm
     commands = ""

@@ -401,10 +401,12 @@ def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
     """15. The contract between cell 5 and this one.
 
     ``extract_command`` follows ``session_config_path`` out of the project
-    config and replaces the whole parameter set with the entry belonging to
-    the recording, so what a user settled on in the arena widget is literally
-    what the extraction ran with. The h5 records that set, which is where the
-    two are compared.
+    config and takes the settings the arena widget sets from the entry
+    belonging to the recording, so what a user settled on in the widget is
+    literally what the extraction ran with. The entry's other values are the
+    config's, copied when the widget opened, so every saved value is what the
+    extraction ran with. The h5 records that set, which is where the two are
+    compared.
     """
     saved = plain(read_yaml(str(arena)))
     for name in RECORDINGS:

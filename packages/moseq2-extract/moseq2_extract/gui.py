@@ -21,8 +21,8 @@ from moseq2_extract.recordings import (
     DEFAULT_MAX_DEPTH,
     RECORDING_EXTENSIONS,
     find_recordings,
-    session_config_key,
 )
+from moseq2_extract.session_config import recording_configs
 from moseq2_extract.cli import batch_extract
 
 
@@ -332,10 +332,20 @@ def find_roi_command(
 
 @filter_warnings
 def extract_command(
-    input_file, output_dir, config_file, num_frames=None, skip=False, cli_options=None
+    input_file,
+    output_dir,
+    config_file,
+    num_frames=None,
+    skip=False,
+    cli_options=None,
+    explain_settings=True,
 ):
     """
     Extract depth file
+
+    The recording is extracted with the settings ``recording_configs`` resolves: the arena
+    tool's settings from its entry in session_config.yaml, every other setting from the config
+    file, and the typed options over both.
 
     Args:
     input_file (str): path to depth file to extract.
@@ -344,25 +354,19 @@ def extract_command(
     num_frames (int): number of frames to extract. If None, all frames are extracted.
     skip (bool): skip already extracted file.
     cli_options (dict): parameters typed on the command line; they take precedence over the config file and the session config.
+    explain_settings (bool): print which settings in the recording's session config entry differ from the config file
+        and are not used. ``run_local_extract`` prints this once for all its recordings instead.
 
     Returns:
     (str or None): path to the output directory, or None if the file was skipped as already extracted.
     """
 
-    config_data = read_yaml(config_file)
-
-    # Loading individual session config parameters if it exists
-    if exists(config_data.get("session_config_path", "")):
-        session_configs = read_yaml(config_data["session_config_path"])
-        # keyed by folder name, or by the folder's path below the project where names are shared
-        session_key = session_config_key(session_configs, input_file)
-
-        # If key is found, update config_data, otherwise, use default dict
-        if session_key is not None:
-            config_data = session_configs[session_key]
-
-    if cli_options:
-        config_data = {**config_data, **cli_options}
+    resolved = recording_configs(config_file, [input_file], cli_options)
+    config_data = resolved.configs[input_file]
+    if explain_settings:
+        message = resolved.message()
+        if message:
+            print(message)
 
     if output_dir is None:
         output_dir = config_data.get("output_dir", "proc")
