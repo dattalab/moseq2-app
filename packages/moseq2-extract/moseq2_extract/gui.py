@@ -16,11 +16,8 @@ from moseq2_extract.helpers.wrappers import (
     generate_index_wrapper,
     aggregate_extract_results_wrapper,
 )
-from moseq2_extract.util import (
-    recursive_find_unextracted_dirs,
-    load_found_session_paths,
-    filter_warnings,
-)
+from moseq2_extract.util import load_found_session_paths, filter_warnings
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 from moseq2_extract.cli import batch_extract
 
 
@@ -154,7 +151,12 @@ def generate_config_command(output_file, camera_type="k2"):
 
 @filter_warnings
 def extract_found_sessions(
-    input_dir, config_file, ext, extract_all=True, skip_extracted=False
+    input_dir,
+    config_file,
+    ext,
+    extract_all=True,
+    skip_extracted=False,
+    max_depth=DEFAULT_MAX_DEPTH,
 ):
     """
     Find and extract all depth files with specified extensions within input_dir
@@ -162,25 +164,25 @@ def extract_found_sessions(
     Args:
     input_dir (str): path to directory containing all session folders
     config_file (str): path to config file
-    ext (str): file extension for depth files to search for
+    ext (str or list): file extension(s) for depth files to search for
     extract_all (bool): if True, auto searches for all sessions, else, prompts user to select sessions individually.
     skip_extracted (bool): indicates whether to skip already extracted session.
+    max_depth (int): how many folders below input_dir to search for recordings.
 
     """
     # error out early
     if not exists(config_file):
         raise IOError(f"Config file {config_file} does not exist")
 
-    to_extract = []
+    # every recording is listed; run_local_extract skips the extracted ones when skip_extracted is set
+    search = find_recordings(input_dir, extensions=ext, max_depth=max_depth)
+    message = search.report()
+    if message:
+        print(message)
+    if not search.recordings:
+        return
 
-    # find directories with .dat files that either have incomplete or no extractions
-    if isinstance(ext, str):
-        ext = [ext]
-    for ex in ext:
-        tmp = recursive_find_unextracted_dirs(input_dir, extension=ex, skip_checks=True)
-        to_extract += [e for e in tmp if e.endswith(ex)]
-
-    to_extract = get_selected_sessions(sorted(to_extract), extract_all)
+    to_extract = get_selected_sessions(search.recordings, extract_all)
 
     # read in the config file
     config_data = read_yaml(config_file)
@@ -275,6 +277,7 @@ def find_roi_command(
     exts=["dat", "mkv", "avi"],
     select_session=False,
     default_session=0,
+    max_depth=DEFAULT_MAX_DEPTH,
 ):
     """
     Compute ROI files given depth file.
@@ -285,16 +288,17 @@ def find_roi_command(
     exts (list): list of supported extensions
     select_session (bool): list all found sessions and allow user to select specific session to analyze via user-prompt
     default_session (int): index of the default session to find ROI for
+    max_depth (int): how many folders below input_dir to search for recordings.
 
     Returns:
     images (list of 2d arrays): list of 2d array images to graph in Notebook.
     filenames (list): list of paths to respective image paths
     """
 
-    files = load_found_session_paths(input_dir, exts)
+    # prints where it looked and what it passed over when it finds nothing
+    files = load_found_session_paths(input_dir, exts, max_depth=max_depth)
 
     if len(files) == 0:
-        print("No recordings found")
         return
 
     if select_session:

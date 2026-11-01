@@ -5,15 +5,13 @@ This module handles all jupyter notebook progress related functionalities.
 import os
 import uuid
 import json
-from glob import glob
+from glob import glob, escape as glob_escape
 import ruamel.yaml as yaml
 from moseq2_app._yaml import write_yaml as _write_yaml
-from operator import add
-from functools import reduce
-from toolz import compose, complement
 from moseq2_viz.util import get_sorted_index, read_yaml
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 
 
 def generate_missing_metadata(sess_dir, sess_name):
@@ -34,147 +32,118 @@ def generate_missing_metadata(sess_dir, sess_name):
         json.dump(sample_meta, fp)
 
 
-def _is_unextracted(folder):
+def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi', 'tar.gz'),
+                 max_depth=DEFAULT_MAX_DEPTH):
     """
-    check if ny sessions in the folder is unextracted.
+    Find the recordings the arena tool shows.
 
-    Args:
-        folder (str): path to depth recording
-    
-    Return:
-        (bool): whether the session is extracted
-    """
-    if not exists(join(folder, 'proc')):
-        return True
-    elif not exists(join(folder, 'proc', 'results_00.yaml')):
-        return True
-    # if results.yaml exists, then check if extraction has successfully completed
-    results_dict = read_yaml(join(folder, 'proc', 'results_00.yaml'))
-    return not results_dict.get('complete', False)
-
-
-def _has_metadata(folder):
-    """
-    check if all sessions have metadata.
-
-    Args:
-        folder (str): path to depth recording
-
-    Returns:
-        (bool): whether there is metadata
-    """
-    return exists(join(folder, 'metadata.json'))
-
-
-def get_sessions(data_dir, skip_extracted=True, extensions=('dat', 'mkv', 'avi', 'tar.gz')):
-    """get sessions to extract
+    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
+    folder, at most max_depth folders below data_dir, following symlinked folders. Where it
+    looked and what it passed over is printed when it finds nothing or leaves anything out,
+    and each recording without a metadata.json is named with a warning.
 
     Args:
         data_dir (str): path to project directory
         skip_extracted (bool, optional): bool flag for skipping extracted sessions. Defaults to True.
         extensions (tuple, optional): extensions to look for depth recordings. Defaults to ('dat', 'mkv', 'avi', 'tar.gz').
+        max_depth (int, optional): how many folders below data_dir to search. Defaults to 5.
 
     Returns:
-        _type_: _description_
+        (list): sorted paths of the recordings found
     """
-    # look for files in subfolders
-    files = [glob(join(data_dir, '**', f'*.{ext}'), recursive=True) for ext in extensions]
-    # concatenate all files of different extensions
-    files = sorted(reduce(add, files))
-
-    def is_not_depth(f):
-        return 'ir.avi' in basename(f) or 'ir.dat' in basename(f) or basename(f) == 'nidaq.dat'
-
-    # remove IR videos and the NI-DAQ stream the Kinect v2 app records beside depth.dat
-    files = filter(complement(is_not_depth), files)
-
-    # remove any folder that doesn't have a metadata.json file
-    files = list(filter(compose(_has_metadata, dirname), files))
-
-    if skip_extracted:
-        # filter any folders that have been extracted
-        files = list(filter(compose(_is_unextracted, dirname), files))
-
-    return files
+    search = find_recordings(data_dir, extensions=extensions, max_depth=max_depth,
+                             skip_extracted=skip_extracted)
+    message = search.report()
+    if message:
+        print(message)
+    return search.recordings
 
 
-def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mkv', 'avi']):
+def _extracted_paths(data_dir, flipped=False):
+    """
+    The movie each extraction wrote, from ``<data_dir>/*/proc/``, keyed by session folder name.
+
+    Args:
+    data_dir (str): path to directory containing all session folders.
+    flipped (bool): return the flip-corrected movies (``*_flipped.mp4``) instead.
+
+    Returns:
+    path_dict (dict): session directory name keys pair with their respective absolute paths.
+    """
+    path = '*/proc/*_flipped.mp4' if flipped else '*/proc/*.mp4'
+
+    files = []
+    if len(data_dir) == 0:
+        data_dir = os.getcwd()
+        files = sorted(glob(path))
+    else:
+        data_dir = data_dir.strip()
+        if os.path.isdir(data_dir):
+            files = sorted(glob(os.path.join(data_dir, path)))
+        else:
+            print('directory not found, try again.')
+    if not flipped:
+        files = [f for f in files if not basename(f).endswith('_flipped.mp4')]
+    sessions = files
+
+    if len(sessions) == 0:
+        sessions = sorted(glob(join(data_dir, '*.mp4')))
+
+    names = [basename(dirname(dirname(sess))) for sess in sessions]
+    if len(set(names)) == len(sessions):
+        return {n: p for n, p in zip(names, sessions)}
+    return {basename(p): p for p in sessions}
+
+
+def _session_names(data_dir, recordings):
+    """
+    Name each recording by its session folder, or by its path below data_dir when two
+    recordings share a folder name (``GroupA/mouse1/depth.dat`` and ``GroupB/mouse1/depth.dat``).
+    """
+    names = [basename(dirname(r)) for r in recordings]
+    if len(set(names)) == len(names):
+        return names
+    return [os.path.relpath(r, abspath(data_dir)) for r in recordings]
+
+
+def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mkv', 'avi'],
+                      max_depth=DEFAULT_MAX_DEPTH):
     """
     Find all depth recording sessions and their paths (with given extensions) to work on given base directory.
+
+    Recordings are found with ``moseq2_extract.recordings.find_recordings``: one per session
+    folder, at most max_depth folders below data_dir, following symlinked folders. Where it
+    looked and what it passed over is printed when it finds nothing or leaves anything out. A
+    default metadata.json is written into each session folder that has none, after a warning
+    naming the folder. With extracted=True, the movies extraction wrote in ``<data_dir>/*/proc/``
+    are returned instead.
 
     Args:
     data_dir (str): path to directory containing all session folders.
     exts (list): list of depth file extensions to search for.
     flipped (bool): indicates whether to show corrected flip videos
     extracted (bool): indicates to return paths to extracted sessions only.
+    max_depth (int): how many folders below data_dir to search for recordings.
 
     Returns:
     path_dict (dict): session directory name keys pair with their respective absolute paths.
     """
 
     if extracted:
-        path = '*/proc/*.'
-        if flipped:
-            path = '*/proc/*_flipped.'
-        exts = ['mp4']
-    else:
-        path = '*/*.'
+        return _extracted_paths(data_dir, flipped=flipped)
 
-    sessions = []
+    data_dir = data_dir.strip() or os.getcwd()
+    search = find_recordings(data_dir, extensions=exts, max_depth=max_depth)
+    message = search.report()
+    if message:
+        print(message)
+    sessions = search.recordings
 
-    # Get list of sessions ending in the given extensions
-    for ext in exts:
-        files = []
-        if len(data_dir) == 0:
-            data_dir = os.getcwd()
-            if flipped:
-                files = sorted(glob(path + ext))
-            else:
-                files = [f for f in sorted(glob(path + ext)) if not basename(f).endswith(f'_flipped.{ext}')]
-        else:
-            data_dir = data_dir.strip()
-            if os.path.isdir(data_dir):
-                if flipped:
-                    files = sorted(glob(os.path.join(data_dir, path + ext)))
-                else:
-                    files = [f for f in sorted(glob(os.path.join(data_dir, path + ext)))
-                             if not basename(f).endswith(f'_flipped.{ext}')]
-            else:
-                print('directory not found, try again.')
-        if ext in ("dat", "avi"):
-            files = [f for f in files if "depth" in basename(f)]
-        sessions += files
+    for folder, _ in search.without_metadata:
+        # Generate metadata.json file if it's missing
+        generate_missing_metadata(folder, basename(folder))
 
-    if len(sessions) == 0:
-        if extracted:
-            sessions = sorted(glob(join(data_dir, '*.mp4')))
-        else:
-            for ext in exts:
-                sessions += sorted(glob(join(data_dir, f'*.{ext}')))
-
-    if extracted:
-        names = [basename(dirname(dirname(sess))) for sess in sessions]
-        if len(set(names)) == len(sessions):
-            path_dict = {n: p for n, p in zip(names, sessions)}
-        else:
-            path_dict = {basename(p): p for p in sessions}
-    else:
-        for sess in sessions:
-            # get path to session directory
-            sess_dir = dirname(sess)
-            sess_name = basename(sess_dir)
-            if 'metadata.json' not in os.listdir(sess_dir):
-                # Generate metadata.json file if it's missing
-                generate_missing_metadata(sess_dir, sess_name)
-
-        # Create path dictionary
-        names = [basename(dirname(sess)) for sess in sessions]
-        if len(set(names)) == len(sessions):
-            path_dict = {n: p for n, p in zip(names, sessions)}
-        else:
-            path_dict = {basename(p): p for p in sessions}
-
-    return path_dict
+    return dict(zip(_session_names(data_dir, sessions), sessions))
 
 def update_progress(progress_file, varK, varV):
     """
@@ -445,26 +414,28 @@ def incomplete_extraction_message(session, recording, yaml_path):
     )
 
 
-def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
+def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi'], max_depth=DEFAULT_MAX_DEPTH):
     """
     Count the number of fully extracted sessions, and print the session directory names of the incomplete or missing extractions.
 
     Args:
     base_dir (str): Path to parent directory containing all sessions
+    max_depth (int): how many folders below base_dir to search for recordings
 
     Returns:
     path_dict (dict): Dict with paths to all found sessions
     num_extracted (int): Total number of completed extractions
     """
 
-    path_dict = get_session_paths(base_dir, exts=exts)
-
-    e_path_dict = get_session_paths(base_dir, extracted=True, exts=exts)
+    path_dict = get_session_paths(base_dir, exts=exts, max_depth=max_depth)
 
     # Count number of extracted sessions and print names of the missing/incomplete extractions
     num_extracted = 0
     for k, v in path_dict.items():
-        extracted_path = e_path_dict.get(k, v)
+        # the movie extraction wrote beside the recording, in its proc folder
+        movies = [f for f in sorted(glob(join(glob_escape(dirname(v)), 'proc', '*.mp4')))
+                  if not basename(f).endswith('_flipped.mp4')]
+        extracted_path = movies[-1] if movies else v
         extracted = False
         if extracted_path.endswith('.mp4'):
             yaml_path = extracted_path[:-4] + '.yaml'
@@ -479,13 +450,14 @@ def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi']):
     return path_dict, num_extracted
 
 
-def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
+def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi'], max_depth=DEFAULT_MAX_DEPTH):
     """
     Search for all the paths included in the progress file and displays 4 progress bars, one for each pipeline step.
 
     Args:
     base_dir (str): Path to parent directory containing all sessions
     progress_vars (dict): notebook progress dict
+    max_depth (int): how many folders below base_dir to search for recordings
     """
 
     pca_progress = {'pca_dirname': False,
@@ -496,7 +468,7 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     modeling_progress = {'base_model_path': False}
 
     # Get Extract Progress
-    path_dict, num_extracted = get_extraction_progress(base_dir, exts=exts)
+    path_dict, num_extracted = get_extraction_progress(base_dir, exts=exts, max_depth=max_depth)
 
     # Get PCA Progress
     pca_progress = get_pca_progress(progress_vars, pca_progress)
@@ -508,7 +480,9 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
             modeling_progress['model_path'] = True
             model_num = len(glob(join(base_model_path, '*.p')))
 
-    print(f'Extraction Progress: {num_extracted} out of {len(path_dict)} session(s) extracted')
+    # with no recordings, the search has already said where it looked and why it found none
+    if path_dict:
+        print(f'Extraction Progress: {num_extracted} out of {len(path_dict)} session(s) extracted')
 
     info_print = f'PCA Progress: {sum(pca_progress.values())} out of {len(pca_progress)} items finished'
     if sum(pca_progress.values()) != len(pca_progress):
@@ -520,13 +494,15 @@ def print_progress(base_dir, progress_vars, exts=['dat', 'mkv', 'avi']):
     if modeling_progress.get('model_path'):
         print(f'Found {model_num} model(s)')
 
-def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'mkv', 'avi', 'tar.gz']):
+def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'mkv', 'avi', 'tar.gz'],
+                   max_depth=DEFAULT_MAX_DEPTH):
     """
     Check whether progress file exists and prompt user input on whether to overwrite, load old, or generate a new one.
 
     Args:
-    base_dir (str): path to directory to create/find progress file
     progress_filepath (str): path to progress filename
+    exts (list): recording extensions to search for
+    max_depth (int): how many folders below the project folder to search for recordings
     """
 
     # Check if progress file exists
@@ -535,7 +511,7 @@ def check_progress(progress_filepath=abspath('./progress.yaml'), exts=['dat', 'm
 
         print('Found progress file, displaying progress...\n')
         # Display progress bars
-        print_progress(progress_vars['base_dir'], progress_vars, exts=exts)
+        print_progress(progress_vars['base_dir'], progress_vars, exts=exts, max_depth=max_depth)
 
 def progress_path_sanity_check(progress_paths, progress_filepath='./progress.yaml'):
     """

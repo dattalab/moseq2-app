@@ -55,11 +55,11 @@ def test_a_project_under_a_flipped_directory_lists_its_sessions(tmp_path):
 
 
 def test_a_project_under_a_depth_directory_lists_only_its_depth_recordings(tmp_path):
-    """A recording is a .dat or .avi file with "depth" in its name.
+    """A session folder holds one recording, and one with "depth" in its name is taken first.
 
     A session can hold other movies beside its depth recording, such as
-    ``ir.avi``. A project kept under a directory with "depth" in its name
-    still lists one recording per session.
+    ``ir.avi`` and ``rgb.avi``. A project kept under a directory with "depth"
+    in its name still lists one recording per session.
     """
     project = tmp_path / "depth_study" / "project"
     for session in ("s0", "s1"):

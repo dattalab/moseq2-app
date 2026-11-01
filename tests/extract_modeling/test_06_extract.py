@@ -112,8 +112,8 @@ def proc(project, recording):
 def build_fake_project(root, recordings=RECORDINGS, extension=".avi"):
     """A project of empty depth files, for testing which recordings get chosen.
 
-    ``recursive_find_unextracted_dirs`` is called with ``skip_checks=True``, so
-    it decides from filenames alone and never opens anything.
+    The cell finds recordings with ``find_recordings``, which decides from
+    filenames alone and never opens anything.
     """
     root = Path(root)
     for name in recordings:

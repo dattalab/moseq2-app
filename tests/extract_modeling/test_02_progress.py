@@ -65,9 +65,10 @@ def read_progress(path):
 def build_project(root, n_sessions=4, n_extracted=0, n_incomplete=0, pca_items=(), n_models=0):
     """Assemble a project directory in a given state of completion.
 
-    Sessions are discovered by globbing ``*/*.avi`` and extractions by
-    globbing ``*/proc/*.mp4``, so empty files are enough to be found. The one
-    thing read rather than stat'd is the per-session ``complete`` flag.
+    Sessions are found by their recording files and extractions by the
+    ``proc/*.mp4`` beside each recording, so empty files are enough to be
+    found. The one thing read rather than stat'd is the per-session
+    ``complete`` flag.
     """
     root.mkdir(parents=True, exist_ok=True)
     marked = 0
