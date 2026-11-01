@@ -25,6 +25,8 @@ kappas would have in front of them.
 
 from __future__ import annotations
 
+import shutil
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -155,21 +157,26 @@ def test_the_comparison_figure_is_drawn(comparison, project):
     assert (pixels < 250).mean() > 0.01, "the comparison plot is blank"
 
 
-def test_the_choice_is_handed_to_the_analysis_notebook(comparison, progress_file):
+def test_the_choice_is_handed_to_the_analysis_notebook(comparison, progress_file, tmp_path):
     """7. The handover between the two notebooks.
 
     The cell writes the chosen model back into the progress file, which is
     the only thing the analysis notebook is given. A choice that was made and
     not recorded would leave that notebook opening whichever model happened
     to be named last.
+
+    The write goes to a copy of the chain's progress file. Cell 17's test
+    reads the model path that cell recorded there, and may run after this.
     """
     chosen, _ = comparison
     best = chosen[f"best model - {DEFAULT_OBJECTIVE}"]
 
     from moseq2_app.gui.progress import update_progress
 
-    update_progress(str(progress_file), "model_path", best)
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
+    progress = tmp_path / "progress.yaml"
+    shutil.copy2(progress_file, progress)
+    update_progress(str(progress), "model_path", best)
+    recorded = restore_progress_vars(str(progress), init=False, overwrite=False)
     assert recorded["model_path"] == best
 
 
