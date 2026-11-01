@@ -415,7 +415,7 @@ def scalars_to_dataframe(index: dict, include_keys: list = ['SessionName', 'Subj
     model_uuids = None
     model_type = ''
     if model_path is not None and exists(model_path):
-        labels_df = prepare_model_dataframe(model_path, index['pca_path']).set_index('uuid')
+        labels_df = prepare_model_dataframe(model_path, index['pca_path'], index=index).set_index('uuid')
         model_type = labels_df['model_type'].unique()[0]
         has_model = True
         # loading the session uuids that the model was trained on
