@@ -66,6 +66,9 @@ dependencies = [
     # clean install could not import moseq2_viz.model.stat.
     "statsmodels>=0.15.0",
     "tqdm>=4.70.1",
+    # Exact pin, not a floor: moseq2-common releases with this package, at the
+    # same version, from the same tag.
+    "moseq2-common==1.4.5",
 ]
 
 [project.optional-dependencies]

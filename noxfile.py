@@ -10,8 +10,8 @@ or on every interpreter the packages claim to support::
 
 Every session installs all six packages from this checkout: moseq2-app from
 the root and the other five from packages/. They go in one resolution, so the
-four checkouts satisfy moseq2-app's exact pins on them and each brings its
-own requirements with it.
+five checkouts satisfy the exact pins on them and each brings its own
+requirements with it.
 """
 
 import nox
