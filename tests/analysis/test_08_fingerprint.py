@@ -1,8 +1,8 @@
 """Cell 8: one picture of each recording.
 
-    stat_type, n_bins, range_type = 'mean', 100, 'robust'
+    n_bins, range_type = 100, 'robust'
     preprocessor = MinMaxScaler()
-    summary, range_dict = create_fingerprint_dataframe(moseq_df, stats_df, stat_type=stat_type,
+    summary, range_dict = create_fingerprint_dataframe(moseq_df, stats_df,
                                                        n_bins=n_bins, range_type=range_type)
     plotting_fingerprint(summary, progress_paths['plot_path'], range_dict, preprocessor=preprocessor)
 
@@ -25,6 +25,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from moseq2_viz.model.fingerprint_classifier import (
@@ -33,7 +34,7 @@ from moseq2_viz.model.fingerprint_classifier import (
 )
 
 #: What the cell asks for.
-SETTINGS = {"stat_type": "mean", "n_bins": 100, "range_type": "robust"}
+SETTINGS = {"n_bins": 100, "range_type": "robust"}
 
 #: The scalars the fingerprint is built from, and the syllable block that
 #: sits beside them. These are ``create_fingerprint_dataframe``'s defaults,
@@ -211,3 +212,91 @@ def test_the_heatmap_spans_the_width_of_the_figure(images):
         pixels = np.asarray(image)
         columns_with_ink = (pixels < 250).any(axis=0)
         assert columns_with_ink.mean() > 0.5, f"{name} leaves half its width blank"
+
+
+#: Every per-syllable statistic ``compute_behavioral_statistics`` writes, the
+#: values a user could have set ``stat_type`` to.
+SUMMARY_STATS = ("std", "min", "max")
+
+
+@pytest.mark.parametrize("stat_type", SUMMARY_STATS + ("median",))
+def test_stat_type_does_not_change_the_fingerprint(moseq_df, stats_df, fingerprint, stat_type):
+    """11. ``stat_type`` never reached the figure (moseq2-app#235).
+
+    The scalar blocks are histograms of every frame in ``moseq_df`` and the
+    syllable block is ``stats_df``'s usage column. Neither reads the
+    per-syllable mean, std, min or max that ``stat_type`` named, so a user
+    who set it to ``'std'`` got the figure ``'mean'`` gives. A name that no
+    summary column carries, such as ``'median'``, gives it too.
+    """
+    summary, ranges = fingerprint
+    other_summary, other_ranges = create_fingerprint_dataframe(
+        moseq_df, stats_df, **{**SETTINGS, "stat_type": stat_type}
+    )
+    pd.testing.assert_frame_equal(other_summary, summary)
+    pd.testing.assert_frame_equal(other_ranges, ranges)
+
+
+def test_speed_is_binned_in_mm_per_second(moseq_df, fingerprint):
+    """12. The speed block's axis is millimetres per second.
+
+    ``velocity_2d_mm`` is millimetres per frame; the fingerprint multiplies
+    it by the 30 frames a second the cameras record at before binning, so
+    the bounds printed under the block match the figure's "Speed (mm/s)"
+    heading. It is the frames that are rescaled, on a copy: the caller's
+    ``moseq_df`` keeps its own units.
+    """
+    _, ranges = fingerprint
+    speed = moseq_df["velocity_2d_mm"].astype("float64") * 30
+    np.testing.assert_allclose(
+        ranges["velocity_2d_mm"].to_numpy(),
+        [speed.quantile(0.01), speed.quantile(0.99)],
+        rtol=1e-5,
+    )
+    assert moseq_df["velocity_2d_mm"].max() < speed.max(), "the caller's frame was rescaled in place"
+
+
+def test_a_summary_without_velocity_columns_gives_the_same_fingerprint(
+    moseq_df, stats_df, fingerprint
+):
+    """13. The syllable summary's column names do not decide whether it runs.
+
+    Only ``usage`` is read from the summary, so a table without any
+    ``velocity_2d_mm_*`` column, as a user's own summary or an older
+    export may be, builds the same fingerprint.
+    """
+    summary, ranges = fingerprint
+    trimmed = stats_df.drop(columns=[c for c in stats_df.columns if "velocity" in c])
+    other_summary, other_ranges = create_fingerprint_dataframe(
+        moseq_df, trimmed, **SETTINGS
+    )
+    pd.testing.assert_frame_equal(other_summary, summary)
+    pd.testing.assert_frame_equal(other_ranges, ranges)
+
+
+@pytest.mark.parametrize("stat_type", SUMMARY_STATS)
+def test_setting_stat_type_says_it_can_be_removed(moseq_df, stats_df, capsys, stat_type):
+    """14. A notebook or script that still sets it is told, in one line."""
+    create_fingerprint_dataframe(moseq_df, stats_df, **{**SETTINGS, "stat_type": stat_type})
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1, lines
+    assert f"stat_type={stat_type!r}" in lines[0]
+    assert "does not change the fingerprint" in lines[0]
+    assert "remove" in lines[0].lower()
+
+
+@pytest.mark.parametrize("passed", [{}, {"stat_type": "mean"}])
+def test_the_default_stat_type_says_nothing(moseq_df, stats_df, capsys, passed):
+    """15. Old notebooks set it to ``'mean'``; they are not told anything."""
+    create_fingerprint_dataframe(
+        moseq_df, stats_df, **{**SETTINGS, **passed}
+    )
+    assert "stat_type" not in capsys.readouterr().out
+
+
+def test_the_notebook_does_not_offer_stat_type():
+    """16. The cell no longer sets a variable that changes nothing."""
+    from cells import ANALYSIS, NOTEBOOKS, code_cell
+
+    assert "create_fingerprint_dataframe" in code_cell(ANALYSIS, 8)
+    assert "stat_type" not in (NOTEBOOKS / ANALYSIS).read_text(encoding="utf-8")
