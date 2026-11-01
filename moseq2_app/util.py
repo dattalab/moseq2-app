@@ -2,7 +2,7 @@
 General utility functions.
 """
 import pandas as pd
-from moseq2_app._yaml import write_yaml as _write_yaml
+from moseq2_common.yaml import write_yaml as _write_yaml
 from copy import deepcopy
 from os.path import basename, join, exists, splitext
 from os import mkdir

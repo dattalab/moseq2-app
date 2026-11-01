@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-PACKAGES = ["moseq2_extract", "moseq2_pca", "moseq2_model", "moseq2_viz"]
+PACKAGES = ["moseq2_extract", "moseq2_pca", "moseq2_model", "moseq2_viz", "moseq2_app"]
 
 
 def sources(pkg):

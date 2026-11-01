@@ -11,12 +11,12 @@ import pandas as pd
 from glob import glob
 from copy import deepcopy
 from bokeh.io import show
-import ruamel.yaml as yaml
 import ipywidgets as widgets
 from bokeh.layouts import column
 from bokeh.plotting import figure
 from os.path import exists
 from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import write_yaml
 from moseq2_viz.util import get_sorted_index
 from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output
@@ -27,9 +27,6 @@ from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
 from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syllable_pdfs)
-
-yml = yaml.YAML()
-yml.indent(mapping=3, offset=2)
 
 def _blank_syll_entry():
     return {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}}
@@ -136,8 +133,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
             tmp[syll].pop('group_info', None)
 
         # Write to file
-        with open(self.save_path, 'w') as f:
-            yml.dump({**tmp, **self.unshown_syll_info}, f)
+        write_yaml({**tmp, **self.unshown_syll_info}, self.save_path)
 
         if curr_syll is not None:
             # Update the syllable dropdown options
