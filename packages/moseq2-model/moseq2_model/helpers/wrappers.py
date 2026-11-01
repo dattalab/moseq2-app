@@ -149,7 +149,6 @@ def learn_model_wrapper(input_file, dest_file, config_data):
     arhmm, loglikes, labels, iter_lls, iter_holls, interrupt = train_model(
         model=arhmm,
         num_iter=config_data["num_iter"],
-        ncpus=config_data["ncpus"],
         checkpoint_freq=checkpoint_freq,
         checkpoint_file=join(checkpoint_path, checkpoint_file),
         start=itr,

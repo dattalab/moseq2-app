@@ -618,7 +618,7 @@ def batch_extract(
         # the session specific config doesn't get generated in session proc file
         # session specific config direct used in config_data dictionary in extraction from extract_command function
         typed = _typed_extract_options()
-        run_local_extract(
+        failures = run_local_extract(
             to_extract,
             config_file,
             skip_completed,
@@ -626,6 +626,9 @@ def batch_extract(
             output_dir=typed.pop("output_dir", None),
             cli_options=typed,
         )
+        # the summary run_local_extract printed names each failure
+        if failures:
+            click.get_current_context().exit(1)
     else:
         # add paramters to config
         config_data["session_config_path"] = (

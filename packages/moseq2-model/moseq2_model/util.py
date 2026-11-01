@@ -581,8 +581,6 @@ def get_parameter_strings(config_data):
 
     if config_data["max_states"]:
         parameters += f'--max-states {config_data["max_states"]} '
-    if config_data["ncpus"] > 0:
-        parameters += f'--ncpus {config_data["ncpus"]} '
 
     # Forward only options already supported by the learn-model CLI.
     for key in ('nlags', 'whiten', 'alpha', 'gamma', 'var_name',

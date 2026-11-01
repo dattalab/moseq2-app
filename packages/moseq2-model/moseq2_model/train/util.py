@@ -12,7 +12,6 @@ from moseq2_model.util import save_arhmm_checkpoint, get_loglikelihoods
 def train_model(
     model,
     num_iter=100,
-    ncpus=1,
     checkpoint_freq=None,
     checkpoint_file=None,
     start=0,
@@ -30,7 +29,6 @@ def train_model(
     Args:
     model (ARHMM): model object to train
     num_iter (int): total number of resampling iterations
-    ncpus (int): number of cpus used to resample the model
     checkpoint_freq (int): frequency (iterations) to save a checkpoint of the model
     checkpoint_file (str): path to save new checkpoint file
     start (int): starting iteration index used to resume modeling. Default is 0
@@ -63,7 +61,7 @@ def train_model(
             # boosting the diagonal before inversion inside the observation
             # distribution, rather than by writing a data-dependent ridge back
             # into the prior term between iterations.
-            model.resample_model(num_procs=ncpus)
+            model.resample_model()
         except KeyboardInterrupt:
             print("Training manually interrupted.")
             print("Returning and saving current iteration of model. ")

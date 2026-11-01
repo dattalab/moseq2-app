@@ -178,13 +178,6 @@ def prepare_model_metadata(data_dict, data_metadata, config_data):
         hold_out = []
         train = list(data_dict)
 
-    if config_data["ncpus"] > len(train):
-        # Setting number of allocated cpus equal to number of training sessions
-        config_data["ncpus"] = len(train)
-        warnings.warn(
-            f"Setting ncpus to {len(train)}. ncpus must be <= number of training sessions in dataset"
-        )
-
     # Pack all the modeling parameters into a single dict
     model_parameters = {
         "gamma": config_data["gamma"],
