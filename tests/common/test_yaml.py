@@ -22,6 +22,7 @@ import stat
 
 import numpy as np
 import pytest
+from ruamel.yaml import YAML
 
 from moseq2_common.yaml import UnwritableValueError, dump_yaml, read_yaml, write_yaml
 
@@ -159,3 +160,15 @@ def test_files_are_read_as_yaml_1_2():
         "wall_time": "06:00:00",
         "flag": "yes",
     }
+
+
+def test_a_tuple_key_is_written_as_the_safe_writer_wrote_it():
+    # The safe writer writes a tuple key as a sequence key; converting it to a
+    # list would make it unhashable.
+    legacy = YAML(typ="safe", pure=True)
+    legacy.allow_unicode = False
+    legacy.width = 82
+    stream = io.StringIO()
+    legacy.dump({(1, 2): 3}, stream)
+    assert dump_yaml({(1, 2): 3}) == stream.getvalue()
+    assert dump_yaml({(np.int64(1), 2): 3}) == stream.getvalue()

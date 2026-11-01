@@ -95,16 +95,23 @@ def _plain(value):
     only exact ``dict``, ``list`` and ``tuple`` are walked, so a container the
     safe writer refuses (a ``defaultdict``) still raises, and an
     ``OrderedDict`` still writes as ``!!omap``. A tuple becomes a list, which
-    is how the safe writer writes one anyway. The input is never changed.
+    is how the safe writer writes one anyway, except as a dict key, where it
+    stays a tuple so it can still be a key. The input is never changed.
     """
     kind = type(value)
     if kind is dict:
-        return {_plain(k): _plain(v) for k, v in value.items()}
+        return {_plain_key(k): _plain(v) for k, v in value.items()}
     if kind is list or kind is tuple:
         return [_plain(item) for item in value]
     if isinstance(value, (np.generic, np.ndarray)):
         return value.tolist()
     return value
+
+
+def _plain_key(key):
+    if type(key) is tuple:
+        return tuple(_plain_key(item) for item in key)
+    return _plain(key)
 
 
 def _writable(value):
