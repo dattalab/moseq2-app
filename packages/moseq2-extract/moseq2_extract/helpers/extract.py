@@ -112,6 +112,26 @@ def make_output_movie(results, config_data, offset=0):
     return output_movie
 
 
+def _orientation_before_next_chunk(orientation, overlap, previous_orientation):
+    """
+    The orientation the next chunk's first frame is resolved against: that of the
+    last frame with a mouse before the next chunk starts. The next chunk extracts
+    this chunk's last ``overlap`` frames again, so those are not counted.
+
+    Args:
+    orientation (np.ndarray): this chunk's unwrapped orientation per frame, NaN where no mouse was found.
+    overlap (int): frames the next chunk shares with this one (chunk_overlap).
+    previous_orientation (float): the orientation carried into this chunk, kept when this chunk's frames
+        before the next chunk hold no mouse.
+
+    Returns:
+    (float): the orientation to carry, or previous_orientation.
+    """
+    before_next = orientation[: max(len(orientation) - overlap, 0)]
+    found = before_next[~np.isnan(before_next)]
+    return found[-1] if found.size else previous_orientation
+
+
 def process_extract_batches(
     input_file,
     config_data,
@@ -149,6 +169,8 @@ def process_extract_batches(
 
     tracking_init_mean = config_data.pop("tracking_init_mean", None)
     tracking_init_cov = config_data.pop("tracking_init_cov", None)
+    # the heading carried from one chunk to the next
+    previous_orientation = None
 
     for i, frame_range in enumerate(tqdm(frame_batches, desc="Processing batches")):
         raw_chunk = load_movie_data(
@@ -166,6 +188,10 @@ def process_extract_batches(
             bground=bground_im,
             tracking_init_mean=tracking_init_mean,
             tracking_init_cov=tracking_init_cov,
+            previous_orientation=previous_orientation,
+        )
+        previous_orientation = _orientation_before_next_chunk(
+            results["unwrapped_orientation"], config_data["chunk_overlap"], previous_orientation
         )
 
         if config_data["use_tracking_model"]:

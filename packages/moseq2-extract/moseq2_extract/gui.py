@@ -5,7 +5,7 @@ GUI front-end operations accessible from a jupyter notebook.
 import os
 import re
 from moseq2_extract._yaml import write_yaml
-from os.path import dirname, basename, exists, join
+from os.path import abspath, dirname, basename, exists, join
 from moseq2_extract.util import read_yaml
 from moseq2_extract.io.image import read_tiff_files
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
@@ -195,8 +195,10 @@ def extract_found_sessions(
         }
         # merge default params and config data, preferring values in config data
         config_data = {**params, **config_data}
+        # each job reads this config file; the one generate-config writes holds
+        # config_file: null, which would otherwise reach every command
+        config_data["config_file"] = abspath(config_file)
 
-        # function call to run_slurm_extract to be implemented
         run_slurm_extract(input_dir, to_extract, config_data, skip_extracted)
 
 
