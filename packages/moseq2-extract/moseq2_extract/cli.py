@@ -565,7 +565,7 @@ def _typed_extract_options():
     help="Batch command string to prefix model training command (slurm only).",
 )
 @click.option(
-    "--ncpus", "-c", type=int, default=1, help="Number of cores to use in extraction"
+    "--ncpus", type=int, default=1, help="CPUs each extraction job requests (slurm only)"
 )
 @click.option("--memory", type=str, default="5GB", help="RAM (slurm only)")
 @click.option("--wall-time", type=str, default="3:00:00", help="Wall time (slurm only)")

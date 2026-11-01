@@ -131,3 +131,85 @@ def test_an_mkv_carries_its_own_timestamps(tmp_path):
     write(session / "metadata.json", "{}")
     _, timestamps, _ = handle_extract_metadata(str(session / "depth.mkv"), str(session))
     assert len(timestamps) == 60
+
+
+# ---------------------------------------------------------------- frame count mismatch
+
+
+@pytest.fixture
+def recording_with_short_timestamps(tmp_path, raw_sessions):
+    """A copy of one fixture recording, and its timestamps one line short."""
+    source = Path(raw_sessions) / "saline_example_0"
+    session = tmp_path / "saline_example_0"
+    session.mkdir()
+    for name in ("depth.avi", "metadata.json"):
+        shutil.copy(source / name, session / name)
+    lines = (source / "depth_ts.txt").read_text().splitlines(keepends=True)
+    return session, lines[:-1]
+
+
+def mismatch(session):
+    result = CliRunner().invoke(
+        extract_cli.cli,
+        ["extract", str(session / "depth.avi"), "--output-dir", str(session / "proc"), "--num-frames", "20"],
+    )
+    assert isinstance(result.exception, ValueError), result.output
+    return str(result.exception)
+
+
+def expected_mismatch(session, n_frames, n_timestamps, source):
+    recording = session / "depth.avi"
+    return (
+        f"Frame count mismatch for {recording}: the depth video has {n_frames} frames but "
+        f"{n_timestamps} timestamps were read from {source}. Each frame needs one timestamp, "
+        f"so the video or the timestamps are incomplete, or they do not belong together. "
+        f"Check that {source} is this recording's own timestamp file and that neither was "
+        f"cut short when copied, then extract the recording again."
+    )
+
+
+def test_a_frame_count_mismatch_names_depth_ts(recording_with_short_timestamps):
+    session, lines = recording_with_short_timestamps
+    (session / "depth_ts.txt").write_text("".join(lines))
+    assert mismatch(session) == expected_mismatch(
+        session, len(lines) + 1, len(lines), session / "depth_ts.txt"
+    )
+
+
+def test_a_frame_count_mismatch_names_timestamps_csv(recording_with_short_timestamps):
+    """timestamps.csv is read when there is no depth_ts.txt; the message names it."""
+    session, lines = recording_with_short_timestamps
+    seconds = [float(line.split()[0]) / 1000 for line in lines]
+    (session / "timestamps.csv").write_text("".join(f"{t:.6f} 0\n" for t in seconds))
+    message = mismatch(session)
+    assert "depth_ts.txt" not in message
+    assert message == expected_mismatch(
+        session, len(lines) + 1, len(lines), session / "timestamps.csv"
+    )
+
+
+def test_a_frame_count_mismatch_names_a_tarball_member(tmp_path):
+    """A tarball's three-frame depth.dat with two lines in its timestamps.csv."""
+    tarball = tmp_path / "session_1.tar.gz"
+    members = (
+        ("metadata.json", b"{}"),
+        ("depth.dat", b"\0" * (512 * 424 * 2 * 3)),
+        ("timestamps.csv", b"0.000000 0\n0.033333 0\n"),
+    )
+    with tarfile.open(tarball, "w:gz") as tar:
+        for name, data in members:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    result = CliRunner().invoke(
+        extract_cli.cli, ["extract", str(tarball), "--output-dir", str(tmp_path / "proc")]
+    )
+    assert isinstance(result.exception, ValueError), result.output
+    source = f"timestamps.csv inside {tarball}"
+    assert str(result.exception) == (
+        f"Frame count mismatch for {tarball}: the depth video has 3 frames but "
+        f"2 timestamps were read from {source}. Each frame needs one timestamp, "
+        f"so the video or the timestamps are incomplete, or they do not belong together. "
+        f"Check that {source} is this recording's own timestamp file and that neither was "
+        f"cut short when copied, then extract the recording again."
+    )

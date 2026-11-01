@@ -557,10 +557,13 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         config_data["finfo"]["nframes"] = n_timestamps
     elif n_timestamps > 0 and nframes_from_video != n_timestamps:
         raise ValueError(
-            f"Frame count mismatch in '{in_dirname}': "
-            f"the depth video has {nframes_from_video} frames but "
-            f"depth_ts.txt has {n_timestamps} timestamps. "
-            f"This session's data appears to be corrupt or incomplete."
+            f"Frame count mismatch for {recording}: the depth video has "
+            f"{nframes_from_video} frames but {n_timestamps} timestamps were read "
+            f"from {timestamp_source}. Each frame needs one timestamp, so the video "
+            f"or the timestamps are incomplete, or they do not belong together. "
+            f"Check that {timestamp_source} is this recording's own timestamp file "
+            f"and that neither was cut short when copied, then extract the "
+            f"recording again."
         )
 
     status_dict["metadata"] = acquisition_metadata  # update status dict
