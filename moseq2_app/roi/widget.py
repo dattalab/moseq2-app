@@ -35,16 +35,27 @@ _hover_dict = {
 
 class ArenaMaskWidget:
     
-    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=True) -> None:
+    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=None) -> None:
         """initialize arena mask widget
+
+        Parameters saved in session_config.yaml are kept and shown; parameters
+        are detected (``detect_and_set_camera_parameters``) only for recordings
+        that have none saved yet.
 
         Args:
             data_dir (str): project base directory.
             config_file (str): path to config.yaml
             session_config_path (str): path to session_config.yaml.
             skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
-            overwrite_session_configs (bool, optional): boolean flag for overwriting session config files using the default config file. Defaults to True.
+            overwrite_session_configs: ignored. Notebooks from earlier releases
+                pass it; passing it prints a note that it can be removed.
         """
+        if overwrite_session_configs is not None:
+            print('overwrite_session_configs is no longer used and is ignored: the arena tool '
+                  f'always keeps the parameters saved in {session_config_path} and detects parameters '
+                  'only for recordings that have none there yet. Remove overwrite_session_configs '
+                  'from the cell that opens ArenaMaskWidget.')
+
         self.backgrounds = {}
         self.extracts = {}
         self.data_dir = data_dir
@@ -62,12 +73,11 @@ class ArenaMaskWidget:
         if exists(session_config_path):
             # this config contains session names as keys and a dict of config parameters as values
             session_parameters = read_yaml(session_config_path)
-            new_sessions = set(map(lambda f: basename(dirname(f)), sessions))
-            if not overwrite_session_configs:
-                new_sessions = new_sessions - set(session_parameters)
+            # recordings with saved parameters keep them; only new ones are detected
+            new_sessions = set(map(lambda f: basename(dirname(f)), sessions)) - set(session_parameters)
             if len(new_sessions) > 0:
                 for _session in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
-                    full_path = [x for x in sessions if _session in x][0]
+                    full_path = [x for x in sessions if basename(dirname(x)) == _session][0]
                     session_parameters[_session] = detect_and_set_camera_parameters(
                         deepcopy(self.config_data), full_path)
                 # write session config with default parameters for new sessions

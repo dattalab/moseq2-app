@@ -8,17 +8,18 @@
 
     ArenaMaskWidget(progress_paths['base_dir'], progress_paths['config_file'],
                     progress_paths['session_config'],
-                    skip_extracted=skip_extracted,
-                    overwrite_session_configs=overwrite_session_configs)
+                    skip_extracted=skip_extracted)
 
 The first interactive cell. Everything up to here produced one configuration
 for the whole project; this cell produces one per recording, because the arena
 sits at a different depth in every rig and often moves between recordings.
 
 Opening the widget already writes the file: it runs
-``detect_and_set_camera_parameters`` over each recording and saves a copy of
-the configuration under the recording's folder name. The widget then lets a
-user look at the floor it found, adjust the parameters, and save.
+``detect_and_set_camera_parameters`` over each recording that has no saved
+parameters and saves a copy of the configuration under the recording's folder
+name. A recording that has saved parameters keeps them, so running the cell
+again shows what was saved. The widget then lets a user look at the floor it
+found, adjust the parameters, and save.
 
 The widget is a Panel object, so the tests drive it the way the browser does:
 they set a parameter, or assign a button's ``value``, and the callbacks run in
@@ -111,13 +112,11 @@ def scratch(tmp_path, project, arena):
     """A copy of the project, for every test that opens the widget.
 
     The chain's own copy holds what the walkthrough saved, and cell 6 extracts
-    from it. Opening the widget is enough to change that: as the notebook's
-    cell does, it re-detects every recording's parameters and writes them over
-    the session config, which would replace what the walkthrough saved with an
-    unsaved set, before or after the chain's extraction depending on the order
-    the tests run in. So every test that opens the widget works on its own
-    copy. Copying costs a fraction of a second and the backgrounds come with
-    it already computed.
+    from it. The tests below save tuned parameters, which would change what
+    the chain extracts with, before or after the chain's extraction depending
+    on the order the tests run in. So every test that opens the widget works
+    on its own copy. Copying costs a fraction of a second and the backgrounds
+    come with it already computed.
     """
     root = tmp_path / "project"
     shutil.copytree(project, root)
@@ -302,11 +301,7 @@ def test_sorting_by_position_gives_extraction_the_arena_the_tool_showed(scratch)
 
 
 def test_saving_leaves_the_other_recordings_alone(scratch):
-    """11. A user tunes one recording at a time.
-
-    Compared with the session config as the open widget left it: opening the
-    widget re-detects every recording's parameters and writes them first.
-    """
+    """11. A user tunes one recording at a time."""
     session_config = scratch / "session_config.yaml"
     _, data, buttons = open_widget(scratch)
     before = plain(read_yaml(str(session_config)))
@@ -451,3 +446,137 @@ def test_the_tracking_likelihood_threshold_accepts_a_decimal(scratch):
     box = boxes["Tracking model mouse likelihood threshold"]
     box.value = -16.5
     assert box.value == -16.5
+
+
+# ------------------------------------------------- running the cell again
+
+
+@pytest.fixture
+def unextracted(tmp_path, project, arena):
+    """A copy of the project as the arena step leaves it: recordings, config and
+    session config, with nothing extracted.
+
+    The cell skips extracted recordings (``skip_extracted = True``), so a copy
+    made after the chain's extraction would show it none.
+    """
+    from moseq2_app.gui.progress import update_progress
+
+    root = tmp_path / "project"
+    shutil.copytree(
+        project,
+        root,
+        ignore=shutil.ignore_patterns(
+            "proc", "aggregate_results", "_pca", "models", "progress.yaml", "*.tar.gz"
+        ),
+    )
+    progress = root / "progress.yaml"
+    progress.write_text("{}\n")
+    update_progress(str(progress), "base_dir", str(root))
+    update_progress(str(progress), "config_file", str(root / "config.yaml"))
+    return root
+
+
+def run_arena_cell(root):
+    """Run the notebook's own arena cell on a project; return the widget it shows.
+
+    The cell ends on the widget, which a notebook displays. Evaluated here the
+    way a kernel does, so that expression is what comes back.
+    """
+    import ast
+
+    from cells import code_cell
+
+    progress = root / "progress.yaml"
+    namespace = {
+        "progress_filepath": str(progress),
+        "progress_paths": read_yaml(str(progress)),
+    }
+    tree = ast.parse(code_cell("MoSeq2-Extract-Modeling-Notebook.ipynb", 5))
+    last = tree.body.pop()
+    exec(compile(tree, "<arena cell>", "exec"), namespace)
+    return eval(compile(ast.Expression(last.value), "<arena cell>", "eval"), namespace)
+
+
+def tune_first_recording(widget):
+    """Tune and save the first recording, as a user would; return what was set."""
+    data = widget.session_data
+    data.depth_range = (600, 700)
+    data.mask_weight1, data.mask_weight2, data.mask_weight3 = 0, 1, 0
+    click(buttons_of(widget.view)["Save session parameters"])
+    return data.path
+
+
+def test_rerunning_the_cell_keeps_saved_parameters(unextracted):
+    """A user tunes a recording, saves, and runs the cell again (after a kernel
+    restart, say). The saved parameters stay in the file and are what the
+    widget shows."""
+    session_config = unextracted / "session_config.yaml"
+    tuned = tune_first_recording(run_arena_cell(unextracted))
+    saved = plain(read_yaml(str(session_config)))
+
+    widget = run_arena_cell(unextracted)
+
+    assert plain(read_yaml(str(session_config))) == saved
+    assert saved[tuned]["bg_roi_depth_range"] == [600, 700]
+    assert saved[tuned]["bg_roi_weights"] == [0, 1, 0]
+    assert widget.session_data.path == tuned
+    assert widget.session_data.depth_range == (600, 700)
+    assert (
+        widget.session_data.mask_weight1,
+        widget.session_data.mask_weight2,
+        widget.session_data.mask_weight3,
+    ) == (0, 1, 0)
+
+
+def test_a_new_recording_is_detected_and_the_others_keep_theirs(unextracted):
+    """A recording added to the project after the first run gets parameters
+    detected for it; every recording already in the file keeps what it has."""
+    from moseq2_extract.util import detect_and_set_camera_parameters
+    from moseq2_app.util import read_and_clean_config
+
+    session_config = unextracted / "session_config.yaml"
+    tune_first_recording(run_arena_cell(unextracted))
+    before = plain(read_yaml(str(session_config)))
+
+    shutil.copytree(unextracted / "saline_example_1", unextracted / "saline_example_2")
+    widget = run_arena_cell(unextracted)
+
+    after = plain(read_yaml(str(session_config)))
+    assert sorted(after) == sorted(RECORDINGS + ["saline_example_2"])
+    for name in RECORDINGS:
+        assert after[name] == before[name], f"{name} was rewritten"
+    detected = detect_and_set_camera_parameters(
+        read_and_clean_config(str(unextracted / "config.yaml")),
+        str(unextracted / "saline_example_2" / "depth.avi"),
+    )
+    assert after["saline_example_2"] == plain(detected)
+    assert "saline_example_2" in widget.sessions
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_the_old_argument_is_accepted_ignored_and_explained(unextracted, capsys, value):
+    """A notebook from an earlier release still passes overwrite_session_configs.
+    It opens, keeps the saved parameters whatever the value, and says once that
+    the argument can go."""
+    session_config = unextracted / "session_config.yaml"
+    tune_first_recording(run_arena_cell(unextracted))
+    saved = plain(read_yaml(str(session_config)))
+    capsys.readouterr()
+
+    widget = ArenaMaskWidget(
+        str(unextracted),
+        str(unextracted / "config.yaml"),
+        str(session_config),
+        skip_extracted=True,
+        overwrite_session_configs=value,
+    )
+
+    assert widget.view is not None
+    assert plain(read_yaml(str(session_config))) == saved
+    printed = [line for line in capsys.readouterr().out.splitlines() if "overwrite_session_configs" in line]
+    assert printed == [
+        "overwrite_session_configs is no longer used and is ignored: the arena tool "
+        f"always keeps the parameters saved in {session_config} and detects parameters "
+        "only for recordings that have none there yet. Remove overwrite_session_configs "
+        "from the cell that opens ArenaMaskWidget."
+    ]
