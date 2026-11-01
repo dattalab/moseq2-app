@@ -33,40 +33,39 @@ classifiers = [
 # be is what the version matrix measures, and a ceiling here would refuse
 # the columns that produce the answer.
 requires-python = ">=3.10"
-# Floors, not pins. A version is named only where the code calls an API that
-# requires it; the rest are left to the resolver, since every previous "=="
-# pin was contemporaneous with Python 3.7 and none of them builds on a
-# supported interpreter.
 dependencies = [
+    # Each floor is the oldest version the CI suite has passed with.
+
     # ffmpeg's own libraries, as a wheel. Crowd movies are written through
     # these rather than through an ffmpeg a user has to install themselves.
-    "av>=17.1",
-    "h5py>=3",
-    # ruamel dropped the module-level safe_load/safe_dump in 0.18;
-    # moseq2_viz._yaml uses the YAML() interface, present from 0.17.
-    "ruamel.yaml>=0.17",
-    # scipy.stats.mode grew keepdims in 1.9, which viz.py passes so the
+    "av>=17.1.0",
+    "h5py>=3.16.0",
+    # moseq2_viz._yaml uses the YAML() interface; ruamel dropped the
+    # module-level safe_load/safe_dump in 0.18.
+    "ruamel.yaml>=0.19.1",
+    # viz.py passes keepdims to scipy.stats.mode (added in 1.9) so the
     # result keeps the shape it had before the 1.11 default flip.
-    "scipy>=1.9",
-    # pointplot took linestyle in 0.13, replacing the deprecated join.
-    "seaborn>=0.13",
-    "click",
-    "cytoolz",
-    "dtaidistance",
-    "joblib",
-    "matplotlib",
-    "networkx",
-    "numpy",
-    "opencv-python-headless",
-    "pandas",
+    "scipy>=1.15.3",
+    # pointplot is called with linestyle (from 0.13), which replaced the
+    # deprecated join.
+    "seaborn>=0.13.2",
+    "click>=8.5.0",
+    "cytoolz>=1.2.0",
+    "dtaidistance>=2.5.1",
+    "joblib>=1.6.0",
+    "matplotlib>=3.10.9",
+    "networkx>=3.4.2",
+    "numpy>=2.2.6",
+    "opencv-python-headless>=5.0.0.93",
+    "pandas>=2.3.3",
     # Not imported directly; pandas needs it for the to_parquet path in
     # helpers/wrappers.py.
-    "pyarrow",
-    "scikit-learn",
+    "pyarrow>=25.0.1",
+    "scikit-learn>=1.7.2",
     # Imported by model/stat.py, and missing from this list until now, so a
     # clean install could not import moseq2_viz.model.stat.
-    "statsmodels",
-    "tqdm",
+    "statsmodels>=0.15.0",
+    "tqdm>=4.70.1",
 ]
 
 [project.optional-dependencies]

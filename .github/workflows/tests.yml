@@ -9,9 +9,16 @@ name: tests
 # five from this checkout and everything else the way a user's install would.
 #
 # Pull requests test the oldest and newest supported Pythons on all three
-# operating systems. The nightly run and manual runs test every supported
-# Python and the tests that reach the network. Nothing reaches main except
-# through a pull request, so a push to it has already been tested as one.
+# operating systems. The release pull request (its branch name starts with
+# "release") tests every supported Python, as do the nightly run and manual
+# runs, which also run the tests that reach the network. Nothing reaches main
+# except through a pull request, so a push to it has already been tested as
+# one.
+#
+# Every suite job saves the versions it passed with as a pip constraints
+# file. The release workflow attaches the release pull request's files to
+# the GitHub release, one per operating system and Python, so a user whose
+# fresh install breaks can install exactly what was tested.
 
 on:
   pull_request:
@@ -74,7 +81,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        python: ${{ fromJSON((github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release')) && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,10 +115,28 @@ jobs:
       - name: Record the resolution
         run: python -m pip freeze
 
+      # Named for the operating system a user has (linux, macos, windows)
+      # rather than the runner image.
+      - name: Write the resolution as a constraints file
+        id: constraints
+        run: |
+          name="constraints-$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')-py${{ matrix.python }}"
+          python -m pip freeze | python .github/scripts/write_constraints.py "$name.txt"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
       - name: Run the suite
         env:
           MPLBACKEND: Agg
         run: pytest -q
+
+      # Only after the suite passed, so a file exists only for a resolution
+      # that was tested.
+      - name: Keep the constraints file
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.constraints.outputs.name }}
+          path: ${{ steps.constraints.outputs.name }}.txt
+          if-no-files-found: error
 
   # The flip-classifier cell downloads a trained classifier. Those tests sit
   # out of pull requests so a remote outage cannot redden one.

@@ -2,7 +2,8 @@ name: release
 
 # Publishing a GitHub release builds all five packages from the release tag
 # and uploads them to PyPI over trusted publishing, so no API token is stored
-# anywhere. Running the workflow by hand instead checks that the publisher is
+# anywhere, then attaches to the release the versions its CI run passed with.
+# Running the workflow by hand instead checks that the publisher is
 # registered, by making the same exchange and stopping at the answer.
 #
 # PyPI scopes a trusted publisher to one repository and one workflow file, by
@@ -130,3 +131,60 @@ jobs:
       - name: Move it
         if: steps.final.outputs.final == 'true'
         run: git push origin HEAD:refs/heads/release
+
+  # The versions this release passed CI with, one pip constraints file per
+  # operating system and Python, so a user whose fresh install breaks after an
+  # upstream release can run
+  #   python -m pip install moseq2-app==<version> -c <file>
+  # The release is the merge of the release pull request into main, so the
+  # merge commit's second parent is that pull request's head, and its tests
+  # run is the one that tested every supported Python on every operating
+  # system and saved a constraints file from each suite job.
+  constraints:
+    name: attach the tested versions
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Find the release pull request's tests run
+        id: run
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GH_REPO/commits/$TAG" --jq '.parents[1].sha // empty')
+          if [ -z "$head" ]; then
+            echo "::error::$TAG does not point at a merge commit, so there is no release pull request whose tests run to take the constraints files from. Attach them by hand: gh run download <run id> --pattern 'constraints-*', then gh release upload $TAG <files>."
+            exit 1
+          fi
+          run=$(gh run list --workflow tests --event pull_request --commit "$head" \
+            --status success --limit 20 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run" ]; then
+            echo "::error::No successful pull-request run of the tests workflow at $head, the head of the pull request $TAG merged. Re-run that pull request's tests run from the Actions tab (a merged pull request's run can still be re-run), then re-run this job."
+            exit 1
+          fi
+          echo "Taking the constraints files from $GITHUB_SERVER_URL/$GH_REPO/actions/runs/$run (tests at $head)"
+          echo "id=$run" >> "$GITHUB_OUTPUT"
+
+      - name: Attach its constraints files to the release
+        run: |
+          set -euo pipefail
+          run=${{ steps.run.outputs.id }}
+          if ! gh run download "$run" --pattern 'constraints-*' --dir constraints; then
+            echo "::error::Run $run has no constraints files to download: it predates the step in tests.yml that writes them, or its artifacts have expired. This release gets no constraints files; attach any you have by hand with gh release upload $TAG <files>."
+            exit 1
+          fi
+          files=(constraints/*/constraints-*.txt)
+          # Five Pythons on three operating systems. Fewer means the pull
+          # request ran the two-Python matrix, which happens when its branch
+          # name does not start with "release".
+          if [ ${#files[@]} -ne 15 ]; then
+            echo "::warning::Run $run kept ${#files[@]} constraints files, not 15 (five Pythons on three operating systems): ${files[*]##*/}. Users on the missing Pythons have no file for $TAG. A release pull request's branch name has to start with \"release\" for it to test every Python."
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+          echo "Attached to $TAG:"
+          printf '  %s\n' "${files[@]##*/}"

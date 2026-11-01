@@ -46,11 +46,14 @@ uvx nox -R -s tests-3.10 -- -k uuid       # tests whose names match
 MoSeq2 supports Python 3.10 through 3.14. The list lives in `PYTHON_VERSIONS`
 in `noxfile.py`. Every run installs the newest release of each dependency the
 requirements allow, and those differ by Python version: 3.10 gets pandas 2 and
-an older NumPy, later versions get pandas 3.
+an older NumPy, later versions get pandas 3. Each requirement's floor in the
+five `pyproject.toml` files is the oldest version the suite has passed with,
+which is usually what the Python 3.10 jobs install.
 
 | When | Python versions | Required to merge |
 |---|---|---|
 | Every push to a pull request | 3.10 and 3.14 | Yes |
+| Every push to the release pull request (branch name starting with `release`) | 3.10 through 3.14 | Yes |
 | Nightly, and on demand | 3.10 through 3.14 | No |
 
 A pull request tests the oldest and newest because those bracket the range of
@@ -99,7 +102,9 @@ whether you think the change is substantial.
 
 ## Releasing
 
-Publish a GitHub release against a tag on `main`. The release workflow builds
+A release is the merge of a release pull request into `main`: a branch whose
+name starts with `release`, so its CI run tests every supported Python. Publish
+a GitHub release against a tag on that merge commit. The release workflow builds
 all five packages from the tag and uploads them to PyPI over trusted
 publishing, so no token is stored anywhere. Before uploading anything it
 checks that every package declares the version the tag names, that
@@ -107,6 +112,15 @@ checks that every package declares the version the tag names, that
 names the tag's minor version. It uploads `moseq2-app` last, so a failure
 partway never leaves it requiring a release that is not there. After
 uploading it waits for the index, then moves `release` to the tag.
+
+It also attaches to the GitHub release the versions the release was tested
+with. Every suite job writes its `pip freeze` as a pip constraints file,
+`constraints-<os>-py<python>.txt` (`linux`, `macos` or `windows`), with the
+five MoSeq2 packages pinned at the version being released. The release
+workflow takes the files from the release pull request's run, found as the
+tests run of the merge commit's second parent, and uploads all fifteen. A user
+whose fresh install breaks after an upstream release can then install exactly
+what was tested with `python -m pip install moseq2-app==<version> -c <file>`.
 
 Bump the version in its own pull request first: `__version__` in all five
 `__init__.py` files and the four pins in `moseq2-app`'s `pyproject.toml`, plus
