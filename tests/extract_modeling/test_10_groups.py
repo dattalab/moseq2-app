@@ -60,16 +60,16 @@ def assign(widget, prefix, group):
 
 
 @pytest.fixture
-def scratch_index(tmp_path, aggregated, project):
-    """A copy of the project's index, for tests that save changes to it."""
+def scratch_index(tmp_path, index_as_aggregated):
+    """A copy of the index cell 9 wrote, for tests that save changes to it."""
     index = tmp_path / "moseq2-index.yaml"
-    shutil.copy2(aggregated, index)
+    shutil.copy2(index_as_aggregated, index)
     return index
 
 
-def test_the_cell_displays_the_controls_and_the_table(aggregated, displayed):
+def test_the_cell_displays_the_controls_and_the_table(index_as_aggregated, displayed):
     """1. What a user is given."""
-    widget = open_table(aggregated)
+    widget = open_table(index_as_aggregated)
 
     controls = displayed.one(widgets.HBox)
     assert [type(child).__name__ for child in controls.children] == [
@@ -82,9 +82,9 @@ def test_the_cell_displays_the_controls_and_the_table(aggregated, displayed):
     assert widget.qgrid_widget in displayed.objects
 
 
-def test_the_table_shows_every_recording(aggregated):
+def test_the_table_shows_every_recording(index_as_aggregated):
     """2. One row per recording, with what a user needs to tell them apart."""
-    widget = open_table(aggregated)
+    widget = open_table(index_as_aggregated)
     table = widget.qgrid_widget.get_changed_df()
 
     assert list(table.columns) == [
@@ -98,13 +98,13 @@ def test_the_table_shows_every_recording(aggregated):
     assert set(table["group"]) == {"default"}
 
 
-def test_only_the_group_can_be_edited(aggregated):
+def test_only_the_group_can_be_edited(index_as_aggregated):
     """3. The table is for labelling, not for correcting the metadata.
 
     A user who could edit a uuid here would break the link between the index
     and the extraction it describes.
     """
-    widget = open_table(aggregated)
+    widget = open_table(index_as_aggregated)
 
     assert widget.col_opts["editable"] is False
     assert widget.col_defs == {"group": {"editable": True, "toolTip": "editable"}}

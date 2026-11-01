@@ -138,14 +138,15 @@ def test_the_movies_are_gathered_but_not_indexed(aggregated, project):
     assert not any(str(movie) in indexed for movie in movies)
 
 
-def test_every_recording_starts_in_the_default_group(aggregated):
+def test_every_recording_starts_in_the_default_group(index_as_aggregated):
     """7. The state cell 10 exists to change.
 
     Nothing has told the project which recordings are which condition yet, so
     every entry carries the same label and a group comparison here would
-    compare the experiment against itself.
+    compare the experiment against itself. Cell 10 labels the groups in the
+    index itself, so this reads the index as this cell wrote it.
     """
-    assert {entry["group"] for entry in entries(aggregated).values()} == {"default"}
+    assert {entry["group"] for entry in entries(index_as_aggregated).values()} == {"default"}
 
 
 def test_the_index_is_written_beside_the_project_and_recorded(

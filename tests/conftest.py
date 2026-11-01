@@ -301,7 +301,7 @@ def arena(project, progress_file, configured, flipped):
 
 
 @pytest.fixture(scope="session")
-def aggregated(project, progress_file, extracted):
+def aggregation(tmp_path_factory, project, progress_file, extracted):
     """Cell 9: gather every extraction into one directory and index it.
 
     Until now each recording's output has sat beside the recording. Modeling
@@ -309,6 +309,11 @@ def aggregated(project, progress_file, extracted):
     ``aggregate_results/`` under a name built from the acquisition metadata,
     and writes ``moseq2-index.yaml`` listing what it found. That index is
     what every cell from here on is pointed at.
+
+    Returns the index and a copy of it as this cell wrote it. Cell 10 labels
+    the groups in the index itself, and a test that describes the index cell
+    10 is given reads the copy, since the chain may already have gone past
+    cell 10 when it runs.
     """
     from moseq2_app.gui.progress import update_progress
     from moseq2_extract.gui import aggregate_extract_results_command
@@ -320,7 +325,22 @@ def aggregated(project, progress_file, extracted):
         str(project), "{start_time}_{session_name}_{subject_name}", "aggregate_results/"
     )
     update_progress(str(progress_file), "index_file", index)
-    return Path(index)
+
+    as_written = tmp_path_factory.mktemp("aggregated") / "moseq2-index.yaml"
+    shutil.copy2(index, as_written)
+    return Path(index), as_written
+
+
+@pytest.fixture(scope="session")
+def aggregated(aggregation):
+    """Cell 9's index, ``moseq2-index.yaml`` in the project, as later cells change it."""
+    return aggregation[0]
+
+
+@pytest.fixture(scope="session")
+def index_as_aggregated(aggregation):
+    """A copy of the index as cell 9 wrote it: every recording still in group ``default``."""
+    return aggregation[1]
 
 
 @pytest.fixture(scope="session")
