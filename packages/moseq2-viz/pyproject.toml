@@ -57,7 +57,7 @@ dependencies = [
     "matplotlib",
     "networkx",
     "numpy",
-    "opencv-python",
+    "opencv-python-headless",
     "pandas",
     # Not imported directly; pandas needs it for the to_parquet path in
     # helpers/wrappers.py.
