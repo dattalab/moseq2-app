@@ -14,6 +14,7 @@ from panel.viewable import Viewer
 from bokeh.models import HoverTool
 from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
 from moseq2_extract.io.video import load_movie_data
 from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
@@ -35,7 +36,8 @@ _hover_dict = {
 
 class ArenaMaskWidget:
     
-    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=None) -> None:
+    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=None,
+                 max_depth=DEFAULT_MAX_DEPTH) -> None:
         """initialize arena mask widget
 
         Parameters saved in session_config.yaml are kept and shown; parameters
@@ -49,6 +51,8 @@ class ArenaMaskWidget:
             skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
             overwrite_session_configs: ignored. Notebooks from earlier releases
                 pass it; passing it prints a note that it can be removed.
+            max_depth (int, optional): how many folders below data_dir to search for
+                recordings. Defaults to 5.
         """
         if overwrite_session_configs is not None:
             print('overwrite_session_configs is no longer used and is ignored: the arena tool '
@@ -63,10 +67,10 @@ class ArenaMaskWidget:
 
         self.config_data = read_and_clean_config(config_file)
 
-        sessions = get_sessions(data_dir, skip_extracted=skip_extracted)
+        # prints where it looked and what it passed over when it finds nothing to show
+        sessions = get_sessions(data_dir, skip_extracted=skip_extracted, max_depth=max_depth)
         if len(sessions) == 0:
             self.view = None
-            print('No sessions to show. There are either no sessions present or they are all extracted.')
             return
 
         # creates session-specific configurations

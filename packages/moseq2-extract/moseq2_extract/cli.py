@@ -7,11 +7,8 @@ import click
 from moseq2_extract._yaml import write_yaml
 from tqdm.auto import tqdm
 from copy import deepcopy
-from moseq2_extract.util import (
-    command_with_config,
-    read_yaml,
-    recursive_find_unextracted_dirs,
-)
+from moseq2_extract.util import command_with_config, read_yaml
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 from moseq2_extract.helpers.wrappers import (
     get_roi_wrapper,
     extract_wrapper,
@@ -544,7 +541,14 @@ def _typed_extract_options():
 @click.option(
     "--skip-checks",
     is_flag=True, default=False,
-    help="Flag: skip checks for the existance of a metadata file",
+    help="Flag: include recordings whose extraction already finished",
+)
+@click.option(
+    "--max-depth",
+    type=int,
+    default=DEFAULT_MAX_DEPTH,
+    show_default=True,
+    help="How many folders below the input folder to search for recordings",
 )
 @click.option(
     "--extract-out-script",
@@ -583,6 +587,7 @@ def batch_extract(
     num_frames,
     extensions,
     skip_checks,
+    max_depth,
     **config_data,
 ):
 
@@ -595,23 +600,19 @@ def batch_extract(
         )
         return
 
-    # Add message to tell the users to specify a config file
-    to_extract = []
-    for ex in extensions:
-        to_extract.extend(
-            recursive_find_unextracted_dirs(
-                input_folder,
-                extension=ex,
-                skip_checks=True if ex in (".tgz", ".tar.gz") else skip_checks,
-                yaml_path=os.path.join(output_dir, "results_00.yaml"),
-            )
-        )
+    search = find_recordings(
+        input_folder,
+        extensions=extensions,
+        max_depth=max_depth,
+        skip_extracted=not skip_checks,
+        results_yaml=os.path.join(output_dir, "results_00.yaml"),
+    )
+    message = search.report()
+    if message:
+        print(message)
+    to_extract = search.recordings
 
-    # Add message when all sessions are extracted
     if len(to_extract) == 0:
-        print(
-            'No session to be extracted. If you want to re-extract the data, please add "--skip-checks"'
-        )
         return
 
     if config_data["cluster_type"] == "local":

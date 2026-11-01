@@ -421,26 +421,31 @@ def load_metadata(metadata_file):
 
     return metadata
 
-def load_found_session_paths(input_dir, exts):
+def load_found_session_paths(input_dir, exts, max_depth=None):
     """
-    Find all depth files with the specified extension recursively in input directory.
+    Find the recordings with the given extensions under input_dir.
+
+    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
+    folder, at most max_depth folders below input_dir, following symlinked folders. What it
+    passed over, and each recording without a metadata.json, is printed.
 
     Args:
     input_dir (str): path to project base directory holding all the session sub-folders.
     exts (list or str): list of extensions to search for, or a single extension in string form.
+    max_depth (int): how many folders below input_dir to search; defaults to 5.
 
     Returns:
     files (list): sorted list of all paths to found depth files
     """
+    from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 
-    if not isinstance(exts, (tuple, list)):
-        exts = [exts]
-
-    files = []
-    for ext in exts:
-        files.extend(glob(join(input_dir, '*/*' + ext), recursive=True))
-
-    return sorted(files)
+    search = find_recordings(
+        input_dir, extensions=exts, max_depth=DEFAULT_MAX_DEPTH if max_depth is None else max_depth
+    )
+    message = search.report()
+    if message:
+        print(message)
+    return search.recordings
 
 def get_strels(config_data):
     """
@@ -980,45 +985,40 @@ def recursive_find_unextracted_dirs(root_dir=os.getcwd(),
                                     extension='.dat',
                                     yaml_path='proc/results_00.yaml',
                                     metadata_path='metadata.json',
-                                    skip_checks=False):
+                                    skip_checks=False,
+                                    max_depth=None):
     """
-    Recursively find unextracted (or incompletely extracted) directories
+    Find the recordings under root_dir whose extraction is missing or incomplete.
+
+    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
+    folder, at most max_depth folders below root_dir, following symlinked folders. What it
+    passed over, and each recording without a metadata.json, is printed.
 
     Args:
     root_dir (str): path to base directory to start recursive search for unextracted folders.
-    session_pattern (str): folder name pattern to search for
+    session_pattern (str): not used; every .tar.gz or .tgz archive is a session.
     extension (str): file extension to search for
-    yaml_path (str): path to respective extracted metadata
-    metadata_path (str): path to relative metadata.json files
-    skip_checks (bool): indicates whether to check if the files exist at the given relative paths
+    yaml_path (str): path to an extraction's results yaml, relative to the recording's folder
+    metadata_path (str): not used; a recording without a metadata.json is included with a warning.
+    skip_checks (bool): include recordings whose extraction already finished
+    max_depth (int): how many folders below root_dir to search; defaults to 5.
 
     Returns:
-    proc_dirs (1d-list): list of paths to each unextracted session's proc/ directory
+    proc_dirs (1d-list): list of paths to each unextracted session's depth file
     """
+    from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 
-    from moseq2_extract.helpers.data import check_completion_status
-
-    session_archive_pattern = re.compile(session_pattern)
-
-    proc_dirs = []
-    for root, _, files in os.walk(root_dir):
-        for file in files:
-            # test for uncompressed session; ir.* and the NI-DAQ stream (nidaq.dat) sit beside the depth file
-            if file.endswith(extension) and not file.startswith("ir") and file != "nidaq.dat":
-                status_file = join(root, yaml_path)
-                metadata_file = join(root, metadata_path)
-            elif session_archive_pattern.fullmatch(file):  # test for compressed session
-                session_name = basename(file).replace('.tar.gz', '').replace('.tgz', '')
-                status_file = join(root, session_name, yaml_path)
-                metadata_file = join(root, '{}.json'.format(session_name))
-            else:
-                continue  # skip this current file as it does not look like session data
-
-            # perform checks, append depth file to list if extraction is missing or incomplete
-            if skip_checks or (not check_completion_status(status_file) and exists(metadata_file)):
-                proc_dirs.append(join(root, file))
-
-    return proc_dirs
+    search = find_recordings(
+        root_dir,
+        extensions=[extension],
+        max_depth=DEFAULT_MAX_DEPTH if max_depth is None else max_depth,
+        skip_extracted=not skip_checks,
+        results_yaml=yaml_path,
+    )
+    message = search.report()
+    if message:
+        print(message)
+    return search.recordings
 
 def click_param_annot(click_cmd):
     """
