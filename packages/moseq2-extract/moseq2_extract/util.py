@@ -176,9 +176,22 @@ def gen_batch_sequence(nframes, chunk_size, overlap, offset=0):
         out.append(seq[i:i + chunk_size])
     return out
 
+def _timestamp_field(field):
+    """
+    Read one field of a timestamp file as a float. The columns are separated by
+    whitespace, so a single comma in a field without a decimal point is a decimal
+    separator, as a system set to a decimal-comma locale writes it.
+    """
+    if isinstance(field, bytes):
+        field = field.decode()
+    if field.count(',') == 1 and '.' not in field:
+        field = field.replace(',', '.')
+    return float(field)
+
 def load_timestamps(timestamp_file, col=0, alternate=False):
     """
-    Read timestamps from space delimited text file for timestamps.
+    Read timestamps from space delimited text file for timestamps. A decimal comma
+    (``25044816,2766``) is read as a decimal point.
 
     Args:
     timestamp_file (str): path to timestamp file
@@ -189,19 +202,27 @@ def load_timestamps(timestamp_file, col=0, alternate=False):
     ts (1D array): list of timestamps
     """
 
-    ts = []
+    def read(lines, name):
+        ts = []
+        for line_number, line in enumerate(lines, start=1):
+            cols = line.split()
+            try:
+                ts.append(_timestamp_field(cols[col]))
+            except ValueError:
+                raise ValueError(
+                    f'Could not read a timestamp from line {line_number} of {name}: '
+                    f'column {col} holds {cols[col]!r}, which is not a number. Each line should '
+                    f'hold whitespace-separated numbers, such as "674717230.8241 0". '
+                    f'Check that the file is the recording\'s own timestamp file and is not damaged.'
+                ) from None
+        return np.array(ts)
+
     try:
         with open(timestamp_file, 'r') as f:
-            for line in f:
-                cols = line.split()
-                ts.append(float(cols[col]))
-        ts = np.array(ts)
+            ts = read(f, timestamp_file)
     except TypeError as e:
         # try iterating directly
-        for line in timestamp_file:
-            cols = line.split()
-            ts.append(float(cols[col]))
-        ts = np.array(ts)
+        ts = read(timestamp_file, getattr(timestamp_file, 'name', 'the timestamp file'))
     except FileNotFoundError as e:
         ts = None
         warnings.warn('Timestamp file was not found! Make sure the timestamp file exists is named '

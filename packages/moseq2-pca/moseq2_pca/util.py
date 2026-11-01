@@ -249,6 +249,63 @@ def select_strel(string='e', size=(10, 10)):
     return strel
 
 
+#: The whole frames per second ``frame_rate_from_timestamps`` accepts. Depth
+#: cameras run at 30 to 90 frames per second; PCA reads the extraction's
+#: timestamps as milliseconds, and an Azure .mkv recording stores seconds, so its
+#: rate reads 1000 times too high (30000) and is still placed correctly, because
+#: insert_nans only compares gaps with the rate the same timestamps give.
+FRAME_RATE_BOUNDS = (1, 1_000_000)
+
+
+def frame_rate_from_timestamps(timestamps, session=None):
+    """
+    The whole frames per second a session's timestamps imply, which insert_nans
+    uses as the grid to place dropped frames on. Stops with the values involved
+    when the timestamps cannot give one.
+
+    Args:
+    timestamps (numpy.array): the session's timestamps, in seconds.
+    session (str): the session's uuid and file, for the error message.
+
+    Returns:
+    fps (int): frames per second, rounded to a whole number.
+    """
+    timestamps = np.asarray(timestamps, dtype='float64')
+    diffs = np.diff(timestamps)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        rate = 1 / np.mean(diffs) if len(diffs) > 0 else np.nan
+    low, high = FRAME_RATE_BOUNDS
+    if np.isfinite(rate) and low <= np.round(rate) <= high:
+        return np.round(rate).astype('int')
+
+    if len(diffs) == 0:
+        cause = f'there are only {len(timestamps)} timestamps, and a frame rate needs at least two.'
+    elif not np.isfinite(timestamps).all():
+        cause = 'some timestamps are NaN or infinite.'
+    elif np.all(diffs == 0):
+        cause = 'the timestamps are all equal, so no time passes between frames.'
+    elif np.mean(diffs) < 0:
+        cause = 'the timestamps decrease, so they are out of order.'
+    elif rate < low:
+        cause = (
+            'the timestamps are about 1000 times too large, which is what timestamps in '
+            'milliseconds look like where seconds are expected (at extraction, a depth_ts.txt '
+            'in microseconds rather than milliseconds), or the recording has very long gaps.'
+        )
+    else:
+        cause = 'the timestamps are far smaller than a camera\'s frame interval, so their unit is not the one expected.'
+    name = f'session {session}' if session is not None else 'this session'
+    first = ', '.join(f'{d:g}' for d in diffs[:5])
+    raise ValueError(
+        f'Cannot work out the frame rate of {name} from its timestamps, so dropped frames '
+        f'cannot be placed. They give {rate:g} frames per second (rounded to {np.round(rate):g}); '
+        f'a frame rate between {low} and {high:,} is needed. The first timestamp differences '
+        f'are [{first}] seconds. Likely cause: {cause} Check the depth_ts.txt this session '
+        f'was extracted from (one line per frame, the time in milliseconds first) and '
+        f'extract the session again.'
+    )
+
+
 def insert_nans(timestamps, data, fps=30):
     """
     Fill NaN values with 0 in given 1D timestamps array. Used to handle dropped frames from the video acquisition.
@@ -653,7 +710,7 @@ def get_rps(frames, rps=600, normalize=True):
 
 
 def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
-                     baseline=True, timestamps=None):
+                     baseline=True, timestamps=None, session=None):
     """
     Compute changepoints and its corresponding distribution. Changepoints describe
     the magnitude of frame-to-frame changes of mouse pose.
@@ -668,6 +725,7 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
     peak_neighbors (int): number of peaks in the CP curve.
     baseline (bool): normalize data.
     timestamps (numpy.array): loaded timestamps.
+    session (str): the session's uuid and file, named if its timestamps give no frame rate.
 
     Returns:
     cps (numpy.ndarray): array of changepoint values
@@ -709,7 +767,7 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
 
         if timestamps is not None:
             normed_df, _, _ = insert_nans(
-                timestamps, normed_df, fps=np.round(1 / np.mean(np.diff(timestamps))).astype('int'))
+                timestamps, normed_df, fps=frame_rate_from_timestamps(timestamps, session))
 
         normed_df = np.squeeze(normed_df)
         cps = scipy.signal.argrelextrema(

@@ -258,6 +258,19 @@ def copy_manifest_results(manifest, output_dir):
             write_yaml(v["yaml_dict"], f)
 
 
+def _no_timestamps_message(recording, looked_in, empty=None, where="next to it"):
+    """The error for a recording with no per-frame timestamps from any source."""
+    places = "\n".join(f"  {place}" for place in looked_in)
+    found = f" ({empty} is empty)" if empty else ""
+    return (
+        f"No frame timestamps were found for {recording}{found}. Looked in:\n{places}\n"
+        "Without the time of each frame, the frames the camera dropped cannot be "
+        "found, and every later step (PCA, changepoints, modeling) would assume "
+        f"none were dropped. Put the recording's depth_ts.txt back {where}, as "
+        "the acquisition software wrote it, and run the extraction again."
+    )
+
+
 def handle_extract_metadata(input_file, dirname):
     """
     Extract metadata and timestamp in the extraction.
@@ -276,6 +289,9 @@ def handle_extract_metadata(input_file, dirname):
     tar_members = None
     alternate_correct = False
     from_depth_file = False
+    timestamp_path = None
+    recording = input_file
+    where = "next to it"
 
     # Handle TAR files
     if input_file.endswith((".tar.gz", ".tgz")):
@@ -291,35 +307,56 @@ def handle_extract_metadata(input_file, dirname):
 
     if tar is not None:
         # Handling tar paths
-        metadata_path = tar.extractfile(tar_members[tar_names.index("metadata.json")])
+        where = "inside the tarball"
+        looked_in = [
+            f"depth_ts.txt inside {input_file}",
+            f"timestamps.csv inside {input_file}",
+        ]
         if "depth_ts.txt" in tar_names:
             timestamp_path = tar.extractfile(
                 tar_members[tar_names.index("depth_ts.txt")]
             )
+            source = looked_in[0]
         elif "timestamps.csv" in tar_names:
             timestamp_path = tar.extractfile(
                 tar_members[tar_names.index("timestamps.csv")]
             )
+            source = looked_in[1]
             alternate_correct = True
+        metadata_path = tar.extractfile(tar_members[tar_names.index("metadata.json")])
     else:
         # Handling non-compressed session paths
         metadata_path = join(dirname, "metadata.json")
-        timestamp_path = join(dirname, "depth_ts.txt")
+        depth_ts_path = join(dirname, "depth_ts.txt")
         alternate_timestamp_path = join(dirname, "timestamps.csv")
+        looked_in = [depth_ts_path, alternate_timestamp_path]
         # Checks for alternative timestamp file if original .txt extension does not exist
-        if not exists(timestamp_path) and exists(alternate_timestamp_path):
+        if exists(depth_ts_path):
+            timestamp_path = depth_ts_path
+        elif exists(alternate_timestamp_path):
             timestamp_path = alternate_timestamp_path
             alternate_correct = True
-        elif not (
-            exists(timestamp_path) or exists(alternate_timestamp_path)
-        ) and input_file.endswith(".mkv"):
+        elif input_file.endswith(".mkv"):
             from_depth_file = True
 
-    acquisition_metadata = load_metadata(metadata_path)
+    if timestamp_path is None and not from_depth_file:
+        raise FileNotFoundError(_no_timestamps_message(recording, looked_in, where=where))
+
     if not from_depth_file:
+        if tar is None:
+            source = timestamp_path
         timestamps = load_timestamps(timestamp_path, col=0, alternate=alternate_correct)
     else:
         timestamps = load_timestamps_from_movie(input_file)
+        source = f"the frame timestamps inside {input_file}"
+        looked_in = looked_in + [source]
+
+    if len(timestamps) == 0:
+        raise FileNotFoundError(
+            _no_timestamps_message(recording, looked_in, empty=source, where=where)
+        )
+
+    acquisition_metadata = load_metadata(metadata_path)
 
     return acquisition_metadata, timestamps, tar
 
