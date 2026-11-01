@@ -64,7 +64,6 @@ def command_with_config(config_file_param_name):
             param_defaults = {p.human_readable_name: p.default for p in self.params
                               if isinstance(p, click.core.Option)}
             param_defaults = {k: tuple(v) if type(v) is list else v for k, v in param_defaults.items()}
-            param_cli = {k: tuple(v) if type(v) is list else v for k, v in ctx.params.items()}
 
             if config_file is not None:
 
@@ -79,16 +78,14 @@ def command_with_config(config_file_param_name):
                 config_data = {k: tuple(v) if isinstance(v, CommentedSeq) else v
                                for k, v in config_data.items() if k in param_defaults.keys() and v is not None}
 
-                # find differences btw config and param defaults
-                diffs = set(param_defaults.items()) ^ set(param_cli.items())
-
-                # combine defaults w/ config data
-                combined = {**param_defaults, **config_data}
-
-                # update cli params that are non-default
-                keys = [d[0] for d in diffs]
-                for k in set(keys):
-                    combined[k] = ctx.params[k]
+                # a value typed on the command line outranks the config file, which
+                # outranks the default. click records where each value came from;
+                # comparing a value with the option's default cannot tell, because
+                # the two coincide whenever someone types the default.
+                combined = dict(ctx.params)
+                for k, v in config_data.items():
+                    if ctx.get_parameter_source(k) is not click.core.ParameterSource.COMMANDLINE:
+                        combined[k] = v
 
                 ctx.params = combined
                 

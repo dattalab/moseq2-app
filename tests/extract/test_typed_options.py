@@ -1,0 +1,167 @@
+"""Options typed on the command line outrank the config file.
+
+``command_with_config`` merges a command's options with its ``--config-file``.
+An option typed on the command line wins, including when the typed value
+happens to equal the option's default (moseq2-extract#24): ``--crop-size 80 80``
+over a config holding ``[120, 120]`` extracts at 80. An option not typed takes
+the config file's value where it has one.
+
+``batch-extract`` run locally extracts each recording from the config file and
+that recording's entry in the session config. The options typed on its command
+line are applied over both, and ``--num-frames`` reaches the extraction
+(moseq2-extract#158).
+"""
+
+from __future__ import annotations
+
+import pytest
+from click.testing import CliRunner
+
+import moseq2_extract.cli as extract_cli
+import moseq2_extract.gui as extract_gui
+from moseq2_extract._yaml import write_yaml
+
+
+def run(*args):
+    result = CliRunner().invoke(extract_cli.cli, list(args), catch_exceptions=False)
+    assert result.exit_code == 0, result.output
+    return result
+
+
+@pytest.fixture
+def received(monkeypatch):
+    """What ``extract`` hands its wrapper, instead of running it."""
+    calls = []
+    monkeypatch.setattr(
+        extract_cli, "extract_wrapper", lambda f, out, config, **kw: calls.append(config)
+    )
+    return calls
+
+
+@pytest.mark.parametrize(
+    "typed, expected",
+    [
+        (("--crop-size", "80", "80"), (80, 80)),
+        (("--crop-size", "100", "100"), (100, 100)),
+        ((), (120, 120)),
+    ],
+    ids=["typed-default", "typed-other", "not-typed"],
+)
+def test_extract_crop_size(typed, expected, tmp_path, received):
+    recording = tmp_path / "depth.avi"
+    recording.touch()
+    config = tmp_path / "config.yaml"
+    write_yaml({"crop_size": [120, 120]}, str(config))
+
+    run("extract", str(recording), "--config-file", str(config), *typed)
+
+    assert tuple(received[0]["crop_size"]) == expected
+
+
+SESSION = "session_1"
+
+
+@pytest.fixture
+def project(tmp_path):
+    """One recording, a config file and a session config that disagree with
+    the defaults."""
+    session = tmp_path / SESSION
+    session.mkdir()
+    (session / "depth.avi").touch()
+    (session / "metadata.json").write_text("{}")
+
+    session_config = tmp_path / "session_config.yaml"
+    write_yaml(
+        {
+            SESSION: {
+                "crop_size": [120, 120],
+                "frame_trim": [5, 5],
+                "fps": 15,
+                "bg_roi_depth_range": [550, 650],
+                "manual_set_depth_range": False,
+            }
+        },
+        str(session_config),
+    )
+    config = tmp_path / "config.yaml"
+    write_yaml(
+        {
+            "cluster_type": "local",
+            "crop_size": [90, 90],
+            "fps": 20,
+            "session_config_path": str(session_config),
+        },
+        str(config),
+    )
+    return tmp_path, config
+
+
+@pytest.fixture
+def extracted(monkeypatch):
+    """What each local extraction hands ``extract_wrapper``, instead of running it."""
+    calls = []
+
+    def record(input_file, output_dir, config_data, num_frames=None, skip=False):
+        calls.append(
+            {"config": config_data, "num_frames": num_frames, "output_dir": output_dir}
+        )
+
+    monkeypatch.setattr(extract_gui, "extract_wrapper", record)
+    return calls
+
+
+def batch(root, config, *typed):
+    return run(
+        "batch-extract",
+        str(root),
+        "--config-file",
+        str(config),
+        "--extensions",
+        ".avi",
+        *typed,
+    )
+
+
+def test_batch_extract_typed_options_reach_each_recording(project, extracted):
+    root, config = project
+    batch(
+        root,
+        config,
+        "--num-frames",
+        "50",
+        "--frame-trim",
+        "10",
+        "10",
+        "--crop-size",
+        "80",
+        "80",
+    )
+
+    assert len(extracted) == 1
+    call = extracted[0]
+    assert call["num_frames"] == 50
+    assert tuple(call["config"]["frame_trim"]) == (10, 10)
+    assert tuple(call["config"]["crop_size"]) == (80, 80)
+    # not typed: the session config's value
+    assert call["config"]["fps"] == 15
+
+
+def test_batch_extract_without_typed_options_uses_the_session_config(project, extracted):
+    root, config = project
+    batch(root, config)
+
+    call = extracted[0]
+    assert call["num_frames"] is None
+    assert tuple(call["config"]["frame_trim"]) == (5, 5)
+    assert tuple(call["config"]["crop_size"]) == (120, 120)
+    assert call["config"]["fps"] == 15
+    assert call["config"]["manual_set_depth_range"] is False
+
+
+def test_batch_extract_typed_depth_range_is_manual(project, extracted):
+    root, config = project
+    batch(root, config, "--bg-roi-depth-range", "600", "800")
+
+    call = extracted[0]
+    assert tuple(call["config"]["bg_roi_depth_range"]) == (600, 800)
+    assert call["config"]["manual_set_depth_range"] is True

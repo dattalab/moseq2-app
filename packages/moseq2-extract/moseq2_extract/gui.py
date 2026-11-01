@@ -317,7 +317,9 @@ def find_roi_command(
 
 
 @filter_warnings
-def extract_command(input_file, output_dir, config_file, num_frames=None, skip=False):
+def extract_command(
+    input_file, output_dir, config_file, num_frames=None, skip=False, cli_options=None
+):
     """
     Extract depth file
 
@@ -327,6 +329,7 @@ def extract_command(input_file, output_dir, config_file, num_frames=None, skip=F
     config_file (str): path to config file (config.yaml).
     num_frames (int): number of frames to extract. If None, all frames are extracted.
     skip (bool): skip already extracted file.
+    cli_options (dict): parameters typed on the command line; they take precedence over the config file and the session config.
 
     Returns:
     (str): String indicating that the extracted is completed.
@@ -341,6 +344,9 @@ def extract_command(input_file, output_dir, config_file, num_frames=None, skip=F
 
         # If key is found, update config_data, otherwise, use default dict
         config_data = session_configs.get(session_key, config_data)
+
+    if cli_options:
+        config_data = {**config_data, **cli_options}
 
     if output_dir is None:
         output_dir = config_data.get("output_dir", "proc")
