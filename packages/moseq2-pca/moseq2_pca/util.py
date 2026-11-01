@@ -3,20 +3,25 @@ Utility and helper functions for finding and reading files, filtering operations
 """
 
 import os
+import sys
+import asyncio
 import cv2
 import h5py
 import time
 import dask
+import logging
 import click
 from click.core import ParameterSource
 import psutil
 import warnings
 import platform
+import shutil
 import subprocess
 import numpy as np
 import scipy.signal
 from glob import glob
 from copy import deepcopy
+from contextlib import contextmanager
 from moseq2_pca._yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
@@ -439,6 +444,28 @@ def read_yaml(yaml_file):
     return return_dict
 
 
+def _frame_shapes(h5s, dicts, h5_path='/frames'):
+    """Each session's frame size, UUID and file, for the sessions that have frames at h5_path."""
+    shapes = []
+    for h5, meta in zip(h5s, dicts):
+        with h5py.File(h5, 'r') as f:
+            if h5_path not in f:
+                continue
+            shape = tuple(f[h5_path].shape[1:])
+        uuid = (meta or {}).get('uuid', 'no uuid in its yaml')
+        shapes.append((shape, uuid, h5))
+    return shapes
+
+
+def _frame_size(shape):
+    return ' x '.join(str(n) for n in shape)
+
+
+def _frame_size_rows(shapes):
+    width = max(len(_frame_size(shape)) for shape, _, _ in shapes)
+    return '\n'.join(f'  {_frame_size(shape):<{width}}  {uuid}  {h5}' for shape, uuid, h5 in sorted(shapes))
+
+
 def check_frame_shapes(h5s, dicts, h5_path='/frames'):
     """
     Stop before PCA when the sessions' frames are not all the same size. Every
@@ -451,29 +478,52 @@ def check_frame_shapes(h5s, dicts, h5_path='/frames'):
     dicts (list): the sessions' yaml contents, in the same order, for their UUIDs.
     h5_path (str): path to the frames inside each h5 file.
     """
-    shapes = []
-    for h5, meta in zip(h5s, dicts):
-        with h5py.File(h5, 'r') as f:
-            if h5_path not in f:
-                continue
-            shape = tuple(f[h5_path].shape[1:])
-        uuid = (meta or {}).get('uuid', 'no uuid in its yaml')
-        shapes.append((shape, uuid, h5))
+    shapes = _frame_shapes(h5s, dicts, h5_path)
 
     if len({shape for shape, _, _ in shapes}) <= 1:
         return
 
-    def size(shape):
-        return ' x '.join(str(n) for n in shape)
-
-    width = max(len(size(shape)) for shape, _, _ in shapes)
-    rows = '\n'.join(f'  {size(shape):<{width}}  {uuid}  {h5}' for shape, uuid, h5 in sorted(shapes))
     raise ValueError(
         f'The extracted sessions do not all have the same frame size, so they cannot go into '
-        f'one PCA. Each session\'s frame size in pixels ({h5_path}), UUID and file:\n{rows}\n'
+        f'one PCA. Each session\'s frame size in pixels ({h5_path}), UUID and file:\n'
+        f'{_frame_size_rows(shapes)}\n'
         f'Frames of different sizes come from extracting with different crop_size settings. '
         f'Extract every session again with one crop_size (crop_size in config.yaml, or '
         f'--crop-size on the command line), then run PCA again.'
+    )
+
+
+def check_frames_match_pca(h5s, dicts, components, pca_file, h5_path='/frames'):
+    """
+    Stop before applying a PCA when sessions' frames are not the size its
+    components were trained on. Each component holds one value per pixel of a
+    frame, so a PCA can only score frames with that many pixels.
+
+    Args:
+    h5s (list): paths to the sessions' extracted h5 files.
+    dicts (list): the sessions' yaml contents, in the same order, for their UUIDs.
+    components (numpy.ndarray): the trained components, one per row.
+    pca_file (str): the PCA file the components were read from, for the message.
+    h5_path (str): path to the frames inside each h5 file.
+    """
+    pixels = int(np.shape(components)[-1])
+    wrong = [(shape, uuid, h5) for shape, uuid, h5 in _frame_shapes(h5s, dicts, h5_path)
+             if int(np.prod(shape)) != pixels]
+    if not wrong:
+        return
+
+    side = int(round(np.sqrt(pixels)))
+    trained = f'{pixels} pixels' + (f' (frames of {side} x {side})' if side * side == pixels else '')
+    raise ValueError(
+        f'The PCA in {pca_file} was trained on frames of {trained}, and '
+        f'{len(wrong)} session{"s" if len(wrong) != 1 else ""} '
+        f'{"have" if len(wrong) != 1 else "has"} frames of another size, so '
+        f'{"they" if len(wrong) != 1 else "it"} cannot be scored with it. Each such session\'s '
+        f'frame size in pixels ({h5_path}), UUID and file:\n{_frame_size_rows(wrong)}\n'
+        f'Frames of different sizes come from extracting with different crop_size settings. '
+        f'Apply a PCA trained on extractions made with the same crop_size as these sessions, or '
+        f'extract these sessions again with the crop_size the PCA was trained on (crop_size in '
+        f'config.yaml, or --crop-size on the command line).'
     )
 
 
@@ -611,36 +661,478 @@ def set_dask_config(memory={'target': 0.85, 'spill': False, 'pause': False, 'ter
     dask.config.set({'optimization.fuse.ave-width': 5})
 
 
-def get_env_cpu_and_mem():
+#: Where the kernel says which cgroup this process is in, and where the cgroup
+#: filesystem is mounted. Module attributes so tests can point them at fakes.
+PROC_SELF_CGROUP = '/proc/self/cgroup'
+CGROUP_ROOT = '/sys/fs/cgroup'
+
+#: A cgroup memory limit at or above this is cgroup v1's way of saying "no
+#: limit" (it reports 9223372036854771712).
+CGROUP_NO_LIMIT = 2 ** 60
+
+#: Bytes in each unit SLURM gives memory in; SLURM's units are binary.
+SLURM_MEMORY_UNITS = {'K': 2 ** 10, 'M': 2 ** 20, 'G': 2 ** 30, 'T': 2 ** 40}
+
+
+def _read_number(path, key=None):
     """
-    Read current system environment and return the amount of available memory and CPUs to allocate to the created cluster.
+    The number in a cgroup file, or the value of key in a file of "key value"
+    lines. None when the file is missing or holds no number (cgroup v2's "max").
+    """
+    try:
+        with open(path) as f:
+            text = f.read()
+    except OSError:
+        return None
+    if key is not None:
+        for line in text.splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[0] == key:
+                text = parts[1]
+                break
+        else:
+            return None
+    try:
+        return int(text.strip())
+    except ValueError:
+        return None
+
+
+def cgroup_memory_available():
+    """
+    The memory, in bytes, this process's cgroup still lets it use, or None when
+    no cgroup limits it. This is how a container's memory limit (Docker's
+    --memory, Kubernetes' limits) and a SLURM job's limit reach a process.
+
+    The tightest limit along the path from the process's cgroup to the root
+    binds. What is available under it is the limit less what the group already
+    uses, not counting inactive file cache, which the kernel reclaims before it
+    runs out (the same "working set" docker stats reports). Both cgroup v2
+    (memory.max) and v1 (memory.limit_in_bytes) are read.
 
     Returns:
-    mem (float): Optimal number of memory (in bytes) to allocate to initialized dask cluster
-    cpu (int): Optimal number of CPUs to allocate to dask
+    available (int or None): bytes available under the cgroup's limit.
+    """
+    try:
+        with open(PROC_SELF_CGROUP) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+
+    folders = []
+    for line in lines:
+        parts = line.split(':', 2)
+        if len(parts) != 3:
+            continue
+        _, controllers, path = parts
+        if controllers == '':
+            folders.append((CGROUP_ROOT, path, 'memory.max', 'memory.current', 'inactive_file'))
+        elif 'memory' in controllers.split(','):
+            folders.append((join(CGROUP_ROOT, 'memory'), path, 'memory.limit_in_bytes',
+                            'memory.usage_in_bytes', 'total_inactive_file'))
+
+    available = []
+    for root, path, limit_file, usage_file, inactive_key in folders:
+        # walk from the process's group up to the root of the hierarchy; inside a
+        # container with its own cgroup namespace the path is "/" and only the
+        # root is there
+        parts = [p for p in path.split('/') if p]
+        for depth in range(len(parts), -1, -1):
+            folder = join(root, *parts[:depth])
+            limit = _read_number(join(folder, limit_file))
+            if limit is None or limit >= CGROUP_NO_LIMIT:
+                continue
+            usage = _read_number(join(folder, usage_file)) or 0
+            inactive = _read_number(join(folder, 'memory.stat'), inactive_key) or 0
+            available.append(max(0, limit - max(0, usage - inactive)))
+
+    return min(available) if available else None
+
+
+def _parse_slurm_memory(value, cpus):
+    """
+    Bytes in a memory value as sacct's ReqMem gives it: a number with a unit
+    (K, M, G or T; M when there is none), and in older SLURM versions a
+    trailing "c" for per-CPU or "n" for per-node.
+    """
+    value = value.strip()
+    per_cpu = value.endswith('c')
+    if value[-1:] in ('c', 'n'):
+        value = value[:-1]
+    unit = value[-1:].upper()
+    if unit in SLURM_MEMORY_UNITS:
+        number = float(value[:-1]) * SLURM_MEMORY_UNITS[unit]
+    else:
+        number = float(value) * SLURM_MEMORY_UNITS['M']
+    return number * cpus if per_cpu else number
+
+
+def _slurm_cpu_and_mem(job_id):
+    """
+    The CPUs and bytes of memory a SLURM job was given, from the variables
+    SLURM sets in the job's environment, or from sacct when they are absent.
+    Either may be None when SLURM does not say.
+    """
+    cpus = os.environ.get('SLURM_CPUS_ON_NODE')
+    cpus = int(cpus) if cpus and cpus.isdigit() else None
+    per_node = os.environ.get('SLURM_MEM_PER_NODE')
+    per_cpu = os.environ.get('SLURM_MEM_PER_CPU')
+
+    if per_node and per_node.isdigit() and int(per_node) > 0:
+        return cpus, int(per_node) * SLURM_MEMORY_UNITS['M']
+    if per_cpu and per_cpu.isdigit() and int(per_cpu) > 0 and cpus is not None:
+        return cpus, int(per_cpu) * cpus * SLURM_MEMORY_UNITS['M']
+
+    click.echo('Detected slurm environment, using "sacct" to detect cpu and memory requirements')
+    cmd = f'sacct -j {job_id} --format AllocCPUS,ReqMem -X -n -p'
+    output = subprocess.check_output(cmd.split(' '))
+    alloc_cpus, reqmem = output.decode('utf-8').strip().split('|')[:2]
+    alloc_cpus = int(alloc_cpus)
+    return alloc_cpus, _parse_slurm_memory(reqmem, alloc_cpus)
+
+
+def get_env_cpu_and_mem():
+    """
+    The memory and CPUs this process may use, to size the local dask cluster from.
+
+    The machine's own numbers (its available memory and CPU count) describe the
+    whole computer, which a process in a container, on a shared server or in a
+    SLURM job does not have to itself. Each is capped by what the process may
+    use: memory by its cgroup's limit and, in a SLURM job, by the job's
+    allocation; CPUs by the ones it may run on (os.sched_getaffinity) and, in a
+    SLURM job, by SLURM_CPUS_ON_NODE.
+
+    Returns:
+    mem (float): bytes of memory to give the dask cluster: 80% of what is
+        available, leaving room for this process and others it starts
+    cpu (int): CPUs to give dask: one fewer than are available, and at least one
     """
 
-    is_slurm = os.environ.get('SLURM_JOBID', False)
+    mem = psutil.virtual_memory().available
+    cpus = psutil.cpu_count()
+    if hasattr(os, 'sched_getaffinity'):
+        cpus = min(cpus, len(os.sched_getaffinity(0)))
 
-    if is_slurm:
-        click.echo('Detected slurm environment, using "sacct" to detect cpu and memory requirements')
-        cmd = f'sacct -j {is_slurm} --format AllocCPUS,ReqMem -X -n -p'
-        output = subprocess.check_output(cmd.split(' '))
-        output = output.decode('utf-8').strip().split('|')
-        cpu, mem, _ = output
-        cpu = max(1, int(cpu)-1)
+    cgroup_mem = cgroup_memory_available()
+    if cgroup_mem is not None:
+        mem = min(mem, cgroup_mem)
 
-        if 'G' in mem:
-            # account for additional processes that needs memory
-            mem = float(mem[:mem.index('G')]) * 1e9 * 0.8
-        elif 'M' in mem:
-            # account for additional processes that needs memory
-            mem = float(mem[:mem.index('M')]) * 1e6 * 0.8
+    job_id = os.environ.get('SLURM_JOB_ID') or os.environ.get('SLURM_JOBID')
+    if job_id:
+        slurm_cpus, slurm_mem = _slurm_cpu_and_mem(job_id)
+        if slurm_mem is not None:
+            mem = min(mem, slurm_mem)
+        if slurm_cpus is not None:
+            cpus = min(cpus, slurm_cpus)
+
+    # account for additional processes that need memory
+    return mem * 0.8, max(1, cpus - 1)
+
+
+#: The loggers dask, distributed and the web servers under its dashboard write to.
+DASK_LOGGERS = ('distributed', 'dask', 'tornado', 'bokeh')
+DASK_LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+
+class _Forward(logging.Handler):
+    """
+    Pass records at or above level to another handler. Not a StreamHandler, so
+    a LocalCluster starting up (which sets every StreamHandler on the
+    distributed logger to WARNING while it runs) leaves its level alone.
+    """
+
+    def __init__(self, target, level=logging.NOTSET):
+        super().__init__(level)
+        self.target = target
+        target.setFormatter(logging.Formatter(DASK_LOG_FORMAT))
+
+    def emit(self, record):
+        self.target.handle(record)
+
+    def close(self):
+        self.target.close()
+        super().close()
+
+
+def _not_cancelled(record):
+    """
+    False for an error whose exception is a cancelled task. distributed logs one
+    at ERROR whenever the progress bar stops following a computation (the
+    scheduler's feed to it is cancelled); nothing has failed, so it stays out
+    of the console.
+    """
+    return not (record.exc_info and record.exc_info[0] is not None
+                and issubclass(record.exc_info[0], asyncio.CancelledError))
+
+
+@contextmanager
+def dask_messages_to(log_file):
+    """
+    Send dask's log messages and warnings from WARNING up to ERROR to log_file
+    instead of the console, for as long as the block runs. Errors go to both,
+    so a real failure still shows; the console is told once where the rest went.
+
+    distributed logs freely to the console (worker memory warnings, a dashboard
+    port already in use, shutdown chatter), and next to a command's own output
+    users could not tell those from a failure. Only this process's loggers are
+    moved: workers started as separate processes (local_processes True, or a
+    SLURM cluster) log where they always have.
+
+    Args:
+    log_file (str): path to the command's log file; it is appended to.
+    """
+    # warnings and above: the INFO chatter of workers starting and stopping is
+    # what a LocalCluster hides from the console too
+    file_handler = _Forward(logging.FileHandler(log_file), logging.WARNING)
+    console = _Forward(logging.StreamHandler(sys.stderr), logging.ERROR)
+    console.addFilter(_not_cancelled)
+
+    def prints(handler):
+        return isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler)
+
+    # the top-level loggers, and every logger under them that prints itself
+    # (distributed gives several their own console handler and stops them
+    # propagating); other handlers, such as the in-memory one a worker keeps
+    # its recent logs in, stay where they are
+    names = {name for name, logger in logging.Logger.manager.loggerDict.items()
+             if isinstance(logger, logging.Logger) and name.split('.')[0] in DASK_LOGGERS
+             and any(prints(h) for h in logger.handlers)}
+    saved = {}
+    for name in sorted(names | set(DASK_LOGGERS)):
+        logger = logging.getLogger(name)
+        saved[name] = (list(logger.handlers), logger.propagate)
+        for handler in [h for h in logger.handlers if prints(h)]:
+            logger.removeHandler(handler)
+        logger.addHandler(file_handler)
+        logger.addHandler(console)
+        logger.propagate = False
+
+    show = warnings.showwarning
+    packages = tuple(os.sep + name + os.sep for name in DASK_LOGGERS)
+
+    def showwarning(message, category, filename, lineno, file=None, line=None):
+        if any(p in filename for p in packages):
+            file_handler.handle(logging.LogRecord(
+                'py.warnings', logging.WARNING, filename, lineno,
+                f'{category.__name__}: {message}', None, None))
+        else:
+            show(message, category, filename, lineno, file, line)
+
+    warnings.showwarning = showwarning
+    click.echo(f'Dask\'s messages are written to {log_file}; errors are shown here too.')
+    try:
+        yield
+    finally:
+        warnings.showwarning = show
+        for name, (handlers, propagate) in saved.items():
+            logger = logging.getLogger(name)
+            logger.handlers = handlers
+            logger.propagate = propagate
+        file_handler.close()
+
+
+def local_workers(nworkers):
+    """
+    How many workers a local dask cluster starts and the memory each is given,
+    from the memory and CPUs this process may use (get_env_cpu_and_mem).
+
+    Args:
+    nworkers (int): the number of workers asked for.
+
+    Returns:
+    nworkers (int): the number of workers to start, at most the one asked for.
+    mem_limit (float): bytes of memory each worker may use.
+    """
+    max_mem, max_cpu = get_env_cpu_and_mem()
+    overhead = 0.8e9  # memory overhead for each worker; approximate
+
+    # allocating 0.4 of the maximum memory to account for overhead per worker
+    allowed = max_mem * 0.4
+    max_workers = allowed // overhead
+
+    # Set the number of workers to the maximum the memory and the CPUs
+    # allow, and never to none. A cluster with no workers accepts the graph
+    # and then never finishes it, so asking for zero is an indefinite hang
+    # with no error, and the ceilings reach zero on an ordinary machine:
+    # max_workers is zero whenever less than about 2.5GB is free.
+    nworkers = int(max(1, min(nworkers, max_workers, max_cpu)))
+    mem_limit = max(1, max_mem / nworkers)
+    return nworkers, mem_limit
+
+
+#: Training data above TRAINING_MEMORY_WARN times the workers' memory warns:
+#: dask spills what does not fit to disk, and training is slower. Above
+#: TRAINING_MEMORY_STOP times, train-pca stops before it starts. Past that point
+#: more than three quarters of the data lives on disk and is read back on every
+#: pass of the SVD, so the disk sets the run time. Measured on the test suite's
+#: 20-session bundle (719,372 frames, 18.4 GB as float32) with the dask cache
+#: on a local disk, spilling 9 times over still finished, in about 1.7 times
+#: as long; projects several times over their machine's memory have died hours
+#: in (moseq2-app#193).
+TRAINING_MEMORY_WARN = 1.0
+TRAINING_MEMORY_STOP = 4.0
+
+#: The suggested train_on_subset and SLURM workers aim at this fraction of the
+#: workers' memory, leaving the rest for each worker's own overhead.
+TRAINING_MEMORY_TARGET = 0.9
+
+
+class TrainingMemoryWarning(Warning):
+    """
+    The PCA training data is larger than the dask workers' memory, so dask
+    spills to disk. A Warning rather than a UserWarning, because the notebook's
+    PCA cell hides UserWarnings.
+    """
+
+
+class TrainingMemoryError(RuntimeError):
+    """The PCA training data is far larger than the dask workers' memory."""
+
+
+def _format_bytes(n):
+    """Bytes in decimal units with two decimals, as dask's memory settings write them."""
+    for unit, size in (('TB', 1e12), ('GB', 1e9), ('MB', 1e6), ('kB', 1e3)):
+        if n >= size:
+            return f'{n / size:.2f} {unit}'
+    return f'{n:.0f} B'
+
+
+def _round_down(x, digits=2):
+    """x rounded down to two significant figures, so a suggested value stays under its target."""
+    if x <= 0:
+        return 0.0
+    scale = 10 ** (digits - 1 - int(np.floor(np.log10(x))))
+    return float(np.floor(x * scale) / scale)
+
+
+def _free_disk(path):
+    """Free bytes on the disk that holds path, or its nearest existing parent."""
+    path = abspath(expanduser(str(path)))
+    while not exists(path) and os.path.dirname(path) != path:
+        path = os.path.dirname(path)
+    try:
+        return shutil.disk_usage(path).free
+    except OSError:
+        return None
+
+
+def check_training_memory(h5s, config_data):
+    """
+    Before train-pca starts, compare the memory its training data needs with
+    what the dask workers have; warn when it is somewhat more and stop when it
+    is far more, saying how to make it fit.
+
+    Training holds every training frame in the workers' memory at once, as
+    float32 after cleaning: the mean over all frames must finish before any
+    frame can be centred for the SVD. With missing-data PCA the frame masks are
+    held too. When that is more than the workers have, dask spills the excess
+    to disk at dask_cache_path, and every pass of the SVD reads it back, so
+    training slows with how much is spilled. Up to TRAINING_MEMORY_STOP times
+    the workers' memory this warns; beyond it, or when the disk lacks room for
+    what would be spilled, it stops.
+
+    Args:
+    h5s (list): paths to the sessions' extracted h5 files.
+    config_data (dict): train-pca's parameters.
+    """
+    cluster_type = config_data.get('cluster_type', 'local')
+    if cluster_type not in ('local', 'slurm'):
+        return
+
+    h5_path = config_data.get('h5_path', '/frames')
+    subset = config_data.get('train_on_subset', 1)
+    lengths, pixels = [], None
+    for h5 in h5s:
+        with h5py.File(h5, 'r') as f:
+            if h5_path not in f:
+                continue
+            frames = f[h5_path]
+            lengths.append(len(frames))
+            pixels = tuple(frames.shape[1:])
+    if not lengths:
+        return
+
+    missing_data = config_data.get('missing_data') or config_data.get('cable_filter_iters', 0) > 1
+    bytes_per_frame = float(np.prod(pixels)) * (4 + (1 if missing_data else 0))
+
+    def used_frames(fraction):
+        return sum(int(n * fraction) for n in lengths)
+
+    n_frames = used_frames(subset)
+    needed = n_frames * bytes_per_frame
+
+    nworkers = int(config_data.get('nworkers', 1))
+    if cluster_type == 'local':
+        n, per_worker = local_workers(nworkers)
+        have = n * per_worker
+        workers = (f'{n} local worker{"s" if n != 1 else ""} of {_format_bytes(per_worker)}, '
+                   f'80% of the memory this process may use')
     else:
-        mem = psutil.virtual_memory().available * 0.8
-        cpu = max(1, psutil.cpu_count() - 1)
+        processes = max(1, int(config_data.get('processes', 1)))
+        jobs = int(np.ceil(nworkers / processes))
+        have = jobs * dask.utils.parse_bytes(config_data['memory'])
+        workers = (f'{jobs} SLURM job{"s" if jobs != 1 else ""} of {config_data["memory"]}, '
+                   f'from nworkers {nworkers} and memory {config_data["memory"]}')
 
-    return mem, cpu
+    ratio = needed / have
+    if ratio <= TRAINING_MEMORY_WARN:
+        return
+
+    cache = config_data.get('dask_cache_path') or os.getcwd()
+    spill = needed - have
+    free = _free_disk(cache)
+    no_room = free is not None and free < spill
+
+    # a train_on_subset that brings the training data under the workers' memory
+    fit_subset = _round_down(subset * TRAINING_MEMORY_TARGET * have / needed)
+    fit_frames = used_frames(fit_subset)
+    # SLURM workers of the memory already set (train-pca's default when there is none)
+    memory = config_data.get('memory') or '15GB'
+    per_job = dask.utils.parse_bytes(memory)
+    processes = max(1, int(config_data.get('processes', 1)))
+    jobs_needed = int(np.ceil(needed / (TRAINING_MEMORY_TARGET * per_job)))
+    slurm_workers = jobs_needed * processes
+
+    size = ' x '.join(str(p) for p in pixels)
+    what = (f'Training PCA on {n_frames:,} frames of {size} pixels from {len(lengths)} '
+            f'session{"s" if len(lengths) != 1 else ""} (train_on_subset {subset:g}, of '
+            f'{sum(lengths):,} frames in all) needs about {_format_bytes(needed)} of memory'
+            f'{" with the missing-data masks" if missing_data else ""}, and the dask workers have '
+            f'{_format_bytes(have)} ({workers}): {ratio:.1f} times what they have.')
+    remedies = (
+        f'  - Train on fewer frames: set train_on_subset to {fit_subset:g} '
+        f'({fit_frames:,} frames, about {_format_bytes(fit_frames * bytes_per_frame)}).\n'
+        f'  - If you have a SLURM cluster, run the workers there: set cluster_type slurm, '
+        f'nworkers {slurm_workers}, memory {memory} per worker '
+        f'({_format_bytes(jobs_needed * per_job)} in all), and queue to your cluster\'s partition.\n'
+        f'In the notebook\'s PCA cell these are config_data[\'train_on_subset\'], '
+        f'config_data[\'cluster_type\'], config_data[\'nworkers\'], config_data[\'memory\'] and '
+        f'config_data[\'queue\']; on the command line, --train-on-subset, --cluster-type, '
+        f'--nworkers, --memory and --queue.'
+    )
+
+    if ratio > TRAINING_MEMORY_STOP:
+        raise TrainingMemoryError(
+            f'{what} Training holds all of its frames in memory at once. Dask can spill what does '
+            f'not fit to disk ({cache}), but beyond {TRAINING_MEMORY_STOP:g} times the workers\' '
+            f'memory most of the data lives on disk and is read back on every pass of the SVD; '
+            f'unless that disk is a fast local one the run takes many hours, and runs this far '
+            f'over have died partway. It has been stopped before starting. To make it fit, do '
+            f'one of these:\n{remedies}'
+        )
+    if no_room:
+        raise TrainingMemoryError(
+            f'{what} Dask would spill about {_format_bytes(spill)} to disk in {cache}, which has '
+            f'{_format_bytes(free)} free, so the run would fail partway. It has been stopped before '
+            f'starting. Set dask_cache_path to a folder on a disk with more than '
+            f'{_format_bytes(spill)} free, or make the training data fit in memory with one of '
+            f'these:\n{remedies}'
+        )
+    warnings.warn(
+        f'{what} Dask will spill about {_format_bytes(spill)} to disk in {cache}, which makes '
+        f'training slower. To keep it in memory, do one of these:\n{remedies}',
+        TrainingMemoryWarning, stacklevel=2,
+    )
 
 
 def initialize_dask(nworkers=50, processes=1, memory='4GB', cores=1,
@@ -676,28 +1168,10 @@ def initialize_dask(nworkers=50, processes=1, memory='4GB', cores=1,
 
     if cluster_type == 'local':
 
-        max_mem, max_cpu = get_env_cpu_and_mem()
-        overhead = 0.8e9  # memory overhead for each worker; approximate
-        
-        # allocating 0.4 of the maximum memory to account for overhead per worker
-        allowed = max_mem * 0.4 
-        max_workers = allowed // overhead
-
-        # Set the number of workers to the maximum the memory and the CPUs
-        # allow, and never to none. A cluster with no workers accepts the graph
-        # and then never finishes it, so asking for zero is an indefinite hang
-        # with no error, and the ceilings reach zero on an ordinary machine:
-        # max_workers is zero whenever less than about 2.5GB is free.
         requested = nworkers
-        nworkers = int(max(1, min(nworkers, max_workers, max_cpu)))
+        nworkers, mem_limit = local_workers(nworkers)
         if nworkers < requested:
             click.echo(f'Reducing number of workers to {nworkers} to account for worker base memory and the number of CPUs')
-
-        # compute mem limit per worker
-        try:
-            mem_limit = max(1, max_mem / nworkers)
-        except:
-            mem_limit = 1
 
         # display some diagnostic info
         if data_size is not None:
