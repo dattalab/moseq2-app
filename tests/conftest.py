@@ -434,7 +434,7 @@ def pca(project, progress_file, configured, grouped):
     Runs under dask, which is why the cell configures workers.
     """
     from moseq2_app.gui.progress import update_progress
-    from moseq2_app.util import update_config
+    from moseq2_app.util import camera_for_pca, update_config
     from moseq2_pca.gui import train_pca_command
 
     pca_dirname = str(project / "_pca") + "/"
@@ -444,6 +444,9 @@ def pca(project, progress_file, configured, grouped):
         config["gaussfilter_space"] = (1.5, 1)
         config["medfilter_space"] = [0]
         config["medfilter_time"] = [0]
+        if camera_for_pca(config.get("camera_type"), paths["train_data_dir"], paths["base_dir"]) == "azure":
+            config["gaussfilter_space"] = (2.25, 1.5)
+            config["tailfilter_size"] = (13, 13)
         config["nworkers"] = 1
 
     train_pca_command(paths, pca_dirname, "pca")
