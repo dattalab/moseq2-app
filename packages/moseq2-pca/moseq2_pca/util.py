@@ -250,23 +250,59 @@ def select_strel(string='e', size=(10, 10)):
     return strel
 
 
-#: The whole frames per second ``frame_rate_from_timestamps`` accepts. Depth
-#: cameras run at 30 to 90 frames per second; PCA reads the extraction's
-#: timestamps as milliseconds, and an Azure .mkv recording stores seconds, so its
-#: rate reads 1000 times too high (30000) and is still placed correctly, because
-#: insert_nans only compares gaps with the rate the same timestamps give.
-FRAME_RATE_BOUNDS = (1, 1_000_000)
+#: How many of each value of a timestamps dataset's ``unit`` attribute make a
+#: second. Extraction writes ``/timestamps`` in milliseconds and records ``unit``
+#: as ``milliseconds``; a file written before it did so has no attribute and is
+#: read as milliseconds.
+TIMESTAMP_UNITS = {'milliseconds': 1000.0, 'ms': 1000.0, 'seconds': 1.0, 's': 1.0}
 
 
-def frame_rate_from_timestamps(timestamps, session=None):
+def timestamp_unit(dataset):
     """
-    The whole frames per second a session's timestamps imply, which insert_nans
-    uses as the grid to place dropped frames on. Stops with the values involved
-    when the timestamps cannot give one.
+    The unit a timestamps dataset records in its ``unit`` attribute, or None
+    when it records none (a file extracted before the attribute was written).
+
+    Args:
+    dataset (h5py.Dataset): an extraction's ``/timestamps`` dataset.
+
+    Returns:
+    unit (str or None): the recorded unit.
+    """
+    unit = dataset.attrs.get('unit')
+    if isinstance(unit, bytes):
+        unit = unit.decode()
+    if unit is not None and unit not in TIMESTAMP_UNITS:
+        raise ValueError(
+            f'{dataset.file.filename}: the timestamps at {dataset.name} record their unit as '
+            f'{unit!r}, which is not one of {", ".join(TIMESTAMP_UNITS)}. moseq2-extract writes '
+            f'milliseconds; check that this file is the extraction\'s own results h5 and is not '
+            f'damaged, or extract the session again.'
+        )
+    return unit
+
+
+#: The whole frames per second ``frame_rate_from_timestamps`` accepts. Depth
+#: cameras run at 5 to 90 frames per second. A file that records its timestamps'
+#: unit is held to 1 to 1,000. A file from before the unit was recorded is read as
+#: milliseconds, and an Azure .mkv extracted then stored seconds, so its rate
+#: reads 1000 times too high (about 30,000); those files are held to 1 to
+#: 1,000,000, and their dropped frames are still placed correctly, because
+#: insert_nans takes the frame period from the same timestamps.
+FRAME_RATE_BOUNDS = (1, 1_000)
+FRAME_RATE_BOUNDS_UNIT_NOT_RECORDED = (1, 1_000_000)
+
+
+def frame_rate_from_timestamps(timestamps, session=None, unit=None):
+    """
+    The whole frames per second a session's timestamps imply, from the median
+    gap between them, which is the frame period insert_nans places dropped frames
+    with. Stops with the values involved when the timestamps cannot give one.
 
     Args:
     timestamps (numpy.array): the session's timestamps, in seconds.
     session (str): the session's uuid and file, for the error message.
+    unit (str): the unit the session's file records for its timestamps, or None
+        when it records none.
 
     Returns:
     fps (int): frames per second, rounded to a whole number.
@@ -274,8 +310,9 @@ def frame_rate_from_timestamps(timestamps, session=None):
     timestamps = np.asarray(timestamps, dtype='float64')
     diffs = np.diff(timestamps)
     with np.errstate(divide='ignore', invalid='ignore'):
-        rate = 1 / np.mean(diffs) if len(diffs) > 0 else np.nan
-    low, high = FRAME_RATE_BOUNDS
+        period = np.median(diffs) if len(diffs) > 0 else np.nan
+        rate = 1 / period
+    low, high = FRAME_RATE_BOUNDS if unit is not None else FRAME_RATE_BOUNDS_UNIT_NOT_RECORDED
     if np.isfinite(rate) and low <= np.round(rate) <= high:
         return np.round(rate).astype('int')
 
@@ -285,13 +322,20 @@ def frame_rate_from_timestamps(timestamps, session=None):
         cause = 'some timestamps are NaN or infinite.'
     elif np.all(diffs == 0):
         cause = 'the timestamps are all equal, so no time passes between frames.'
-    elif np.mean(diffs) < 0:
+    elif period < 0:
         cause = 'the timestamps decrease, so they are out of order.'
+    elif period == 0:
+        cause = 'at least half of the frames have the same timestamp as the frame before.'
     elif rate < low:
         cause = (
             'the timestamps are about 1000 times too large, which is what timestamps in '
             'milliseconds look like where seconds are expected (at extraction, a depth_ts.txt '
             'in microseconds rather than milliseconds), or the recording has very long gaps.'
+        )
+    elif unit is not None:
+        cause = (
+            f'the timestamps are far smaller than a camera\'s frame interval for the unit the '
+            f'file records ({unit}); timestamps in seconds recorded as milliseconds look like this.'
         )
     else:
         cause = 'the timestamps are far smaller than a camera\'s frame interval, so their unit is not the one expected.'
@@ -300,32 +344,52 @@ def frame_rate_from_timestamps(timestamps, session=None):
     raise ValueError(
         f'Cannot work out the frame rate of {name} from its timestamps, so dropped frames '
         f'cannot be placed. They give {rate:g} frames per second (rounded to {np.round(rate):g}); '
-        f'a frame rate between {low} and {high:,} is needed. The first timestamp differences '
+        f'a frame rate between {low:,} and {high:,} is needed. The first timestamp differences '
         f'are [{first}] seconds. Likely cause: {cause} Check the depth_ts.txt this session '
         f'was extracted from (one line per frame, the time in milliseconds first) and '
         f'extract the session again.'
     )
 
 
-def insert_nans(timestamps, data, fps=30):
+def insert_nans(timestamps, data, fps=None):
     """
-    Fill NaN values with 0 in given 1D timestamps array. Used to handle dropped frames from the video acquisition.
+    Put an empty (NaN) row in data wherever the camera dropped frames, so that
+    every row is one frame step.
+
+    The frame period is the median gap between timestamps, which the drops
+    themselves do not move, or 1 / fps when fps is given. A gap of n periods,
+    rounded to the nearest whole number, holds n - 1 dropped frames.
 
     Args:
-    timestamps (numpy.array): timestamp values
-    data (numpy.array): additional data to fill with NaN values - can be PC scores
-    fps (int): frames per second
+    timestamps (numpy.array): each row's time, in seconds
+    data (numpy.array): rows to fill, one per timestamp - can be PC scores
+    fps (float): frames per second to place frames with; by default the
+        timestamps' own, from the median gap
 
     Returns:
-    filled_data (numpy.array): filled missing timestamp values.
-    data_idx (numpy.array): indices of inserted 0s
-    filled_timestamps (numpy.array): filled timestamp-strs
+    filled_data (numpy.array): data with a NaN row for every dropped frame
+    data_idx (numpy.array): each row's index into data, NaN for an inserted row
+    filled_timestamps (numpy.array): timestamps with one for every inserted row
     """
 
-    df_timestamps = np.diff(np.insert(timestamps, 0, timestamps[0] - 1.0 / fps))
-    missing_frames = np.floor(df_timestamps / (1.0 / fps))
+    timestamps = np.asarray(timestamps)
+    gaps = np.diff(timestamps)
+    if fps is not None:
+        period = 1.0 / fps
+    elif len(gaps) > 0:
+        period = np.median(gaps)
+    else:
+        period = np.nan
 
-    fill_idx = np.where(missing_frames > 1)[0]
+    if len(gaps) > 0 and not (np.isfinite(period) and period > 0):
+        raise ValueError(
+            f'Cannot place dropped frames: the frame period from these timestamps is {period:g} '
+            f'seconds, and a positive period is needed. The first timestamp differences are '
+            f'[{", ".join(f"{d:g}" for d in gaps[:5])}] seconds. Check the timestamps with '
+            f'frame_rate_from_timestamps, which says what is wrong with them.'
+        )
+
+    steps = np.round(gaps / period) if len(gaps) > 0 else gaps
     data_idx = np.arange(len(timestamps)).astype('float64')
 
     filled_data = deepcopy(data)
@@ -339,16 +403,16 @@ def insert_nans(timestamps, data, fps=30):
 
     nframes, nfeatures = filled_data.shape
 
-    for idx in fill_idx[::-1]:
-        if idx < len(missing_frames): # ensures ninserts value remains an int
-            ninserts = int(missing_frames[idx] - 1)
-            data_idx = np.insert(data_idx, idx, [np.nan] * ninserts)
-            insert_timestamps = timestamps[idx - 1] + \
-                np.cumsum(np.ones(ninserts,) * 1.0 / fps)
-            filled_data = np.insert(filled_data, idx,
-                                    np.ones((ninserts, nfeatures)) * np.nan, axis=0)
-            filled_timestamps = np.insert(
-                filled_timestamps, idx, insert_timestamps)
+    # gap i lies between rows i and i + 1; insert from the end so earlier positions hold
+    for gap in np.flatnonzero(steps > 1)[::-1]:
+        ninserts = int(steps[gap]) - 1
+        idx = gap + 1
+        data_idx = np.insert(data_idx, idx, [np.nan] * ninserts)
+        insert_timestamps = timestamps[gap] + np.arange(1, ninserts + 1) * period
+        filled_data = np.insert(filled_data, idx,
+                                np.ones((ninserts, nfeatures)) * np.nan, axis=0)
+        filled_timestamps = np.insert(
+            filled_timestamps, idx, insert_timestamps)
 
     if isvec:
         filled_data = np.squeeze(filled_data)
@@ -373,6 +437,44 @@ def read_yaml(yaml_file):
         return_dict = {}
 
     return return_dict
+
+
+def check_frame_shapes(h5s, dicts, h5_path='/frames'):
+    """
+    Stop before PCA when the sessions' frames are not all the same size. Every
+    session's frames go into one matrix whose columns are a frame's pixels, so
+    frames of different sizes (extractions made with different crop_size
+    settings) cannot share one set of components.
+
+    Args:
+    h5s (list): paths to the sessions' extracted h5 files.
+    dicts (list): the sessions' yaml contents, in the same order, for their UUIDs.
+    h5_path (str): path to the frames inside each h5 file.
+    """
+    shapes = []
+    for h5, meta in zip(h5s, dicts):
+        with h5py.File(h5, 'r') as f:
+            if h5_path not in f:
+                continue
+            shape = tuple(f[h5_path].shape[1:])
+        uuid = (meta or {}).get('uuid', 'no uuid in its yaml')
+        shapes.append((shape, uuid, h5))
+
+    if len({shape for shape, _, _ in shapes}) <= 1:
+        return
+
+    def size(shape):
+        return ' x '.join(str(n) for n in shape)
+
+    width = max(len(size(shape)) for shape, _, _ in shapes)
+    rows = '\n'.join(f'  {size(shape):<{width}}  {uuid}  {h5}' for shape, uuid, h5 in sorted(shapes))
+    raise ValueError(
+        f'The extracted sessions do not all have the same frame size, so they cannot go into '
+        f'one PCA. Each session\'s frame size in pixels ({h5_path}), UUID and file:\n{rows}\n'
+        f'Frames of different sizes come from extracting with different crop_size settings. '
+        f'Extract every session again with one crop_size (crop_size in config.yaml, or '
+        f'--crop-size on the command line), then run PCA again.'
+    )
 
 
 def check_timestamps(h5s):
@@ -767,8 +869,8 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
             normed_df -= np.nanmin(normed_df)
 
         if timestamps is not None:
-            normed_df, _, _ = insert_nans(
-                timestamps, normed_df, fps=frame_rate_from_timestamps(timestamps, session))
+            frame_rate_from_timestamps(timestamps, session)
+            normed_df, _, _ = insert_nans(timestamps, normed_df)
 
         normed_df = np.squeeze(normed_df)
         cps = scipy.signal.argrelextrema(

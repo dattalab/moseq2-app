@@ -17,7 +17,7 @@ from os.path import abspath, join, exists, splitext, basename, dirname
 from moseq2_pca.helpers.data import get_pca_paths, get_pca_yaml_data, load_pcs_for_cp
 from moseq2_pca.pca.util import apply_pca_dask, apply_pca_local, train_pca_dask, get_changepoints_dask
 from moseq2_pca.util import recursive_find_h5s, select_strel, initialize_dask, set_dask_config, close_dask, \
-            h5_to_dict, check_timestamps
+            h5_to_dict, check_timestamps, check_frame_shapes
 
 def load_and_check_data(input_dir, output_dir, config_data):
     """
@@ -48,6 +48,7 @@ def load_and_check_data(input_dir, output_dir, config_data):
     h5s, dicts, yamls = recursive_find_h5s(input_dir)
 
     check_timestamps(h5s)  # function to check whether timestamp files are found
+    check_frame_shapes(h5s, dicts, config_data.get('h5_path', '/frames'))
 
     return output_dir, h5s, dicts, yamls
 
