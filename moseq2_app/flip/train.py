@@ -4,6 +4,7 @@ import pickle
 import joblib
 import numpy as np
 from pathlib import Path
+from functools import partial
 from sklearn.svm import SVC
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -48,6 +49,12 @@ def create_training_dataset(
                 if left:
                     frames_subset = np.rot90(frames_subset, 2, axes=(1, 2))
                 frames.append(frames_subset)
+    if sum(len(f) for f in frames) == 0:
+        raise ValueError(
+            f"No labeled frames in {data_index_path}. Add at least one frame range "
+            "in the labeling widget before training: click Start Range, step to the "
+            "last frame of the range, then click Facing Left or Facing Right."
+        )
     frames = np.concatenate(frames, axis=0)
     # rotate frames
     frames = np.concatenate((frames, np.rot90(frames, 2, axes=(1, 2))), axis=0)
@@ -114,8 +121,11 @@ def train_classifier(
     pca = PCA(n_components=n_components)
     pca.fit(flatten(frames[-len(frames) // 3:]))
 
+    # The fitted PCA is bound into the function rather than passed as kw_args:
+    # cross-validation clones the pipeline per fold, and scikit-learn's clone
+    # replaces an estimator inside a kw_args dict with an unfitted copy.
     pipeline = make_pipeline(
-        FunctionTransformer(batch_apply_pca, kw_args={"pca": pca}, validate=False),
+        FunctionTransformer(partial(batch_apply_pca, pca=pca), validate=False),
         StandardScaler(),
         (
             RandomForestClassifier(n_estimators=150)
