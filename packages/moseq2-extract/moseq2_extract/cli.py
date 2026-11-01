@@ -78,8 +78,11 @@ def common_roi_options(function):
         "--camera-type",
         default="auto",
         type=click.Choice(["auto", "kinect", "azure", "realsense"]),
-        help='Camera type used for recording for auto-sets bg-roi-weights to precomputed values for different camera types. \
-                             Possible types: ["kinect", "azure", "realsense"]',
+        help="Camera the recordings were made with. It sets bg_roi_weights, pixel_format and "
+        "movie_dtype for that camera where they are missing or still at the Kinect v2 values; "
+        "a value you changed is kept. auto tells the camera from the file (.dat is a Kinect v2, "
+        ".mkv an Azure Kinect or Orbbec Femto, .avi by its frame size). An .mkv recording gets "
+        "the Azure settings under kinect too.",
     )(function)
     function = click.option(
         "--manual-set-depth-range",
@@ -173,13 +176,15 @@ def common_roi_options(function):
     return function
 
 
-def common_avi_options(function, threads_short_flag=True):
+def common_avi_options(function, threads_short_flag=True,
+                       threads_help="Number of threads for encoding"):
     """
     Decorator function for grouping shared video processing parameters.
 
     Args:
     function: Function to add enclosed parameters to as click options.
     threads_short_flag (bool): whether ``--threads`` also answers to ``-t``.
+    threads_help (str): the help text of ``--threads``.
 
     Returns:
     function: Updated function including shared parameters.
@@ -201,7 +206,7 @@ def common_avi_options(function, threads_short_flag=True):
     )(function)
     threads_flags = ("-t", "--threads") if threads_short_flag else ("--threads",)
     function = click.option(
-        *threads_flags, type=int, default=8, help="Number of threads for encoding"
+        *threads_flags, type=int, default=8, help=threads_help
     )(function)
     function = click.option(
         "-m",
@@ -218,9 +223,14 @@ def extraction_avi_options(function):
     """
     ``common_avi_options`` for the extraction commands, where ``-t`` is the
     short flag of ``--temporal-filter-size`` (since 2018) and ``--threads``
-    has none.
+    has none. There ``--threads`` decodes the recording; ``--compress-threads``
+    encodes the extraction movie.
     """
-    return common_avi_options(function, threads_short_flag=False)
+    return common_avi_options(
+        function,
+        threads_short_flag=False,
+        threads_help="Number of threads for decoding .avi and .mkv recordings",
+    )
 
 
 def extract_options(function):
@@ -616,8 +626,9 @@ def batch_extract(
         return
 
     if config_data["cluster_type"] == "local":
-        # the session specific config doesn't get generated in session proc file
-        # session specific config direct used in config_data dictionary in extraction from extract_command function
+        # extract_command takes each recording's arena tool settings from its
+        # session_config.yaml entry and every other setting from config.yaml
+        # (session_config.recording_configs)
         typed = _typed_extract_options()
         failures = run_local_extract(
             to_extract,

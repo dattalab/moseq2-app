@@ -36,6 +36,7 @@ from moseq2_extract.util import read_yaml
 from cells import code_cell
 
 EXTRACT = "MoSeq2-Extract-Modeling-Notebook.ipynb"
+APPLY = "[OPTIONAL]MoSeq2-Apply-Pre-Trained-Model-Notebook.ipynb"
 
 #: The only keys `camera_type='azure'` changes.
 AZURE_OVERRIDES = {
@@ -99,6 +100,13 @@ def test_the_camera_chosen_here_is_the_one_the_config_records(tmp_path):
 def test_later_cells_do_not_reset_the_camera(cell):
     """A later cell that assigned ``camera_type`` would undo the choice made here."""
     assert not re.search(r"config_data\['camera_type'\]\s*=(?!=)", code_cell(EXTRACT, cell))
+
+
+def test_the_apply_notebooks_arena_cell_does_not_reset_the_camera():
+    """The Apply notebook asks for the camera in its own config cell, as this one does."""
+    arena = code_cell(APPLY, 4)
+    assert "ArenaMaskWidget(" in arena
+    assert not re.search(r"config_data\['camera_type'\]\s*=(?!=)", arena)
 
 
 def test_every_value_is_a_plain_yaml_type(tmp_path):

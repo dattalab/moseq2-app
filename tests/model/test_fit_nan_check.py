@@ -95,6 +95,10 @@ def test_the_message_names_the_causes_and_what_to_do(scores, sweeps):
     assert "missing from the frame or still" in message
     assert "background" in message
     assert "leave out" in message and "fit again" in message
+    # the notebook's cell, by its heading, and the option that makes learn-model read the index
+    assert "QC cell" not in message
+    assert "Run Extraction Validation Tests" in message
+    assert "only when given -i" in message
     assert "No checkpoint of this fit was saved" in message
 
 

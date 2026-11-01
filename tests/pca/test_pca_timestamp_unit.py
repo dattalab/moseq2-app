@@ -112,3 +112,5 @@ def test_a_rate_out_of_camera_range_stops_when_the_unit_is_recorded(tmp_path, cl
     message = str(e.value)
     assert "mislabelled" in message and h5 in message
     assert "1,000" in message and "frames per second" in message
+    # the timestamps may have come from any of the three sources extraction reads
+    assert "depth_ts.txt" in message and "timestamps.csv" in message and ".mkv" in message

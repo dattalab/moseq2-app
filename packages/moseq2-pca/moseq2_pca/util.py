@@ -350,9 +350,10 @@ def frame_rate_from_timestamps(timestamps, session=None, unit=None):
         f'Cannot work out the frame rate of {name} from its timestamps, so dropped frames '
         f'cannot be placed. They give {rate:g} frames per second (rounded to {np.round(rate):g}); '
         f'a frame rate between {low:,} and {high:,} is needed. The first timestamp differences '
-        f'are [{first}] seconds. Likely cause: {cause} Check the depth_ts.txt this session '
-        f'was extracted from (one line per frame, the time in milliseconds first) and '
-        f'extract the session again.'
+        f'are [{first}] seconds. Likely cause: {cause} Check the timestamps this session '
+        f'was extracted from (the recording\'s depth_ts.txt, one line per frame with the time '
+        f'in milliseconds first; its timestamps.csv, in seconds; or, for an .mkv recording '
+        f'with neither, the frame times stored in the .mkv) and extract the session again.'
     )
 
 
@@ -466,6 +467,13 @@ def _frame_size_rows(shapes):
     return '\n'.join(f'  {_frame_size(shape):<{width}}  {uuid}  {h5}' for shape, uuid, h5 in sorted(shapes))
 
 
+#: Where an extraction's crop_size comes from, as the frame-size messages say it.
+CROP_SIZE_SOURCES = (
+    'crop_size in config.yaml, or --crop-size on the command line; a recording the arena '
+    'tool has listed in session_config.yaml takes crop_size from its entry there'
+)
+
+
 def check_frame_shapes(h5s, dicts, h5_path='/frames'):
     """
     Stop before PCA when the sessions' frames are not all the same size. Every
@@ -488,8 +496,8 @@ def check_frame_shapes(h5s, dicts, h5_path='/frames'):
         f'one PCA. Each session\'s frame size in pixels ({h5_path}), UUID and file:\n'
         f'{_frame_size_rows(shapes)}\n'
         f'Frames of different sizes come from extracting with different crop_size settings. '
-        f'Extract every session again with one crop_size (crop_size in config.yaml, or '
-        f'--crop-size on the command line), then run PCA again.'
+        f'Extract every session again with one crop_size ({CROP_SIZE_SOURCES}), then run PCA '
+        f'again.'
     )
 
 
@@ -522,8 +530,8 @@ def check_frames_match_pca(h5s, dicts, components, pca_file, h5_path='/frames'):
         f'frame size in pixels ({h5_path}), UUID and file:\n{_frame_size_rows(wrong)}\n'
         f'Frames of different sizes come from extracting with different crop_size settings. '
         f'Apply a PCA trained on extractions made with the same crop_size as these sessions, or '
-        f'extract these sessions again with the crop_size the PCA was trained on (crop_size in '
-        f'config.yaml, or --crop-size on the command line).'
+        f'extract these sessions again with the crop_size the PCA was trained on '
+        f'({CROP_SIZE_SOURCES}).'
     )
 
 

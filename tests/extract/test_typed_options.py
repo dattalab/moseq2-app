@@ -290,3 +290,11 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
     assert call["num_frames"] is None
     assert tuple(call["config"]["crop_size"]) == (90, 90)
     assert call["config"]["fps"] == 20
+
+
+@pytest.mark.parametrize("command", ["extract", "batch-extract"])
+def test_threads_help_says_it_is_for_reading_the_recording(command):
+    """On the extraction commands ``--threads`` decodes; ``--compress-threads`` encodes."""
+    (option,) = [p for p in extract_cli.cli.commands[command].params if p.name == "threads"]
+    assert "decod" in option.help
+    assert "encoding" not in option.help

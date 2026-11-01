@@ -342,8 +342,9 @@ def extraction_summary(n_recordings, n_skipped, failures):
         lines.extend(f"    {line}" for line in message.splitlines())
     lines.append(
         "Fix the problem each error names, then run the extraction again. Recordings already "
-        "extracted are skipped when skip_extracted (the notebook) or --skip-completed "
-        "(batch-extract) is set."
+        "extracted are skipped: the notebook skips them when skip_extracted is True, and "
+        "batch-extract leaves them out unless --skip-checks is given (with --skip-checks, "
+        "--skip-completed skips them)."
     )
     return "\n".join(lines)
 
