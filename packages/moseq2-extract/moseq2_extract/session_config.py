@@ -17,7 +17,9 @@ Where an entry holds a value for another setting that differs from
 
 ``recording_configs`` is what every extraction path uses: ``extract_command``
 (the notebook's local extraction and ``batch-extract``) and
-``run_slurm_extract`` (each SLURM job's ``config.yaml``).
+``run_slurm_extract`` (each SLURM job's ``config.yaml``). It resolves each
+recording with ``recording_config``, which the arena tool also uses for the arena
+it shows and its preview extraction, with the values the tool holds as the entry.
 """
 
 from copy import deepcopy
@@ -205,21 +207,45 @@ def recording_configs(config_file, recordings, cli_options=None):
         config_data=config_data,
     )
     for recording in recordings:
-        config = deepcopy(config_data)
         key = session_config_key(session_configs, recording)
-        if key is not None:
-            differing = {}
-            for setting, value in session_configs[key].items():
-                if setting in ARENA_TOOL_SETTINGS or setting not in config_data:
-                    config[setting] = deepcopy(value)
-                elif (
-                    setting not in _NOT_REPORTED
-                    and setting not in typed
-                    and _plain(value) != _plain(config_data[setting])
-                ):
-                    differing[setting] = value
-            if differing:
-                resolved.differences[recording] = (key, differing)
-        config.update(deepcopy(typed))
+        entry = session_configs[key] if key is not None else None
+        config, differing = recording_config(config_data, entry, typed)
+        if differing:
+            resolved.differences[recording] = (key, differing)
         resolved.configs[recording] = config
     return resolved
+
+
+def recording_config(config_data, entry, cli_options=None):
+    """
+    The settings one recording is extracted with, from config.yaml and its entry.
+
+    From ``entry``, the settings in ``ARENA_TOOL_SETTINGS`` and any setting ``config_data``
+    does not hold; from ``config_data``, every other setting; from ``cli_options``, the
+    options typed on the command line, over both. ``recording_configs`` resolves every
+    recording of an extraction with it, and the arena tool its arena and preview extraction.
+
+    Args:
+    config_data (dict): config.yaml as read.
+    entry (dict): the recording's entry in session_config.yaml, or None when it has none.
+    cli_options (dict): parameters typed on the command line.
+
+    Returns:
+    config (dict): the settings the recording is extracted with.
+    differing (dict): {setting: the entry's value} for each setting outside
+        ``ARENA_TOOL_SETTINGS`` whose entry value differs from config.yaml's and is reported.
+    """
+    typed = cli_options or {}
+    config = deepcopy(config_data)
+    differing = {}
+    for setting, value in (entry or {}).items():
+        if setting in ARENA_TOOL_SETTINGS or setting not in config_data:
+            config[setting] = deepcopy(value)
+        elif (
+            setting not in _NOT_REPORTED
+            and setting not in typed
+            and _plain(value) != _plain(config_data[setting])
+        ):
+            differing[setting] = value
+    config.update(deepcopy(typed))
+    return config, differing
