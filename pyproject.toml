@@ -51,11 +51,11 @@ dependencies = [
     # version, and the notebooks carry a directory tree and a config file
     # between steps rather than a return value, so a mixed set is a
     # pipeline whose halves disagree about the files they hand each other.
-    "moseq2-common==1.4.5",
-    "moseq2-extract==1.4.5",
-    "moseq2-model==1.4.5",
-    "moseq2-pca==1.4.5",
-    "moseq2-viz==1.4.5",
+    "moseq2-common==1.5.0",
+    "moseq2-extract==1.5.0",
+    "moseq2-model==1.5.0",
+    "moseq2-pca==1.5.0",
+    "moseq2-viz==1.5.0",
     "Cython>=3.3.0",
     "requests>=2.34.2",
 ]

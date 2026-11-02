@@ -98,7 +98,7 @@ the other five at exactly its own version and each of the four it drives pins
 whole pipeline at that version.
 
 Each notebook records the minor version it is written for in its notebook
-metadata, as `"moseq2": {"version": "1.4"}`. A patch release leaves it alone.
+metadata, as `"moseq2": {"version": "1.5"}`. A patch release leaves it alone.
 
 A minor release either substantially changes a result or changes something
 about the notebook interface: which cells a user runs, what a cell takes, or
