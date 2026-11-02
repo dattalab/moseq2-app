@@ -57,11 +57,13 @@ class ModelNaNError(RuntimeError):
             "",
             "This usually comes from the data: sessions with long stretches where "
             "the mouse is missing from the frame or still, which the extraction "
-            "notebook's QC cell flags, or sessions where the mouse was absorbed into "
-            "the background image and barely appears in the extraction.",
-            "What to do: check those sessions' extractions (the QC cell and each "
+            "notebook's \"[OPTIONAL] Run Extraction Validation Tests\" cell can flag, "
+            "or sessions where the mouse was absorbed into the background image and "
+            "barely appears in the extraction.",
+            "What to do: check those sessions' extractions (that cell and each "
             "session's extraction movie), leave out the bad ones by removing their "
-            "entries from the index file (moseq2-index.yaml), then fit again.",
+            "entries from the index file (moseq2-index.yaml; learn-model reads it "
+            "only when given -i), then fit again.",
         ]
         return "\n".join(lines)
 

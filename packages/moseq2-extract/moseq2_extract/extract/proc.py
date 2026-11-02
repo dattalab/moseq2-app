@@ -375,8 +375,8 @@ def clean_frames(frames, prefilter_space=(3,), prefilter_time=None,
     strel_tail (cv2.StructuringElement): Element for tail filtering.
     iters_tail (int): number of iterations to run opening
     frame_dtype (str): frame encodings
-    strel_min (int): minimum kernel size
-    iters_min (int): minimum number of filtering iterations
+    strel_min (cv2.StructuringElement): element for the cable filter's erosion.
+    iters_min (int): number of cable filter erosions with strel_min (cable_filter_iters)
     progress_bar (bool): display progress bar
 
     Returns:

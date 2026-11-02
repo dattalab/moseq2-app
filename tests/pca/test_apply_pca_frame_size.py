@@ -21,7 +21,7 @@ import pytest
 
 import moseq2_pca.helpers.wrappers as wrappers
 from moseq2_pca.cli import apply_pca, compute_changepoints
-from moseq2_pca.util import write_yaml
+from moseq2_pca.util import check_frame_shapes, write_yaml
 
 
 class ReachedDask(Exception):
@@ -87,6 +87,17 @@ def test_sessions_of_another_size_stop_before_scoring(tmp_path, no_dask):
     assert "6400" in message and "80 x 80" in message
     assert pca_file in message
     assert "crop_size" in message
+    assert "session_config.yaml" in message
+
+
+def test_sessions_of_different_sizes_say_where_crop_size_is_set(tmp_path):
+    """A recording the arena tool listed takes crop_size from its session_config.yaml entry."""
+    paths = make_sessions(tmp_path / "input", {"uuid-a": (80, 80), "uuid-b": (64, 64)})
+    with pytest.raises(ValueError) as e:
+        check_frame_shapes(list(paths.values()), [{"uuid": uuid} for uuid in paths])
+    message = str(e.value)
+    assert "crop_size in config.yaml" in message
+    assert "session_config.yaml" in message
 
 
 def test_only_the_mismatching_sessions_are_listed(tmp_path, no_dask, monkeypatch):

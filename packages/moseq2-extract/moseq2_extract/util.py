@@ -279,8 +279,9 @@ def detect_avi_file(finfo):
 
 def detect_and_set_camera_parameters(config_data, input_file=None):
     """
-    Read the camera type and info and set the bg_roi_weights to the precomputed values.
-    If camera_type is None, function will assume kinect is used.
+    Set bg_roi_weights, pixel_format and movie_dtype to the values for the camera named by
+    camera_type, or, when it is ``auto``, for the camera told from the file. A camera_type
+    that names no known camera (None included) changes nothing and warns.
 
     Only a setting still at the generic default (the Kinect v2's value, which a generated
     config holds) or missing is replaced; a value the user changed is kept. ``k2`` is the

@@ -76,6 +76,9 @@ def test_the_batch_ends_with_a_summary_of_its_failures(project, monkeypatch, cap
         "    second line\n"
     )
     assert "Fix the problem each error names" in summary
+    # batch-extract leaves finished extractions out by default; --skip-checks puts them back
+    assert "unless --skip-checks" in summary
+    assert "or --skip-completed (batch-extract) is set" not in summary
     assert [path for path, _ in failures] == [failed]
 
 

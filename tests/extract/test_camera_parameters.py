@@ -91,3 +91,13 @@ def test_a_dat_recording_stays_kinect_without_a_line(camera_type, capsys):
     config = detect(camera_type, input_file="project/session_1/depth.dat")
     assert {key: tuple(v) if isinstance(v, list) else v for key, v in config.items() if key in KINECT} == KINECT
     assert camera_lines(capsys.readouterr().out) == []
+
+
+def test_camera_type_help_says_what_it_sets():
+    """``--camera-type``'s help names every setting it fills and when it leaves one alone."""
+    from moseq2_extract.cli import extract
+
+    (option,) = [p for p in extract.params if p.name == "camera_type"]
+    for setting in ("bg_roi_weights", "pixel_format", "movie_dtype", "auto", ".mkv"):
+        assert setting in option.help
+    assert "changed" in option.help
