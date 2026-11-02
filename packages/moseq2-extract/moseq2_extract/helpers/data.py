@@ -8,7 +8,7 @@ import shutil
 import tarfile
 import warnings
 import numpy as np
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from cytoolz import keymap
 from importlib.metadata import version
@@ -254,28 +254,55 @@ def copy_manifest_results(manifest, output_dir):
             shutil.copyfile(mp4_path, join(output_dir, f'{v["copy_path"]}.mp4'))
 
         v["yaml_dict"].pop("extraction_metadata", None)
-        with open(f'{join(output_dir, v["copy_path"])}.yaml', "w") as f:
-            write_yaml(v["yaml_dict"], f)
+        write_yaml(v["yaml_dict"], f'{join(output_dir, v["copy_path"])}.yaml')
 
 
-def handle_extract_metadata(input_file, dirname):
+#: The unit of every extraction's ``/timestamps``, also written as the dataset's
+#: ``unit`` attribute. A Kinect v2 ``depth_ts.txt`` is in milliseconds already;
+#: ``timestamps.csv`` and an ``.mkv`` container's own frame times are seconds and
+#: are converted when read.
+TIMESTAMP_UNIT = "milliseconds"
+
+
+def _no_timestamps_message(recording, looked_in, empty=None, where="next to it"):
+    """The error for a recording with no per-frame timestamps from any source."""
+    places = "\n".join(f"  {place}" for place in looked_in)
+    found = f" ({empty} is empty)" if empty else ""
+    return (
+        f"No frame timestamps were found for {recording}{found}. Looked in:\n{places}\n"
+        "Without the time of each frame, the frames the camera dropped cannot be "
+        "found, and every later step (PCA, changepoints, modeling) would assume "
+        f"none were dropped. Put the recording's depth_ts.txt back {where}, as "
+        "the acquisition software wrote it, and run the extraction again."
+    )
+
+
+def handle_extract_metadata(input_file, dirname, with_source=False):
     """
     Extract metadata and timestamp in the extraction.
 
     Args:
     input_file (str): path to input file to extract
     dirname (str): path to directory where extraction files reside.
+    with_source (bool): also return where the timestamps were read from.
 
     Returns:
     acquisition_metadata (dict): key-value pairs of JSON contents
-    timestamps (1D array): list of loaded timestamps
+    timestamps (1D array): the time of every frame, in milliseconds
     tar (bool): indicator for whether the file is compressed.
+    source (str): where the timestamps were read from: the timestamp file's
+        path, ``depth_ts.txt inside <tarball>``, or ``the frame timestamps
+        inside <file>`` for an ``.mkv`` read without a timestamp file.
+        Returned only when ``with_source`` is True.
     """
 
     tar = None
     tar_members = None
     alternate_correct = False
     from_depth_file = False
+    timestamp_path = None
+    recording = input_file
+    where = "next to it"
 
     # Handle TAR files
     if input_file.endswith((".tar.gz", ".tgz")):
@@ -291,36 +318,60 @@ def handle_extract_metadata(input_file, dirname):
 
     if tar is not None:
         # Handling tar paths
-        metadata_path = tar.extractfile(tar_members[tar_names.index("metadata.json")])
+        where = "inside the tarball"
+        looked_in = [
+            f"depth_ts.txt inside {input_file}",
+            f"timestamps.csv inside {input_file}",
+        ]
         if "depth_ts.txt" in tar_names:
             timestamp_path = tar.extractfile(
                 tar_members[tar_names.index("depth_ts.txt")]
             )
+            source = looked_in[0]
         elif "timestamps.csv" in tar_names:
             timestamp_path = tar.extractfile(
                 tar_members[tar_names.index("timestamps.csv")]
             )
+            source = looked_in[1]
             alternate_correct = True
+        metadata_path = tar.extractfile(tar_members[tar_names.index("metadata.json")])
     else:
         # Handling non-compressed session paths
         metadata_path = join(dirname, "metadata.json")
-        timestamp_path = join(dirname, "depth_ts.txt")
+        depth_ts_path = join(dirname, "depth_ts.txt")
         alternate_timestamp_path = join(dirname, "timestamps.csv")
+        looked_in = [depth_ts_path, alternate_timestamp_path]
         # Checks for alternative timestamp file if original .txt extension does not exist
-        if not exists(timestamp_path) and exists(alternate_timestamp_path):
+        if exists(depth_ts_path):
+            timestamp_path = depth_ts_path
+        elif exists(alternate_timestamp_path):
             timestamp_path = alternate_timestamp_path
             alternate_correct = True
-        elif not (
-            exists(timestamp_path) or exists(alternate_timestamp_path)
-        ) and input_file.endswith(".mkv"):
+        elif input_file.endswith(".mkv"):
             from_depth_file = True
 
-    acquisition_metadata = load_metadata(metadata_path)
+    if timestamp_path is None and not from_depth_file:
+        raise FileNotFoundError(_no_timestamps_message(recording, looked_in, where=where))
+
     if not from_depth_file:
+        if tar is None:
+            source = timestamp_path
         timestamps = load_timestamps(timestamp_path, col=0, alternate=alternate_correct)
     else:
-        timestamps = load_timestamps_from_movie(input_file)
+        # the container's frame times are in seconds; extraction writes milliseconds
+        timestamps = np.asarray(load_timestamps_from_movie(input_file)) * 1000
+        source = f"the frame timestamps inside {input_file}"
+        looked_in = looked_in + [source]
 
+    if len(timestamps) == 0:
+        raise FileNotFoundError(
+            _no_timestamps_message(recording, looked_in, empty=source, where=where)
+        )
+
+    acquisition_metadata = load_metadata(metadata_path)
+
+    if with_source:
+        return acquisition_metadata, timestamps, tar, source
     return acquisition_metadata, timestamps, tar
 
 
@@ -374,6 +425,7 @@ def create_extract_h5(
             data=config_data["timestamps"][first_frame_idx:last_frame_idx],
         )
         h5_file["timestamps"].attrs["description"] = "Depth video timestamps"
+        h5_file["timestamps"].attrs["unit"] = TIMESTAMP_UNIT
 
     # Cropped Frames
     h5_file.create_dataset(

@@ -27,6 +27,7 @@ the call the cell makes, and never the reporting underneath it.
 
 from __future__ import annotations
 
+import shutil
 import uuid
 
 import pytest
@@ -64,9 +65,10 @@ def read_progress(path):
 def build_project(root, n_sessions=4, n_extracted=0, n_incomplete=0, pca_items=(), n_models=0):
     """Assemble a project directory in a given state of completion.
 
-    Sessions are discovered by globbing ``*/*.avi`` and extractions by
-    globbing ``*/proc/*.mp4``, so empty files are enough to be found. The one
-    thing read rather than stat'd is the per-session ``complete`` flag.
+    Sessions are found by their recording files and extractions by the
+    ``proc/*.mp4`` beside each recording, so empty files are enough to be
+    found. The one thing read rather than stat'd is the per-session
+    ``complete`` flag.
     """
     root.mkdir(parents=True, exist_ok=True)
     marked = 0
@@ -113,13 +115,30 @@ def build_project(root, n_sessions=4, n_extracted=0, n_incomplete=0, pca_items=(
     return path
 
 
+@pytest.fixture(scope="module")
+def fresh_progress_file(tmp_path_factory, raw_sessions):
+    """This cell run on its own copy of the four recordings.
+
+    The chain's ``progress_file`` belongs to a project the rest of the suite
+    keeps working on: by the time a test here runs, other tests may have
+    extracted, aggregated and modeled it, and later cells add their own keys to
+    the file. The project at this point in the notebook holds the recordings
+    and nothing else, which is what this copy is.
+    """
+    root = tmp_path_factory.mktemp("fresh_project")
+    shutil.copytree(raw_sessions, root, dirs_exist_ok=True)
+    path = root / "progress.yaml"
+    restore_progress_vars(str(path), init=True, overwrite=False)
+    return path
+
+
 # --- restore_progress_vars ------------------------------------------------
 
 
-def test_creates_a_progress_file_with_the_expected_keys(progress_file):
+def test_creates_a_progress_file_with_the_expected_keys(fresh_progress_file):
     """A project that had only recordings now has the notebook's state file."""
-    assert progress_file.exists()
-    stored = read_progress(progress_file)
+    assert fresh_progress_file.exists()
+    stored = read_progress(fresh_progress_file)
     assert set(stored) == EXPECTED_KEYS
 
 
@@ -187,9 +206,9 @@ def test_overwrite_starts_a_fresh_file(tmp_path):
 # --- check_progress -------------------------------------------------------
 
 
-def test_reports_nothing_extracted_in_a_fresh_project(progress_file, capsys):
+def test_reports_nothing_extracted_in_a_fresh_project(fresh_progress_file, capsys):
     """The real project at this point in the notebook: four recordings, no work done."""
-    check_progress(str(progress_file))
+    check_progress(str(fresh_progress_file))
     out = capsys.readouterr().out
 
     assert "Extraction Progress: 0 out of 4 session(s) extracted" in out
@@ -221,9 +240,22 @@ def test_extraction_counts(tmp_path, capsys, state, expected):
 
 
 def test_an_incomplete_extraction_is_named(tmp_path, capsys):
+    """An extraction whose results file says it did not finish was stopped
+    partway, most often by a job or kernel killed for memory or time. The
+    line says so, where to look and how to redo it."""
     path = build_project(tmp_path / "proj", n_extracted=0, n_incomplete=1)
     check_progress(str(path))
-    assert "is listed as incomplete." in capsys.readouterr().out
+    session = tmp_path / "proj" / "session_0"
+    proc = session / "proc"
+    assert (
+        f"Extraction of session_0 started but did not finish: {proc / 'results_00.yaml'} "
+        "records it as incomplete. An extraction stopped partway leaves this behind, most "
+        "often because the job or notebook kernel running it was stopped, for example "
+        "killed for running out of memory or for reaching its time limit. Look in "
+        f"{proc} for what it wrote and, if it ran on SLURM, in the job's log, "
+        "slurm-<job id>.out in the directory the extraction jobs were submitted from. "
+        f"Run the extraction again for {session / 'depth.avi'} to redo it.\n"
+    ) in capsys.readouterr().out
 
 
 

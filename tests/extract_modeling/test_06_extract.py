@@ -3,17 +3,15 @@
     with update_config(progress_paths['config_file']) as config_data:
         config_data['cluster_type'] = 'local'
 
-    extensions = ['.avi', '.dat', '.tar.gz']
     extract_all = True
 
     extract_found_sessions(progress_paths['base_dir'],
                            progress_paths['config_file'],
-                           extensions,
                            extract_all=extract_all,
                            skip_extracted=skip_extracted)
 
 The heaviest cell, and the one every later cell is built on. It does four
-things: walk the project for depth files with any of the given extensions,
+things: walk the project for depth recordings of every type the pipeline reads,
 narrow that list to what the user wants, dispatch on ``cluster_type``, and
 extract. What it leaves behind is a ``proc`` directory beside each recording
 holding the cropped frames, the scalars computed from them, a preview movie
@@ -26,10 +24,11 @@ the chain's own extraction, which runs once for the whole suite.
 
 Two things make the cell quieter than it looks. ``run_local_extract`` catches
 every exception a recording raises, prints it and moves to the next, so the
-cell finishes and prints ``Extractions Complete.`` whether or not anything was
-extracted. And the recordings it extracts have already been filtered twice, so
-a project that yields nothing is indistinguishable from one that extracted
-everything. Both mean a test has to look at the files on disk.
+cell finishes without raising; a failure shows only in the summary it prints
+at the end in place of ``Extractions Complete.``. And the recordings it
+extracts have already been filtered twice, so a project that yields nothing is
+indistinguishable from one that extracted everything. Both mean a test has to
+look at the files on disk.
 """
 
 from __future__ import annotations
@@ -50,7 +49,8 @@ from moseq2_extract.util import read_yaml
 from test_03_config import plain
 from test_05_arena_mask import RECORDINGS
 
-#: The extensions the notebook searches for.
+#: The extensions notebooks from earlier releases pass to the cell; a list
+#: passed is still the list searched.
 EXTENSIONS = [".avi", ".dat", ".tar.gz"]
 
 #: What extraction writes beside every recording.
@@ -111,8 +111,8 @@ def proc(project, recording):
 def build_fake_project(root, recordings=RECORDINGS, extension=".avi"):
     """A project of empty depth files, for testing which recordings get chosen.
 
-    ``recursive_find_unextracted_dirs`` is called with ``skip_checks=True``, so
-    it decides from filenames alone and never opens anything.
+    The cell finds recordings with ``find_recordings``, which decides from
+    filenames alone and never opens anything.
     """
     root = Path(root)
     for name in recordings:
@@ -155,6 +155,17 @@ def test_only_the_named_extensions_are_searched(tmp_path, chosen):
 
     extract_found_sessions(str(root), str(root / "config.yaml"), [".mkv"])
     assert len(chosen) == len(RECORDINGS)
+
+
+def test_the_nidaq_stream_is_not_a_recording(tmp_path, chosen):
+    """With its NI-DAQ stream on, the Kinect v2 app writes ``nidaq.dat`` beside
+    ``depth.dat``; only the depth file is a recording."""
+    root = build_fake_project(tmp_path / "project", extension=".dat")
+    for name in RECORDINGS:
+        (root / name / "nidaq.dat").touch()
+    extract_found_sessions(str(root), str(root / "config.yaml"), [".dat"])
+
+    assert chosen == sorted(str(root / name / "depth.dat") for name in RECORDINGS)
 
 
 def test_a_missing_config_is_reported_before_the_search(tmp_path, chosen):
@@ -390,10 +401,12 @@ def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
     """15. The contract between cell 5 and this one.
 
     ``extract_command`` follows ``session_config_path`` out of the project
-    config and replaces the whole parameter set with the entry belonging to
-    the recording, so what a user settled on in the arena widget is literally
-    what the extraction ran with. The h5 records that set, which is where the
-    two are compared.
+    config and takes the settings the arena widget sets from the entry
+    belonging to the recording, so what a user settled on in the widget is
+    literally what the extraction ran with. The entry's other values are the
+    config's, copied when the widget opened, so every saved value is what the
+    extraction ran with. The h5 records that set, which is where the two are
+    compared.
     """
     saved = plain(read_yaml(str(arena)))
     for name in RECORDINGS:

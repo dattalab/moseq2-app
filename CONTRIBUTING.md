@@ -1,9 +1,10 @@
 # Contributing to MoSeq2
 
-MoSeq2 is five packages: `moseq2-app` and the four it drives, `moseq2-extract`,
-`moseq2-pca`, `moseq2-model` and `moseq2-viz`. All five live in this
-repository, `moseq2-app` at the root and the other four under `packages/`, and
-each is published to PyPI under its own name. This page covers how changes get
+MoSeq2 is six packages: `moseq2-app`, the four it drives (`moseq2-extract`,
+`moseq2-pca`, `moseq2-model` and `moseq2-viz`), and `moseq2-common`, which
+holds code the other five share. All six live in this repository, `moseq2-app`
+at the root and the other five under `packages/`, and each is published to
+PyPI under its own name. This page covers how changes get
 into any of them and how to run and extend the test suite.
 
 ## How changes get merged
@@ -17,20 +18,31 @@ can merge a pull request whose check is red.
 and moves only when a release is published, so the notebook links in the
 documentation always open the version a user can install.
 
+## Code the packages share
+
+`moseq2-common` is the one home for code that is substantially duplicated
+across the packages, so a fix lands once instead of drifting across copies.
+Code belongs there when it is a few lines repeated in most packages, or several
+times within one package as well as across packages, or a chunk of about 30
+lines or more that appears in two packages. Small, occasional duplication stays
+where it is, and code repeated only within one package is tidied inside that
+package. Every YAML file is read and written through `moseq2_common.yaml`, so
+the pipeline writes one format.
+
 ## Running the tests
 
 The suite runs the steps of both notebooks against a small fixture dataset,
-and every step runs through the four packages under `packages/`, so it is the
-test for all five. With [uv](https://docs.astral.sh/uv/) installed, run it from
+and every step runs through the five packages under `packages/`, so it is the
+test for all six. With [uv](https://docs.astral.sh/uv/) installed, run it from
 a checkout of this repository:
 
 ```bash
 uvx nox -s tests-3.10
 ```
 
-This builds a fresh environment, installs all five packages from the checkout
+This builds a fresh environment, installs all six packages from the checkout
 along with `moseq2-app`'s `tests` dependencies, and runs pytest. A change to
-any of the five is therefore tested by the same command. The first run downloads about 640 MB of
+any of the six is therefore tested by the same command. The first run downloads about 640 MB of
 fixtures and caches them in your user cache directory. The suite takes roughly
 eight minutes.
 
@@ -46,11 +58,14 @@ uvx nox -R -s tests-3.10 -- -k uuid       # tests whose names match
 MoSeq2 supports Python 3.10 through 3.14. The list lives in `PYTHON_VERSIONS`
 in `noxfile.py`. Every run installs the newest release of each dependency the
 requirements allow, and those differ by Python version: 3.10 gets pandas 2 and
-an older NumPy, later versions get pandas 3.
+an older NumPy, later versions get pandas 3. Each requirement's floor in the
+six `pyproject.toml` files is the oldest version the suite has passed with,
+which is usually what the Python 3.10 jobs install.
 
 | When | Python versions | Required to merge |
 |---|---|---|
 | Every push to a pull request | 3.10 and 3.14 | Yes |
+| Every push to the release pull request (branch name starting with `release`) | 3.10 through 3.14 | Yes |
 | Nightly, and on demand | 3.10 through 3.14 | No |
 
 A pull request tests the oldest and newest because those bracket the range of
@@ -77,12 +92,13 @@ every thread rather than running until the job times out with nothing to read.
 
 ## Version numbers
 
-The five packages share one version and release together. `moseq2-app` pins
-the other four at exactly its own version, so installing `moseq2-app` at a
-version installs the whole pipeline at that version.
+The six packages share one version and release together. `moseq2-app` pins
+the other five at exactly its own version and each of the four it drives pins
+`moseq2-common` at it, so installing `moseq2-app` at a version installs the
+whole pipeline at that version.
 
 Each notebook records the minor version it is written for in its notebook
-metadata, as `"moseq2": {"version": "1.4"}`. A patch release leaves it alone.
+metadata, as `"moseq2": {"version": "1.5"}`. A patch release leaves it alone.
 
 A minor release either substantially changes a result or changes something
 about the notebook interface: which cells a user runs, what a cell takes, or
@@ -99,18 +115,34 @@ whether you think the change is substantial.
 
 ## Releasing
 
-Publish a GitHub release against a tag on `main`. The release workflow builds
-all five packages from the tag and uploads them to PyPI over trusted
+A release is the merge of a release pull request into `main`: a branch whose
+name starts with `release`, so its CI run tests every supported Python. Publish
+a GitHub release against a tag on that merge commit. The release workflow builds
+all six packages from the tag and uploads them to PyPI over trusted
 publishing, so no token is stored anywhere. Before uploading anything it
 checks that every package declares the version the tag names, that
-`moseq2-app` pins the other four at that version, and that every notebook
-names the tag's minor version. It uploads `moseq2-app` last, so a failure
-partway never leaves it requiring a release that is not there. After
+`moseq2-app` pins the other five at that version, that each of the four it
+drives pins `moseq2-common` at that version, and that every notebook names the
+tag's minor version. It uploads `moseq2-common` first and `moseq2-app` last, so
+a failure partway never leaves a package requiring a release that is not there.
+A package new to PyPI cannot be uploaded until a pending trusted publisher is
+registered for its name on pypi.org, naming this repository, the workflow
+`release.yml` and no environment. After
 uploading it waits for the index, then moves `release` to the tag.
 
-Bump the version in its own pull request first: `__version__` in all five
-`__init__.py` files and the four pins in `moseq2-app`'s `pyproject.toml`, plus
-the notebooks' metadata for a minor release. A tag cut before that bump
+It also attaches to the GitHub release the versions the release was tested
+with. Every suite job writes its `pip freeze` as a pip constraints file,
+`constraints-<os>-py<python>.txt` (`linux`, `macos` or `windows`), with the
+six MoSeq2 packages pinned at the version being released. The release
+workflow takes the files from the release pull request's run, found as the
+tests run of the merge commit's second parent, and uploads all fifteen. A user
+whose fresh install breaks after an upstream release can then install exactly
+what was tested with `python -m pip install moseq2-app==<version> -c <file>`.
+
+Bump the version in its own pull request first: `__version__` in all six
+`__init__.py` files, the five pins in `moseq2-app`'s `pyproject.toml` and the
+`moseq2-common` pin in each of the other four, plus the notebooks' metadata for
+a minor release. A tag cut before that bump
 publishes the previous release's number.
 
 ## Reporting problems

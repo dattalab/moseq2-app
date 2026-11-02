@@ -291,7 +291,6 @@ def arena(project, progress_file, configured, flipped):
     session_config = project / "session_config.yaml"
     update_progress(str(progress_file), "session_config", str(session_config))
     with update_config(str(configured)) as config:
-        config["camera_type"] = "auto"
         config["output_dir"] = "proc"
 
     widget = ArenaMaskWidget(str(project), str(configured), str(session_config))
@@ -302,7 +301,7 @@ def arena(project, progress_file, configured, flipped):
 
 
 @pytest.fixture(scope="session")
-def aggregated(project, progress_file, extracted):
+def aggregation(tmp_path_factory, project, progress_file, extracted):
     """Cell 9: gather every extraction into one directory and index it.
 
     Until now each recording's output has sat beside the recording. Modeling
@@ -310,6 +309,11 @@ def aggregated(project, progress_file, extracted):
     ``aggregate_results/`` under a name built from the acquisition metadata,
     and writes ``moseq2-index.yaml`` listing what it found. That index is
     what every cell from here on is pointed at.
+
+    Returns the index and a copy of it as this cell wrote it. Cell 10 labels
+    the groups in the index itself, and a test that describes the index cell
+    10 is given reads the copy, since the chain may already have gone past
+    cell 10 when it runs.
     """
     from moseq2_app.gui.progress import update_progress
     from moseq2_extract.gui import aggregate_extract_results_command
@@ -321,7 +325,22 @@ def aggregated(project, progress_file, extracted):
         str(project), "{start_time}_{session_name}_{subject_name}", "aggregate_results/"
     )
     update_progress(str(progress_file), "index_file", index)
-    return Path(index)
+
+    as_written = tmp_path_factory.mktemp("aggregated") / "moseq2-index.yaml"
+    shutil.copy2(index, as_written)
+    return Path(index), as_written
+
+
+@pytest.fixture(scope="session")
+def aggregated(aggregation):
+    """Cell 9's index, ``moseq2-index.yaml`` in the project, as later cells change it."""
+    return aggregation[0]
+
+
+@pytest.fixture(scope="session")
+def index_as_aggregated(aggregation):
+    """A copy of the index as cell 9 wrote it: every recording still in group ``default``."""
+    return aggregation[1]
 
 
 @pytest.fixture(scope="session")
@@ -344,7 +363,6 @@ def extracted(project, configured, arena):
     extract_found_sessions(
         str(project),
         str(configured),
-        [".avi", ".dat", ".tar.gz"],
         extract_all=True,
         skip_extracted=True,
     )
@@ -416,17 +434,19 @@ def pca(project, progress_file, configured, grouped):
     Runs under dask, which is why the cell configures workers.
     """
     from moseq2_app.gui.progress import update_progress
-    from moseq2_app.util import update_config
+    from moseq2_app.util import camera_for_pca, update_config
     from moseq2_pca.gui import train_pca_command
 
     pca_dirname = str(project / "_pca") + "/"
     paths = update_progress(str(progress_file), "pca_dirname", pca_dirname)
     with update_config(str(configured)) as config:
-        config["camera_type"] = "k2"
         config["overwrite_pca"] = False
         config["gaussfilter_space"] = (1.5, 1)
         config["medfilter_space"] = [0]
         config["medfilter_time"] = [0]
+        if camera_for_pca(config.get("camera_type"), paths["train_data_dir"], paths["base_dir"]) == "azure":
+            config["gaussfilter_space"] = (2.25, 1.5)
+            config["tailfilter_size"] = (13, 13)
         config["nworkers"] = 1
 
     train_pca_command(paths, pca_dirname, "pca")

@@ -357,8 +357,8 @@ class JaxARHMM(object):
     def stateseqs(self):
         return [s.stateseq for s in self.states_list]
 
-    def resample_model(self, num_procs=0, **kwargs):
-        """One Gibbs sweep. ``num_procs`` is accepted and ignored."""
+    def resample_model(self):
+        """One Gibbs sweep."""
         self._model = self._module.resample_model(self._data, **self._model)
         self._clear_derived()
 

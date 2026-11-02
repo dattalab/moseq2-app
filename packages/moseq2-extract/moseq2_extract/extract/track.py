@@ -75,7 +75,7 @@ def em_init(
 
     mask = np.logical_and(depth_frame > depth_floor, depth_frame < depth_ceiling)
     mask = cv2.morphologyEx(
-        mask.astype("uint8"), cv2.MORPH_OPEN, init_strel, strel_iters
+        mask.astype("uint8"), cv2.MORPH_OPEN, init_strel, iterations=strel_iters
     )
 
     cnts, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)

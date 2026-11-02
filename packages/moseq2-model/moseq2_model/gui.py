@@ -9,7 +9,7 @@ from moseq2_model.helpers.wrappers import (
     kappa_scan_fit_models_wrapper,
     apply_model_wrapper,
 )
-from moseq2_model._yaml import read_yaml
+from moseq2_common.yaml import read_yaml
 
 
 def learn_model_command(progress_paths, get_cmd=True, verbose=False):

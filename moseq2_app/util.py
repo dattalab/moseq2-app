@@ -2,9 +2,11 @@
 General utility functions.
 """
 import pandas as pd
-from moseq2_app._yaml import write_yaml as _write_yaml
+from moseq2_common.yaml import write_yaml as _write_yaml
 from copy import deepcopy
-from os.path import basename, join, exists, splitext
+import os
+import warnings
+from os.path import abspath, basename, dirname, join, exists, splitext
 from os import mkdir
 from glob import glob
 from shutil import copy2
@@ -13,7 +15,8 @@ from contextlib import contextmanager
 from moseq2_viz.util import read_yaml
 from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
-from moseq2_extract.util import read_yaml, check_filter_sizes
+from moseq2_extract.util import read_yaml, check_filter_sizes, recursive_find_h5s
+from moseq2_extract.recordings import find_recordings
 from moseq2_viz.model.util import compute_behavioral_statistics
 
 
@@ -212,3 +215,100 @@ def update_config(path: str) -> dict:
         yield config
     finally:
         _write_yaml(config, path)
+
+
+#: The ``camera_type`` values under which the PCA cell decides the camera from
+#: the recordings: the Kinect v2 (``k2``, ``kinect``) and ``auto``. Notebooks from
+#: 1.4.5 and earlier left ``k2`` or ``auto`` in an Azure or Femto project's config.
+_CAMERA_FROM_RECORDINGS = ('k2', 'kinect', 'auto')
+
+
+def _recording_kinds(train_data_dir, project_dir):
+    """Count the sessions in ``train_data_dir`` by the recording each was extracted from.
+
+    An aggregated session shares its uuid with the extraction it was copied from,
+    which sits in an output folder at or below its recording's folder. The
+    recording is the one ``find_recordings`` lists in the nearest folder above
+    that extraction.
+
+    Returns:
+    (dict): ``{'mkv': n, 'other': n, 'not found': n}``.
+    """
+    _, trained, _ = recursive_find_h5s(train_data_dir)
+    train_root = abspath(train_data_dir)
+    project_root = abspath(project_dir)
+
+    extractions = {}
+    for h5, results in zip(*recursive_find_h5s(project_dir)[:2]):
+        if not abspath(h5).startswith(train_root + os.sep):
+            extractions.setdefault(results.get('uuid'), abspath(h5))
+
+    recordings = {}
+    for recording in find_recordings(project_dir).recordings:
+        recordings.setdefault(dirname(abspath(recording)), []).append(recording)
+
+    kinds = {'mkv': 0, 'other': 0, 'not found': 0}
+    for results in trained:
+        folder = extractions.get(results.get('uuid'))
+        found = None
+        while folder is not None and found is None:
+            folder = dirname(folder)
+            found = recordings.get(folder)
+            if folder == project_root or dirname(folder) == folder:
+                break
+        if not found:
+            kinds['not found'] += 1
+        elif any(recording.endswith('.mkv') for recording in found):
+            kinds['mkv'] += 1
+        else:
+            kinds['other'] += 1
+    return kinds
+
+
+def camera_for_pca(camera_type, train_data_dir, project_dir):
+    """The camera whose filters the PCA cell applies: ``'azure'`` or ``camera_type``.
+
+    Only Azure Kinect and Orbbec Femto cameras write ``.mkv``. When ``camera_type``
+    is ``k2``, ``kinect`` or ``auto`` and every session in ``train_data_dir`` was
+    extracted from an ``.mkv``, the camera is ``'azure'``, and a line says so. When
+    some sessions are ``.mkv`` and others are not, or their recordings cannot be
+    found, ``camera_type`` is kept and a warning gives the counts. Any other
+    ``camera_type`` is returned as it is.
+
+    Args:
+    camera_type (str): ``camera_type`` from config.yaml.
+    train_data_dir (str): the folder PCA trains on (``aggregate_results/``).
+    project_dir (str): the project folder holding the recordings and their extractions.
+
+    Returns:
+    (str): ``'azure'`` or ``camera_type``.
+    """
+    if camera_type not in _CAMERA_FROM_RECORDINGS:
+        return camera_type
+
+    kinds = _recording_kinds(train_data_dir, project_dir)
+    n_mkv = kinds['mkv']
+    if n_mkv == 0:
+        return camera_type
+
+    if n_mkv == sum(kinds.values()):
+        sessions = (f'the 1 session in {train_data_dir} was recorded as an .mkv' if n_mkv == 1
+                    else f'all {n_mkv} sessions in {train_data_dir} were recorded as .mkv files')
+        print('PCA uses the Azure Kinect and Orbbec Femto filters set in this cell '
+              f'(gaussfilter_space, tailfilter_size): config.yaml says camera_type: {camera_type}, '
+              f'but {sessions}, which only those cameras write. Set camera_type: azure in config.yaml.')
+        return 'azure'
+
+    parts = [f"{n_mkv} {'was' if n_mkv == 1 else 'were'} recorded as .mkv (an Azure Kinect or Orbbec Femto)"]
+    if kinds['other']:
+        parts.append(f"{kinds['other']} as another file type (.dat, .avi or .tar.gz)")
+    if kinds['not found']:
+        parts.append(f"for {kinds['not found']} the recording could not be found under {project_dir}")
+    counts = parts[0] if len(parts) == 1 else ', '.join(parts[:-1]) + ' and ' + parts[-1]
+    warnings.warn(
+        f'Not every session in {train_data_dir} was recorded as an .mkv: {counts}. PCA uses the '
+        f"filters for config.yaml's camera_type: {camera_type}, which suit the Kinect v2. If every "
+        'session is from an Azure Kinect or Orbbec Femto, set camera_type: azure in config.yaml '
+        'and run this cell again.'
+    )
+    return camera_type

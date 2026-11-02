@@ -7,7 +7,7 @@ This module contains the widget components that comprise the group setting table
 # fork of it that carries the same API, so the calls below are unchanged.
 import qgridnext as qgrid
 import pandas as pd
-from moseq2_app._yaml import write_yaml as _write_yaml
+from moseq2_common.yaml import write_yaml as _write_yaml
 import ipywidgets as widgets
 from IPython.display import clear_output
 from moseq2_app.util import index_to_dataframe

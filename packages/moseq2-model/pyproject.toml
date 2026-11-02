@@ -34,25 +34,24 @@ classifiers = [
 # the columns that produce the answer.
 requires-python = ">=3.10"
 dependencies = [
-    # The model itself. 0.3.5 is the first release carrying the robust
-    # AR-HMM work this package fits through: robust x separate_trans, the
-    # robust evaluation surface, stateseq_marginals and stateseq_mode.
-    "jax-moseq>=0.3.5",
-    "jax",
-    # Runtime dependencies, floors rather than pins. The previous "=="
-    # pins were contemporaneous with Python 3.7 and none of them has a
-    # wheel for the interpreters this now supports.
-    "numpy",
-    "scipy",
-    "h5py>=3",
-    "click>=8",
-    "joblib",
-    "cytoolz",
-    "tqdm>=4.48.0",
-    "matplotlib",
-    # 0.18 removed the module-level safe_load; moseq2_model._yaml uses the
-    # YAML() interface, which is available from 0.17 onward.
-    "ruamel.yaml>=0.17",
+    # Each floor is the oldest version the CI suite has passed with.
+
+    # The model itself, including the robust AR-HMM work this package fits
+    # through (robust x separate_trans, the robust evaluation surface,
+    # stateseq_marginals and stateseq_mode), which first shipped in 0.3.5.
+    "jax-moseq>=0.3.8",
+    "jax>=0.6.2",
+    "numpy>=2.2.6",
+    "scipy>=1.15.3",
+    "h5py>=3.16.0",
+    "click>=8.5.0",
+    "joblib>=1.6.0",
+    "cytoolz>=1.2.0",
+    "tqdm>=4.70.1",
+    "matplotlib>=3.10.9",
+    # Exact pin, not a floor: moseq2-common releases with this package, at the
+    # same version, from the same tag.
+    "moseq2-common==1.5.0",
 ]
 
 [project.scripts]

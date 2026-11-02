@@ -8,10 +8,10 @@ or on every interpreter the packages claim to support::
 
     uvx nox -s tests
 
-Every session installs all five packages from this checkout: moseq2-app from
-the root and the other four from packages/. They go in one resolution, so the
-four checkouts satisfy moseq2-app's exact pins on them and each brings its
-own requirements with it.
+Every session installs all six packages from this checkout: moseq2-app from
+the root and the other five from packages/. They go in one resolution, so the
+five checkouts satisfy the exact pins on them and each brings its own
+requirements with it.
 """
 
 import nox
@@ -22,6 +22,7 @@ nox.options.sessions = ["tests"]
 PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
 SIBLINGS = [
+    "packages/moseq2-common",
     "packages/moseq2-extract",
     "packages/moseq2-pca",
     "packages/moseq2-model",

@@ -14,12 +14,15 @@ from panel.viewable import Viewer
 from bokeh.models import HoverTool
 from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings, session_config_key, session_keys
 from moseq2_extract.io.video import load_movie_data
-from moseq2_extract.util import select_strel, get_strels
+from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
+from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
+from moseq2_extract.session_config import recording_config
 from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config, update_config
-from moseq2_extract.extract.proc import get_bground_im_file, get_roi, apply_roi, threshold_chunk
+from moseq2_extract.extract.proc import get_bground_im_file, apply_roi, threshold_chunk
 
 
 
@@ -34,47 +37,62 @@ _hover_dict = {
 
 class ArenaMaskWidget:
     
-    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=True) -> None:
+    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=None,
+                 max_depth=DEFAULT_MAX_DEPTH) -> None:
         """initialize arena mask widget
+
+        Parameters saved in session_config.yaml are kept and shown; parameters
+        are detected (``detect_and_set_camera_parameters``) only for recordings
+        that have none saved yet.
 
         Args:
             data_dir (str): project base directory.
             config_file (str): path to config.yaml
             session_config_path (str): path to session_config.yaml.
             skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
-            overwrite_session_configs (bool, optional): boolean flag for overwriting session config files using the default config file. Defaults to True.
+            overwrite_session_configs: ignored. Notebooks from earlier releases
+                pass it; passing it prints a note that it can be removed.
+            max_depth (int, optional): how many folders below data_dir to search for
+                recordings. Defaults to 5.
         """
+        if overwrite_session_configs is not None:
+            print('overwrite_session_configs is no longer used and is ignored: the arena tool '
+                  f'always keeps the parameters saved in {session_config_path} and detects parameters '
+                  'only for recordings that have none there yet. Remove overwrite_session_configs '
+                  'from the cell that opens ArenaMaskWidget.')
+
         self.backgrounds = {}
         self.extracts = {}
         self.data_dir = data_dir
         self.session_config_path = session_config_path
+        self.config_file = config_file
 
         self.config_data = read_and_clean_config(config_file)
 
-        sessions = get_sessions(data_dir, skip_extracted=skip_extracted)
+        # prints where it looked and what it passed over when it finds nothing to show
+        sessions = get_sessions(data_dir, skip_extracted=skip_extracted, max_depth=max_depth)
         if len(sessions) == 0:
             self.view = None
-            print('No sessions to show. There are either no sessions present or they are all extracted.')
             return
 
-        # creates session-specific configurations
-        if exists(session_config_path):
-            # this config contains session names as keys and a dict of config parameters as values
-            session_parameters = read_yaml(session_config_path)
-            new_sessions = set(map(lambda f: basename(dirname(f)), sessions))
-            if not overwrite_session_configs:
-                new_sessions = new_sessions - set(session_parameters)
-            if len(new_sessions) > 0:
-                for _session in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
-                    full_path = [x for x in sessions if _session in x][0]
-                    session_parameters[_session] = detect_and_set_camera_parameters(
-                        deepcopy(self.config_data), full_path)
-                # write session config with default parameters for new sessions
-                write_yaml(session_parameters, self.session_config_path)
+        # Each session is keyed by its folder's name, or by its folder's path below data_dir when
+        # session folders share a name. Names are told apart across every recording in the
+        # project, extracted or not, so a recording's key does not depend on skip_extracted.
+        everything = sessions if not skip_extracted else find_recordings(data_dir, max_depth=max_depth).recordings
+        keys = session_keys(everything, data_dir)
+        session_parameters = read_yaml(session_config_path) if exists(session_config_path) else {}
+        session_parameters = session_parameters or {}
+        # an entry saved under a path stays where it is; otherwise the key session_keys gives
+        named = {session_config_key(session_parameters, f, by_folder_name=False) or keys[f]: f for f in sessions}
+        self._explain_shared_folder_names(session_parameters, named, everything, data_dir)
 
-        else:
-            session_parameters = {basename(dirname(f)): detect_and_set_camera_parameters(
-                deepcopy(self.config_data), f) for f in tqdm(sessions, desc="Setting camera parameters", leave=False)}
+        # recordings with saved parameters keep them; only new ones are detected
+        new_sessions = [key for key in named if key not in session_parameters]
+        if len(new_sessions) > 0 or not exists(session_config_path):
+            for key in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
+                session_parameters[key] = detect_and_set_camera_parameters(
+                    deepcopy(self.config_data), named[key])
+            # write session config with default parameters for new sessions
             write_yaml(session_parameters, self.session_config_path)
 
         # add session_config path to config.yaml
@@ -83,7 +101,7 @@ class ArenaMaskWidget:
             temp_config_data['session_config_path'] = session_config_path
 
         self.session_config = session_parameters
-        self.sessions = {basename(dirname(f)): f for f in sessions}
+        self.sessions = {key: named[key] for key in sorted(named, key=lambda k: named[k])}
 
         # instantiate ArenaMaskData with the first session in this list
         self.session_data = ArenaMaskData(path=list(self.sessions)[0], controller=self, configs=self.session_config)
@@ -92,13 +110,36 @@ class ArenaMaskWidget:
 
         self.view = ArenaMaskView(self.session_data)
 
+    def _explain_shared_folder_names(self, session_parameters, named, everything, data_dir):
+        """
+        Say so when session_config.yaml holds parameters under a folder name that session
+        folders share. Those were saved for one of the folders, and which one is not recorded,
+        so each folder shown gets parameters of its own under its path instead.
+        """
+        for name in sorted({basename(dirname(f)) for k, f in named.items()
+                            if k != basename(dirname(f)) and k not in session_parameters}):
+            if name not in session_parameters:
+                continue
+            folders = sorted({dirname(f) for f in everything if basename(dirname(f)) == name})
+            keys = ', '.join(f'"{k}"' for k, f in named.items() if basename(dirname(f)) == name)
+            print(f'{self.session_config_path} holds parameters under "{name}", a folder name that '
+                  f'{" and ".join(folders)} share, so which of them they were saved for is not known. '
+                  f'Each of these folders now has parameters of its own, saved under its path below '
+                  f'{data_dir} ({keys}) and starting from detected values. Check the arena for each '
+                  'of them in the tool below and save. Extraction reads the entries named by path, so '
+                  f'the "{name}" entry is no longer used for these folders and can be deleted from '
+                  f'{self.session_config_path}.')
+
     def _repr_mimebundle_(self, include=None, exclude=None):
         if self.view is not None:
             return self.view._repr_mimebundle_(include, exclude)
 
     def set_session_config_vars(self):
         """
-        get session default config variable.
+        Write the values shown in the tool into the current recording's entry.
+
+        It writes exactly the keys in ``moseq2_extract.session_config.ARENA_TOOL_SETTINGS``,
+        which extraction takes from the entry; every other setting comes from config.yaml.
         """
         folder = self.session_data.path
         session = self.session_config[folder]
@@ -164,8 +205,25 @@ class ArenaMaskWidget:
 
         write_yaml(self.session_config, self.session_config_path)
 
+    def recording_config(self, folder):
+        """
+        The settings extraction would use for a recording, resolved as extraction resolves them.
+
+        The tool's settings (``ARENA_TOOL_SETTINGS``) come from the values it holds for the
+        recording, which ``set_session_config_vars`` has written into its entry whether or not
+        they are saved yet; every other setting comes from config.yaml as it is on disk now.
+
+        Args:
+            folder (str): the recording's key in session_config.yaml.
+
+        Returns:
+            (dict): the recording's settings.
+        """
+        config, _ = recording_config(read_yaml(self.config_file) or {}, self.session_config[folder])
+        return config
+
     def compute_arena_mask(self):
-        """compute the arena mask using the parameters in the session config file.
+        """compute the arena mask with the settings extraction would use (``recording_config``).
 
         Returns:
             background (numpy.ndarray): background of the session
@@ -177,22 +235,15 @@ class ArenaMaskWidget:
         folder = self.session_data.path
         background = self.get_background(folder)
 
-        session_config = self.session_config[folder]
+        session_config = self.recording_config(folder)
 
-        strel_dilate = select_strel(session_config['bg_roi_shape'], tuple(session_config['bg_roi_dilate']))
-        strel_erode = select_strel(session_config['bg_roi_shape'], tuple(session_config['bg_roi_erode']))
-
-        rois, _, = get_roi(background,
-                            **session_config,
-                            strel_dilate=strel_dilate,
-                            strel_erode=strel_erode,
-                            get_all_data=False
-                            )
+        # the function extraction uses, so the saved parameters give extraction this arena
+        rois, background = find_arena_candidates(background, session_config, self._output_dir(folder))
         # add to view
         return background, rois
 
     def compute_extraction(self):
-        """compute extraction of the given frames
+        """compute extraction of the given frames, with the settings extraction would use (``recording_config``)
 
         Returns:
             (numpy.ndarray): extracted frames
@@ -201,11 +252,10 @@ class ArenaMaskWidget:
         self.set_session_config_vars()
 
         folder = self.session_data.path
-        background = self.get_background(folder)
-        session_config = self.session_config[folder]
+        session_config = self.recording_config(folder)
 
         # TODO: compute mask only if not already done
-        _, rois = self.compute_arena_mask()
+        background, rois = self.compute_arena_mask()
         mask = rois[self.session_data.mask_index]
 
         # get segmented frame
@@ -238,12 +288,16 @@ class ArenaMaskWidget:
             folder = self.session_data.path
         # get full path
         file = self.sessions[folder]
-        # compute background
-        bground = get_bground_im_file(file, frame_stride=1000)
+        # compute background, cached where extraction reads it
+        bground = get_bground_im_file(file, frame_stride=1000, output_dir=self._output_dir(folder))
         # save for recall later
         self.backgrounds[folder] = bground
 
         return self.backgrounds[folder]
+
+    def _output_dir(self, folder):
+        """The folder this recording's extraction writes to."""
+        return session_output_dir(self.sessions[folder], self.recording_config(folder).get('output_dir'))
 
 
 # define data class first

@@ -781,7 +781,46 @@ def compute_syllable_onset(labels):
     return onset.to_numpy()
 
 
-def prepare_model_dataframe(model_path, pca_path):
+def _session_names(index):
+    """Map each session's uuid to its SessionName, from a sorted or unsorted index."""
+    if not index:
+        return {}
+    files = index.get('files', {})
+    entries = files.items() if isinstance(files, dict) else ((f.get('uuid'), f) for f in files)
+    return {uuid: entry.get('metadata', {}).get('SessionName') for uuid, entry in entries}
+
+
+def _check_labels_match_scores(mdl, labels, scores_idx, pca_path, index=None):
+    """Raise naming every session whose labels do not line up with the PCA scores."""
+    names = _session_names(index)
+    problems = []
+    for uuid, v in labels.items():
+        if uuid not in scores_idx:
+            problem = 'its UUID is not in the PCA scores file'
+        elif len(scores_idx[uuid]) != len(v):
+            problem = f'{len(v)} labels in the model, {len(scores_idx[uuid])} frames in the PCA scores file'
+        else:
+            continue
+        name = names.get(uuid)
+        problems.append(f'  {uuid}{f" ({name})" if name else ""}: {problem}')
+    if not problems:
+        return
+
+    fitted_on = mdl.get('pc_score_path')
+    fitted_on = (f'The model records that it was fit on the PCA scores in {fitted_on} '
+                 '(the path as it was when the model was fit).\n') if fitted_on else ''
+    raise ValueError(
+        f'The model\'s syllable labels do not line up with the PCA scores in {pca_path} '
+        f'for {len(problems)} of the {len(labels)} sessions the model labels:\n'
+        + '\n'.join(problems) + '\n'
+        + fitted_on
+        + 'Likely cause: the model was fit on PCA scores from a different run, for example PCA was run '
+        'again after the model was fit. Point the pca_path in the index file (moseq2-index.yaml) at the '
+        'PCA scores file the model was fit on, or fit the model again on these PCA scores.'
+    )
+
+
+def prepare_model_dataframe(model_path, pca_path, index=None):
     """
 
     Creates a dataframe from syllable labels to be aligned with scalars.
@@ -789,6 +828,7 @@ def prepare_model_dataframe(model_path, pca_path):
     Args:
     model_path (str): path to model to load label arrays from
     pca_path (str): path to pca_scores.h5 file.
+    index (dict): the index, sorted or not, used only to name sessions in an error.
 
     Returns:
     _df (pandas.DataFrame): DataFrame object of timestamp aligned syllable label information.
@@ -808,8 +848,7 @@ def prepare_model_dataframe(model_path, pca_path):
     scores_idx = h5_to_dict(pca_path, path='scores_idx')
 
     # make sure all pcs align with labels
-    if not all(k in scores_idx and len(scores_idx[k]) == len(v) for k, v in labels.items()):
-        raise ValueError('PC scores don\'t align with labels or label UUID not found in PC scores')
+    _check_labels_match_scores(mdl, labels, scores_idx, pca_path, index=index)
 
     _df = pd.concat((pd.DataFrame({
         'uuid': k,

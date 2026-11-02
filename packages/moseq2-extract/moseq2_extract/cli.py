@@ -4,14 +4,11 @@ CLI for extracting the depth data.
 
 import os
 import click
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from copy import deepcopy
-from moseq2_extract.util import (
-    command_with_config,
-    read_yaml,
-    recursive_find_unextracted_dirs,
-)
+from moseq2_extract.util import command_with_config, read_yaml
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 from moseq2_extract.helpers.wrappers import (
     get_roi_wrapper,
     extract_wrapper,
@@ -81,8 +78,11 @@ def common_roi_options(function):
         "--camera-type",
         default="auto",
         type=click.Choice(["auto", "kinect", "azure", "realsense"]),
-        help='Camera type used for recording for auto-sets bg-roi-weights to precomputed values for different camera types. \
-                             Possible types: ["kinect", "azure", "realsense"]',
+        help="Camera the recordings were made with. It sets bg_roi_weights, pixel_format and "
+        "movie_dtype for that camera where they are missing or still at the Kinect v2 values; "
+        "a value you changed is kept. auto tells the camera from the file (.dat is a Kinect v2, "
+        ".mkv an Azure Kinect or Orbbec Femto, .avi by its frame size). An .mkv recording gets "
+        "the Azure settings under kinect too.",
     )(function)
     function = click.option(
         "--manual-set-depth-range",
@@ -176,12 +176,15 @@ def common_roi_options(function):
     return function
 
 
-def common_avi_options(function):
+def common_avi_options(function, threads_short_flag=True,
+                       threads_help="Number of threads for encoding"):
     """
     Decorator function for grouping shared video processing parameters.
 
     Args:
     function: Function to add enclosed parameters to as click options.
+    threads_short_flag (bool): whether ``--threads`` also answers to ``-t``.
+    threads_help (str): the help text of ``--threads``.
 
     Returns:
     function: Updated function including shared parameters.
@@ -201,8 +204,9 @@ def common_avi_options(function):
     function = click.option(
         "--delete", is_flag=True, default=False, help="Delete raw file if encoding is sucessful"
     )(function)
+    threads_flags = ("-t", "--threads") if threads_short_flag else ("--threads",)
     function = click.option(
-        "-t", "--threads", type=int, default=8, help="Number of threads for encoding"
+        *threads_flags, type=int, default=8, help=threads_help
     )(function)
     function = click.option(
         "-m",
@@ -213,6 +217,20 @@ def common_avi_options(function):
     )(function)
 
     return function
+
+
+def extraction_avi_options(function):
+    """
+    ``common_avi_options`` for the extraction commands, where ``-t`` is the
+    short flag of ``--temporal-filter-size`` (since 2018) and ``--threads``
+    has none. There ``--threads`` decodes the recording; ``--compress-threads``
+    encodes the extraction movie.
+    """
+    return common_avi_options(
+        function,
+        threads_short_flag=False,
+        threads_help="Number of threads for decoding .avi and .mkv recordings",
+    )
 
 
 def extract_options(function):
@@ -461,7 +479,17 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
 @common_roi_options
 def find_roi(input_file, output_dir, **config_data):
 
+    _typed_depth_range_is_manual(config_data)
     get_roi_wrapper(input_file, config_data, output_dir)
+
+
+def _typed_depth_range_is_manual(config_data):
+    """Use a --bg-roi-depth-range typed on the command line as given, rather than
+    replacing it with the detected range. A range from the config file still
+    follows manual_set_depth_range."""
+    source = click.get_current_context().get_parameter_source("bg_roi_depth_range")
+    if source is click.core.ParameterSource.COMMANDLINE:
+        config_data["manual_set_depth_range"] = True
 
 
 @cli.command(
@@ -478,13 +506,30 @@ def find_roi(input_file, output_dir, **config_data):
     help="Platform to train models on",
 )
 @common_roi_options
-@common_avi_options
+@extraction_avi_options
 @extract_options
 def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 
+    _typed_depth_range_is_manual(config_data)
     extract_wrapper(
         input_file, output_dir, config_data, num_frames=num_frames, skip=skip_completed
     )
+
+
+def _typed_extract_options():
+    """The extraction options typed on batch-extract's command line, to apply over
+    the config file and each recording's session config. Only options extract
+    itself takes are kept; num_frames and skip_completed are passed separately."""
+    ctx = click.get_current_context()
+    passed_separately = {"input_file", "num_frames", "skip_completed", "config_file", "cluster_type"}
+    names = {p.name for p in extract.params} - passed_separately
+    typed = {
+        k: v
+        for k, v in ctx.params.items()
+        if k in names and ctx.get_parameter_source(k) is click.core.ParameterSource.COMMANDLINE
+    }
+    _typed_depth_range_is_manual(typed)
+    return typed
 
 
 @cli.command(
@@ -494,7 +539,7 @@ def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 )
 @click.argument("input-folder", type=click.Path(exists=True, resolve_path=False))
 @common_roi_options
-@common_avi_options
+@extraction_avi_options
 @extract_options
 @click.option(
     "--extensions",
@@ -506,7 +551,14 @@ def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
 @click.option(
     "--skip-checks",
     is_flag=True, default=False,
-    help="Flag: skip checks for the existance of a metadata file",
+    help="Flag: include recordings whose extraction already finished",
+)
+@click.option(
+    "--max-depth",
+    type=int,
+    default=DEFAULT_MAX_DEPTH,
+    show_default=True,
+    help="How many folders below the input folder to search for recordings",
 )
 @click.option(
     "--extract-out-script",
@@ -527,7 +579,7 @@ def extract(input_file, output_dir, num_frames, skip_completed, **config_data):
     help="Batch command string to prefix model training command (slurm only).",
 )
 @click.option(
-    "--ncpus", "-c", type=int, default=1, help="Number of cores to use in extraction"
+    "--ncpus", type=int, default=1, help="CPUs each extraction job requests (slurm only)"
 )
 @click.option("--memory", type=str, default="5GB", help="RAM (slurm only)")
 @click.option("--wall-time", type=str, default="3:00:00", help="Wall time (slurm only)")
@@ -545,6 +597,7 @@ def batch_extract(
     num_frames,
     extensions,
     skip_checks,
+    max_depth,
     **config_data,
 ):
 
@@ -557,29 +610,37 @@ def batch_extract(
         )
         return
 
-    # Add message to tell the users to specify a config file
-    to_extract = []
-    for ex in extensions:
-        to_extract.extend(
-            recursive_find_unextracted_dirs(
-                input_folder,
-                extension=ex,
-                skip_checks=True if ex in (".tgz", ".tar.gz") else skip_checks,
-                yaml_path=os.path.join(output_dir, "results_00.yaml"),
-            )
-        )
+    search = find_recordings(
+        input_folder,
+        extensions=extensions,
+        max_depth=max_depth,
+        skip_extracted=not skip_checks,
+        results_yaml=os.path.join(output_dir, "results_00.yaml"),
+    )
+    message = search.report()
+    if message:
+        print(message)
+    to_extract = search.recordings
 
-    # Add message when all sessions are extracted
     if len(to_extract) == 0:
-        print(
-            'No session to be extracted. If you want to re-extract the data, please add "--skip-checks"'
-        )
         return
 
     if config_data["cluster_type"] == "local":
-        # the session specific config doesn't get generated in session proc file
-        # session specific config direct used in config_data dictionary in extraction from extract_command function
-        run_local_extract(to_extract, config_file, skip_completed)
+        # extract_command takes each recording's arena tool settings from its
+        # session_config.yaml entry and every other setting from config.yaml
+        # (session_config.recording_configs)
+        typed = _typed_extract_options()
+        failures = run_local_extract(
+            to_extract,
+            config_file,
+            skip_completed,
+            num_frames=num_frames,
+            output_dir=typed.pop("output_dir", None),
+            cli_options=typed,
+        )
+        # the summary run_local_extract printed names each failure
+        if failures:
+            click.get_current_context().exit(1)
     else:
         # add paramters to config
         config_data["session_config_path"] = (
@@ -594,7 +655,14 @@ def batch_extract(
         config_data["extensions"] = extensions
         config_data["skip_checks"] = skip_checks
         # run slurm extract will generate a config.yaml in session proc file for slurm
-        run_slurm_extract(input_folder, to_extract, config_data, skip_completed)
+        run_slurm_extract(
+            input_folder,
+            to_extract,
+            config_data,
+            skip_completed,
+            num_frames=num_frames,
+            cli_options=_typed_extract_options(),
+        )
 
 
 @cli.command(
@@ -639,8 +707,7 @@ def generate_config(output_file, camera_type):
         params["crop_size"] = [120, 120]
         params["camera_type"] = "azure"
 
-    with open(output_file, "w") as f:
-        write_yaml(params, f)
+    write_yaml(params, output_file)
 
     print("Successfully generated config file in base directory.")
 

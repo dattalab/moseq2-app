@@ -4,6 +4,7 @@ import pickle
 import joblib
 import numpy as np
 from pathlib import Path
+from functools import partial
 from sklearn.svm import SVC
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -13,6 +14,13 @@ from sklearn.ensemble import RandomForestClassifier
 from moseq2_extract.extract.proc import clean_frames
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
+
+
+#: How a user gets labels from the widget into training, as every message about
+#: unsaved labels says it.
+SAVE_AND_RETRAIN = (
+    "click Save Labels (or run the notebook's save cell), then run training again"
+)
 
 
 @dataclass
@@ -36,6 +44,12 @@ def create_training_dataset(
         clean_parameters = CleanParameters()
 
     # load trainingdata index
+    if not data_index_path.exists():
+        raise FileNotFoundError(
+            f"No saved flip labels at {data_index_path}: the file does not exist. "
+            "Labels reach training only once they are saved: in the labeling widget, "
+            f"{SAVE_AND_RETRAIN}."
+        )
     with open(data_index_path, "rb") as f:
         session_paths, data_index = pickle.load(f)
 
@@ -48,6 +62,14 @@ def create_training_dataset(
                 if left:
                     frames_subset = np.rot90(frames_subset, 2, axes=(1, 2))
                 frames.append(frames_subset)
+    if sum(len(f) for f in frames) == 0:
+        raise ValueError(
+            f"No labeled frames in {data_index_path}. Labels reach training only once "
+            "they are saved: if the labeling widget lists ranges under Selected Ranges, "
+            f"{SAVE_AND_RETRAIN}. If it lists none, add a frame range first: click "
+            "Start Range, step to the last frame of the range, then click Facing Left "
+            "or Facing Right, and save."
+        )
     frames = np.concatenate(frames, axis=0)
     # rotate frames
     frames = np.concatenate((frames, np.rot90(frames, 2, axes=(1, 2))), axis=0)
@@ -114,8 +136,11 @@ def train_classifier(
     pca = PCA(n_components=n_components)
     pca.fit(flatten(frames[-len(frames) // 3:]))
 
+    # The fitted PCA is bound into the function rather than passed as kw_args:
+    # cross-validation clones the pipeline per fold, and scikit-learn's clone
+    # replaces an estimator inside a kw_args dict with an unfitted copy.
     pipeline = make_pipeline(
-        FunctionTransformer(batch_apply_pca, kw_args={"pca": pca}, validate=False),
+        FunctionTransformer(partial(batch_apply_pca, pca=pca), validate=False),
         StandardScaler(),
         (
             RandomForestClassifier(n_estimators=150)

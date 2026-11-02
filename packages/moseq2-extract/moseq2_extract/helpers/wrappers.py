@@ -13,7 +13,7 @@ from glob import glob
 import numpy as np
 import urllib.request
 from copy import deepcopy
-from moseq2_extract._yaml import write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from cytoolz import partial
 from moseq2_extract.io.image import write_image
@@ -77,8 +77,7 @@ def copy_h5_metadata_to_yaml_wrapper(input_dir, h5_metadata_path):
             tup[0]["metadata"] = dict(tmp)
 
         new_file = f"{basename(tup[1])}_update.yaml"
-        with open(new_file, "w+") as f:
-            write_yaml(tup[0], f)
+        write_yaml(tup[0], new_file)
 
         if new_file != tup[1]:
             shutil.move(new_file, tup[1])
@@ -123,8 +122,7 @@ def generate_index_wrapper(input_dir, output_file):
     output_dict = build_index_dict(file_with_uuids)
 
     # write out index yaml
-    with open(output_file, "w") as f:
-        write_yaml(output_dict, f)
+    write_yaml(output_dict, output_file)
 
     return output_file
 
@@ -219,8 +217,74 @@ def generate_index_from_agg_res_wrapper(input_dir):
     output_file = os.path.join(os.path.dirname(input_dir), "moseq2-index.yaml")
 
     # write out index yaml
-    with open(output_file, "w") as f:
-        write_yaml(index_data, f)
+    write_yaml(index_data, output_file)
+
+
+def session_output_dir(input_file, output_dir=None):
+    """
+    The folder a recording's extraction writes to, and where its background is cached.
+
+    Args:
+    input_file (str): path to the depth file.
+    output_dir (str): the configured output folder; relative to the recording's folder
+        unless it already names it.
+
+    Returns:
+    (str): path to the output folder.
+    """
+    in_dirname = dirname(input_file)
+    if output_dir is None:
+        return join(in_dirname, "proc")
+    if in_dirname not in output_dir:
+        return join(in_dirname, output_dir)
+    return output_dir
+
+
+def find_arena_candidates(bground_im, config_data, output_dir=None):
+    """
+    Find a recording's candidate arena masks, in the order ``bg_roi_index`` counts them.
+
+    The arena tool and extraction both call this, so a recording's saved parameters give
+    the arena the tool showed.
+
+    Args:
+    bground_im (numpy.ndarray): the recording's background.
+    config_data (dict): the recording's parameters.
+    output_dir (str): where a plane-fit background is saved, as ``plane_bground.tiff``, when
+        ``use_plane_bground`` is set.
+
+    Returns:
+    rois (list): candidate arena masks.
+    bground_im (numpy.ndarray): the background extraction subtracts, which is the plane
+        fit when ``use_plane_bground`` is set.
+    """
+    strel_dilate = select_strel(
+        config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])
+    )
+    strel_erode = select_strel(
+        config_data["bg_roi_shape"], tuple(config_data["bg_roi_erode"])
+    )
+
+    rois, plane = get_roi(
+        bground_im,
+        **config_data,
+        strel_dilate=strel_dilate,
+        strel_erode=strel_erode,
+        get_all_data=False,
+    )
+
+    if config_data["use_plane_bground"]:
+        print("Using plane fit for background...")
+        bground_im = set_bground_to_plane_fit(bground_im, plane, output_dir)
+
+    # Keep the best-ranked ROIs and order them top to bottom
+    if config_data["bg_sort_roi_by_position"]:
+        rois = rois[: config_data["bg_sort_roi_by_position_max_rois"]]
+        rois = [
+            rois[i] for i in np.argsort([np.nonzero(roi)[0].mean() for roi in rois])
+        ]
+
+    return rois, bground_im
 
 
 def get_roi_wrapper(input_file, config_data, output_dir=None):
@@ -292,31 +356,7 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
     )
 
     print("Getting roi...")
-    strel_dilate = select_strel(
-        config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])
-    )
-    strel_erode = select_strel(
-        config_data["bg_roi_shape"], tuple(config_data["bg_roi_erode"])
-    )
-
-    rois, plane = get_roi(
-        bground_im,
-        **config_data,
-        strel_dilate=strel_dilate,
-        strel_erode=strel_erode,
-        get_all_data=False,
-    )
-
-    if config_data["use_plane_bground"]:
-        print("Using plane fit for background...")
-        bground_im = set_bground_to_plane_fit(bground_im, plane, output_dir)
-
-    # Sort ROIs by largest mean area to later select largest one (bg_roi_index)
-    if config_data["bg_sort_roi_by_position"]:
-        rois = rois[: config_data["bg_sort_roi_by_position_max_rois"]]
-        rois = [
-            rois[i] for i in np.argsort([np.nonzero(roi)[0].mean() for roi in rois])
-        ]
+    rois, bground_im = find_arena_candidates(bground_im, config_data, output_dir)
 
     if type(config_data["bg_roi_index"]) == int:
         config_data["bg_roi_index"] = [config_data["bg_roi_index"]]
@@ -331,6 +371,40 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
         write_image(join(output_dir, roi_filename), rois[idx], scale=True)
 
     return roi, bground_im, first_frame
+
+
+class NoFlipClassifierWarning(Warning):
+    """
+    A recording is extracted without a flip classifier. A subclass of Warning
+    rather than UserWarning, so the notebook's filter_warnings does not hide it.
+    """
+
+
+def warn_without_flip_classifier(input_file, config_data):
+    """
+    Warn, once per recording, that a recording is extracted without a flip
+    classifier, so the mouse's heading is known only up to half a turn.
+
+    Args:
+    input_file (str): path to the recording being extracted.
+    config_data (dict): extraction configuration; its 'flip_classifier' is checked.
+    """
+    if config_data.get("flip_classifier"):
+        return
+    warnings.warn(
+        f"Extracting {input_file} without a flip classifier (flip_classifier is "
+        f"{config_data.get('flip_classifier')!r}). The mouse's heading is then "
+        "resolved only up to half a turn for the whole recording: extraction keeps "
+        "it continuous from frame to frame, but nothing decides which end of the "
+        "mouse is its head, so every frame of the recording may face the wrong way. "
+        "To orient the mouse, get a flip classifier that matches your camera and "
+        "mice, either a pre-trained one with `moseq2-extract download-flip-file "
+        "config.yaml` (which writes its path into config.yaml) or one trained in the "
+        "Flip-Classifier-Training-Notebook, and pass it as flip_classifier in the "
+        "config file or with --flip-classifier.",
+        NoFlipClassifierWarning,
+        stacklevel=2,
+    )
 
 
 def validate_flip_classifier(config_data):
@@ -416,11 +490,31 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     extract (function): extraction function state
 
     Returns:
-    output_dir (str): path to directory containing extraction
+    output_dir (str): path to directory containing extraction, or None if the file was skipped as already extracted
     """
     print("Processing:", input_file)
 
+    # The output folder is built from the recording's path; for a tarball,
+    # input_file becomes the opened archive further down.
+    recording = input_file
+    output_dir = session_output_dir(recording, output_dir)
+
+    roi_index = config_data["bg_roi_index"]
+    if isinstance(roi_index, list):
+        roi_index = roi_index[0]
+    output_filename = f"results_{roi_index:02d}"
+    status_filename = join(output_dir, f"{output_filename}.yaml")
+    movie_filename = join(output_dir, f"{output_filename}.mp4")
+    results_filename = join(output_dir, f"{output_filename}.h5")
+
+    # A recording already extracted is skipped before anything about it is
+    # checked: the checks below guard an extraction that is about to run.
+    if skip and check_completion_status(status_filename):
+        print("Skipping...")
+        return
+
     validate_flip_classifier(config_data)
+    warn_without_flip_classifier(input_file, config_data)
 
     # get the basic metadata
 
@@ -444,8 +538,8 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
 
     # If input file is compressed (tarFile), returns decompressed file path and tar bool indicator.
     # Also gets loads respective metadata dictionary and timestamp array.
-    acquisition_metadata, config_data["timestamps"], config_data["tar"] = (
-        handle_extract_metadata(input_file, in_dirname)
+    acquisition_metadata, config_data["timestamps"], config_data["tar"], timestamp_source = (
+        handle_extract_metadata(input_file, in_dirname, with_source=True)
     )
 
     # updating input_file reference to open tar file object if input file ends with [.tar/.tar.gz]
@@ -458,21 +552,34 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     n_timestamps = len(config_data["timestamps"]) if config_data["timestamps"] is not None else 0
 
     if nframes_from_video is None:
-        warnings.warn(
-            f"Could not determine frame count from the depth video in "
-            f"'{in_dirname}'. This can happen if the video format is "
-            f"unrecognized or the file is empty. Falling back to "
-            f"depth_ts.txt timestamp count ({n_timestamps}). Cannot verify "
-            f"that the depth video and depth_ts.txt have the same length — "
-            f"please check manually."
-        )
+        # An .mkv stores a duration rather than a frame count, and an .avi can
+        # lack one. The timestamps then give the count: an .mkv's own frame
+        # times are the video's frames, a timestamp file's lines are not.
+        if timestamp_source == f"the frame timestamps inside {recording}":
+            print(
+                f"{recording} records no frame count of its own; extracting the "
+                f"{n_timestamps} frames counted from {timestamp_source}."
+            )
+        else:
+            warnings.warn(
+                f"{recording} records no frame count of its own, so extraction "
+                f"takes the {n_timestamps} timestamps in {timestamp_source} as its "
+                f"number of frames. That count cannot be checked against the "
+                f"video. If {timestamp_source} is not this recording's own "
+                f"timestamp file, or the extraction stops early or comes out "
+                f"shorter than the recording, check that the file belongs to "
+                f"{recording}."
+            )
         config_data["finfo"]["nframes"] = n_timestamps
     elif n_timestamps > 0 and nframes_from_video != n_timestamps:
         raise ValueError(
-            f"Frame count mismatch in '{in_dirname}': "
-            f"the depth video has {nframes_from_video} frames but "
-            f"depth_ts.txt has {n_timestamps} timestamps. "
-            f"This session's data appears to be corrupt or incomplete."
+            f"Frame count mismatch for {recording}: the depth video has "
+            f"{nframes_from_video} frames but {n_timestamps} timestamps were read "
+            f"from {timestamp_source}. Each frame needs one timestamp, so the video "
+            f"or the timestamps are incomplete, or they do not belong together. "
+            f"Check that {timestamp_source} is this recording's own timestamp file "
+            f"and that neither was cut short when copied, then extract the "
+            f"recording again."
         )
 
     status_dict["metadata"] = acquisition_metadata  # update status dict
@@ -506,32 +613,12 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         offset=first_frame_idx,
     )
 
-    # set up the output directory
-    if output_dir is None:
-        output_dir = join(in_dirname, "proc")
-    else:
-        if in_dirname not in output_dir:
-            output_dir = join(in_dirname, output_dir)
-
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    # Ensure index is int
-    if isinstance(config_data["bg_roi_index"], list):
-        config_data["bg_roi_index"] = config_data["bg_roi_index"][0]
+    config_data["bg_roi_index"] = roi_index
 
-    output_filename = f'results_{config_data["bg_roi_index"]:02d}'
-    status_filename = join(output_dir, f"{output_filename}.yaml")
-    movie_filename = join(output_dir, f"{output_filename}.mp4")
-    results_filename = join(output_dir, f"{output_filename}.h5")
-
-    # Check if session has already been extracted
-    if check_completion_status(status_filename) and skip:
-        print("Skipping...")
-        return
-
-    with open(status_filename, "w") as f:
-        write_yaml(status_dict, f)
+    write_yaml(status_dict, status_filename)
 
     # Get Structuring Elements for extraction
     str_els = get_strels(config_data)
@@ -611,8 +698,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     if status_dict["parameters"].get("true_depth") is None:
         # config_data.get('true_depth') is numpy.float64 and yaml.safe_dump can't represent the object
         status_dict["parameters"]["true_depth"] = float(config_data.get("true_depth"))
-    with open(status_filename, "w") as f:
-        write_yaml(status_dict, f)
+    write_yaml(status_dict, status_filename)
 
     return output_dir
 
@@ -688,8 +774,7 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
         config_data = read_yaml(config_file)
         config_data["flip_classifier"] = output_filename
 
-        with open(config_file, "w") as f:
-            write_yaml(config_data, f)
+        write_yaml(config_data, config_file)
     except Exception as e:
         print("Could not update configuration file flip classifier path")
         print("Unexpected error:", e)

@@ -78,7 +78,6 @@ dask_port: '8787'
 data_size: 4603980800
 detrend_window: 0
 dims: 300
-fill_gaps: true
 gaussfilter_space: [1.5, 1]
 gaussfilter_time: 0
 h5_mask_path: /frames_mask

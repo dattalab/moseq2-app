@@ -13,7 +13,7 @@ from cytoolz.curried import valmap
 from cytoolz.dicttoolz import dissoc, assoc
 from cytoolz.itertoolz import first, groupby
 from os.path import join, exists, dirname, splitext
-from moseq2_viz._yaml import read_yaml as _read_yaml
+from moseq2_common.yaml import read_yaml as _read_yaml
 
 
 def camel_to_snake(s):
@@ -171,9 +171,49 @@ def h5_to_dict(h5file, path: str = "/") -> dict:
     return out
 
 
+#: How many milliseconds each value of a timestamps dataset's ``unit`` attribute
+#: is. Extraction writes ``/timestamps`` in milliseconds and records ``unit``.
+TIMESTAMP_UNITS_IN_MS = {"milliseconds": 1, "ms": 1, "seconds": 1000, "s": 1000}
+
+
+def read_timestamps(h5file: str):
+    """
+    Read an extraction's frame times in milliseconds, by the unit its timestamps
+    dataset records. A file that records no unit (extracted before the unit was
+    recorded) is returned as stored.
+
+    Args:
+    h5file (str): path to h5 file.
+
+    Returns:
+    timestamps (np.ndarray): the time of every frame, in milliseconds.
+    unit_recorded (bool): whether the file records its timestamps' unit.
+    """
+
+    with h5py.File(h5file, "r") as f:
+        # v0.1.3 or greater data format keeps them at /timestamps
+        path = "timestamps" if "timestamps" in f else "metadata/timestamps"
+        timestamps = f[path][()]
+        unit = f[path].attrs.get("unit")
+    if unit is None:
+        return timestamps, False
+    if isinstance(unit, bytes):
+        unit = unit.decode()
+    if unit not in TIMESTAMP_UNITS_IN_MS:
+        raise ValueError(
+            f"{h5file}: the timestamps at /{path} record their unit as {unit!r}, which is not "
+            f"one of {', '.join(TIMESTAMP_UNITS_IN_MS)}. moseq2-extract writes milliseconds; "
+            "check that this file is the extraction's own results h5 and is not damaged, or "
+            "extract the session again."
+        )
+    factor = TIMESTAMP_UNITS_IN_MS[unit]
+    return (timestamps if factor == 1 else timestamps * factor), True
+
+
 def get_timestamps_from_h5(h5file: str) -> np.ndarray:
     """
-    Return a dict of timestamps from h5file.
+    Return an extraction's frame times, in milliseconds when the file records
+    their unit and as stored when it does not.
 
     Args:
     h5file (str): path to h5 file.
@@ -182,13 +222,7 @@ def get_timestamps_from_h5(h5file: str) -> np.ndarray:
     (np.ndarray): timestamps from extraction within the h5file.
     """
 
-    with h5py.File(h5file, "r") as f:
-        # v0.1.3 or greater data format
-        is_new = "timestamps" in f
-    if is_new:
-        return h5_to_dict(h5file, "timestamps")["timestamps"]
-    else:
-        return h5_to_dict(h5file, "metadata/timestamps")["timestamps"]
+    return read_timestamps(h5file)[0]
 
 
 def get_metadata_path(h5file):

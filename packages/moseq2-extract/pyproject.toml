@@ -31,26 +31,31 @@ classifiers = [
 # the columns that produce the answer.
 requires-python = ">=3.10"
 dependencies = [
+    # Each floor is the oldest version the CI suite has passed with.
+
     # ffmpeg's own libraries, as a wheel. Video is read and written through
     # these rather than through an ffmpeg a user has to install themselves.
-    "av>=17.1",
-    "click>=7.0",
-    "cytoolz>=0.10.1",
-    "h5py>=2.10.0",
+    "av>=17.1.0",
+    "click>=8.5.0",
+    "cytoolz>=1.2.0",
+    "h5py>=3.16.0",
     # Only for reading a classifier saved before 2026: those are pickles,
     # and flip_classifier.py hands one to joblib rather than refusing it
     # outright. The classifiers this package downloads are pickle-free npz
     # archives read with numpy, and nothing here imports scikit-learn.
-    "joblib>=0.15.1",
-    "matplotlib>=3.1.2",
-    "numpy>=1.18.3",
-    "opencv-python>=4.1.2.30",
-    "ruamel.yaml>=0.16.5",
-    "scikit-image>=0.16.2",
-    "scipy>=1.3.2",
-    "statsmodels>=0.10.2",
-    "tqdm>=4.48.0",
-    "tifffile>=2024.7.24",
+    "joblib>=1.6.0",
+    "matplotlib>=3.10.9",
+    "numpy>=2.2.6",
+    "opencv-python-headless>=5.0.0.93",
+    "ruamel.yaml>=0.19.1",
+    "scikit-image>=0.25.2",
+    "scipy>=1.15.3",
+    "statsmodels>=0.15.0",
+    "tqdm>=4.70.1",
+    "tifffile>=2025.5.10",
+    # Exact pin, not a floor: moseq2-common releases with this package, at the
+    # same version, from the same tag.
+    "moseq2-common==1.5.0",
 ]
 
 [project.optional-dependencies]

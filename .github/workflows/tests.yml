@@ -4,14 +4,21 @@ name: tests
 # A run answers one question: does a user on this operating system, with this
 # Python, get the same results as a user on any other?
 #
-# It walks both notebooks cell by cell, and every cell runs through the four
-# packages under packages/, so it is the test for all five. A run installs all
-# five from this checkout and everything else the way a user's install would.
+# It walks both notebooks cell by cell, and every cell runs through the five
+# packages under packages/, so it is the test for all six. A run installs all
+# six from this checkout and everything else the way a user's install would.
 #
 # Pull requests test the oldest and newest supported Pythons on all three
-# operating systems. The nightly run and manual runs test every supported
-# Python and the tests that reach the network. Nothing reaches main except
-# through a pull request, so a push to it has already been tested as one.
+# operating systems. The release pull request (its branch name starts with
+# "release") tests every supported Python, as do the nightly run and manual
+# runs, which also run the tests that reach the network. Nothing reaches main
+# except through a pull request, so a push to it has already been tested as
+# one.
+#
+# Every suite job saves the versions it passed with as a pip constraints
+# file. The release workflow attaches the release pull request's files to
+# the GitHub release, one per operating system and Python, so a user whose
+# fresh install breaks can install exactly what was tested.
 
 on:
   pull_request:
@@ -74,7 +81,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        python: ${{ fromJSON((github.event_name == 'pull_request' && !startsWith(github.head_ref, 'release')) && '["3.10", "3.14"]' || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -93,12 +100,13 @@ jobs:
           path: ${{ steps.cache-dir.outputs.dir }}/*.tar.gz
           key: fixtures-${{ runner.os }}-${{ hashFiles('tests/fixture_registry.txt') }}
 
-      # One command, so the resolver sees all five at once: the four checkouts
-      # satisfy moseq2-app's exact pins on them, and each brings its own
-      # requirements with it.
+      # One command, so the resolver sees all six at once: the five checkouts
+      # satisfy the exact pins on them, and each brings its own requirements
+      # with it.
       - name: Install the pipeline from this checkout
         run: |
           python -m pip install \
+            ./packages/moseq2-common \
             ./packages/moseq2-extract \
             ./packages/moseq2-pca \
             ./packages/moseq2-model \
@@ -108,10 +116,28 @@ jobs:
       - name: Record the resolution
         run: python -m pip freeze
 
+      # Named for the operating system a user has (linux, macos, windows)
+      # rather than the runner image.
+      - name: Write the resolution as a constraints file
+        id: constraints
+        run: |
+          name="constraints-$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')-py${{ matrix.python }}"
+          python -m pip freeze | python .github/scripts/write_constraints.py "$name.txt"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
       - name: Run the suite
         env:
           MPLBACKEND: Agg
         run: pytest -q
+
+      # Only after the suite passed, so a file exists only for a resolution
+      # that was tested.
+      - name: Keep the constraints file
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.constraints.outputs.name }}
+          path: ${{ steps.constraints.outputs.name }}.txt
+          if-no-files-found: error
 
   # The flip-classifier cell downloads a trained classifier. Those tests sit
   # out of pull requests so a remote outage cannot redden one.
@@ -142,6 +168,7 @@ jobs:
       - name: Install the pipeline from this checkout
         run: |
           python -m pip install \
+            ./packages/moseq2-common \
             ./packages/moseq2-extract \
             ./packages/moseq2-pca \
             ./packages/moseq2-model \
@@ -153,17 +180,52 @@ jobs:
           MPLBACKEND: Agg
         run: pytest -q -m network
 
+  # A Docker image, a fresh WSL distribution or a bare server has none of the
+  # desktop libraries the runners above come with. This job installs into one
+  # and starts every command-line tool, which is the first thing such a user
+  # does.
+  bare-linux:
+    name: bare Linux
+    runs-on: ubuntu-latest
+    container: python:3.12-slim
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pipeline from this checkout
+        run: |
+          python -m pip install \
+            ./packages/moseq2-common \
+            ./packages/moseq2-extract \
+            ./packages/moseq2-pca \
+            ./packages/moseq2-model \
+            ./packages/moseq2-viz \
+            .
+
+      - name: Record the resolution
+        run: python -m pip freeze
+
+      - name: Start every command-line tool
+        run: |
+          moseq2-extract --version
+          moseq2-pca --version
+          moseq2-model --version
+          moseq2-viz --version
+          python -c "import moseq2_app"
+
   # The check the repository requires before merging. It passes only when the
-  # suite passed, whichever Pythons this run chose to test, and the network
-  # tests passed wherever they ran. A matrix whose size depends on the event
-  # cannot be named in a required check; this job can.
+  # suite and the bare-Linux install passed, whichever Pythons this run chose
+  # to test, and the network tests passed wherever they ran. A matrix whose
+  # size depends on the event cannot be named in a required check; this job
+  # can.
   tests:
     name: tests
     if: always()
-    needs: [suite, network]
+    needs: [suite, network, bare-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Require the suite to have passed
         run: |
           test "${{ needs.suite.result }}" = success
+          test "${{ needs.bare-linux.result }}" = success
           case "${{ needs.network.result }}" in success|skipped) ;; *) exit 1 ;; esac

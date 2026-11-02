@@ -14,7 +14,7 @@ import numpy as np
 from glob import glob
 from copy import deepcopy
 from ruamel.yaml.comments import CommentedSeq
-from moseq2_extract._yaml import read_yaml as _read_yaml
+from moseq2_common.yaml import read_yaml as _read_yaml
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -64,7 +64,6 @@ def command_with_config(config_file_param_name):
             param_defaults = {p.human_readable_name: p.default for p in self.params
                               if isinstance(p, click.core.Option)}
             param_defaults = {k: tuple(v) if type(v) is list else v for k, v in param_defaults.items()}
-            param_cli = {k: tuple(v) if type(v) is list else v for k, v in ctx.params.items()}
 
             if config_file is not None:
 
@@ -79,16 +78,14 @@ def command_with_config(config_file_param_name):
                 config_data = {k: tuple(v) if isinstance(v, CommentedSeq) else v
                                for k, v in config_data.items() if k in param_defaults.keys() and v is not None}
 
-                # find differences btw config and param defaults
-                diffs = set(param_defaults.items()) ^ set(param_cli.items())
-
-                # combine defaults w/ config data
-                combined = {**param_defaults, **config_data}
-
-                # update cli params that are non-default
-                keys = [d[0] for d in diffs]
-                for k in set(keys):
-                    combined[k] = ctx.params[k]
+                # a value typed on the command line outranks the config file, which
+                # outranks the default. click records where each value came from;
+                # comparing a value with the option's default cannot tell, because
+                # the two coincide whenever someone types the default.
+                combined = dict(ctx.params)
+                for k, v in config_data.items():
+                    if ctx.get_parameter_source(k) is not click.core.ParameterSource.COMMANDLINE:
+                        combined[k] = v
 
                 ctx.params = combined
                 
@@ -112,10 +109,13 @@ def set_bground_to_plane_fit(bground_im, plane, output_dir):
     Replaces median-computed background image with plane fit.
     Only occurs if config_data['use_plane_bground'] == True.
 
+    The plane is written to ``plane_bground.tiff``. ``bground.tiff`` in the same folder is the
+    cached median background that the arena is found on, so the plane never replaces it.
+
     Args:
     bground_im (numpy.ndarray): Background image computed via median value in each pixel of depth video.
     plane (numpy.ndarray): Computed ROI Plane using RANSAC.
-    output_dir (str): Path to write updated background image to.
+    output_dir (str): Path to write the plane-fit background image to.
 
     Returns:
     bground_im (numpy.ndarray): The background image.
@@ -127,7 +127,7 @@ def set_bground_to_plane_fit(bground_im, plane, output_dir):
     plane_im = (np.dot(coords.T, plane[:2]) + plane[3]) / -plane[2]
     plane_im = plane_im.reshape(bground_im.shape)
 
-    write_image(join(output_dir, 'bground.tiff'), plane_im, scale=True)
+    write_image(join(output_dir, 'plane_bground.tiff'), plane_im, scale=True)
 
     return plane_im
 
@@ -179,9 +179,22 @@ def gen_batch_sequence(nframes, chunk_size, overlap, offset=0):
         out.append(seq[i:i + chunk_size])
     return out
 
+def _timestamp_field(field):
+    """
+    Read one field of a timestamp file as a float. The columns are separated by
+    whitespace, so a single comma in a field without a decimal point is a decimal
+    separator, as a system set to a decimal-comma locale writes it.
+    """
+    if isinstance(field, bytes):
+        field = field.decode()
+    if field.count(',') == 1 and '.' not in field:
+        field = field.replace(',', '.')
+    return float(field)
+
 def load_timestamps(timestamp_file, col=0, alternate=False):
     """
-    Read timestamps from space delimited text file for timestamps.
+    Read timestamps from space delimited text file for timestamps. A decimal comma
+    (``25044816,2766``) is read as a decimal point.
 
     Args:
     timestamp_file (str): path to timestamp file
@@ -192,19 +205,27 @@ def load_timestamps(timestamp_file, col=0, alternate=False):
     ts (1D array): list of timestamps
     """
 
-    ts = []
+    def read(lines, name):
+        ts = []
+        for line_number, line in enumerate(lines, start=1):
+            cols = line.split()
+            try:
+                ts.append(_timestamp_field(cols[col]))
+            except ValueError:
+                raise ValueError(
+                    f'Could not read a timestamp from line {line_number} of {name}: '
+                    f'column {col} holds {cols[col]!r}, which is not a number. Each line should '
+                    f'hold whitespace-separated numbers, such as "674717230.8241 0". '
+                    f'Check that the file is the recording\'s own timestamp file and is not damaged.'
+                ) from None
+        return np.array(ts)
+
     try:
         with open(timestamp_file, 'r') as f:
-            for line in f:
-                cols = line.split()
-                ts.append(float(cols[col]))
-        ts = np.array(ts)
+            ts = read(f, timestamp_file)
     except TypeError as e:
         # try iterating directly
-        for line in timestamp_file:
-            cols = line.split()
-            ts.append(float(cols[col]))
-        ts = np.array(ts)
+        ts = read(timestamp_file, getattr(timestamp_file, 'name', 'the timestamp file'))
     except FileNotFoundError as e:
         ts = None
         warnings.warn('Timestamp file was not found! Make sure the timestamp file exists is named '
@@ -258,8 +279,18 @@ def detect_avi_file(finfo):
 
 def detect_and_set_camera_parameters(config_data, input_file=None):
     """
-    Read the camera type and info and set the bg_roi_weights to the precomputed values.
-    If camera_type is None, function will assume kinect is used.
+    Set bg_roi_weights, pixel_format and movie_dtype to the values for the camera named by
+    camera_type, or, when it is ``auto``, for the camera told from the file. A camera_type
+    that names no known camera (None included) changes nothing and warns.
+
+    Only a setting still at the generic default (the Kinect v2's value, which a generated
+    config holds) or missing is replaced; a value the user changed is kept. ``k2`` is the
+    Kinect v2, as the notebook and moseq2-pca name it.
+
+    Only Azure Kinect and Orbbec Femto cameras write ``.mkv``, so an ``.mkv`` recording
+    gets the Azure settings whatever ``camera_type`` says. Notebooks from 1.4.5 and
+    earlier left ``k2`` or ``auto`` in an Azure project's config; where it says ``k2`` or
+    ``kinect``, a line names the recording and says to set ``camera_type: azure``.
 
     Args:
     config_data (dict): dictionary containing all input parameters.
@@ -270,8 +301,10 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
     """
 
     # Auto-setting background weights
-    camera_type = config_data.get('camera_type')
+    stated = config_data.get('camera_type')
+    camera_type = 'kinect' if stated == 'k2' else stated
     finfo = config_data.get('finfo')
+    is_mkv = isinstance(input_file, (str, os.PathLike)) and str(input_file).endswith('.mkv')
 
     default_parameters = {
         'kinect': {
@@ -309,16 +342,42 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
             warnings.warn('Extension not recognized, trying default Kinect v2 parameters.')
             detected = 'kinect'
 
-        # set the params
-        config_data.update(**default_parameters[detected])
+        _fill_camera_defaults(config_data, default_parameters[detected], default_parameters['kinect'])
+    elif camera_type == 'kinect' and is_mkv:
+        _fill_camera_defaults(config_data, default_parameters['azure'], default_parameters['kinect'])
+        used = ', '.join(f'{key} {_setting_text(config_data[key])}' for key in default_parameters['azure'])
+        print(f'{input_file} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras '
+              f'write, but config.yaml says camera_type: {stated} (the Kinect v2). Used the Azure '
+              f'settings for it: {used}. Set camera_type: azure in config.yaml.')
     elif camera_type in default_parameters:
-        # update the config with the corresponding param set
-        config_data.update(**default_parameters[camera_type])
+        _fill_camera_defaults(config_data, default_parameters[camera_type], default_parameters['kinect'])
     else:
         warnings.warn('Warning, make sure the following parameters are set to best handle your camera type: '
                       '"bg_roi_weights", "pixel_format", "movie_dtype"')
 
     return config_data
+
+
+def _fill_camera_defaults(config_data, camera_defaults, generic_defaults):
+    """Set each camera default whose setting is missing or still at the generic default."""
+    for key, value in camera_defaults.items():
+        current = config_data.get(key)
+        if current is None or _same_setting(current, generic_defaults[key]):
+            config_data[key] = value
+
+
+def _setting_text(value):
+    """A setting as a user would write it in config.yaml: ``[10, 0.1, 1]``, ``gray16be``."""
+    if isinstance(value, (list, tuple)):
+        return f"[{', '.join(str(v) for v in value)}]"
+    return str(value)
+
+
+def _same_setting(a, b):
+    """Compare two settings, treating a list read back from yaml and a tuple as equal."""
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return list(a) == list(b)
+    return a == b
 
 def check_filter_sizes(config_data):
     """
@@ -384,26 +443,31 @@ def load_metadata(metadata_file):
 
     return metadata
 
-def load_found_session_paths(input_dir, exts):
+def load_found_session_paths(input_dir, exts, max_depth=None):
     """
-    Find all depth files with the specified extension recursively in input directory.
+    Find the recordings with the given extensions under input_dir.
+
+    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
+    folder, at most max_depth folders below input_dir, following symlinked folders. What it
+    passed over, and each recording without a metadata.json, is printed.
 
     Args:
     input_dir (str): path to project base directory holding all the session sub-folders.
     exts (list or str): list of extensions to search for, or a single extension in string form.
+    max_depth (int): how many folders below input_dir to search; defaults to 5.
 
     Returns:
     files (list): sorted list of all paths to found depth files
     """
+    from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 
-    if not isinstance(exts, (tuple, list)):
-        exts = [exts]
-
-    files = []
-    for ext in exts:
-        files.extend(glob(join(input_dir, '*/*' + ext), recursive=True))
-
-    return sorted(files)
+    search = find_recordings(
+        input_dir, extensions=exts, max_depth=DEFAULT_MAX_DEPTH if max_depth is None else max_depth
+    )
+    message = search.report()
+    if message:
+        print(message)
+    return search.recordings
 
 def get_strels(config_data):
     """
@@ -943,44 +1007,40 @@ def recursive_find_unextracted_dirs(root_dir=os.getcwd(),
                                     extension='.dat',
                                     yaml_path='proc/results_00.yaml',
                                     metadata_path='metadata.json',
-                                    skip_checks=False):
+                                    skip_checks=False,
+                                    max_depth=None):
     """
-    Recursively find unextracted (or incompletely extracted) directories
+    Find the recordings under root_dir whose extraction is missing or incomplete.
+
+    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
+    folder, at most max_depth folders below root_dir, following symlinked folders. What it
+    passed over, and each recording without a metadata.json, is printed.
 
     Args:
     root_dir (str): path to base directory to start recursive search for unextracted folders.
-    session_pattern (str): folder name pattern to search for
+    session_pattern (str): not used; every .tar.gz or .tgz archive is a session.
     extension (str): file extension to search for
-    yaml_path (str): path to respective extracted metadata
-    metadata_path (str): path to relative metadata.json files
-    skip_checks (bool): indicates whether to check if the files exist at the given relative paths
+    yaml_path (str): path to an extraction's results yaml, relative to the recording's folder
+    metadata_path (str): not used; a recording without a metadata.json is included with a warning.
+    skip_checks (bool): include recordings whose extraction already finished
+    max_depth (int): how many folders below root_dir to search; defaults to 5.
 
     Returns:
-    proc_dirs (1d-list): list of paths to each unextracted session's proc/ directory
+    proc_dirs (1d-list): list of paths to each unextracted session's depth file
     """
+    from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 
-    from moseq2_extract.helpers.data import check_completion_status
-
-    session_archive_pattern = re.compile(session_pattern)
-
-    proc_dirs = []
-    for root, _, files in os.walk(root_dir):
-        for file in files:
-            if file.endswith(extension) and not file.startswith("ir"):  # test for uncompressed session
-                status_file = join(root, yaml_path)
-                metadata_file = join(root, metadata_path)
-            elif session_archive_pattern.fullmatch(file):  # test for compressed session
-                session_name = basename(file).replace('.tar.gz', '').replace('.tgz', '')
-                status_file = join(root, session_name, yaml_path)
-                metadata_file = join(root, '{}.json'.format(session_name))
-            else:
-                continue  # skip this current file as it does not look like session data
-
-            # perform checks, append depth file to list if extraction is missing or incomplete
-            if skip_checks or (not check_completion_status(status_file) and exists(metadata_file)):
-                proc_dirs.append(join(root, file))
-
-    return proc_dirs
+    search = find_recordings(
+        root_dir,
+        extensions=[extension],
+        max_depth=DEFAULT_MAX_DEPTH if max_depth is None else max_depth,
+        skip_extracted=not skip_checks,
+        results_yaml=yaml_path,
+    )
+    message = search.report()
+    if message:
+        print(message)
+    return search.recordings
 
 def click_param_annot(click_cmd):
     """

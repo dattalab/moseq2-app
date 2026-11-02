@@ -375,8 +375,8 @@ def clean_frames(frames, prefilter_space=(3,), prefilter_time=None,
     strel_tail (cv2.StructuringElement): Element for tail filtering.
     iters_tail (int): number of iterations to run opening
     frame_dtype (str): frame encodings
-    strel_min (int): minimum kernel size
-    iters_min (int): minimum number of filtering iterations
+    strel_min (cv2.StructuringElement): element for the cable filter's erosion.
+    iters_min (int): number of cable filter erosions with strel_min (cable_filter_iters)
     progress_bar (bool): display progress bar
 
     Returns:
@@ -389,14 +389,14 @@ def clean_frames(frames, prefilter_space=(3,), prefilter_time=None,
     for i in tqdm(range(frames.shape[0]), disable=not progress_bar, desc='Cleaning frames'):
         # Erode Frames
         if iters_min is not None and iters_min > 0:
-            filtered_frames[i] = cv2.erode(filtered_frames[i], strel_min, iters_min)
+            filtered_frames[i] = cv2.erode(filtered_frames[i], strel_min, iterations=iters_min)
         # Median Blur
         if prefilter_space is not None and np.all(np.array(prefilter_space) > 0):
             for j in range(len(prefilter_space)):
                 filtered_frames[i] = cv2.medianBlur(filtered_frames[i], prefilter_space[j])
         # Tail Filter
         if iters_tail is not None and iters_tail > 0:
-            filtered_frames[i] = cv2.morphologyEx(filtered_frames[i], cv2.MORPH_OPEN, strel_tail, iters_tail)
+            filtered_frames[i] = cv2.morphologyEx(filtered_frames[i], cv2.MORPH_OPEN, strel_tail, iterations=iters_tail)
 
     # Temporal Median Filter
     if prefilter_time is not None and np.all(np.array(prefilter_time) > 0):

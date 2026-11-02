@@ -4,22 +4,23 @@
     progress_paths = update_progress(progress_filepath, 'session_config', session_config_path)
 
     with update_config(progress_paths['config_file']) as config_data:
-        config_data['camera_type'] = 'auto'
         config_data['output_dir'] = 'proc'
 
     ArenaMaskWidget(progress_paths['base_dir'], progress_paths['config_file'],
                     progress_paths['session_config'],
-                    skip_extracted=skip_extracted,
-                    overwrite_session_configs=overwrite_session_configs)
+                    skip_extracted=skip_extracted)
 
 The first interactive cell. Everything up to here produced one configuration
 for the whole project; this cell produces one per recording, because the arena
 sits at a different depth in every rig and often moves between recordings.
 
 Opening the widget already writes the file: it runs
-``detect_and_set_camera_parameters`` over each recording and saves a copy of
-the configuration under the recording's folder name. The widget then lets a
-user look at the floor it found, adjust the parameters, and save.
+``detect_and_set_camera_parameters`` over each recording that has no saved
+parameters and saves a copy of the configuration under the recording's folder
+name, or under the folder's path below the project when session folders share
+a name. A recording that has saved parameters keeps them, so running the cell
+again shows what was saved. The widget then lets a user look at the floor it
+found, adjust the parameters, and save.
 
 The widget is a Panel object, so the tests drive it the way the browser does:
 they set a parameter, or assign a button's ``value``, and the callbacks run in
@@ -41,10 +42,12 @@ from __future__ import annotations
 
 import shutil
 
+import numpy as np
 import pytest
 
 from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_app.roi.widget import ArenaMaskWidget
+from moseq2_app.util import update_config
 from moseq2_extract.util import read_yaml
 
 from test_03_config import plain
@@ -107,12 +110,14 @@ def open_widget(root):
 
 @pytest.fixture
 def scratch(tmp_path, project, arena):
-    """A copy of the project, for tests that change parameters and save.
+    """A copy of the project, for every test that opens the widget.
 
     The chain's own copy holds what the walkthrough saved, and cell 6 extracts
-    from it, so a test that writes different parameters works on its own copy.
-    Copying costs a fraction of a second and the backgrounds come with it
-    already computed.
+    from it. The tests below save tuned parameters, which would change what
+    the chain extracts with, before or after the chain's extraction depending
+    on the order the tests run in. So every test that opens the widget works
+    on its own copy. Copying costs a fraction of a second and the backgrounds
+    come with it already computed.
     """
     root = tmp_path / "project"
     shutil.copytree(project, root)
@@ -120,10 +125,15 @@ def scratch(tmp_path, project, arena):
 
 
 def test_every_recording_gets_a_parameter_file(arena, project):
-    """1. The cell's output: one entry per recording, keyed by folder name."""
+    """1. The cell's output: one entry per recording, keyed by folder name.
+
+    A recording is a folder holding a depth video. Later cells add folders of
+    their own to the project (``aggregate_results/``, ``_pca/``, ``models/``),
+    and the shared chain may have reached them before this test runs.
+    """
     saved = read_yaml(str(arena))
     assert sorted(saved) == RECORDINGS
-    assert sorted(p.name for p in project.iterdir() if p.is_dir()) == RECORDINGS
+    assert sorted(p.parent.name for p in project.glob("*/depth.avi")) == RECORDINGS
 
 
 def test_detected_parameters_are_unchanged(arena, data_regression):
@@ -176,17 +186,17 @@ def test_the_configuration_points_at_the_parameter_file(arena, configured, progr
     assert recorded["session_config"] == str(arena)
 
 
-def test_the_widget_offers_four_actions(arena, project):
+def test_the_widget_offers_four_actions(scratch):
     """6. The buttons a user has, by the label each shows."""
-    _, _, buttons = open_widget(project)
+    _, _, buttons = open_widget(scratch)
     assert sorted(buttons) == sorted(ACTIONS)
 
 
-def test_the_selector_lists_every_recording(arena, project):
+def test_the_selector_lists_every_recording(scratch):
     """7. The widget opens on the first recording and can reach them all."""
     import panel as pn
 
-    widget, data, _ = open_widget(project)
+    widget, data, _ = open_widget(scratch)
     selector = widget.view.__panel__().select(pn.widgets.Select)[0]
 
     assert list(selector.options) == RECORDINGS
@@ -194,9 +204,9 @@ def test_the_selector_lists_every_recording(arena, project):
     assert data.param.path.objects == RECORDINGS
 
 
-def test_nothing_is_computed_until_a_button_is_pressed(arena, project):
+def test_nothing_is_computed_until_a_button_is_pressed(scratch):
     """8. Opening the widget reads no frames; the four panels start empty."""
-    _, data, _ = open_widget(project)
+    _, data, _ = open_widget(scratch)
     assert set(data.images) == {
         "Background",
         "Arena mask",
@@ -206,7 +216,7 @@ def test_nothing_is_computed_until_a_button_is_pressed(arena, project):
     assert all(image is None for image in data.images.values())
 
 
-def test_computing_the_arena_mask_finds_the_floor(arena, project):
+def test_computing_the_arena_mask_finds_the_floor(scratch):
     """9. The cell's purpose: a mask covering the arena and nothing else.
 
     ``get_roi`` returns candidate regions ranked by how arena-like they are.
@@ -215,7 +225,7 @@ def test_computing_the_arena_mask_finds_the_floor(arena, project):
     mask itself keeps the check meaningful across OpenCV releases, which
     change region boundaries by a pixel or two.
     """
-    _, data, buttons = open_widget(project)
+    _, data, buttons = open_widget(scratch)
     click(buttons["Compute arena mask"])
 
     background = data.images["Background"]
@@ -256,12 +266,49 @@ def test_saving_records_the_parameters_as_set(scratch):
     assert saved["bg_roi_weights"] == [2, 0.5, 3]
 
 
+def assert_extraction_cuts_the_arena_shown(widget, data, buttons, root):
+    """Compute and save in the tool, then find the arena the way extraction does,
+    with the settings extraction resolves (the saved entry's arena tool settings,
+    config.yaml's others), and compare it with the one the tool showed."""
+    from moseq2_extract.helpers.wrappers import get_roi_wrapper
+    from moseq2_extract.session_config import recording_configs
+
+    click(buttons["Compute arena mask"])
+    shown = data.images["Arena mask"][data.mask_index]
+    click(buttons["Save session parameters"])
+
+    recording = widget.sessions[data.path]
+    resolved = recording_configs(str(root / "config.yaml"), [recording]).configs[recording]
+    roi, _, _ = get_roi_wrapper(recording, resolved, output_dir=str(root / data.path / "proc"))
+    np.testing.assert_array_equal(roi.astype(bool), shown)
+
+
+def test_tuned_weights_give_extraction_the_arena_the_tool_showed(scratch):
+    """moseq2-extract#174: a user tunes a recording until the tool shows a good
+    arena, and extraction has to cut that arena. Weights of (0, 1, 0) rank a
+    different region of this recording first than the defaults do."""
+    widget, data, buttons = open_widget(scratch)
+    data.mask_weight1, data.mask_weight2, data.mask_weight3 = 0, 1, 0
+    assert_extraction_cuts_the_arena_shown(widget, data, buttons, scratch)
+
+
+def test_sorting_by_position_gives_extraction_the_arena_the_tool_showed(scratch):
+    """``bg_sort_roi_by_position`` has no box in the tool; it comes from the config.
+    Sorting this recording's five best regions top to bottom puts a fragment at
+    the top edge ahead of the floor, and the tool has to show the same order."""
+    with update_config(str(scratch / "config.yaml")) as config_data:
+        config_data["bg_sort_roi_by_position"] = True
+        config_data["bg_sort_roi_by_position_max_rois"] = 5
+    widget, data, buttons = open_widget(scratch)
+    assert_extraction_cuts_the_arena_shown(widget, data, buttons, scratch)
+
+
 def test_saving_leaves_the_other_recordings_alone(scratch):
     """11. A user tunes one recording at a time."""
     session_config = scratch / "session_config.yaml"
+    _, data, buttons = open_widget(scratch)
     before = plain(read_yaml(str(session_config)))
 
-    _, data, buttons = open_widget(scratch)
     data.depth_range = (600, 700)
     click(buttons["Save session parameters"])
 
@@ -402,3 +449,290 @@ def test_the_tracking_likelihood_threshold_accepts_a_decimal(scratch):
     box = boxes["Tracking model mouse likelihood threshold"]
     box.value = -16.5
     assert box.value == -16.5
+
+
+# ------------------------------------------------- running the cell again
+
+
+@pytest.fixture
+def unextracted(tmp_path, project, arena):
+    """A copy of the project as the arena step leaves it: recordings, config and
+    session config, with nothing extracted.
+
+    The cell skips extracted recordings (``skip_extracted = True``), so a copy
+    made after the chain's extraction would show it none.
+    """
+    from moseq2_app.gui.progress import update_progress
+
+    root = tmp_path / "project"
+    shutil.copytree(
+        project,
+        root,
+        ignore=shutil.ignore_patterns(
+            "proc", "aggregate_results", "_pca", "models", "progress.yaml", "*.tar.gz"
+        ),
+    )
+    progress = root / "progress.yaml"
+    progress.write_text("{}\n")
+    update_progress(str(progress), "base_dir", str(root))
+    update_progress(str(progress), "config_file", str(root / "config.yaml"))
+    return root
+
+
+def run_arena_cell(root):
+    """Run the notebook's own arena cell on a project; return the widget it shows.
+
+    The cell ends on the widget, which a notebook displays. Evaluated here the
+    way a kernel does, so that expression is what comes back.
+    """
+    import ast
+
+    from cells import code_cell
+
+    progress = root / "progress.yaml"
+    namespace = {
+        "progress_filepath": str(progress),
+        "progress_paths": read_yaml(str(progress)),
+    }
+    tree = ast.parse(code_cell("MoSeq2-Extract-Modeling-Notebook.ipynb", 5))
+    last = tree.body.pop()
+    exec(compile(tree, "<arena cell>", "exec"), namespace)
+    return eval(compile(ast.Expression(last.value), "<arena cell>", "eval"), namespace)
+
+
+def tune_first_recording(widget):
+    """Tune and save the first recording, as a user would; return what was set."""
+    data = widget.session_data
+    data.depth_range = (600, 700)
+    data.mask_weight1, data.mask_weight2, data.mask_weight3 = 0, 1, 0
+    click(buttons_of(widget.view)["Save session parameters"])
+    return data.path
+
+
+def test_rerunning_the_cell_keeps_saved_parameters(unextracted):
+    """A user tunes a recording, saves, and runs the cell again (after a kernel
+    restart, say). The saved parameters stay in the file and are what the
+    widget shows."""
+    session_config = unextracted / "session_config.yaml"
+    tuned = tune_first_recording(run_arena_cell(unextracted))
+    saved = plain(read_yaml(str(session_config)))
+
+    widget = run_arena_cell(unextracted)
+
+    assert plain(read_yaml(str(session_config))) == saved
+    assert saved[tuned]["bg_roi_depth_range"] == [600, 700]
+    assert saved[tuned]["bg_roi_weights"] == [0, 1, 0]
+    assert widget.session_data.path == tuned
+    assert widget.session_data.depth_range == (600, 700)
+    assert (
+        widget.session_data.mask_weight1,
+        widget.session_data.mask_weight2,
+        widget.session_data.mask_weight3,
+    ) == (0, 1, 0)
+
+
+def test_a_new_recording_is_detected_and_the_others_keep_theirs(unextracted):
+    """A recording added to the project after the first run gets parameters
+    detected for it; every recording already in the file keeps what it has."""
+    from moseq2_extract.util import detect_and_set_camera_parameters
+    from moseq2_app.util import read_and_clean_config
+
+    session_config = unextracted / "session_config.yaml"
+    tune_first_recording(run_arena_cell(unextracted))
+    before = plain(read_yaml(str(session_config)))
+
+    shutil.copytree(unextracted / "saline_example_1", unextracted / "saline_example_2")
+    widget = run_arena_cell(unextracted)
+
+    after = plain(read_yaml(str(session_config)))
+    assert sorted(after) == sorted(RECORDINGS + ["saline_example_2"])
+    for name in RECORDINGS:
+        assert after[name] == before[name], f"{name} was rewritten"
+    detected = detect_and_set_camera_parameters(
+        read_and_clean_config(str(unextracted / "config.yaml")),
+        str(unextracted / "saline_example_2" / "depth.avi"),
+    )
+    assert after["saline_example_2"] == plain(detected)
+    assert "saline_example_2" in widget.sessions
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_the_old_argument_is_accepted_ignored_and_explained(unextracted, capsys, value):
+    """A notebook from an earlier release still passes overwrite_session_configs.
+    It opens, keeps the saved parameters whatever the value, and says once that
+    the argument can go."""
+    session_config = unextracted / "session_config.yaml"
+    tune_first_recording(run_arena_cell(unextracted))
+    saved = plain(read_yaml(str(session_config)))
+    capsys.readouterr()
+
+    widget = ArenaMaskWidget(
+        str(unextracted),
+        str(unextracted / "config.yaml"),
+        str(session_config),
+        skip_extracted=True,
+        overwrite_session_configs=value,
+    )
+
+    assert widget.view is not None
+    assert plain(read_yaml(str(session_config))) == saved
+    printed = [line for line in capsys.readouterr().out.splitlines() if "overwrite_session_configs" in line]
+    assert printed == [
+        "overwrite_session_configs is no longer used and is ignored: the arena tool "
+        f"always keeps the parameters saved in {session_config} and detects parameters "
+        "only for recordings that have none there yet. Remove overwrite_session_configs "
+        "from the cell that opens ArenaMaskWidget."
+    ]
+
+
+# ------------------------------------------------- a plane-fit background
+
+#: The recording the plane-fit tests run on.
+STILL_RECORDING = "amphetamine_example_0"
+
+
+def h5_arena_and_frames(results):
+    """What an extraction cut and subtracted: its arena, its frames and its background."""
+    import h5py
+
+    with h5py.File(results, "r") as f:
+        return (
+            f["metadata/extraction/roi"][()].astype(bool),
+            f["frames"][()],
+            f["metadata/extraction/background"][()],
+        )
+
+
+@pytest.fixture(scope="module")
+def plane_run(tmp_path_factory, raw_sessions):
+    """A user with a mouse that sits still sets ``use_plane_bground``, finds the
+    arena in the tool (clicking "Compute arena mask" twice, then "Compute
+    extraction"), saves, runs the extraction cell, and runs it again.
+
+    ``use_plane_bground`` replaces the background extraction subtracts with a
+    plane fit to the floor. The arena is found on the median background, where
+    the floor and the walls differ in depth; on the plane the floor is
+    everywhere, and the arena found there is the whole frame.
+
+    One recording, so the two extractions take seconds. Returns what each step
+    showed or wrote.
+    """
+    from moseq2_extract.gui import extract_found_sessions, generate_config_command
+    from moseq2_extract.io.image import read_image
+
+    root = tmp_path_factory.mktemp("plane") / "project"
+    shutil.copytree(raw_sessions / STILL_RECORDING, root / STILL_RECORDING)
+    config = root / "config.yaml"
+    generate_config_command(str(config), camera_type="k2")
+    with update_config(str(config)) as config_data:
+        config_data["output_dir"] = "proc"
+        config_data["use_plane_bground"] = True
+        config_data["cluster_type"] = "local"
+
+    widget, data, buttons = open_widget(root)
+    proc = root / data.path / "proc"
+    run = {"root": root, "proc": proc, "widget": widget}
+
+    click(buttons["Compute arena mask"])
+    run["first click"] = data.images["Arena mask"][data.mask_index]
+    run["background shown"] = data.images["Background"]
+    click(buttons["Compute arena mask"])
+    run["second click"] = data.images["Arena mask"][data.mask_index]
+
+    # "Compute extraction" finds the arena again before extracting; keep what it found
+    found = []
+    compute_arena_mask = widget.compute_arena_mask
+
+    def recording_compute_arena_mask():
+        background, rois = compute_arena_mask()
+        found.append((background, rois))
+        return background, rois
+
+    widget.compute_arena_mask = recording_compute_arena_mask
+    click(buttons["Compute extraction"])
+    widget.compute_arena_mask = compute_arena_mask
+    run["compute extraction"] = found[-1][1][data.mask_index]
+
+    click(buttons["Save session parameters"])
+    run["saved"] = read_yaml(str(root / "session_config.yaml"))[data.path]
+
+    results = proc / "results_00.h5"
+    extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
+    run["first extraction"] = h5_arena_and_frames(results)
+    run["bground.tiff after the first extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
+    extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
+    run["second extraction"] = h5_arena_and_frames(results)
+    run["bground.tiff after the second extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
+    return run
+
+
+@pytest.fixture(scope="module")
+def median_background(tmp_path_factory, plane_run):
+    """The recording's median background, computed from scratch in an empty
+    folder the way the tool computes it, read back as the cache file holds it."""
+    from moseq2_extract.extract.proc import get_bground_im_file
+    from moseq2_extract.io.image import read_image
+
+    clean = tmp_path_factory.mktemp("median")
+    recording = plane_run["widget"].sessions[STILL_RECORDING]
+    get_bground_im_file(recording, frame_stride=1000, output_dir=str(clean))
+    return read_image(str(clean / "bground.tiff"), scale=True)
+
+
+def test_a_plane_background_finds_the_floor_on_the_first_click(plane_run):
+    """The arena is most of a quarter of the frame, not all of it."""
+    shown = plane_run["first click"]
+    assert 0.20 < shown.mean() < 0.28, f"the arena is {shown.mean():.0%} of the frame"
+
+
+def test_a_plane_background_shows_the_same_arena_on_the_second_click(plane_run):
+    np.testing.assert_array_equal(plane_run["second click"], plane_run["first click"])
+
+
+def test_a_plane_background_gives_compute_extraction_the_arena_shown(plane_run):
+    np.testing.assert_array_equal(plane_run["compute extraction"], plane_run["first click"])
+
+
+def test_a_plane_background_gives_extraction_the_arena_the_tool_showed(plane_run):
+    arena, _, _ = plane_run["first extraction"]
+    np.testing.assert_array_equal(arena, plane_run["first click"])
+
+
+def test_a_plane_background_gives_a_second_extraction_the_same_arena_and_frames(plane_run):
+    first_arena, first_frames, first_background = plane_run["first extraction"]
+    second_arena, second_frames, second_background = plane_run["second extraction"]
+    np.testing.assert_array_equal(second_arena, plane_run["first click"])
+    np.testing.assert_array_equal(second_arena, first_arena)
+    np.testing.assert_array_equal(second_background, first_background)
+    np.testing.assert_array_equal(second_frames, first_frames)
+
+
+def test_a_plane_background_leaves_the_median_in_bground_tiff(plane_run, median_background):
+    """``proc/bground.tiff`` is the cache every later reader takes as the
+    median background, so the plane fit never replaces it."""
+    np.testing.assert_array_equal(plane_run["bground.tiff after the first extraction"], median_background)
+    np.testing.assert_array_equal(plane_run["bground.tiff after the second extraction"], median_background)
+
+
+def test_a_plane_background_is_what_extraction_subtracts(plane_run, median_background):
+    """Extraction subtracts, and records, the plane fit to the floor of the
+    median background with the saved parameters; the tool shows and subtracts
+    the same plane."""
+    from moseq2_extract.extract.proc import get_roi
+    from moseq2_extract.util import select_strel
+
+    params = dict(plane_run["saved"])
+    _, plane = get_roi(
+        median_background,
+        **params,
+        strel_dilate=select_strel(params["bg_roi_shape"], tuple(params["bg_roi_dilate"])),
+        strel_erode=select_strel(params["bg_roi_shape"], tuple(params["bg_roi_erode"])),
+        get_all_data=False,
+    )
+    a, b, c, d = plane
+    yy, xx = np.mgrid[: median_background.shape[0], : median_background.shape[1]]
+    expected = (a * xx + b * yy + d) / -c
+
+    _, _, recorded = plane_run["first extraction"]
+    np.testing.assert_allclose(recorded, expected)
+    np.testing.assert_allclose(plane_run["background shown"], expected)

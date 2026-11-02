@@ -8,13 +8,16 @@ counts themselves to what they claim to count.
 
 from __future__ import annotations
 
+import h5py
 import numpy as np
 import pandas as pd
+import pytest
 
 from moseq2_app.roi.validation import (
     check_timestamp_error_percentage,
     count_frames_with_small_areas,
     count_stationary_frames,
+    make_session_status_dicts,
 )
 
 
@@ -69,3 +72,25 @@ def test_a_frame_is_small_from_two_standard_deviations_under_the_mean():
     areas = pd.DataFrame({"area_px": [100.0] * 14 + [94.0, 106.0, 90.0, 110.0]})
     assert areas["area_px"].mean() == 100 and areas["area_px"].std() == 4
     assert count_frames_with_small_areas(areas) == 1
+
+
+def _extraction(tmp_path, name, timestamps, unit):
+    h5 = tmp_path / f"{name}.h5"
+    with h5py.File(h5, "w") as f:
+        f["timestamps"] = timestamps
+        if unit is not None:
+            f["timestamps"].attrs["unit"] = unit
+    (tmp_path / f"{name}.yaml").write_text(f"uuid: {name}\nmetadata: {{}}\n")
+    (tmp_path / f"{name}.mp4").touch()
+    return str(tmp_path / f"{name}.mp4")
+
+
+def test_the_dropped_frame_check_reads_the_recorded_unit(tmp_path):
+    """Frames 5 ms apart are 200 frames per second when the file says milliseconds.
+
+    Without a recorded unit the check guesses from the size of the gaps, and
+    gaps under 10 read as seconds.
+    """
+    fast = np.arange(10) * 5.0
+    status = make_session_status_dicts({"fast": _extraction(tmp_path, "fast", fast, "milliseconds")})
+    assert status["fast"]["dropped_frames"] == pytest.approx((200 - 30) / 30)

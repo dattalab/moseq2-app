@@ -9,8 +9,13 @@ import click
 import numpy as np
 from copy import deepcopy
 from cytoolz import valmap
-from moseq2_model.train.util import train_model, run_e_step, apply_model
-from os.path import join, basename, realpath, dirname, splitext
+from moseq2_model.train.util import (
+    ModelNaNError,
+    train_model,
+    run_e_step,
+    apply_model,
+)
+from os.path import join, basename, realpath, dirname, splitext, getctime
 from moseq2_model.util import (
     save_dict,
     load_pcs,
@@ -33,6 +38,39 @@ from moseq2_model.helpers.data import (
 )
 
 
+# The extensions save_dict can write a model or applied-model file as.
+MODEL_EXTENSIONS = [".p", ".pkl", ".z", ".mat", ".h5"]
+
+
+def prepare_output_file(dest_file):
+    """
+    Check that a model file can be written at dest_file before any work starts.
+
+    Creates its folder if needed. Raises ValueError if the extension is not
+    one save_dict writes, and PermissionError if the folder is not writable;
+    both are real errors rather than asserts, so they hold under ``python -O``.
+
+    Args:
+    dest_file (str): path the model or applied-model file will be saved to.
+    """
+    extension = splitext(basename(dest_file))[-1]
+    if extension not in MODEL_EXTENSIONS:
+        found = f"'{extension}'" if extension else "no extension"
+        raise ValueError(
+            f"Cannot save to {dest_file}: it has {found}, and a model file "
+            f"must end in one of {', '.join(MODEL_EXTENSIONS)}. Run again with a "
+            "path that ends in one of them, for example model.p."
+        )
+    os.makedirs(dirname(dest_file), exist_ok=True)
+
+    if not os.access(dirname(dest_file), os.W_OK):
+        raise PermissionError(
+            f"Cannot save to {dest_file}: you do not have permission to "
+            f"write to the folder {dirname(dest_file)}. Choose a path in a folder you "
+            "can write to, or change that folder's permissions, and run again."
+        )
+
+
 def learn_model_wrapper(input_file, dest_file, config_data):
     """
     Wrapper function to train ARHMM on PC scores.
@@ -47,21 +85,11 @@ def learn_model_wrapper(input_file, dest_file, config_data):
     """
 
     dest_file = realpath(dest_file)
-    # make sure the extension for model is correct
-    assert splitext(basename(dest_file))[-1] in [
-        ".mat",
-        ".z",
-        ".pkl",
-        ".p",
-        ".h5",
-    ], "Incorrect model filetype"
-    os.makedirs(dirname(dest_file), exist_ok=True)
-
-    if not os.access(dirname(dest_file), os.W_OK):
-        raise IOError("Output directory is not writable.")
+    # check the model file can be written before loading anything
+    prepare_output_file(dest_file)
 
     # Handle checkpoint parameters
-    checkpoint_path = join(dirname(dest_file), "checkpoints/")
+    checkpoint_path = join(dirname(dest_file), "checkpoints")
     checkpoint_freq = config_data.get("checkpoint_freq", -1)
 
     if checkpoint_freq < 0:
@@ -145,22 +173,31 @@ def learn_model_wrapper(input_file, dest_file, config_data):
     else:
         groupings = None
 
+    # A fit resumed from a checkpoint starts from the newest one, which
+    # get_current_model loaded; it is the last state without NaNs until this
+    # run saves another.
+    resumed_from = (max(all_checkpoints, key=getctime), itr) if itr > 0 else None
+
     # Train ARHMM
-    arhmm, loglikes, labels, iter_lls, iter_holls, interrupt = train_model(
-        model=arhmm,
-        num_iter=config_data["num_iter"],
-        ncpus=config_data["ncpus"],
-        checkpoint_freq=checkpoint_freq,
-        checkpoint_file=join(checkpoint_path, checkpoint_file),
-        start=itr,
-        progress_kwargs=progressbar_kwargs,
-        train_data=train_data,
-        val_data=test_data,
-        separate_trans=config_data["separate_trans"],
-        groups=groupings,
-        check_every=config_data["check_every"],
-        verbose=config_data["verbose"],
-    )
+    try:
+        arhmm, loglikes, labels, iter_lls, iter_holls, interrupt = train_model(
+            model=arhmm,
+            num_iter=config_data["num_iter"],
+            checkpoint_freq=checkpoint_freq,
+            checkpoint_file=join(checkpoint_path, checkpoint_file),
+            start=itr,
+            progress_kwargs=progressbar_kwargs,
+            train_data=train_data,
+            val_data=test_data,
+            separate_trans=config_data["separate_trans"],
+            groups=groupings,
+            check_every=config_data["check_every"],
+            verbose=config_data["verbose"],
+            last_checkpoint=resumed_from,
+        )
+    except ModelNaNError as error:
+        error.dest_file = dest_file
+        raise
 
     click.echo("Computing likelihoods on each training dataset...")
     # Get training log-likelihoods
@@ -229,17 +266,7 @@ def apply_model_wrapper(model_file, pc_file, dest_file, config_data):
     None
     """
 
-    assert splitext(basename(dest_file))[-1] in [
-        ".mat",
-        ".z",
-        ".pkl",
-        ".p",
-        ".h5",
-    ], "Incorrect model filetype"
-    os.makedirs(dirname(dest_file), exist_ok=True)
-
-    if not os.access(dirname(dest_file), os.W_OK):
-        raise IOError("Output directory is not writable.")
+    prepare_output_file(dest_file)
 
     # Load model
     model_data = load_dict(model_file)

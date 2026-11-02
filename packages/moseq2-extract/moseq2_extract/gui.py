@@ -4,8 +4,8 @@ GUI front-end operations accessible from a jupyter notebook.
 
 import os
 import re
-from moseq2_extract._yaml import write_yaml
-from os.path import dirname, basename, exists, join
+from moseq2_common.yaml import write_yaml
+from os.path import abspath, dirname, basename, exists, join
 from moseq2_extract.util import read_yaml
 from moseq2_extract.io.image import read_tiff_files
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
@@ -16,11 +16,13 @@ from moseq2_extract.helpers.wrappers import (
     generate_index_wrapper,
     aggregate_extract_results_wrapper,
 )
-from moseq2_extract.util import (
-    recursive_find_unextracted_dirs,
-    load_found_session_paths,
-    filter_warnings,
+from moseq2_extract.util import load_found_session_paths, filter_warnings
+from moseq2_extract.recordings import (
+    DEFAULT_MAX_DEPTH,
+    RECORDING_EXTENSIONS,
+    find_recordings,
 )
+from moseq2_extract.session_config import recording_configs
 from moseq2_extract.cli import batch_extract
 
 
@@ -130,6 +132,8 @@ def generate_config_command(output_file, camera_type="k2"):
         params["bg_roi_depth_range"] = [550, 650]
         params["spatial_filter_size"] = [5]
         params["tail_filter_size"] = [15, 15]
+        params["crop_size"] = [120, 120]
+        params["camera_type"] = "azure"
 
     # Check if the file already exists, and prompt user if they would like to overwrite pre-existing file
     if exists(output_file):
@@ -138,54 +142,63 @@ def generate_config_command(output_file, camera_type="k2"):
         )
         if ow.lower() == "y":
             # Updating config file
-            with open(output_file, "w") as f:
-                write_yaml(params, f)
+            write_yaml(params, output_file)
         else:
             return "Configuration file has been retained"
     else:
         print("Creating configuration file.")
-        with open(output_file, "w") as f:
-            write_yaml(params, f)
+        write_yaml(params, output_file)
 
     return "Configuration file has been successfully generated."
 
 
 @filter_warnings
 def extract_found_sessions(
-    input_dir, config_file, ext, extract_all=True, skip_extracted=False
+    input_dir,
+    config_file,
+    ext=RECORDING_EXTENSIONS,
+    extract_all=True,
+    skip_extracted=False,
+    max_depth=DEFAULT_MAX_DEPTH,
 ):
     """
-    Find and extract all depth files with specified extensions within input_dir
+    Find and extract the depth recordings within input_dir
 
     Args:
     input_dir (str): path to directory containing all session folders
     config_file (str): path to config file
-    ext (str): file extension for depth files to search for
+    ext (str or list): file extension(s) for depth files to search for. Defaults to every type the
+        pipeline reads (.dat, .mkv, .avi, .tar.gz); None means the same.
     extract_all (bool): if True, auto searches for all sessions, else, prompts user to select sessions individually.
     skip_extracted (bool): indicates whether to skip already extracted session.
+    max_depth (int): how many folders below input_dir to search for recordings.
 
     """
     # error out early
     if not exists(config_file):
         raise IOError(f"Config file {config_file} does not exist")
 
-    to_extract = []
+    # every recording is listed; run_local_extract skips the extracted ones when skip_extracted is set
+    search = find_recordings(
+        input_dir,
+        extensions=RECORDING_EXTENSIONS if ext is None else ext,
+        max_depth=max_depth,
+    )
+    message = search.report()
+    if message:
+        print(message)
+    if not search.recordings:
+        return
 
-    # find directories with .dat files that either have incomplete or no extractions
-    if isinstance(ext, str):
-        ext = [ext]
-    for ex in ext:
-        tmp = recursive_find_unextracted_dirs(input_dir, extension=ex, skip_checks=True)
-        to_extract += [e for e in tmp if e.endswith(ex)]
-
-    to_extract = get_selected_sessions(sorted(to_extract), extract_all)
+    to_extract = get_selected_sessions(search.recordings, extract_all)
 
     # read in the config file
     config_data = read_yaml(config_file)
 
     if config_data["cluster_type"] == "local":
-        run_local_extract(to_extract, config_file, skip_extracted)
-        print("Extractions Complete.")
+        # run_local_extract ends with a summary naming each recording that failed
+        if not run_local_extract(to_extract, config_file, skip_extracted):
+            print("Extractions Complete.")
     else:
         # Get default CLI params
         params = {
@@ -193,8 +206,10 @@ def extract_found_sessions(
         }
         # merge default params and config data, preferring values in config data
         config_data = {**params, **config_data}
+        # each job reads this config file; the one generate-config writes holds
+        # config_file: null, which would otherwise reach every command
+        config_data["config_file"] = abspath(config_file)
 
-        # function call to run_slurm_extract to be implemented
         run_slurm_extract(input_dir, to_extract, config_data, skip_extracted)
 
 
@@ -270,6 +285,7 @@ def find_roi_command(
     exts=["dat", "mkv", "avi"],
     select_session=False,
     default_session=0,
+    max_depth=DEFAULT_MAX_DEPTH,
 ):
     """
     Compute ROI files given depth file.
@@ -280,16 +296,17 @@ def find_roi_command(
     exts (list): list of supported extensions
     select_session (bool): list all found sessions and allow user to select specific session to analyze via user-prompt
     default_session (int): index of the default session to find ROI for
+    max_depth (int): how many folders below input_dir to search for recordings.
 
     Returns:
     images (list of 2d arrays): list of 2d array images to graph in Notebook.
     filenames (list): list of paths to respective image paths
     """
 
-    files = load_found_session_paths(input_dir, exts)
+    # prints where it looked and what it passed over when it finds nothing
+    files = load_found_session_paths(input_dir, exts, max_depth=max_depth)
 
     if len(files) == 0:
-        print("No recordings found")
         return
 
     if select_session:
@@ -305,8 +322,7 @@ def find_roi_command(
     output_dir = join(dirname(input_file), "proc")
     get_roi_wrapper(input_file, config_data, output_dir)
 
-    with open(config_file, "w") as g:
-        write_yaml(config_data, g)
+    write_yaml(config_data, config_file)
 
     images, filenames = read_tiff_files(output_dir)
 
@@ -315,9 +331,21 @@ def find_roi_command(
 
 
 @filter_warnings
-def extract_command(input_file, output_dir, config_file, num_frames=None, skip=False):
+def extract_command(
+    input_file,
+    output_dir,
+    config_file,
+    num_frames=None,
+    skip=False,
+    cli_options=None,
+    explain_settings=True,
+):
     """
     Extract depth file
+
+    The recording is extracted with the settings ``recording_configs`` resolves: the arena
+    tool's settings from its entry in session_config.yaml, every other setting from the config
+    file, and the typed options over both.
 
     Args:
     input_file (str): path to depth file to extract.
@@ -325,26 +353,24 @@ def extract_command(input_file, output_dir, config_file, num_frames=None, skip=F
     config_file (str): path to config file (config.yaml).
     num_frames (int): number of frames to extract. If None, all frames are extracted.
     skip (bool): skip already extracted file.
+    cli_options (dict): parameters typed on the command line; they take precedence over the config file and the session config.
+    explain_settings (bool): print which settings in the recording's session config entry differ from the config file
+        and are not used. ``run_local_extract`` prints this once for all its recordings instead.
 
     Returns:
-    (str): String indicating that the extracted is completed.
+    (str or None): path to the output directory, or None if the file was skipped as already extracted.
     """
 
-    config_data = read_yaml(config_file)
-
-    # Loading individual session config parameters if it exists
-    if exists(config_data.get("session_config_path", "")):
-        session_configs = read_yaml(config_data["session_config_path"])
-        session_key = basename(dirname(input_file))
-
-        # If key is found, update config_data, otherwise, use default dict
-        config_data = session_configs.get(session_key, config_data)
+    resolved = recording_configs(config_file, [input_file], cli_options)
+    config_data = resolved.configs[input_file]
+    if explain_settings:
+        message = resolved.message()
+        if message:
+            print(message)
 
     if output_dir is None:
         output_dir = config_data.get("output_dir", "proc")
 
-    extract_wrapper(
+    return extract_wrapper(
         input_file, output_dir, config_data, num_frames=num_frames, skip=skip
     )
-
-    return "Extraction completed."
