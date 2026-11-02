@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
+import sys
 
 import h5py
 import numpy as np
@@ -113,7 +114,8 @@ def test_train_pca(tmp_path, sessions, busy_port, capfd, monkeypatch):
     monkeypatch.setattr(wrappers, "train_pca_dask", train)
     out = tmp_path / "_pca"
     wrappers.train_pca_wrapper(str(sessions), defaults(train_pca, tmp_path, busy_port), str(out), "pca")
-    check(capfd, out / "train.log")
+    # only Linux refuses the busy port; elsewhere distributed binds it and has nothing to warn about
+    check(capfd, out / "train.log", port_warning=sys.platform.startswith("linux"))
 
 
 @pytest.fixture

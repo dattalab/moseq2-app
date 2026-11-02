@@ -46,6 +46,9 @@ def test_the_extension_check_survives_python_O(tmp_path):
 
 @pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0,
                     reason="root can write to a read-only folder")
+@pytest.mark.skipif(os.name == "nt",
+                    reason="on Windows the read-only attribute does not stop files being "
+                           "created in a folder, so there is no unwritable folder to name")
 def test_an_unwritable_folder_is_named(tmp_path):
     folder = tmp_path / "locked"
     folder.mkdir()

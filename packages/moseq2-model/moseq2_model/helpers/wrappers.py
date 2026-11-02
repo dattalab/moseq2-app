@@ -89,7 +89,7 @@ def learn_model_wrapper(input_file, dest_file, config_data):
     prepare_output_file(dest_file)
 
     # Handle checkpoint parameters
-    checkpoint_path = join(dirname(dest_file), "checkpoints/")
+    checkpoint_path = join(dirname(dest_file), "checkpoints")
     checkpoint_freq = config_data.get("checkpoint_freq", -1)
 
     if checkpoint_freq < 0:
