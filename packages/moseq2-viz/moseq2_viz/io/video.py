@@ -196,8 +196,12 @@ def write_crowd_movies(
         namer=namer,
     )
 
-    # parallel process the crowd movies for all syllables
-    with mp.Pool(config_data.get("processes")) as pool:
+    # parallel process the crowd movies for all syllables. The workers start
+    # fresh ("spawn", as they always do on macOS and Windows) rather than as
+    # forked copies of the caller: a fork copies the threads of JAX and
+    # OpenBLAS mid-flight, and with the OpenBLAS SciPy 1.17 bundles the
+    # caller's next multithreaded LAPACK call then deadlocks.
+    with mp.get_context("spawn").Pool(config_data.get("processes")) as pool:
         # Compute crowd matrices
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
