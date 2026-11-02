@@ -43,20 +43,32 @@ def press(button):
     button._process_event(None)
 
 
-def run_cell(number, namespace, **paths):
-    """Run one of the notebook's code cells in ``namespace``.
-
-    ``paths`` replaces the value of each named assignment in the cell, which is
-    how a user fills in the placeholder paths before running it.
-    """
-    source = code_cell(NOTEBOOK, number)
+def fill_in(source, **paths):
+    """``source`` with the value of each named assignment replaced by its path,
+    which is how a user fills in the placeholder paths before running a cell."""
     for name, value in paths.items():
+        # a function, not a string: re.subn reads a replacement string as a
+        # template and turns each escaped backslash in the repr back into one
+        assignment = f"{name} = {str(value)!r}"
         source, count = re.subn(
-            rf"^{name} = .*$", f"{name} = {str(value)!r}", source, flags=re.MULTILINE
+            rf"^{name} = .*$", lambda _: assignment, source, flags=re.MULTILINE
         )
-        assert count == 1, f"cell {number} no longer assigns {name}"
-    exec(source, namespace)
+        assert count == 1, f"the cell no longer assigns {name}"
+    return source
+
+
+def run_cell(number, namespace, **paths):
+    """Run one of the notebook's code cells in ``namespace``, its ``paths`` filled in."""
+    exec(fill_in(code_cell(NOTEBOOK, number), **paths), namespace)
     return namespace
+
+
+def test_a_windows_path_is_filled_in_as_typed():
+    """On Windows every path holds backslashes, which must reach the cell as written."""
+    path = r"C:\Users\runneradmin\AppData\Local\Temp\project0\config.yaml"
+    namespace = {}
+    exec(fill_in("config_path = ''\n", config_path=path), namespace)
+    assert namespace["config_path"] == path
 
 
 def open_notebook(tmp_path, configured):

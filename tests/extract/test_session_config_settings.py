@@ -19,7 +19,6 @@ Nothing is submitted; each SLURM command is run through ``extract`` with
 
 from __future__ import annotations
 
-import shlex
 from copy import deepcopy
 
 import pytest
@@ -27,6 +26,7 @@ from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.gui as extract_gui
+from commands import split_command
 from moseq2_common.yaml import write_yaml
 from moseq2_extract.gui import extract_command, extract_found_sessions, generate_config_command
 from moseq2_extract.util import detect_and_set_camera_parameters, read_yaml
@@ -114,7 +114,7 @@ def slurm(monkeypatch):
         script = (root / "extract_out.sh").read_text()
         for line in filter(str.strip, script.splitlines()):
             command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
-            run("extract", *shlex.split(command))
+            run("extract", *split_command(command))
         written = {name: read_yaml(str(root / name / "proc" / "config.yaml")) for name in SESSIONS}
         return calls, written
 

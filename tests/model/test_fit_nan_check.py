@@ -185,3 +185,28 @@ def test_the_progress_bar_is_closed(monkeypatch):
     with pytest.raises(ModelNaNError, match="3 NaNs found in params/Ab"):
         train_model(Poisoned(), num_iter=2)
     assert Bar.last.closed
+
+
+def test_the_checkpoint_path_uses_one_separator(scores, monkeypatch):
+    """Each checkpoint's path is built with the platform's own separator, so the
+    message names it the way the platform writes paths. Checked here by building
+    paths the way Windows does and reading the path ``train_model`` is handed."""
+    import ntpath
+
+    import moseq2_model.helpers.wrappers as wrappers
+
+    handed = {}
+
+    class Handed(Exception):
+        pass
+
+    def stop(**kwargs):
+        handed.update(kwargs)
+        raise Handed
+
+    monkeypatch.setattr(wrappers, "join", ntpath.join)
+    monkeypatch.setattr(wrappers, "train_model", stop)
+    with pytest.raises(Handed):
+        learn(scores)
+    folder = str(scores.parent)
+    assert handed["checkpoint_file"] == f"{folder}\\checkpoints\\model"

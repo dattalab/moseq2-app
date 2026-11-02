@@ -17,7 +17,6 @@ here follow what those cells do with what it finds:
 
 from __future__ import annotations
 
-import shlex
 import shutil
 from pathlib import Path
 
@@ -25,6 +24,7 @@ import pytest
 
 import moseq2_extract.cli as extract_cli
 from cells import code_cell
+from commands import split_command
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.util import update_config
@@ -346,7 +346,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
         command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
         from click.testing import CliRunner
 
-        result = CliRunner().invoke(extract_cli.cli, ["extract", *shlex.split(command)], catch_exceptions=False)
+        result = CliRunner().invoke(extract_cli.cli, ["extract", *split_command(command)], catch_exceptions=False)
         assert result.exit_code == 0, result.output
     assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}
 

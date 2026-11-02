@@ -20,6 +20,7 @@ from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.gui as extract_gui
+from commands import split_command
 from moseq2_common.yaml import write_yaml
 
 
@@ -186,8 +187,6 @@ def slurm_extracted(monkeypatch, received):
     """Run ``batch-extract --cluster-type slurm`` without submitting anything,
     then run each written command through ``extract`` and return what it
     received: one dict per recording, the config and ``num_frames``."""
-    import shlex
-
     monkeypatch.setattr(
         "moseq2_extract.helpers.extract.system",
         lambda *_: pytest.fail("batch-extract submitted a job"),
@@ -208,7 +207,7 @@ def slurm_extracted(monkeypatch, received):
         lines = [ln for ln in script.splitlines() if ln.strip()]
         for line in lines:
             command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
-            run("extract", *shlex.split(command))
+            run("extract", *split_command(command))
         return [
             {"config": c, "num_frames": n} for c, n in zip(received, nums)
         ]

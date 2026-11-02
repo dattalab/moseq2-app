@@ -15,12 +15,11 @@ so what is checked is what the job would extract with.
 
 from __future__ import annotations
 
-import shlex
-
 import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
+from commands import split_command
 from moseq2_common.yaml import write_yaml
 from moseq2_extract.gui import extract_found_sessions
 from moseq2_extract.util import read_yaml
@@ -76,7 +75,7 @@ def jobs(monkeypatch):
             if line.strip()
         ]
         for command in commands:
-            run("extract", *shlex.split(command))
+            run("extract", *split_command(command))
         return commands, received
 
     return go
@@ -130,3 +129,33 @@ def test_notebook_slurm_jobs_for_a_recording_missing_from_the_session_config(
     assert len(received) == 1
     assert received[0]["fps"] == 20
     assert tuple(received[0]["crop_size"]) == (90, 90)
+
+
+#: A written command after ``moseq2-extract extract``, as a Windows runner's
+#: temporary folder makes it.
+WINDOWS_CONFIG = r"C:\Users\runneradmin\AppData\Local\Temp\pytest-0\project\session_0\proc\config.yaml"
+WINDOWS_RECORDING = r"C:\Users\runneradmin\AppData\Local\Temp\pytest-0\project\session_0\depth.dat"
+
+
+def test_a_written_command_splits_to_its_windows_paths():
+    """The tests above split each written command before running it, and on
+    Windows its paths are written with backslashes, which a POSIX split
+    reads as escapes and drops."""
+    command = f" --config-file {WINDOWS_CONFIG} --num-frames 30 {WINDOWS_RECORDING}"
+    assert split_command(command, windows=True) == [
+        "--config-file", WINDOWS_CONFIG, "--num-frames", "30", WINDOWS_RECORDING,
+    ]
+
+
+def test_a_quoted_windows_path_loses_only_its_quotes():
+    spaced = r"C:\Users\run neradmin\depth.avi"
+    assert split_command(f' --num-frames 30 "{spaced}"', windows=True) == [
+        "--num-frames", "30", spaced,
+    ]
+
+
+def test_a_written_command_splits_to_its_posix_paths():
+    command = " --config-file /tmp/pytest-0/project/config.yaml /tmp/pytest-0/project/depth.avi"
+    assert split_command(command, windows=False) == [
+        "--config-file", "/tmp/pytest-0/project/config.yaml", "/tmp/pytest-0/project/depth.avi",
+    ]
