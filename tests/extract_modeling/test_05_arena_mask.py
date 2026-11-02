@@ -268,16 +268,18 @@ def test_saving_records_the_parameters_as_set(scratch):
 
 def assert_extraction_cuts_the_arena_shown(widget, data, buttons, root):
     """Compute and save in the tool, then find the arena the way extraction does,
-    from the saved parameters, and compare it with the one the tool showed."""
+    with the settings extraction resolves (the saved entry's arena tool settings,
+    config.yaml's others), and compare it with the one the tool showed."""
     from moseq2_extract.helpers.wrappers import get_roi_wrapper
+    from moseq2_extract.session_config import recording_configs
 
     click(buttons["Compute arena mask"])
     shown = data.images["Arena mask"][data.mask_index]
     click(buttons["Save session parameters"])
 
-    saved = read_yaml(str(root / "session_config.yaml"))[data.path]
     recording = widget.sessions[data.path]
-    roi, _, _ = get_roi_wrapper(recording, saved, output_dir=str(root / data.path / "proc"))
+    resolved = recording_configs(str(root / "config.yaml"), [recording]).configs[recording]
+    roi, _, _ = get_roi_wrapper(recording, resolved, output_dir=str(root / data.path / "proc"))
     np.testing.assert_array_equal(roi.astype(bool), shown)
 
 

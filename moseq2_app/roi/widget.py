@@ -20,6 +20,7 @@ from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
+from moseq2_extract.session_config import recording_config
 from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config, update_config
 from moseq2_extract.extract.proc import get_bground_im_file, apply_roi, threshold_chunk
 
@@ -64,6 +65,7 @@ class ArenaMaskWidget:
         self.extracts = {}
         self.data_dir = data_dir
         self.session_config_path = session_config_path
+        self.config_file = config_file
 
         self.config_data = read_and_clean_config(config_file)
 
@@ -203,8 +205,25 @@ class ArenaMaskWidget:
 
         write_yaml(self.session_config, self.session_config_path)
 
+    def recording_config(self, folder):
+        """
+        The settings extraction would use for a recording, resolved as extraction resolves them.
+
+        The tool's settings (``ARENA_TOOL_SETTINGS``) come from the values it holds for the
+        recording, which ``set_session_config_vars`` has written into its entry whether or not
+        they are saved yet; every other setting comes from config.yaml as it is on disk now.
+
+        Args:
+            folder (str): the recording's key in session_config.yaml.
+
+        Returns:
+            (dict): the recording's settings.
+        """
+        config, _ = recording_config(read_yaml(self.config_file) or {}, self.session_config[folder])
+        return config
+
     def compute_arena_mask(self):
-        """compute the arena mask using the parameters in the session config file.
+        """compute the arena mask with the settings extraction would use (``recording_config``).
 
         Returns:
             background (numpy.ndarray): background of the session
@@ -216,7 +235,7 @@ class ArenaMaskWidget:
         folder = self.session_data.path
         background = self.get_background(folder)
 
-        session_config = self.session_config[folder]
+        session_config = self.recording_config(folder)
 
         # the function extraction uses, so the saved parameters give extraction this arena
         rois, background = find_arena_candidates(background, session_config, self._output_dir(folder))
@@ -224,7 +243,7 @@ class ArenaMaskWidget:
         return background, rois
 
     def compute_extraction(self):
-        """compute extraction of the given frames
+        """compute extraction of the given frames, with the settings extraction would use (``recording_config``)
 
         Returns:
             (numpy.ndarray): extracted frames
@@ -233,7 +252,7 @@ class ArenaMaskWidget:
         self.set_session_config_vars()
 
         folder = self.session_data.path
-        session_config = self.session_config[folder]
+        session_config = self.recording_config(folder)
 
         # TODO: compute mask only if not already done
         background, rois = self.compute_arena_mask()
@@ -278,7 +297,7 @@ class ArenaMaskWidget:
 
     def _output_dir(self, folder):
         """The folder this recording's extraction writes to."""
-        return session_output_dir(self.sessions[folder], self.session_config[folder].get('output_dir'))
+        return session_output_dir(self.sessions[folder], self.recording_config(folder).get('output_dir'))
 
 
 # define data class first
