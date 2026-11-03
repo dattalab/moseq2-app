@@ -31,6 +31,7 @@ requires-python = ">=3.10"
 dependencies = [
     # Each floor is the oldest version the CI suite has passed with.
 
+    "click>=8.5.0",
     "h5py>=3.16.0",
     "numpy>=2.2.6",
     "ruamel.yaml>=0.19.1",
