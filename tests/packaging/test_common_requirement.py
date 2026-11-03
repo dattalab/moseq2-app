@@ -43,7 +43,7 @@ def moseq2_requirements(package):
 def test_moseq2_common_base_requirements():
     reqs = [Requirement(r) for r in distribution("moseq2-common").requires or []]
     names = {req.name for req in reqs if req.marker is None}
-    assert names == {"numpy", "ruamel.yaml", "h5py"}
+    assert names == {"click", "numpy", "ruamel.yaml", "h5py"}
 
 
 def test_the_video_extra_holds_the_video_libraries():
