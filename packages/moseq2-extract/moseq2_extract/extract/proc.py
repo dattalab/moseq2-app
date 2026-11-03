@@ -17,7 +17,8 @@ import moseq2_extract.io.video
 import moseq2_extract.extract.roi
 from os.path import exists, join, dirname
 from moseq2_extract.io.image import read_image, write_image
-from moseq2_extract.util import _depth_camera_geometry, convert_pxs_to_mm, strided_app
+from moseq2_common.scalars import centroid_to_mm, depth_camera_geometry, velocities
+from moseq2_extract.util import strided_app
 from moseq2_extract.extract.flip_classifier import (
     load_flip_classifier,
     is_legacy_pickle_failure,
@@ -585,14 +586,9 @@ def compute_scalars(frames, track_features, min_height=10, max_height=100, true_
     }
 
     # Get mm centroid, with the field of view of the camera that writes this frame size
-    resolution, field_of_view = _depth_camera_geometry(resolution)
-    centroid_mm = convert_pxs_to_mm(track_features['centroid'], resolution=resolution,
-                                    field_of_view=field_of_view, true_depth=true_depth)
-    centroid_mm_shift = convert_pxs_to_mm(track_features['centroid'] + 1, resolution=resolution,
-                                          field_of_view=field_of_view, true_depth=true_depth)
-
-    # Based on the centroid of the mouse, get the mm_to_px conversion
-    px_to_mm = np.abs(centroid_mm_shift - centroid_mm)
+    resolution, field_of_view = depth_camera_geometry(resolution)
+    # px_to_mm, from the centroid of the mouse, is the mm per pixel along x and y
+    centroid_mm, px_to_mm = centroid_to_mm(track_features['centroid'], resolution, field_of_view, true_depth)
     masked_frames = np.logical_and(frames > min_height, frames < max_height)
 
     features['centroid_x_px'] = track_features['centroid'][:, 0]
@@ -620,22 +616,9 @@ def compute_scalars(frames, track_features, min_height=10, max_height=100, true_
             features['height_ave_mm'][i] = np.mean(
                 frames[i, masked_frames[i]])
 
-    vel_x = np.diff(np.concatenate((features['centroid_x_px'][:1], features['centroid_x_px'])))
-    vel_y = np.diff(np.concatenate((features['centroid_y_px'][:1], features['centroid_y_px'])))
-    vel_z = np.diff(np.concatenate((features['height_ave_mm'][:1], features['height_ave_mm'])))
-
-    features['velocity_2d_px'] = np.hypot(vel_x, vel_y)
-    features['velocity_3d_px'] = np.sqrt(
-        np.square(vel_x)+np.square(vel_y)+np.square(vel_z))
-
-    vel_x = np.diff(np.concatenate((features['centroid_x_mm'][:1], features['centroid_x_mm'])))
-    vel_y = np.diff(np.concatenate((features['centroid_y_mm'][:1], features['centroid_y_mm'])))
-
-    features['velocity_2d_mm'] = np.hypot(vel_x, vel_y)
-    features['velocity_3d_mm'] = np.sqrt(
-        np.square(vel_x)+np.square(vel_y)+np.square(vel_z))
-
-    features['velocity_theta'] = np.arctan2(vel_y, vel_x)
+    features.update(velocities(features['centroid_x_px'], features['centroid_y_px'],
+                               features['centroid_x_mm'], features['centroid_y_mm'],
+                               features['height_ave_mm']))
 
     return features
 

@@ -11,6 +11,7 @@ from itertools import starmap
 from os.path import exists
 from collections import defaultdict
 from cytoolz import valmap, get, merge, keyfilter
+from moseq2_common.scalars import DEPTH_FIELD_OF_VIEW, centroid_to_mm, velocities
 from moseq2_viz.model.util import get_transitions, prepare_model_dataframe
 from moseq2_viz.util import (h5_to_dict, strided_app, h5_filepath_from_sorted,
                              get_timestamps_from_h5, parse_index)
@@ -33,39 +34,6 @@ def star_valmap(func, d):
     """
     keys = list(d.keys())
     return dict(zip(keys, starmap(func, d.values())))
-
-
-def convert_pxs_to_mm(coords, resolution=(512, 424), field_of_view=(70.6, 60), true_depth=673.1):
-    """
-    Convert x, y coordinates in pixel space to mm
-    
-    Args:
-    coords (list): list of [x,y] pixel coordinate lists.
-    resolution (tuple): video frame size.
-    field_of_view (tuple): nominal (horizontal, vertical) field of view of the depth camera, in degrees
-    true_depth (float): detected distance between depth camera and bucket floor.
-
-    Returns:
-    new_coords (list): list of same [x,y] coordinates in millimeters.
-    """
-
-    # http://stackoverflow.com/questions/17832238/kinect-intrinsic-parameters-from-field-of-view/18199938#18199938
-    # http://www.imaginativeuniversal.com/blog/post/2014/03/05/quick-reference-kinect-1-vs-kinect-2.aspx
-    # http://smeenk.com/kinect-field-of-view-comparison/
-    cx = resolution[0] // 2
-    cy = resolution[1] // 2
-
-    xhat = coords[:, 0] - cx
-    yhat = coords[:, 1] - cy
-
-    fw = resolution[0] / (2 * np.tan(np.deg2rad(field_of_view[0] / 2)))
-    fh = resolution[1] / (2 * np.tan(np.deg2rad(field_of_view[1] / 2)))
-
-    new_coords = np.zeros_like(coords, dtype=np.float64)
-    new_coords[:, 0] = true_depth * xhat / fw
-    new_coords[:, 1] = true_depth * yhat / fh
-
-    return new_coords
 
 
 def is_legacy(features: dict):
@@ -141,10 +109,9 @@ def convert_legacy_scalars(old_features, force: bool = False, true_depth: float 
 
     features = generate_empty_feature_dict(nframes)
 
-    centroid_mm = convert_pxs_to_mm(centroid, true_depth=true_depth)
-    centroid_mm_shift = convert_pxs_to_mm(centroid + 1, true_depth=true_depth)
-
-    px_to_mm = np.abs(centroid_mm_shift - centroid_mm)
+    # Legacy-format scalars predate Azure support, so they convert with the Kinect v2's geometry
+    kinect_v2 = (512, 424)
+    centroid_mm, px_to_mm = centroid_to_mm(centroid, kinect_v2, DEPTH_FIELD_OF_VIEW[kinect_v2], true_depth)
 
     features['centroid_x_px'] = centroid[:, 0]
     features['centroid_y_px'] = centroid[:, 1]
@@ -172,22 +139,9 @@ def convert_legacy_scalars(old_features, force: bool = False, true_depth: float 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
 
-        vel_x = np.diff(np.concatenate((features['centroid_x_px'][:1], features['centroid_x_px'])))
-        vel_y = np.diff(np.concatenate((features['centroid_y_px'][:1], features['centroid_y_px'])))
-        vel_z = np.diff(np.concatenate((features['height_ave_mm'][:1], features['height_ave_mm'])))
-
-        features['velocity_2d_px'] = np.hypot(vel_x, vel_y)
-        features['velocity_3d_px'] = np.sqrt(
-            np.square(vel_x)+np.square(vel_y)+np.square(vel_z))
-
-        vel_x = np.diff(np.concatenate((features['centroid_x_mm'][:1], features['centroid_x_mm'])))
-        vel_y = np.diff(np.concatenate((features['centroid_y_mm'][:1], features['centroid_y_mm'])))
-
-        features['velocity_2d_mm'] = np.hypot(vel_x, vel_y)
-        features['velocity_3d_mm'] = np.sqrt(
-            np.square(vel_x)+np.square(vel_y)+np.square(vel_z))
-
-        features['velocity_theta'] = np.arctan2(vel_y, vel_x)
+        features.update(velocities(features['centroid_x_px'], features['centroid_y_px'],
+                                   features['centroid_x_mm'], features['centroid_y_mm'],
+                                   features['height_ave_mm']))
 
     return features
 
