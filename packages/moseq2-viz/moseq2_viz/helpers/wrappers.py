@@ -328,6 +328,28 @@ def plot_syllable_stat_wrapper(
     return fig
 
 
+def _position_pdf_data(index_file, output_file, normalize):
+    """
+    Load the index's scalars and compute the position PDF of every session.
+
+    Args:
+    index_file (str): path to index file.
+    output_file (str): filename of the heatmap graph, whose folder is created.
+    normalize (bool): normalize the PDF so that min and max values range from 0-1.
+
+    Returns:
+    pdfs, groups, sessions, subjectNames: the output of `compute_all_pdf_data`.
+    """
+
+    # Get loaded index dicts via decorator
+    _, sorted_index = init_wrapper_function(index_file, output_file=output_file)
+
+    # Load scalar dataframe to compute position PDF heatmap
+    scalar_df = scalars_to_dataframe(sorted_index)
+
+    return compute_all_pdf_data(scalar_df, normalize=normalize)
+
+
 def plot_mean_group_position_pdf_wrapper(
     index_file, output_file, normalize=False, norm_color=mpl.colors.LogNorm()
 ):
@@ -344,14 +366,7 @@ def plot_mean_group_position_pdf_wrapper(
     fig (pyplot.figure): figure to graph in Jupyter Notebook.
     """
 
-    # Get loaded index dicts via decorator
-    _, sorted_index = init_wrapper_function(index_file, output_file=output_file)
-
-    # Load scalar dataframe to compute position PDF heatmap
-    scalar_df = scalars_to_dataframe(sorted_index)
-
-    # Compute Position PDF Heatmaps for all sessions
-    pdfs, groups, _, _ = compute_all_pdf_data(scalar_df, normalize=normalize)
+    pdfs, groups, _, _ = _position_pdf_data(index_file, output_file, normalize)
 
     # Plot the average Position PDF Heatmap for each group
     fig = plot_mean_group_heatmap(
@@ -380,15 +395,8 @@ def plot_verbose_pdfs_wrapper(
     fig (pyplot.figure): figure to graph in Jupyter Notebook.
     """
 
-    # Get loaded index dicts via decorator
-    _, sorted_index = init_wrapper_function(index_file, output_file=output_file)
-
-    # Load scalar dataframe to compute position PDF heatmap
-    scalar_df = scalars_to_dataframe(sorted_index)
-
-    # Compute PDF Heatmaps for all sessions
-    pdfs, groups, sessions, subjectNames = compute_all_pdf_data(
-        scalar_df, normalize=normalize
+    pdfs, groups, sessions, subjectNames = _position_pdf_data(
+        index_file, output_file, normalize
     )
 
     # Plot all session heatmaps in columns organized by groups

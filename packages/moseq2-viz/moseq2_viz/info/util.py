@@ -7,6 +7,78 @@ from moseq2_viz.model.trans_graph import get_transition_matrix
 from moseq2_viz.model.util import get_syllable_statistics, relabel_by_usage
 
 
+def _usages_and_truncate_point(v, truncate_syllable):
+    """
+    Count one session's syllable usages and find where to truncate them.
+
+    Args:
+    v (np.ndarray): one session's labels.
+    truncate_syllable (int): syllable at which to truncate.
+
+    Returns:
+    usages (OrderedDict): syllable usage counts, from `get_syllable_statistics`.
+    truncate_point (int): index of `truncate_syllable` among the syllables, or the number of syllables when it is not among them.
+    """
+
+    usages = get_syllable_statistics([v])[0]
+
+    syllables = np.array(list(usages))
+    truncate_point = np.where(syllables == truncate_syllable)[0]
+
+    if truncate_point is None or len(truncate_point) != 1:
+        truncate_point = len(syllables)
+    else:
+        truncate_point = truncate_point[0]
+
+    return usages, truncate_point
+
+
+def _usage_distribution(usages, truncate_point, smoothing):
+    """
+    Turn usage counts into a probability distribution over the first `truncate_point` syllables.
+
+    Args:
+    usages (OrderedDict): syllable usage counts.
+    truncate_point (int): number of syllables to keep.
+    smoothing (float): pseudocount added to each usage before normalization.
+
+    Returns:
+    usages (np.ndarray): the smoothed, normalized usages.
+    """
+
+    usages = np.array(list(usages.values()), dtype="float")
+    usages = usages[:truncate_point] + smoothing
+    usages /= usages.sum()
+    return usages
+
+
+def _transition_counts(v, tm_smoothing, truncate_point):
+    """
+    Count one session's syllable transitions, add a pseudocount and truncate.
+
+    Args:
+    v (np.ndarray): one session's labels.
+    tm_smoothing (float): pseudocount added to each transition count.
+    truncate_point (int): number of syllables to keep.
+
+    Returns:
+    tm (np.ndarray): the smoothed transition counts, `truncate_point` square.
+    """
+
+    tm = (
+        get_transition_matrix(
+            [v],
+            max_syllable=100,
+            normalize=None,
+            smoothing=0,
+            disable_output=True,
+            combine=True,
+        )
+        + tm_smoothing
+    )
+    return tm[:truncate_point, :truncate_point]
+
+
 def entropy(labels, truncate_syllable=40, smoothing=1.0, relabel_by="usage"):
     """
     Compute syllable usage entropy, base 2.
@@ -26,19 +98,8 @@ def entropy(labels, truncate_syllable=40, smoothing=1.0, relabel_by="usage"):
 
     ent = []
     for v in labels:
-        usages = get_syllable_statistics([v])[0]
-
-        syllables = np.array(list(usages))
-        truncate_point = np.where(syllables == truncate_syllable)[0]
-
-        if truncate_point is None or len(truncate_point) != 1:
-            truncate_point = len(syllables)
-        else:
-            truncate_point = truncate_point[0]
-
-        usages = np.array(list(usages.values()), dtype="float")
-        usages = usages[:truncate_point] + smoothing
-        usages /= usages.sum()
+        usages, truncate_point = _usages_and_truncate_point(v, truncate_syllable)
+        usages = _usage_distribution(usages, truncate_point, smoothing)
 
         entropy = -np.sum(usages * np.log2(usages))
         ent.append(entropy)
@@ -74,35 +135,9 @@ def entropy_rate(
 
     ent = []
     for v in labels:
-
-        usages = get_syllable_statistics([v])[0]
-        syllables = np.array(list(usages.keys()))
-        truncate_point = np.where(syllables == truncate_syllable)[0]
-
-        if truncate_point is None or len(truncate_point) != 1:
-            truncate_point = len(syllables)
-        else:
-            truncate_point = truncate_point[0]
-
-        syllables = syllables[:truncate_point]
-
-        usages = np.array(list(usages.values()), dtype="float")
-        usages = usages[:truncate_point] + smoothing
-        usages /= usages.sum()
-
-        tm = (
-            get_transition_matrix(
-                [v],
-                max_syllable=100,
-                normalize=None,
-                smoothing=0,
-                disable_output=True,
-                combine=True,
-            )
-            + tm_smoothing
-        )
-
-        tm = tm[:truncate_point, :truncate_point]
+        usages, truncate_point = _usages_and_truncate_point(v, truncate_syllable)
+        usages = _usage_distribution(usages, truncate_point, smoothing)
+        tm = _transition_counts(v, tm_smoothing, truncate_point)
 
         if normalize == "bigram":
             tm /= tm.sum()
@@ -151,28 +186,8 @@ def transition_entropy(
     entropies = []
 
     for v in labels:
-        usages = get_syllable_statistics([v])[0]
-
-        syllables = np.array(list(usages))
-        truncate_point = np.where(syllables == truncate_syllable)[0]
-
-        if truncate_point is None or len(truncate_point) != 1:
-            truncate_point = len(syllables)
-        else:
-            truncate_point = truncate_point[0]
-
-        tm = (
-            get_transition_matrix(
-                [v],
-                max_syllable=100,
-                normalize=None,
-                smoothing=0,
-                combine=True,
-                disable_output=True,
-            )
-            + tm_smoothing
-        )
-        tm = tm[:truncate_point, :truncate_point]
+        _, truncate_point = _usages_and_truncate_point(v, truncate_syllable)
+        tm = _transition_counts(v, tm_smoothing, truncate_point)
 
         if transition_type == "outgoing":
             # normalize each row (outgoing syllables)
