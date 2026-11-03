@@ -12,7 +12,8 @@ from os.path import exists
 from collections import defaultdict
 from cytoolz import valmap, get, merge, keyfilter
 from moseq2_viz.model.util import get_transitions, prepare_model_dataframe
-from moseq2_viz.util import (h5_to_dict, strided_app, h5_filepath_from_sorted,
+from moseq2_common.h5 import h5_to_dict
+from moseq2_viz.util import (strided_app, h5_filepath_from_sorted,
                              get_timestamps_from_h5, parse_index)
 
 

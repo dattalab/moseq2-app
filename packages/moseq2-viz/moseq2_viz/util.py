@@ -13,6 +13,7 @@ from cytoolz.curried import valmap
 from cytoolz.dicttoolz import dissoc, assoc
 from cytoolz.itertoolz import first, groupby
 from os.path import join, exists, dirname, splitext
+import moseq2_common.h5
 from moseq2_common.yaml import read_yaml as _read_yaml
 
 
@@ -90,89 +91,6 @@ def clean_dict(dct):
     return valmap(clean_entry, dct)
 
 
-def _read_dataset(dset: h5py.Dataset):
-    """
-    Read an h5 dataset, returning variable-length text as str.
-
-    h5py hands variable-length string data back as bytes, and the consumers of
-    this module treat those values as str: the acquisition metadata and the
-    extraction parameters are written straight into YAML, compared against
-    index-file entries, and used as DataFrame column values.
-
-    Only variable-length utf-8 datasets are decoded, because those are the only
-    ones whose type changed. Fixed-width datasets (``|S5``, holding the
-    extraction version here) and variable-length ascii datasets were byte
-    strings before as well, and their consumers already treat them that way.
-
-    Args:
-    dset (h5py.Dataset): dataset to read.
-
-    Returns:
-    the dataset contents, decoded to str where the dataset holds vlen utf-8.
-    """
-
-    value = dset[()]
-    info = h5py.check_string_dtype(dset.dtype)
-    if info is None or info.length is not None or info.encoding != "utf-8":
-        return value
-    if isinstance(value, bytes):
-        return value.decode(info.encoding)
-    if isinstance(value, np.ndarray):
-        decoded = [v.decode(info.encoding) if isinstance(v, bytes) else v
-                   for v in value.ravel()]
-        return np.array(decoded, dtype=object).reshape(value.shape)
-    return value
-
-
-def _load_h5_to_dict(file: h5py.File, path: str) -> dict:
-    """
-    Load h5 contents to dictionary.
-
-    Args:
-    file (h5py.File): open h5py File object.
-    path (str): path within h5 to dict to load.
-
-    Returns:
-    ans (dict): loaded dictionary from h5 dataset or group
-    """
-
-    ans = {}
-    if isinstance(file[path], h5py.Dataset):
-        # only use the final path key to add to `ans`
-        ans[path.split("/")[-1]] = _read_dataset(file[path])
-    else:
-        for key, item in file[path].items():
-            if isinstance(item, h5py.Dataset):
-                ans[key] = _read_dataset(item)
-            elif isinstance(item, h5py.Group):
-                ans[key] = _load_h5_to_dict(file, "/".join([path, key]))
-    return ans
-
-
-def h5_to_dict(h5file, path: str = "/") -> dict:
-    """
-    Load h5 dict contents to a dict variable.
-
-    Args:
-    h5file (str or h5py.File): file path to the given h5 file or the h5 file handle
-    path (str): path to the base dataset within the h5 file. Default: /
-
-    Returns:
-    out (dict): dictionary of all h5 contents
-    """
-
-    if isinstance(h5file, str):
-        with h5py.File(h5file, "r") as f:
-            out = _load_h5_to_dict(f, path)
-    elif isinstance(h5file, (h5py.File, h5py.Group)):
-        out = _load_h5_to_dict(h5file, path)
-    else:
-        raise Exception("File input not understood. Use an h5 file path or file handle")
-    return out
-
-
-#: How many milliseconds each value of a timestamps dataset's ``unit`` attribute
-#: is. Extraction writes ``/timestamps`` in milliseconds and records ``unit``.
 TIMESTAMP_UNITS_IN_MS = {"milliseconds": 1, "ms": 1, "seconds": 1000, "s": 1000}
 
 
@@ -256,7 +174,7 @@ def load_changepoint_distribution(cpfile):
     (numpy.array): Array of changepoint durations.
     """
 
-    cps = h5_to_dict(cpfile, "cps")
+    cps = moseq2_common.h5.h5_to_dict(cpfile, "cps")
     cp_dist = map(compose(np.diff, np.squeeze), cps.values())
     return np.concatenate(list(cp_dist))
 

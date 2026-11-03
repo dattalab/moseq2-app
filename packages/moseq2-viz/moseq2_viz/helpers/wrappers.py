@@ -16,7 +16,6 @@ from moseq2_viz.util import (
     get_index_hits,
     get_metadata_path,
     clean_dict,
-    h5_to_dict,
     recursive_find_h5s,
 )
 from moseq2_viz.model.trans_graph import (
@@ -40,6 +39,7 @@ from moseq2_viz.model.util import (
     make_separate_crowd_movies,
     labels_to_changepoints,
 )
+from moseq2_common.h5 import h5_to_dict
 from moseq2_common.yaml import write_yaml
 
 

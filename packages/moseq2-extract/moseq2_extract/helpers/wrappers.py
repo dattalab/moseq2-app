@@ -13,6 +13,7 @@ from glob import glob
 import numpy as np
 import urllib.request
 from copy import deepcopy
+from moseq2_common.h5 import h5_to_dict
 from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from cytoolz import partial
@@ -43,7 +44,6 @@ from moseq2_extract.util import (
     graduate_dilated_wall_area,
     get_bucket_center,
     _floor_depth,
-    h5_to_dict,
     detect_and_set_camera_parameters,
     get_frame_range_indices,
     check_filter_sizes,
