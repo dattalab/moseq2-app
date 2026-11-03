@@ -11,8 +11,9 @@ import dask.array as da
 from tqdm.auto import tqdm
 import dask.array.linalg as lng
 from dask.distributed import as_completed, progress
+from moseq2_common.timestamps import read_timestamps, timestamp_unit, timestamps_path
 from moseq2_pca.util import (clean_frames, insert_nans, read_yaml, get_changepoints, get_rps,
-                             frame_rate_from_timestamps, timestamp_unit, TIMESTAMP_UNITS)
+                             frame_rate_from_timestamps)
 
 
 def mask_data(original_data, mask, new_data):
@@ -115,14 +116,10 @@ def get_timestamps(f, frames, fps=30):
     timestamps (numpy.array): array of timestamps for inputted frames variable, in seconds
     """
 
-    # '/timestamps' is the h5 format post v0.1.3, '/metadata/timestamps' the format before
-    path = next((p for p in ('/timestamps', '/metadata/timestamps') if p in f), None)
-    if path is None:
+    if timestamps_path(f) is None:
         print('WARNING: timestamps were not found. Using default frame series-ordering.')
         return np.arange(frames.shape[0]) / fps
-
-    unit = timestamp_unit(f[path])
-    return f[path][()] / TIMESTAMP_UNITS[unit if unit is not None else 'milliseconds']
+    return read_timestamps(f, 'seconds')[0]
 
 
 def get_timestamp_unit(f):
@@ -130,7 +127,7 @@ def get_timestamp_unit(f):
     The unit an open extraction h5 records for its timestamps, or None when it
     records none or has no timestamps.
     """
-    path = next((p for p in ('/timestamps', '/metadata/timestamps') if p in f), None)
+    path = timestamps_path(f)
     return timestamp_unit(f[path]) if path is not None else None
 
 def copy_metadatas_to_scores(f, f_scores, uuid):

@@ -14,8 +14,8 @@ from cytoolz import valmap, get, merge, keyfilter
 from moseq2_common.scalars import DEPTH_FIELD_OF_VIEW, centroid_to_mm, velocities
 from moseq2_viz.model.util import get_transitions, prepare_model_dataframe
 from moseq2_common.h5 import h5_to_dict
-from moseq2_viz.util import (strided_app, h5_filepath_from_sorted,
-                             get_timestamps_from_h5, parse_index)
+from moseq2_common.timestamps import read_timestamps
+from moseq2_viz.util import strided_app, h5_filepath_from_sorted, parse_index
 
 
 def _star_itemmap(func, d):
@@ -401,7 +401,7 @@ def scalars_to_dataframe(index: dict, include_keys: list = ['SessionName', 'Subj
                   f'Not including the dist_to_center_px column in outputted scalar_df for session-uuid {k}')
             pass
 
-        timestamps = get_timestamps_from_h5(pth)
+        timestamps = read_timestamps(pth, "milliseconds")[0]
 
         # convert scalar names into modern format if they are legacy
         if is_legacy(dset) and force_conversion:

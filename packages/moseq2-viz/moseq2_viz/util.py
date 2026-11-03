@@ -91,58 +91,6 @@ def clean_dict(dct):
     return valmap(clean_entry, dct)
 
 
-TIMESTAMP_UNITS_IN_MS = {"milliseconds": 1, "ms": 1, "seconds": 1000, "s": 1000}
-
-
-def read_timestamps(h5file: str):
-    """
-    Read an extraction's frame times in milliseconds, by the unit its timestamps
-    dataset records. A file that records no unit (extracted before the unit was
-    recorded) is returned as stored.
-
-    Args:
-    h5file (str): path to h5 file.
-
-    Returns:
-    timestamps (np.ndarray): the time of every frame, in milliseconds.
-    unit_recorded (bool): whether the file records its timestamps' unit.
-    """
-
-    with h5py.File(h5file, "r") as f:
-        # v0.1.3 or greater data format keeps them at /timestamps
-        path = "timestamps" if "timestamps" in f else "metadata/timestamps"
-        timestamps = f[path][()]
-        unit = f[path].attrs.get("unit")
-    if unit is None:
-        return timestamps, False
-    if isinstance(unit, bytes):
-        unit = unit.decode()
-    if unit not in TIMESTAMP_UNITS_IN_MS:
-        raise ValueError(
-            f"{h5file}: the timestamps at /{path} record their unit as {unit!r}, which is not "
-            f"one of {', '.join(TIMESTAMP_UNITS_IN_MS)}. moseq2-extract writes milliseconds; "
-            "check that this file is the extraction's own results h5 and is not damaged, or "
-            "extract the session again."
-        )
-    factor = TIMESTAMP_UNITS_IN_MS[unit]
-    return (timestamps if factor == 1 else timestamps * factor), True
-
-
-def get_timestamps_from_h5(h5file: str) -> np.ndarray:
-    """
-    Return an extraction's frame times, in milliseconds when the file records
-    their unit and as stored when it does not.
-
-    Args:
-    h5file (str): path to h5 file.
-
-    Returns:
-    (np.ndarray): timestamps from extraction within the h5file.
-    """
-
-    return read_timestamps(h5file)[0]
-
-
 def get_metadata_path(h5file):
     """
     Return path within h5 file that contains the kinect extraction metadata.
@@ -177,28 +125,6 @@ def load_changepoint_distribution(cpfile):
     cps = moseq2_common.h5.h5_to_dict(cpfile, "cps")
     cp_dist = map(compose(np.diff, np.squeeze), cps.values())
     return np.concatenate(list(cp_dist))
-
-
-def load_timestamps(timestamp_file, col=0):
-    """
-    Read timestamps from space delimited text file.
-
-    Args:
-    timestamp_file (str): path to timestamp file
-    col (int): column to load.
-
-    Returns:
-    ts (np.ndarray): loaded array of timestamps
-    """
-
-    ts = np.loadtxt(timestamp_file, delimiter=" ")
-    if ts.ndim > 1:
-        return ts[:, col]
-    elif col > 0:
-        raise Exception(
-            f"Timestamp file {timestamp_file} does not have more than one column of data"
-        )
-    return ts
 
 
 def parse_index(index: Union[str, dict]) -> tuple:

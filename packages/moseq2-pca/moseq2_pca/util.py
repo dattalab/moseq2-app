@@ -22,6 +22,7 @@ from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
 from moseq2_common.frames import clean_frames as clean_frames_spatial
+from moseq2_common.timestamps import timestamps_path
 from moseq2_common.yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
@@ -215,37 +216,6 @@ def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
                 out[:, idx[0], idx[1]] - gauss_smooth(out[:, idx[0], idx[1]], kernel=kernel)
 
     return out
-
-
-#: How many of each value of a timestamps dataset's ``unit`` attribute make a
-#: second. Extraction writes ``/timestamps`` in milliseconds and records ``unit``
-#: as ``milliseconds``; a file written before it did so has no attribute and is
-#: read as milliseconds.
-TIMESTAMP_UNITS = {'milliseconds': 1000.0, 'ms': 1000.0, 'seconds': 1.0, 's': 1.0}
-
-
-def timestamp_unit(dataset):
-    """
-    The unit a timestamps dataset records in its ``unit`` attribute, or None
-    when it records none (a file extracted before the attribute was written).
-
-    Args:
-    dataset (h5py.Dataset): an extraction's ``/timestamps`` dataset.
-
-    Returns:
-    unit (str or None): the recorded unit.
-    """
-    unit = dataset.attrs.get('unit')
-    if isinstance(unit, bytes):
-        unit = unit.decode()
-    if unit is not None and unit not in TIMESTAMP_UNITS:
-        raise ValueError(
-            f'{dataset.file.filename}: the timestamps at {dataset.name} record their unit as '
-            f'{unit!r}, which is not one of {", ".join(TIMESTAMP_UNITS)}. moseq2-extract writes '
-            f'milliseconds; check that this file is the extraction\'s own results h5 and is not '
-            f'damaged, or extract the session again.'
-        )
-    return unit
 
 
 #: The whole frames per second ``frame_rate_from_timestamps`` accepts. Depth
@@ -508,10 +478,12 @@ def check_timestamps(h5s):
 
     for h5 in h5s:
         try:
-            h5_timestamp_path = get_timestamp_path(h5)
-        except:
-            warnings.warn(f'Autoload timestamps for session {h5} failed.')
+            with h5py.File(h5, 'r') as f:
+                h5_timestamp_path = timestamps_path(f)
+        except Exception:
             h5_timestamp_path = None
+        if h5_timestamp_path is None:
+            warnings.warn(f'Autoload timestamps for session {h5} failed.')
         try:
             h5_metadata_path = get_metadata_path(h5)
         except:
@@ -524,26 +496,6 @@ def check_timestamps(h5s):
         if h5_metadata_path is None:
             warnings.warn(f'Could not located metadata in {h5}. \
                           This may cause issues if PCA has been trained on missing data.')
-
-
-def get_timestamp_path(h5file):
-    """
-    Return path within h5 file that contains the kinect timestamps
-
-    Args:
-    h5file (str): path to h5 file.
-
-    Returns:
-    (str): path to metadata timestamps within h5 file
-    """
-
-    with h5py.File(h5file, 'r') as f:
-        if '/timestamps' in f:
-            return '/timestamps'
-        elif '/metadata/timestamps' in f:
-            return '/metadata/timestamps'
-        else:
-            raise KeyError('timestamp key not found')
 
 
 def get_metadata_path(h5file):
