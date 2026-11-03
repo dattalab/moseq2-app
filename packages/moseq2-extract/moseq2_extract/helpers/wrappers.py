@@ -780,6 +780,71 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
         print("Unexpected error:", e)
 
 
+def _copy_frames(
+    input_file,
+    output_file,
+    frame_batches,
+    fps,
+    delete,
+    threads,
+    mapping,
+    avi_encode=True,
+):
+    """
+    Copy the frames of an input depth recording into an output file, batch by batch,
+    check that the output reads back identical to the input, and optionally delete the
+    input.
+
+    Args:
+    input_file (str): Path to depth file to read frames from
+    output_file (str): Path to output file
+    frame_batches (list): Frame index batches to copy, in order
+    fps (int): frame rate.
+    delete (bool): Delete the original depth file if True.
+    threads (int): Number of threads used to encode video.
+    mapping (str or int): Indicate which video stream to from the inputted file
+    avi_encode (bool): Encode the frames as video if True, else append them as raw
+        uint16 bytes
+
+    Returns:
+    """
+
+    video_pipe = None
+
+    for batch in tqdm(frame_batches, desc="Encoding batches"):
+        frames = load_movie_data(input_file, batch, mapping=mapping)
+        if avi_encode:
+            video_pipe = write_frames(
+                output_file,
+                frames,
+                pipe=video_pipe,
+                close_pipe=False,
+                threads=threads,
+                fps=fps,
+            )
+        else:
+            with open(output_file, "ab") as f:
+                f.write(frames.astype("uint16").tobytes())
+
+    if video_pipe:
+        video_pipe.communicate()
+
+    for batch in tqdm(frame_batches, desc="Checking data integrity"):
+        raw_frames = load_movie_data(input_file, batch, mapping=mapping)
+        encoded_frames = load_movie_data(output_file, batch, mapping=mapping)
+
+        if not np.array_equal(raw_frames, encoded_frames):
+            raise RuntimeError(
+                f"Raw frames and encoded frames not equal from {batch[0]} to {batch[-1]}"
+            )
+
+    print("Encoding successful")
+
+    if delete:
+        print("Deleting", input_file)
+        os.remove(input_file)
+
+
 def convert_raw_to_avi_wrapper(
     input_file, output_file, chunk_size, fps, delete, threads, mapping
 ):
@@ -804,36 +869,8 @@ def convert_raw_to_avi_wrapper(
 
     vid_info = get_movie_info(input_file, mapping=mapping)
     frame_batches = gen_batch_sequence(vid_info["nframes"], chunk_size, 0)
-    video_pipe = None
 
-    for batch in tqdm(frame_batches, desc="Encoding batches"):
-        frames = load_movie_data(input_file, batch, mapping=mapping)
-        video_pipe = write_frames(
-            output_file,
-            frames,
-            pipe=video_pipe,
-            close_pipe=False,
-            threads=threads,
-            fps=fps,
-        )
-
-    if video_pipe:
-        video_pipe.communicate()
-
-    for batch in tqdm(frame_batches, desc="Checking data integrity"):
-        raw_frames = load_movie_data(input_file, batch, mapping=mapping)
-        encoded_frames = load_movie_data(output_file, batch, mapping=mapping)
-
-        if not np.array_equal(raw_frames, encoded_frames):
-            raise RuntimeError(
-                f"Raw frames and encoded frames not equal from {batch[0]} to {batch[-1]}"
-            )
-
-    print("Encoding successful")
-
-    if delete:
-        print("Deleting", input_file)
-        os.remove(input_file)
+    _copy_frames(input_file, output_file, frame_batches, fps, delete, threads, mapping)
 
 
 def copy_slice_wrapper(
@@ -872,7 +909,6 @@ def copy_slice_wrapper(
     offset = copy_slice[0]
 
     frame_batches = gen_batch_sequence(nframes, chunk_size, 0, offset)
-    video_pipe = None
 
     if exists(output_file):
         overwrite = input(
@@ -881,35 +917,13 @@ def copy_slice_wrapper(
         if overwrite != "":
             sys.exit(0)
 
-    for batch in tqdm(frame_batches, desc="Encoding batches"):
-        frames = load_movie_data(input_file, batch, mapping=mapping)
-        if avi_encode:
-            video_pipe = write_frames(
-                output_file,
-                frames,
-                pipe=video_pipe,
-                close_pipe=False,
-                threads=threads,
-                fps=fps,
-            )
-        else:
-            with open(output_file, "ab") as f:
-                f.write(frames.astype("uint16").tobytes())
-
-    if avi_encode and video_pipe:
-        video_pipe.communicate()
-
-    for batch in tqdm(frame_batches, desc="Checking data integrity"):
-        raw_frames = load_movie_data(input_file, batch, mapping=mapping)
-        encoded_frames = load_movie_data(output_file, batch, mapping=mapping)
-
-        if not np.array_equal(raw_frames, encoded_frames):
-            raise RuntimeError(
-                f"Raw frames and encoded frames not equal from {batch[0]} to {batch[-1]}"
-            )
-
-    print("Encoding successful")
-
-    if delete:
-        print("Deleting", input_file)
-        os.remove(input_file)
+    _copy_frames(
+        input_file,
+        output_file,
+        frame_batches,
+        fps,
+        delete,
+        threads,
+        mapping,
+        avi_encode=avi_encode,
+    )
