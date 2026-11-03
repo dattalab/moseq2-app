@@ -76,6 +76,19 @@ def _read_config_file(config_file):
         raise click.ClickException(str(error)) from None
 
 
+def shim_click_defaults(ctx, cls, config):
+    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removing PR to be named).
+
+    click converts each default through its option's type (``--timeout``'s 5
+    becomes 5.0, ``--gaussfilter-space``'s (1.5, 1) becomes (1.5, 1.0)), and
+    1.5.0's command line ran on those values where the notebook ran on the
+    declared ones. A null in ``config`` keeps the default.
+    """
+    defaults = {name: ctx.params[name] for name in cls().as_dict()}
+    settings = {name: value for name, value in (config or {}).items() if value is not None}
+    return cls.resolve(config={**defaults, **settings}, explicit=explicit_values(ctx, cls))
+
+
 # 1.5.0's command_with_config left these out of what it wrote back.
 _NOT_WRITTEN_BACK = ('missing_data', 'use_fft', 'verbose', 'from_end')
 
@@ -123,7 +136,7 @@ def shim_camera_swap(opts: TrainPCAOptions) -> TrainPCAOptions:
 @click.pass_context
 def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
     config = _read_config_file(config_file)
-    opts = TrainPCAOptions.resolve(config=config, explicit=explicit_values(ctx, TrainPCAOptions))
+    opts = shim_click_defaults(ctx, TrainPCAOptions, config)
     shim_write_back_before(ctx, config_file, config, opts)
     result = steps.train_pca(input_dir, output_dir, output_file, shim_camera_swap(opts))
     shim_write_back_after(config_file, result)
@@ -138,7 +151,7 @@ def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
 @click.pass_context
 def apply_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
     config = _read_config_file(config_file)
-    opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
+    opts = shim_click_defaults(ctx, ApplyPCAOptions, config)
     shim_write_back_before(ctx, config_file, config, opts)
     result = steps.apply_pca(input_dir, output_dir, output_file, opts)
     shim_write_back_after(config_file, result)
@@ -150,7 +163,7 @@ def apply_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
 @click.pass_context
 def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, **_):
     config = _read_config_file(config_file)
-    opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
+    opts = shim_click_defaults(ctx, ChangepointsOptions, config)
     shim_write_back_before(ctx, config_file, config, opts)
     result = steps.compute_changepoints(input_dir, output_dir, output_file, opts)
     shim_write_back_after(config_file, result)
