@@ -7,8 +7,8 @@ optical axis, with the focal length ``f = width / (2 tan(FOV / 2))`` taken
 from the nominal field of view of the camera that writes that frame size:
 the Kinect v2 (512 x 424, 70.6 x 60 degrees) and the Azure Kinect and
 Orbbec Femto narrow (75 x 65) and wide (120 x 120) modes. A frame size no
-supported camera writes is converted as a Kinect v2 frame. moseq2-viz keeps
-its own copy of ``convert_pxs_to_mm`` for legacy files, which has to agree.
+supported camera writes is converted as a Kinect v2 frame. The conversion
+lives in ``moseq2_common.scalars``, which viz's legacy conversion uses too.
 """
 
 from __future__ import annotations
@@ -17,8 +17,7 @@ import numpy as np
 import pytest
 
 from moseq2_extract.extract.proc import compute_scalars
-from moseq2_extract.util import convert_pxs_to_mm
-from moseq2_viz.scalars.util import convert_pxs_to_mm as viz_convert_pxs_to_mm
+from moseq2_common.scalars import convert_pxs_to_mm
 
 DEPTH = 500.0
 
@@ -37,20 +36,6 @@ def test_the_image_edge_maps_to_the_edge_of_the_field_of_view():
     millimetres = convert_pxs_to_mm(np.array([[512.0, 424.0], [256.0, 212.0]]), true_depth=DEPTH)
     np.testing.assert_allclose(millimetres[0], DEPTH * np.tan(np.deg2rad([35.3, 30.0])))
     np.testing.assert_array_equal(millimetres[1], [0.0, 0.0])
-
-
-@pytest.mark.parametrize(
-    "camera",
-    [{}, {"resolution": (640, 576), "field_of_view": (75, 65)}],
-    ids=["Kinect v2 defaults", "Azure narrow mode"],
-)
-def test_extraction_and_viz_convert_the_same_way(camera):
-    """The two packages' copies give identical millimetres."""
-    pixels = np.array([[10.0, 20.0], [300.5, 400.25], [640.0, 576.0]])
-    np.testing.assert_array_equal(
-        convert_pxs_to_mm(pixels, true_depth=DEPTH, **camera),
-        viz_convert_pxs_to_mm(pixels, true_depth=DEPTH, **camera),
-    )
 
 
 def mm_per_pixel(resolution):
