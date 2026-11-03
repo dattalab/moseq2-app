@@ -29,7 +29,7 @@ import ipywidgets as widgets
 import pytest
 
 from moseq2_app.main import interactive_group_setting
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from test_03_config import plain
 from test_05_arena_mask import RECORDINGS

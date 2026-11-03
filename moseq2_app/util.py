@@ -2,7 +2,7 @@
 General utility functions.
 """
 import pandas as pd
-from moseq2_common.yaml import write_yaml as _write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml as _write_yaml
 from copy import deepcopy
 import os
 import warnings
@@ -12,10 +12,9 @@ from glob import glob
 from shutil import copy2
 from collections import defaultdict
 from contextlib import contextmanager
-from moseq2_viz.util import read_yaml
 from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
-from moseq2_extract.util import read_yaml, check_filter_sizes, recursive_find_h5s
+from moseq2_extract.util import check_filter_sizes, recursive_find_h5s
 from moseq2_extract.recordings import find_recordings
 from moseq2_viz.model.util import compute_behavioral_statistics
 
@@ -42,16 +41,6 @@ def read_and_clean_config(config_file):
     }
 
     return config_data
-
-
-def write_yaml(data, file):
-    """write dictionary to yaml
-
-    Args:
-        data (dict): dictionary of data to be written to yaml
-        file (str): string of yaml file name.
-    """
-    _write_yaml(data, file)
 
 
 def merge_labels_with_scalars(sorted_index, model_path):

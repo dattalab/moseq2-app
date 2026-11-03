@@ -6,7 +6,7 @@ import os
 import shutil
 import numpy as np
 import ipywidgets as widgets
-from moseq2_viz.util import read_yaml
+from moseq2_common.yaml import read_yaml
 from ipywidgets import interactive_output
 from IPython.display import display
 from moseq2_app.gui.progress import get_session_paths

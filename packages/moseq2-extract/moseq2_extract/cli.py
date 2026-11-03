@@ -4,10 +4,10 @@ CLI for extracting the depth data.
 
 import os
 import click
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 from tqdm.auto import tqdm
 from copy import deepcopy
-from moseq2_extract.util import command_with_config, read_yaml
+from moseq2_extract.util import command_with_config
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
 from moseq2_extract.helpers.wrappers import (
     get_roi_wrapper,

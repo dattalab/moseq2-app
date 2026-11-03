@@ -14,25 +14,7 @@ from cytoolz.dicttoolz import dissoc, assoc
 from cytoolz.itertoolz import first, groupby
 from os.path import join, exists, dirname, splitext
 import moseq2_common.h5
-from moseq2_common.yaml import read_yaml as _read_yaml
-
-
-def camel_to_snake(s):
-    """
-    Convert CamelCase to snake_case
-
-    Args:
-    s (str): string to convert to snake case
-
-    Returns:
-    (str): snake_case string
-    """
-    # https://gist.github.com/jaytaylor/3660565
-    _underscorer1 = re.compile(r"(.)([A-Z][a-z]+)")
-    _underscorer2 = re.compile(r"([a-z0-9])([A-Z])")
-
-    subbed = _underscorer1.sub(r"\1_\2", s)
-    return _underscorer2.sub(r"\1_\2", subbed).lower()
+import moseq2_common.yaml
 
 
 def get_index_hits(config_data, metadata, key, v):
@@ -142,7 +124,7 @@ def parse_index(index: Union[str, dict]) -> tuple:
     from_dict = True
     if isinstance(index, str):
         index_dir = dirname(index)
-        index = read_yaml(index)
+        index = moseq2_common.yaml.read_yaml(index)
         from_dict = False
 
     files = index["files"]
@@ -242,23 +224,9 @@ def recursive_find_h5s(root_dir=None, ext=".h5", yaml_string="{}.yaml"):
 
     h5s = list(to_keep)
     yamls = list(map(h5_to_yaml, h5s))
-    dicts = list(map(read_yaml, yamls))
+    dicts = list(map(moseq2_common.yaml.read_yaml, yamls))
 
     return h5s, dicts, yamls
-
-
-def read_yaml(yaml_path: str):
-    """
-    Read a given yaml file path into a dictionary object.
-
-    Args:
-    yaml_path (str): path to yaml file to read.
-
-    Returns:
-    loaded (dict): loaded yaml file contents.
-
-    """
-    return _read_yaml(yaml_path)
 
 
 # from https://stackoverflow.com/questions/40084931/taking-subarrays-from-numpy-array-with-given-stride-stepsize/40085052#40085052

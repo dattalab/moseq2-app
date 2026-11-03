@@ -171,8 +171,7 @@ def _break(progress, root, what):
 
     The index is copied before it is edited, so the shared project stays whole.
     """
-    from moseq2_common.yaml import write_yaml
-    from moseq2_viz.util import read_yaml
+    from moseq2_common.yaml import read_yaml, write_yaml
 
     broken = dict(progress)
     named_in_progress = {

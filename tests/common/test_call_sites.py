@@ -80,3 +80,20 @@ def test_write_yaml_is_given_a_path_not_an_open_file(pkg):
                 ):
                     found.append(f"{path}:{node.lineno}")
     assert found == []
+
+
+# moseq2_pca.util.read_yaml returns {} for a missing file rather than passing
+# straight through, so its callers need that decided; it goes with PR 2.2.
+YAML_HELPER_EXCEPTIONS = {"moseq2_pca/util.py"}
+
+
+def test_only_moseq2_common_defines_the_yaml_helpers():
+    found = [
+        f"{path}:{node.lineno} def {node.name}"
+        for pkg in PACKAGES
+        for path, tree in sources(pkg)
+        if path not in YAML_HELPER_EXCEPTIONS
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name in ("read_yaml", "write_yaml")
+    ]
+    assert found == []

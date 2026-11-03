@@ -4,19 +4,15 @@ GUI front-end operations accessible from a jupyter notebook.
 
 import os
 import re
-from moseq2_common.yaml import write_yaml
-from os.path import abspath, dirname, basename, exists, join
-from moseq2_extract.util import read_yaml
-from moseq2_extract.io.image import read_tiff_files
+from moseq2_common.yaml import read_yaml, write_yaml
+from os.path import abspath, basename, exists, join
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import (
-    get_roi_wrapper,
     extract_wrapper,
     flip_file_wrapper,
-    generate_index_wrapper,
     aggregate_extract_results_wrapper,
 )
-from moseq2_extract.util import load_found_session_paths, filter_warnings
+from moseq2_extract.util import filter_warnings
 from moseq2_extract.recordings import (
     DEFAULT_MAX_DEPTH,
     RECORDING_EXTENSIONS,
@@ -213,23 +209,6 @@ def extract_found_sessions(
         run_slurm_extract(input_dir, to_extract, config_data, skip_extracted)
 
 
-def generate_index_command(input_dir, output_file):
-    """
-    Generate Index File (moseq2-index.yaml) based on aggregated sessions
-
-    Args:
-    input_dir (str): path to folder with aggregated results
-    output_file (str): path to index file
-
-    Returns:
-    output_file (str): path to index file.
-    """
-
-    output_file = generate_index_wrapper(input_dir, output_file)
-    print("Index file successfully generated.")
-    return output_file
-
-
 @filter_warnings
 def aggregate_extract_results_command(
     input_dir, format, output_dir, mouse_threshold=0.0
@@ -276,58 +255,6 @@ def download_flip_command(output_dir, config_file="", selection=1):
     """
 
     flip_file_wrapper(config_file, output_dir, selected_flip=selection)
-
-
-@filter_warnings
-def find_roi_command(
-    input_dir,
-    config_file,
-    exts=["dat", "mkv", "avi"],
-    select_session=False,
-    default_session=0,
-    max_depth=DEFAULT_MAX_DEPTH,
-):
-    """
-    Compute ROI files given depth file.
-
-    Args:
-    input_dir (str): path to directory containing depth file
-    config_file (str): path to config file
-    exts (list): list of supported extensions
-    select_session (bool): list all found sessions and allow user to select specific session to analyze via user-prompt
-    default_session (int): index of the default session to find ROI for
-    max_depth (int): how many folders below input_dir to search for recordings.
-
-    Returns:
-    images (list of 2d arrays): list of 2d array images to graph in Notebook.
-    filenames (list): list of paths to respective image paths
-    """
-
-    # prints where it looked and what it passed over when it finds nothing
-    files = load_found_session_paths(input_dir, exts, max_depth=max_depth)
-
-    if len(files) == 0:
-        return
-
-    if select_session:
-        input_file = get_selected_sessions(files, False)
-        if isinstance(input_file, list):
-            input_file = input_file[0]
-    else:
-        input_file = files[default_session]
-
-    print(f"Processing session: {input_file}")
-    config_data = read_yaml(config_file)
-
-    output_dir = join(dirname(input_file), "proc")
-    get_roi_wrapper(input_file, config_data, output_dir)
-
-    write_yaml(config_data, config_file)
-
-    images, filenames = read_tiff_files(output_dir)
-
-    print(f"ROIs were successfully computed in {output_dir}")
-    return images, filenames
 
 
 @filter_warnings

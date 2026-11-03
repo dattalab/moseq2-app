@@ -9,7 +9,7 @@ import tarfile
 import warnings
 import numpy as np
 from moseq2_common.h5 import h5_to_dict
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 from tqdm.auto import tqdm
 from cytoolz import keymap
 from importlib.metadata import version
@@ -18,7 +18,6 @@ from os.path import exists, join, dirname, basename, splitext
 from moseq2_extract.util import (
     load_timestamps,
     load_metadata,
-    read_yaml,
     camel_to_snake,
     load_textdata,
     build_path,

@@ -44,7 +44,7 @@ import pytest
 from video import index_is_at_the_front, probe
 
 from moseq2_extract.gui import extract_found_sessions
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from test_03_config import plain
 from test_05_arena_mask import RECORDINGS

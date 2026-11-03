@@ -23,7 +23,7 @@ import pytest
 import moseq2_extract.gui as extract_gui
 from moseq2_app.util import update_config
 from moseq2_extract.gui import extract_command, generate_config_command
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from widgets import buttons_of, click
 

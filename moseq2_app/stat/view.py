@@ -22,7 +22,8 @@ from bokeh.plotting import figure, show, from_networkx
 from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Scatter, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
-from moseq2_viz.util import get_sorted_index, read_yaml
+from moseq2_viz.util import get_sorted_index
+from moseq2_common.yaml import read_yaml
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import squareform
 from moseq2_viz.model.dist import get_behavioral_distance

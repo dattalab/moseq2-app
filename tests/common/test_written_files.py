@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from ruamel.yaml import YAML
 
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 
 def legacy_bytes(path, scratch):

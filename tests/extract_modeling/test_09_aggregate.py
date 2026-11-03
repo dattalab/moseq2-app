@@ -35,7 +35,7 @@ from pathlib import Path
 import h5py
 
 from moseq2_app.gui.progress import restore_progress_vars
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from test_03_config import plain
 from test_05_arena_mask import RECORDINGS

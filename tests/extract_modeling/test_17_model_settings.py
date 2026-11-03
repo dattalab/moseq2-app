@@ -37,7 +37,7 @@ from __future__ import annotations
 import pytest
 
 from moseq2_app.gui.progress import restore_progress_vars
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from conftest import MODEL_SETTINGS
 from test_03_config import plain

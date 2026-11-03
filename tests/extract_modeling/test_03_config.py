@@ -31,7 +31,7 @@ import pytest
 
 from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_extract.gui import generate_config_command
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from cells import code_cell
 

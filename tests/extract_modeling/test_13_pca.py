@@ -39,7 +39,7 @@ import h5py
 import numpy as np
 import pytest
 
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from test_03_config import plain
 
