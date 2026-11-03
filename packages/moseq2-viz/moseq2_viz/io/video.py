@@ -8,7 +8,7 @@ from os.path import join
 from tqdm.auto import tqdm
 import multiprocessing as mp
 from functools import partial
-from moseq2_common.video import write_frames_preview
+import moseq2_common.video
 from moseq2_viz.viz import make_crowd_matrix
 from cytoolz.itertoolz import peek, pluck, first
 from cytoolz.dicttoolz import valfilter, merge_with
@@ -169,7 +169,7 @@ def write_crowd_movies(
 
     # write the crowd movies
     write_fun = partial(
-        write_frames_preview,
+        moseq2_common.video.write_frames_preview,
         fps=vid_parameters["fps"],
         depth_min=config_data["min_height"],
         depth_max=config_data["max_height"],

@@ -50,21 +50,18 @@ def _group_syll_info(syll_info, groups, group_df, max_sylls):
 
     for group in groups:
         gd = group_df[group_df['group'] == group].drop('group', axis=1).reset_index(drop=True).to_dict()
-        for syll in gd['syllable']:
+        # gd's columns are keyed by row; the syllable column says which syllable each row is.
+        for row, syll in gd['syllable'].items():
             # ensure syll is less than max number of syllables
             if syll < max_sylls:
-                try:
-                    group_syll_info[syll]['group_info'][group] = {
-                        'usage': gd['usage'][syll],
-                        'duration (s)': gd['duration'][syll],
-                        '2D velocity (mm/frame)': gd['velocity_2d_mm_mean'][syll],
-                        '3D velocity (mm/frame)': gd['velocity_3d_mm_mean'][syll],
-                        'height (mm)': gd['height_ave_mm_mean'][syll],
-                        'distance to center (pixels)': gd['dist_to_center_px_mean'][syll],
-                    }
-                except KeyError:
-                    # if a syllable is not in the given group, a KeyError will arise.
-                    print(f'Warning: syllable #{syll} is not in group:{group}')
+                group_syll_info[syll]['group_info'][group] = {
+                    'usage': gd['usage'][row],
+                    'duration (s)': gd['duration'][row],
+                    '2D velocity (mm/frame)': gd['velocity_2d_mm_mean'][row],
+                    '3D velocity (mm/frame)': gd['velocity_3d_mm_mean'][row],
+                    'height (mm)': gd['height_ave_mm_mean'][row],
+                    'distance to center (pixels)': gd['dist_to_center_px_mean'][row],
+                }
 
     return group_syll_info
 

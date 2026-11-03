@@ -9,10 +9,9 @@ import qgridnext as qgrid
 import pandas as pd
 from moseq2_common.yaml import write_yaml as _write_yaml
 import ipywidgets as widgets
-from IPython.display import clear_output
-from moseq2_app.util import index_to_dataframe
+from moseq2_app.util import ClearOutputMixin, index_to_dataframe
 
-class GroupSettingWidgets:
+class GroupSettingWidgets(ClearOutputMixin):
 
     def __init__(self, index_filepath):
         """
@@ -60,7 +59,7 @@ class GroupSettingWidgets:
         qgrid.set_grid_option('highlightSelectedCell', False)
 
         # Add callback functions
-        self.clear_button.on_click(self.clear_clicked)
+        self.clear_button.on_click(self.clear_on_click)
         self.update_index_button.on_click(self.update_clicked)
         self.save_button.on_click(self.update_table)
 
@@ -104,13 +103,3 @@ class GroupSettingWidgets:
 
         self.update_index_button.button_style = 'success'
         self.update_index_button.icon = 'check'
-
-    def clear_clicked(self, b=None):
-        """
-        Clear the display.
-
-        Args:
-        b (ipywidgets.Button click): callback from button when user clicks the button.
-        Returns:
-        """
-        clear_output()

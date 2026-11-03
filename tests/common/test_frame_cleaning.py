@@ -119,3 +119,9 @@ def test_crowd_movies_still_round_an_even_median_kernel_down(tmp_path, monkeypat
             gaussfilter_space=[0, 0],
         )
     assert kernels and set(kernels) == {3}
+
+
+def test_viz_no_longer_offers_clean_frames():
+    """Crowd movies' cleaning moved to ``moseq2_common.frames``, and the old path says so."""
+    with pytest.raises(ImportError):
+        from moseq2_viz.viz import clean_frames  # noqa: F401

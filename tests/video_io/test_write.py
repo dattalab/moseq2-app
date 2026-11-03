@@ -11,6 +11,7 @@ preview and the crowd movies, all written by the one writer in
 from __future__ import annotations
 
 import av
+import pytest
 import numpy as np
 from moseq2_common.video import write_frames_preview
 from moseq2_extract.io.video import read_frames, write_frames
@@ -116,3 +117,20 @@ def test_closing_returns_the_filename(tmp_path):
     """Crowd movies are listed by the path the writer hands back."""
     out = tmp_path / "crowd.mp4"
     assert write_frames_preview(str(out), depth_block(), text="1") == str(out)
+
+
+def test_the_old_frame_range_keyword_is_refused_by_name(tmp_path):
+    """1.5.0's extraction preview took ``frame_range``; the shared writer calls it ``frame_numbers``.
+
+    The writer ignores keywords it does not know, so a script that kept the
+    old name would get a preview without its frame numbers and no message.
+    """
+    with pytest.raises(TypeError, match="frame_numbers"):
+        write_frames_preview(str(tmp_path / "fr.mp4"), depth_block(3), frame_range=[1, 2, 3])
+    assert not (tmp_path / "fr.mp4").exists()
+
+
+def test_viz_no_longer_offers_the_preview_writer():
+    """The crowd-movie writer moved to ``moseq2_common.video``, and the old path says so."""
+    with pytest.raises(ImportError):
+        from moseq2_viz.io.video import write_frames_preview  # noqa: F401
