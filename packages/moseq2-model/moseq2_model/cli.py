@@ -1,331 +1,112 @@
 """
 CLI for modeling the data using AR-HMM.
+
+Each command's settings are generated from its options class in
+``moseq2_model.options``; the command resolves the settings and calls its step
+in ``moseq2_model.steps``.
 """
 
-import os
-import click
+from dataclasses import replace
 from os.path import join
+
+import click
+
+from moseq2_common.options import click_options, explicit_values
+from moseq2_model import steps
+from moseq2_model.options import ApplyModelOptions, CountFramesOptions, KappaScanOptions, LearnModelOptions
 from moseq2_model.util import count_frames as count_frames_wrapper
-from moseq2_model.helpers.wrappers import (
-    learn_model_wrapper,
-    kappa_scan_fit_models_wrapper,
-    apply_model_wrapper,
-)
-
-orig_init = click.core.Option.__init__
 
 
-def new_init(self, *args, **kwargs):
-    orig_init(self, *args, **kwargs)
-    self.show_default = True
-
-
-click.core.Option.__init__ = new_init
-
-
-@click.group()
+@click.group(context_settings={"show_default": True})
 @click.version_option()
 def cli():
     pass
 
 
-@cli.command(
-    name="count-frames", help="Count the number of frames in given h5 file (pca_scores)"
-)
-@click.argument("input_file", type=click.Path(exists=True))
-@click.option(
-    "--var-name",
-    type=str,
-    default="scores",
-    help="Variable name in input file with PCs",
-)
-def count_frames(input_file, var_name):
-    # Count the number of frames in the input file.
-    count_frames_wrapper(input_file=input_file, var_name=var_name)
+def _index(help):
+    """``--index``, which is not a setting; its help differs between commands."""
+    return click.option("--index", "-i", type=click.Path(), default="", help=help)
 
 
-def modeling_parameters(function):
+_INDEX_HELP = "Path to moseq2-index.yaml for group definitions"
 
-    function = click.option(
-        "--hold-out",
-        "-h",
-        is_flag=True,
-        default=False,
-        help="Hold out one fold (set by nfolds) for computing heldout likelihood",
-    )(function)
-    function = click.option(
-        "--hold-out-seed",
-        type=int,
-        default=-1,
-        help="Random seed for holding out data (set for reproducibility)",
-    )(function)
-    function = click.option(
-        "--nfolds", type=int, default=5, help="Number of folds for split"
-    )(function)
-    function = click.option(
-        "--ncpus",
-        "-c",
-        type=int,
-        default=0,
-        help="CPUs each kappa-scan job requests on SLURM (sbatch -c; 8 when 0). "
-        "A single fit uses the CPUs the job or machine gives it; this does not change that.",
-    )(function)
-    function = click.option(
-        "--num-iter",
-        "-n",
-        type=int,
-        default=100,
-        help="Number of interations to resample model",
-    )(function)
-    function = click.option(
-        "--var-name",
-        type=str,
-        default="scores",
-        help="Variable name in input file with PCs",
-    )(function)
-    function = click.option(
-        "--e-step",
-        is_flag=True,
-        default=False,
-        help="Compute the expected state sequence for each recordings",
-    )(function)
-    function = click.option(
-        "--save-every",
-        "-s",
-        type=int,
-        default=-1,
-        help="Increment to save labels and model object (-1 for just last)",
-    )(function)
-    function = click.option(
-        "--save-model",
-        type=bool,
-        default=True,
-        help="Save model object at the end of training",
-    )(function)
-    function = click.option(
-        "--max-states", "-m", type=int, default=100, help="Maximum number of states"
-    )(function)
-    function = click.option(
-        "--npcs", type=int, default=10, help="Number of PCs to use"
-    )(function)
-    function = click.option(
-        "--whiten",
-        "-w",
-        type=str,
-        default="all",
-        help="Whiten PCs: (e)each session (a)ll combined or (n)o whitening",
-    )(function)
-    function = click.option(
-        "--progressbar", "-p", type=bool, default=True, help="Show model progress"
-    )(function)
-    function = click.option(
-        "--percent-split",
-        type=int,
-        default=0,
-        help="Training-validation split percentage used when not holding out data and when this parameter > 0.",
-    )(function)
-    function = click.option(
-        "--load-groups",
-        type=bool,
-        default=True,
-        help="If groups should be loaded with the PC scores.",
-    )(function)
-    function = click.option(
-        "--gamma",
-        "-g",
-        type=float,
-        default=1e3,
-        help="Gamma; hierarchical dirichlet process hyperparameter (try not to change it).",
-    )(function)
-    function = click.option(
-        "--alpha",
-        "-a",
-        type=float,
-        default=5.7,
-        help="Alpha; hierarchical dirichlet process hyperparameter (try not to change it).",
-    )(function)
-    function = click.option(
-        "--noise-level",
-        type=float,
-        default=0,
-        help="Additive white gaussian noise to input data for regularization. Not generally used",
-    )(function)
-    function = click.option(
-        "--nlags", type=int, default=3, help="Number of lags to use"
-    )(function)
-    function = click.option(
-        "--separate-trans",
-        is_flag=True,
-        default=False,
-        help="Use separate transition matrix for each group",
-    )(function)
-    function = click.option(
-        "--robust",
-        is_flag=True,
-        default=False,
-        help="Use robust AR-HMM model. More tolerant to noise",
-    )(function)
-    function = click.option(
-        "--check-every",
-        type=int,
-        default=5,
-        help="Increment to record training and validation log-likelihoods.",
-    )(function)
-
-    return function
+# The help order of each command, as 1.5.0 lists its options.
+_MODEL_ORDER = ("check_every", "robust", "separate_trans", "nlags", "noise_level", "alpha", "gamma", "load_groups",
+                "percent_split", "progressbar", "whiten", "npcs", "max_states", "save_model", "save_every", "e_step",
+                "var_name", "num_iter", "ncpus", "nfolds", "hold_out_seed", "hold_out")
+LEARN_MODEL_ORDER = ("input_file", "dest_file", *_MODEL_ORDER, "kappa", "checkpoint_freq", "use_checkpoint", "index",
+                     "default_group", "verbose")
+KAPPA_SCAN_ORDER = ("input_file", "output_dir", "index", "out_script", "n_models", "prefix", "cluster_type",
+                    "scan_scale", "min_kappa", "max_kappa", "memory", "wall_time", "partition", "get_cmd", "run_cmd",
+                    *_MODEL_ORDER)
+APPLY_MODEL_ORDER = ("model_file", "pc_file", "dest_file", "var_name", "index", "load_groups")
 
 
-@cli.command(
-    name="learn-model", help="Train ARHMM on PC Scores with given training parameters"
-)
-@click.argument("input_file", type=click.Path(exists=True))
-@click.argument(
-    "dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)
-)
-@modeling_parameters
-@click.option(
-    "--kappa",
-    "-k",
-    type=float,
-    default=None,
-    help="Kappa; hyperparameter used to set syllable duration. Larger k = longer syllable lengths",
-)
-@click.option(
-    "--checkpoint-freq",
-    type=int,
-    default=-1,
-    help="save model checkpoint every n iterations",
-)
-@click.option(
-    "--use-checkpoint",
-    is_flag=True,
-    default=False,
-    help="indicate whether to use previously saved checkpoint",
-)
-@click.option(
-    "--index",
-    "-i",
-    type=click.Path(),
-    default="",
-    help="Path to moseq2-index.yaml for group definitions",
-)
-@click.option(
-    "--default-group",
-    type=str,
-    default="n/a",
-    help="Default group name to use for separate-trans",
-)
-@click.option(
-    "--verbose",
-    "-v",
-    is_flag=True,
-    default=False,
-    help="Print syllable log-likelihoods during training.",
-)
-def learn_model(input_file, dest_file, **config_data):
+def shim_click_defaults(ctx, cls):
+    """Resolve ``cls`` from click's defaults and the typed options (removing PR to be named).
+
+    click converts each default through its option's type (``--noise-level``'s
+    0 becomes 0.0), and 1.5.0's command line ran on those values, which reach
+    the model file's ``run_parameters`` and a kappa scan's commands, where the
+    notebook ran on the declared ones.
+    """
+    defaults = {name: ctx.params[name] for name in cls().as_dict()}
+    return cls.resolve(config=defaults, explicit=explicit_values(ctx, cls))
+
+
+@cli.command(name="count-frames", help="Count the number of frames in given h5 file (pca_scores)")
+@click_options(CountFramesOptions, order=("input_file", "var_name"), others={
+    "input_file": click.argument("input_file", type=click.Path(exists=True)),
+})
+@click.pass_context
+def count_frames(ctx, input_file, **_):
+    opts = CountFramesOptions.resolve(explicit=explicit_values(ctx, CountFramesOptions))
+    count_frames_wrapper(input_file=input_file, var_name=opts.var_name)
+
+
+@cli.command(name="learn-model", help="Train ARHMM on PC Scores with given training parameters")
+@click_options(LearnModelOptions, order=LEARN_MODEL_ORDER, others={
+    "input_file": click.argument("input_file", type=click.Path(exists=True)),
+    "dest_file": click.argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)),
+    "index": _index(_INDEX_HELP),
+})
+@click.pass_context
+def learn_model(ctx, input_file, dest_file, index, **_):
     # Train the ARHMM using PC scores located in the INPUT_FILE, and saves the model to DEST_FILE
-
-    if config_data["ncpus"]:
+    opts = shim_click_defaults(ctx, LearnModelOptions)
+    if opts.ncpus:
         click.echo(
             "--ncpus sets the CPUs each kappa-scan job requests on SLURM. A single fit "
             "uses the CPUs the job or machine gives it, and --ncpus does not change that."
         )
-    learn_model_wrapper(input_file, dest_file, config_data)
+    steps.learn_model(input_file, dest_file, opts, index=index)
 
 
 @cli.command(name="apply-model", help="Apply pre-trained ARHMM to PC scores.")
-@click.argument("model_file", type=click.Path(exists=True))
-@click.argument("pc_file", type=click.Path(exists=True))
-@click.argument(
-    "dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)
-)
-@click.option(
-    "--var-name",
-    type=str,
-    default="scores",
-    help="Variable name in input file with PCs",
-)
-@click.option(
-    "--index",
-    "-i",
-    type=click.Path(),
-    default="",
-    help="Path to moseq2-index.yaml for group definitions",
-)
-@click.option(
-    "--load-groups",
-    type=bool,
-    default=True,
-    help="If groups should be loaded with the PC scores.",
-)
-def apply_model(model_file, pc_file, dest_file, **config_data):
+@click_options(ApplyModelOptions, order=APPLY_MODEL_ORDER, others={
+    "model_file": click.argument("model_file", type=click.Path(exists=True)),
+    "pc_file": click.argument("pc_file", type=click.Path(exists=True)),
+    "dest_file": click.argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)),
+    "index": _index(_INDEX_HELP),
+})
+@click.pass_context
+def apply_model(ctx, model_file, pc_file, dest_file, index, **_):
     # Apply the ARHMM located in MODEL_FILE to the PC scores in PC_FILE, and saves the results to DEST_FILE
+    opts = ApplyModelOptions.resolve(explicit=explicit_values(ctx, ApplyModelOptions))
+    steps.apply_model(model_file, pc_file, dest_file, opts, index=index)
 
-    apply_model_wrapper(model_file, pc_file, dest_file, config_data)
 
-
-@cli.command(
-    name="kappa-scan",
-    help="Batch train multiple model to scan over different kappa values.",
-)
-@click.argument("input_file", type=click.Path(exists=True))
-@click.argument("output_dir", type=click.Path(exists=False))
-@click.option(
-    "--index",
-    "-i",
-    type=click.Path(),
-    default="",
-    help="Path to moseq2-index.yaml for session metadata and group information",
-)
-@click.option(
-    "--out-script",
-    type=click.Path(),
-    default="train_out.sh",
-    help="Name of bash script file to save model training commands.",
-)
-@click.option(
-    "--n-models", type=int, default=10, help="Number of models to train in kappa scan."
-)
-@click.option(
-    "--prefix",
-    type=str,
-    default="",
-    help="Batch command string to prefix model training command (slurm only).",
-)
-@click.option(
-    "--cluster-type",
-    type=click.Choice(["local", "slurm"]),
-    default="local",
-    help="Platform to train models on",
-)
-@click.option(
-    "--scan-scale",
-    type=click.Choice(["log", "linear"]),
-    default="log",
-    help="Scale to scan kappa values at.",
-)
-@click.option(
-    "--min-kappa",
-    type=float,
-    default=None,
-    help="Minimum kappa value to begin scan from.",
-)
-@click.option(
-    "--max-kappa", type=float, default=None, help="Maximum kappa value to end scan on."
-)
-@click.option("--memory", type=str, default="5GB", help="RAM (slurm only)")
-@click.option("--wall-time", type=str, default="3:00:00", help="Wall time (slurm only)")
-@click.option(
-    "--partition", type=str, default="short", help="Partition name (slurm only)"
-)
-@click.option("--get-cmd", is_flag=True, default=False, help="Print scan command strings.")
-@click.option("--run-cmd", is_flag=True, default=False, help="Run scan command strings.")
-@modeling_parameters
-def kappa_scan_fit_models(input_file, output_dir, **config_data):
+@cli.command(name="kappa-scan", help="Batch train multiple model to scan over different kappa values.")
+@click_options(KappaScanOptions, order=KAPPA_SCAN_ORDER, others={
+    "input_file": click.argument("input_file", type=click.Path(exists=True)),
+    "output_dir": click.argument("output_dir", type=click.Path(exists=False)),
+    "index": _index("Path to moseq2-index.yaml for session metadata and group information"),
+})
+@click.pass_context
+def kappa_scan_fit_models(ctx, input_file, output_dir, index, **_):
     # Scan through the kappa hyperparameter to find the kappa that best matches the changepoint duration distribution.
-
-    config_data["out_script"] = join(output_dir, config_data["out_script"])
-    kappa_scan_fit_models_wrapper(input_file, config_data, output_dir)
+    opts = shim_click_defaults(ctx, KappaScanOptions)
+    steps.kappa_scan(input_file, output_dir, replace(opts, out_script=join(output_dir, opts.out_script)), index=index)
 
 
 if __name__ == "__main__":

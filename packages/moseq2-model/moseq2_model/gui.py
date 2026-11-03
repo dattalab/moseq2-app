@@ -1,15 +1,15 @@
 """
 GUI front-end functions for training ARHMM.
+
+Each function reads the project's ``config.yaml``, resolves the step's settings
+and calls the step in ``moseq2_model.steps``.
 """
 
-from moseq2_model.cli import learn_model, kappa_scan_fit_models
 from os.path import dirname, join, exists
-from moseq2_model.helpers.wrappers import (
-    learn_model_wrapper,
-    kappa_scan_fit_models_wrapper,
-    apply_model_wrapper,
-)
-from moseq2_common.yaml import read_yaml
+
+from moseq2_common.options import read_config
+from moseq2_model import steps
+from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
 
 
 def learn_model_command(progress_paths, get_cmd=True, verbose=False):
@@ -42,43 +42,26 @@ def learn_model_command(progress_paths, get_cmd=True, verbose=False):
         index
     ), "Index file not found; set the correct path in progress_paths['index_file']"
 
-    with open(config_file, "r") as f:
-        config_data = read_yaml(f)
-
-    # Get default CLI params
-    params = {tmp.name: tmp.default for tmp in learn_model.params if not tmp.required}
-    # merge default params and config data, preferring values in config data
-    config_data = {**params, **config_data}
-
-    config_data["verbose"] = verbose
-    config_data["index"] = index
+    config = read_config(config_file)
 
     if output_dir is None:
         print("Output directory not specified, saving models to base directory.")
         output_dir = dirname(index)
 
-    if config_data["kappa"] == "scan":
-        assert config_data["scan_scale"] in (
+    if config.get("kappa") == "scan":
+        assert config["scan_scale"] in (
             "log",
             "linear",
         ), 'scan scale must be "log" or "linear"'
 
-        # Get default CLI params
-        params = {
-            tmp.name: tmp.default
-            for tmp in kappa_scan_fit_models.params
-            if not tmp.required
-        }
-        # merge default params and config data, preferring values in config data
-        config_data = {**params, **config_data}
-
-        config_data["out_script"] = join(output_dir, config_data["out_script"])
-        config_data["get_cmd"] = get_cmd
-
-        command = kappa_scan_fit_models_wrapper(input_file, config_data, output_dir)
-        return command
+        scan = KappaScanOptions.resolve(config=config)
+        opts = KappaScanOptions.resolve(
+            config=config, explicit={"get_cmd": get_cmd, "out_script": join(output_dir, scan.out_script)}
+        )
+        return steps.kappa_scan(input_file, output_dir, opts, index=index, shim_flat_config=config).commands
     else:
-        learn_model_wrapper(input_file, dest_file, config_data)
+        opts = LearnModelOptions.resolve(config=config, explicit={"verbose": verbose})
+        steps.learn_model(input_file, dest_file, opts, index=index, shim_flat_config=config)
 
 
 def apply_model_command(progress_paths, model_file):
@@ -89,16 +72,16 @@ def apply_model_command(progress_paths, model_file):
         model_file (str): path to the pre-trained ARHMM.
     """
 
-    # Load proper input variables
-    pc_file = progress_paths["scores_path"]
-    dest_file = progress_paths["model_path"]
-    config_file = progress_paths["config_file"]
-    index = progress_paths["index_file"]
-    output_dir = progress_paths["base_model_path"]
-
-    # load config data
-    with open(config_file, "r") as f:
-        config_data = read_yaml(f)
+    config = read_config(progress_paths["config_file"])
+    # the command line's --load-groups defaults to True; the notebook reads it as False when config.yaml has none
+    opts = ApplyModelOptions.resolve(config=config, explicit={"load_groups": config.get("load_groups", False)})
 
     # apply model to data
-    apply_model_wrapper(model_file, pc_file, dest_file, config_data)
+    steps.apply_model(
+        model_file,
+        progress_paths["scores_path"],
+        progress_paths["model_path"],
+        opts,
+        index=None,  # shim L3, removed by PR 4.6
+        shim_flat_config=config,
+    )

@@ -13,6 +13,7 @@ import numpy as np
 from copy import deepcopy
 from cytoolz import first
 from collections import OrderedDict
+from moseq2_common.slurm import sbatch_command
 from moseq2_model.train.models import ARHMM
 from os.path import basename, getctime, join, exists
 
@@ -549,16 +550,18 @@ def count_frames(data_dict=None, input_file=None, var_name="scores"):
     return total_frames
 
 
-def get_parameter_strings(config_data):
+def shim_kappa_scan_flags(config_data):
     """
-    Create the CLI learn-model command using the given config_data dict contents to run the modeling step.
+    The learn-model flags a kappa scan writes into each of its commands (L4, removed by PR 3.5).
+
+    Only some of the fitting settings are written, some only when set, as
+    1.5.0 wrote them.
 
     Args:
     config_data (dict): Configuration parameters dict.
 
     Returns:
     parameters (str): String containing CLI command parameter flags.
-    prefix (str): Prefix string for the learn-model command (Slurm only).
     """
 
     parameters = f' --npcs {config_data["npcs"]} --num-iter {config_data["num_iter"]} '
@@ -588,13 +591,7 @@ def get_parameter_strings(config_data):
         if config_data.get(key) is not None:
             parameters += f'--{key.replace(chr(95), chr(45))} {config_data[key]} '
 
-    # Handle possible Slurm batch functionality
-    prefix = ""
-    if config_data["cluster_type"] == "slurm":
-        prefix = f'sbatch -c {config_data["ncpus"] if config_data["ncpus"] > 0 else 8} --mem={config_data["memory"]} '
-        prefix += f'-p {config_data["partition"]} -t {config_data["wall_time"]} --wrap "{config_data["prefix"]}'
-
-    return parameters, prefix
+    return parameters
 
 
 def create_command_strings(
@@ -616,7 +613,7 @@ def create_command_strings(
 
     # Get base command and parameter flags
     base_command = f"moseq2-model learn-model {input_file} "
-    parameters, prefix = get_parameter_strings(config_data)
+    parameters = shim_kappa_scan_flags(config_data)
 
     commands = []
     for i, k in enumerate(kappas):
@@ -628,9 +625,17 @@ def create_command_strings(
             + f"--kappa {k}"
         )
 
-        # Add possible batch fitting prefix string
+        # On SLURM, each fit is its own job
         if config_data["cluster_type"] == "slurm":
-            cmd = prefix + cmd + '"'
+            ncpus = config_data["ncpus"]
+            cmd = sbatch_command(
+                cmd,
+                ncpus=ncpus if ncpus > 0 else 8,
+                memory=config_data["memory"],
+                partition=config_data["partition"],
+                wall_time=config_data["wall_time"],
+                prefix=config_data["prefix"],
+            )
         commands.append(cmd)
 
     # Create and return the command string

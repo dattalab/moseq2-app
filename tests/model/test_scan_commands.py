@@ -2,7 +2,7 @@
 
 ``moseq2-model kappa-scan`` takes the same fitting options as
 ``learn-model`` and writes one ``learn-model`` command per kappa, built by
-``get_parameter_strings``. Whatever the scan was given has to reach each of
+``shim_kappa_scan_flags``. Whatever the scan was given has to reach each of
 those commands, or every model in the scan is fit with the defaults instead.
 """
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 import shlex
 
 from moseq2_model.cli import cli
-from moseq2_model.util import get_parameter_strings
+from moseq2_model.util import shim_kappa_scan_flags
 
 #: Fitting options the scan accepts, each set away from its default.
 FITTING = dict(
@@ -33,7 +33,7 @@ def test_the_scans_fitting_options_reach_each_learn_model_command(tmp_path):
         e_step=False, hold_out=False, max_states=20, ncpus=0, cluster_type="local",
         **FITTING,
     )
-    parameters, _ = get_parameter_strings(config)
+    parameters = shim_kappa_scan_flags(config)
     scores = tmp_path / "pca_scores.h5"
     scores.touch()
 
