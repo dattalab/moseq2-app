@@ -4,7 +4,9 @@ GUI functions for visualizing model results.
 """
 
 from os.path import join, exists
-from moseq2_viz.helpers.wrappers import get_best_fit_model_wrapper
+
+from moseq2_viz import steps
+from moseq2_viz.options import BestModelOptions
 
 
 def get_best_fit_model(
@@ -43,15 +45,12 @@ def get_best_fit_model(
     else:
         changepoint_path = progress_paths["changepoints_path"]
     # Get best fit model and plot requested curves
-    best_fit_model, fig = get_best_fit_model_wrapper(
+    result = steps.get_best_model(
         model_dir,
         changepoint_path,
         output_file,
-        plot_all=plot_all,
-        ext=ext,
-        fps=fps,
-        objective=objective,
+        BestModelOptions(plot_all=plot_all, ext=ext, fps=fps, objective=objective),
     )
-    fig.show(warn=False)
+    result.figure.show(warn=False)
 
-    return best_fit_model
+    return result.best_model_info
