@@ -14,6 +14,7 @@ from tqdm.auto import tqdm
 from os.path import dirname
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+from moseq2_common.frames import clean_frames
 from moseq2_viz.model.util import sort_syllables_by_stat, sort_syllables_by_stat_difference
 
 
@@ -79,44 +80,26 @@ def _validate_and_order_syll_stats_params(complete_df, stat='usage', ordering='s
     return ordering, groups, colors, figsize
 
 
-def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
-                 tail_filter=None, tail_threshold=5):
+def _odd_median_kernels(medfilter_space):
     """
-    Smooth frames using Median or Gaussian filters.
+    Round each even median kernel size down to the odd size below it, with a warning.
 
     Args:
-    frames (numpy.array): frames to filter.
-    medfilter_space (list): Median space filter kernel size, list of length 1.
-    gaussfilter_space (list): x sigma and y sigma for Gaussian space filter, list of length 2.
-    tail_filter (cv2.getStructuringElement): structuringElement to filter out mouse tails.
-    tail_threshold (int): filtering threshold value
+    medfilter_space (list): median kernel sizes, or None.
 
     Returns:
-    out (numpy.array): filtered numpy array.
+    medfilter_space (list): the sizes with each even one reduced by one, or the input unchanged when any size is not positive.
     """
 
-    out = np.copy(frames)
-
-
-    if tail_filter is not None:
-        for i in range(frames.shape[0]):
-            mask = cv2.morphologyEx(out[i], cv2.MORPH_OPEN, tail_filter) > tail_threshold
-            out[i] = out[i] * mask.astype(frames.dtype)
-
-    if medfilter_space is not None and np.all(np.array(medfilter_space) > 0):
-        for i in range(frames.shape[0]):
-            for medfilt in medfilter_space:
-                if medfilt % 2 == 0:
-                    warnings.warn(f'medfilter_space kernel must be odd. Reducing {medfilt} to {medfilt - 1}')
-                    medfilt -= 1
-                out[i] = cv2.medianBlur(out[i], medfilt)
-
-    if gaussfilter_space is not None and np.all(np.array(gaussfilter_space) > 0):
-        for i in range(frames.shape[0]):
-            out[i] = cv2.GaussianBlur(out[i], (21, 21),
-                                      gaussfilter_space[0], gaussfilter_space[1])
-
-    return out
+    if medfilter_space is None or not np.all(np.array(medfilter_space) > 0):
+        return medfilter_space
+    odd = []
+    for medfilt in medfilter_space:
+        if medfilt % 2 == 0:
+            warnings.warn(f'medfilter_space kernel must be odd. Reducing {medfilt} to {medfilt - 1}')
+            medfilt -= 1
+        odd.append(medfilt)
+    return odd
 
 
 def save_fig(fig, output_file, suffix=None, **kwargs):
@@ -243,7 +226,10 @@ def make_crowd_matrix(slices, nexamples=50, pad=30, raw_size=(512, 424), outmovi
                 centroid_y += raw_size[1] // 2
 
             angles = h5['scalars/angle'][idx_slice]
-            frames = clean_frames((h5[frame_path][idx_slice] / scale).astype('uint8'), **kwargs)
+            clean_params = dict(kwargs)
+            if 'medfilter_space' in clean_params:
+                clean_params['medfilter_space'] = _odd_median_kernels(clean_params['medfilter_space'])
+            frames = clean_frames((h5[frame_path][idx_slice] / scale).astype('uint8'), **clean_params)
 
             # flip the mouse in the correct orientation if necessary
             if 'flips' in h5['metadata/extraction']:

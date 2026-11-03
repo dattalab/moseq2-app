@@ -5,7 +5,6 @@ Utility and helper functions for finding and reading files, filtering operations
 import os
 import sys
 import asyncio
-import cv2
 import h5py
 import time
 import dask
@@ -22,6 +21,7 @@ import scipy.signal
 from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
+from moseq2_common.frames import clean_frames as clean_frames_spatial
 from moseq2_common.yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
@@ -175,7 +175,8 @@ def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
                  tailfilter=None, tail_threshold=5):
     """
     Filter spatial/temporal noise from frames using Median and Gaussian filters,
-    given kernel sizes for each respective requested filter.
+    given kernel sizes for each respective requested filter. The spatial filters
+    are moseq2_common.frames.clean_frames; the temporal filters follow them.
 
     Args:
     frames (numpy.ndarray): frames to filter.
@@ -191,22 +192,9 @@ def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
     out (numpy.ndarray): filtered frames.
     """
 
-    out = np.copy(frames)
-
-    if tailfilter is not None:
-        for i in range(frames.shape[0]):
-            mask = cv2.morphologyEx(out[i], cv2.MORPH_OPEN, tailfilter) > tail_threshold
-            out[i] = out[i] * mask.astype(frames.dtype)
-
-    if medfilter_space is not None and np.all(np.array(medfilter_space) > 0):
-        for i in range(frames.shape[0]):
-            for medfilt in medfilter_space:
-                out[i] = cv2.medianBlur(out[i], medfilt)
-
-    if gaussfilter_space is not None and np.all(np.array(gaussfilter_space) > 0):
-        for i in range(frames.shape[0]):
-            out[i] = cv2.GaussianBlur(out[i], (21, 21),
-                                      gaussfilter_space[0], gaussfilter_space[1])
+    out = clean_frames_spatial(frames, medfilter_space=medfilter_space,
+                               gaussfilter_space=gaussfilter_space,
+                               tail_filter=tailfilter, tail_threshold=tail_threshold)
 
     if medfilter_time is not None and np.all(np.array(medfilter_time) > 0):
         for idx, i in np.ndenumerate(frames[0]):
@@ -227,32 +215,6 @@ def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
                 out[:, idx[0], idx[1]] - gauss_smooth(out[:, idx[0], idx[1]], kernel=kernel)
 
     return out
-
-
-def select_strel(string='e', size=(10, 10)):
-    """
-    Select Structuring Element Shape. Accepts shapes ('ellipse', 'rectangle'), if neither
-    are given then 'ellipse' is used.
-
-    Args:
-    string (str): e for Ellipse, r for Rectangle
-    size (tuple): size of StructuringElement
-
-    Returns:
-    strel (cv2.StructuringElement): StructuringElement with specified size.
-    """
-    if not isinstance(size, tuple):
-        size = tuple(size)
-
-    if string is None or 'none' in string or np.all(np.array(size) == 0) or len(string) == 0:
-        strel = None
-    elif string[0].lower() == 'e':
-        strel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, size)
-    elif string[0].lower() == 'r':
-        strel = cv2.getStructuringElement(cv2.MORPH_RECT, size)
-    else:
-        strel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, size)
-    return strel
 
 
 #: How many of each value of a timestamps dataset's ``unit`` attribute make a
