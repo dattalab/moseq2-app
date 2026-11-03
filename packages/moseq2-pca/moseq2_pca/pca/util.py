@@ -149,6 +149,76 @@ def copy_metadatas_to_scores(f, f_scores, uuid):
         metadata_name = f'metadata/{uuid}'
         f.copy('/metadata/extraction', f_scores, name=metadata_name)
 
+
+def _session_uuid(h5, yml, verbose):
+    """The uuid a session's yaml records, printing the h5 path when verbose."""
+    uuid = read_yaml(yml)['uuid']
+    if verbose:
+        print('Loading', h5)
+    return uuid
+
+
+def _load_frames(f, h5_path, h5_mask_path, missing_data, mask_params, chunk_size=None):
+    """
+    Load a session's frames as float32, as a dask array when chunk_size is given and
+    a numpy array otherwise. With missing_data, the pixels the mask marks are set to 0
+    and the mask is returned reshaped to (nframes, npixels); otherwise the mask is None.
+    """
+    if chunk_size is None:
+        frames = f[h5_path][()].astype('float32')
+    else:
+        frames = da.from_array(f[h5_path], chunks=chunk_size).astype('float32')
+
+    if not missing_data:
+        return frames, None
+
+    if chunk_size is None:
+        mask = np.logical_and(f[h5_mask_path][()] < mask_params['mask_threshold'],
+                              frames > mask_params['mask_height_threshold'])
+    else:
+        mask = da.logical_and(da.from_array(f[h5_mask_path], chunks=frames.chunks) < mask_params['mask_threshold'],
+                              frames > mask_params['mask_height_threshold'])
+    frames[mask] = 0
+    return frames, mask.reshape(-1, frames.shape[1] * frames.shape[2])
+
+
+def _scores(frames, pca_components, mask, mask_params):
+    """
+    Project 2D frames onto the PCs. With a mask, the masked pixels are filled from the
+    reconstruction (clipped to the mask's height range) and the frames projected again.
+    """
+    scores = frames.dot(pca_components.T)
+    if mask is None:
+        return scores
+
+    recon = scores.dot(pca_components)
+    recon[recon < mask_params['min_height']] = 0
+    recon[recon > mask_params['max_height']] = 0
+    if isinstance(frames, da.Array):
+        frames = da.map_blocks(mask_data, frames, mask, recon, dtype=frames.dtype)
+    else:
+        frames[mask] = recon[mask]
+    return frames.dot(pca_components.T)
+
+
+def _write_scores(f_scores, f, h5, uuid, scores, fps, h5_path):
+    """
+    Copy a session's metadata into the scores file, fill its dropped frames with NaN
+    rows from its timestamps, and write its scores and score indices.
+    """
+    timestamps = get_timestamps(f, f[h5_path], fps)
+    unit = get_timestamp_unit(f)
+    copy_metadatas_to_scores(f, f_scores, uuid)
+
+    frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})', unit)
+    scores, score_idx, _ = insert_nans(data=scores, timestamps=timestamps)
+
+    f_scores.create_dataset(f'scores/{uuid}', data=scores,
+                            dtype='float32', compression='gzip')
+    f_scores.create_dataset(f'scores_idx/{uuid}', data=score_idx,
+                            dtype='float32', compression='gzip')
+
+
 def train_pca_dask(dask_array, clean_params, use_fft, rank, cluster_type, client,
                    mask=None, iters=10, recon_pcs=10, min_height=10, max_height=100):
     """
@@ -282,24 +352,10 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
 
     with h5py.File(f'{save_file}.h5', 'w') as f_scores:
         for h5, yml in tqdm(zip(h5s, yamls), total=len(h5s), desc='Computing scores'):
-            # Load the file's metadata
-            data = read_yaml(yml)
-            uuid = data['uuid']
-
-            if verbose:
-                print('Loading', h5)
+            uuid = _session_uuid(h5, yml, verbose)
 
             with h5py.File(h5, 'r') as f:
-                # Load frames
-                frames = f[h5_path][()].astype('float32')
-
-                if missing_data:
-                    # Load masked frames
-                    mask = f[h5_mask_path][()]
-                    mask = np.logical_and(mask < mask_params['mask_threshold'],
-                                          frames > mask_params['mask_height_threshold'])
-                    frames[mask] = 0
-                    mask = mask.reshape(-1, frames.shape[1] * frames.shape[2])
+                frames, mask = _load_frames(f, h5_path, h5_mask_path, missing_data, mask_params)
 
                 # Filter the data
                 frames = clean_frames(frames, **clean_params)
@@ -311,32 +367,8 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
                 # Reshape the data to 2D matrix
                 frames = frames.reshape(-1, frames.shape[1] * frames.shape[2])
 
-                timestamps = get_timestamps(f, f[h5_path], fps)
-                unit = get_timestamp_unit(f)
-                copy_metadatas_to_scores(f, f_scores, uuid)
-
-            # Compute scores
-            scores = frames.dot(pca_components.T)
-
-            # if we have missing data, simply fill in, repeat the score calculation,
-            # then move on
-            if missing_data:
-                # Compute reconstructed PCs
-                recon = scores.dot(pca_components)
-                recon[recon < mask_params['min_height']] = 0
-                recon[recon > mask_params['max_height']] = 0
-                frames[mask] = recon[mask]
-                scores = frames.dot(pca_components.T)
-
-            # Insert NaNs into scores array
-            frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})', unit)
-            scores, score_idx, _ = insert_nans(data=scores, timestamps=timestamps)
-
-            # Write scores
-            f_scores.create_dataset(f'scores/{uuid}', data=scores,
-                                    dtype='float32', compression='gzip')
-            f_scores.create_dataset(f'scores_idx/{uuid}', data=score_idx,
-                                    dtype='float32', compression='gzip')
+                scores = _scores(frames, pca_components, mask, mask_params)
+                _write_scores(f_scores, f, h5, uuid, scores, fps, h5_path)
 
 
 def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
@@ -368,25 +400,9 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
     h5_file_pointers = []
 
     for h5, yml in tqdm(zip(h5s, yamls), total=len(h5s), desc='Loading Data'):
-        # Load metadata
-        data = read_yaml(yml)
-        uuid = data['uuid']
-
+        uuid = _session_uuid(h5, yml, verbose)
         h5p = h5py.File(h5, mode='r')
-
-        if verbose:
-            print('Loading', h5)
-
-        # Load data
-        frames = da.from_array(h5p[h5_path], chunks=chunk_size).astype('float32')
-
-        if missing_data:
-            # Load masked data
-            mask = da.from_array(h5p[h5_mask_path], chunks=frames.chunks)
-            mask = da.logical_and(mask < mask_params['mask_threshold'],
-                                  frames > mask_params['mask_height_threshold'])
-            frames[mask] = 0
-            mask = mask.reshape(-1, frames.shape[1] * frames.shape[2])
+        frames, mask = _load_frames(h5p, h5_path, h5_mask_path, missing_data, mask_params, chunk_size)
 
         # Apply filters
         if clean_params['gaussfilter_time'] > 0 or np.any(np.array(clean_params['medfilter_time']) > 0):
@@ -403,16 +419,7 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
 
         # Reshape data to 2D and compute scores
         frames = frames.reshape(-1, frames.shape[1] * frames.shape[2])
-        scores = frames.dot(pca_components.T)
-
-        if missing_data:
-            # Reconstruct missing scores data
-            recon = scores.dot(pca_components)
-            recon[recon < mask_params['min_height']] = 0
-            recon[recon > mask_params['max_height']] = 0
-            frames = da.map_blocks(mask_data, frames, mask, recon, dtype=frames.dtype)
-            # Compute reconstructed scores
-            scores = frames.dot(pca_components.T)
+        scores = _scores(frames, pca_components, mask, mask_params)
 
         futures.append(scores)
         uuids.append(uuid)
@@ -438,21 +445,8 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
                 file_idx = keys.index(future.key)
 
                 with h5py.File(h5s_batch[file_idx], mode='r') as f:
-                    # Load timestamps
-                    timestamps = get_timestamps(f, f[h5_path], fps)
-                    unit = get_timestamp_unit(f)
-                    copy_metadatas_to_scores(f, f_scores, uuids_batch[file_idx])
-
-                # Insert NaNs in missing frames in scores array
-                frame_rate_from_timestamps(
-                    timestamps, f'{uuids_batch[file_idx]} ({h5s_batch[file_idx]})', unit)
-                scores, score_idx, _ = insert_nans(data=result, timestamps=timestamps)
-
-                # Write scores
-                f_scores.create_dataset(f'scores/{uuids_batch[file_idx]}', data=scores,
-                                        dtype='float32', compression='gzip')
-                f_scores.create_dataset(f'scores_idx/{uuids_batch[file_idx]}', data=score_idx,
-                                        dtype='float32', compression='gzip')
+                    _write_scores(f_scores, f, h5s_batch[file_idx], uuids_batch[file_idx],
+                                  result, fps, h5_path)
 
     # once complete, close open h5 file pointers
     [h5p.close() for h5p in h5_file_pointers]
@@ -490,34 +484,18 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
     nrps = changepoint_params.pop('rps')
 
     for h5, yml in tqdm(zip(h5s, yamls), disable=progress_bar, desc='Setting up calculation', total=len(h5s)):
-        # Load session metadata
-        data = read_yaml(yml)
-        uuid = data['uuid']
-
-        if verbose:
-            print('Loading', h5)
-
+        uuid = _session_uuid(h5, yml, verbose)
         h5p = h5py.File(h5, 'r')
 
-        # Load frames
-        frames = da.from_array(h5p[h5_path], chunks=chunk_size).astype('float32')
-
         # Load timestamps, and stop here rather than inside the batch if they give no frame rate
-        timestamps = get_timestamps(h5p, frames, fps)
+        timestamps = get_timestamps(h5p, h5p[h5_path], fps)
         frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})', get_timestamp_unit(h5p))
 
         if missing_data and pca_scores is None:
             raise RuntimeError("Need to compute PC scores to impute missing data")
-        elif missing_data:
-            # Load masked data
-            mask = da.from_array(h5p[h5_mask_path], chunks=frames.chunks)
-            mask = da.logical_and(mask < mask_params['mask_threshold'],
-                                  frames > mask_params['mask_height_threshold'])
-            frames[mask] = 0
+        frames, mask = _load_frames(h5p, h5_path, h5_mask_path, missing_data, mask_params, chunk_size)
 
-            # Reshape mask
-            mask = mask.reshape(-1, frames.shape[1] * frames.shape[2])
-
+        if missing_data:
             # Load scores
             with h5py.File(pca_scores, 'r') as f:
                 scores = f[f'scores/{uuid}']
