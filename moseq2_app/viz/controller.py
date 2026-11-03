@@ -30,6 +30,44 @@ from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syl
 def _blank_syll_entry():
     return {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}}
 
+def _group_syll_info(syll_info, groups, group_df, max_sylls):
+    """
+    Copy the syllable info dict and add each group's mean syllable scalars, for the table under the crowd movie.
+
+    Args:
+    syll_info (dict): syllable info keyed by syllable number; a syllable below max_sylls without an entry gets a blank one.
+    groups (iterable): the groups to add.
+    group_df (pd.DataFrame): mean syllable scalars, one row per group and syllable.
+    max_sylls (int): the number of syllables shown.
+
+    Returns:
+    group_syll_info (dict): a copy of syll_info whose entries' 'group_info' maps each group to its scalars.
+    """
+
+    group_syll_info = deepcopy(syll_info)
+    for i in range(max_sylls):
+        group_syll_info.setdefault(i, _blank_syll_entry()).setdefault('group_info', {})
+
+    for group in groups:
+        gd = group_df[group_df['group'] == group].drop('group', axis=1).reset_index(drop=True).to_dict()
+        for syll in gd['syllable']:
+            # ensure syll is less than max number of syllables
+            if syll < max_sylls:
+                try:
+                    group_syll_info[syll]['group_info'][group] = {
+                        'usage': gd['usage'][syll],
+                        'duration (s)': gd['duration'][syll],
+                        '2D velocity (mm/frame)': gd['velocity_2d_mm_mean'][syll],
+                        '3D velocity (mm/frame)': gd['velocity_3d_mm_mean'][syll],
+                        'height (mm)': gd['height_ave_mm_mean'][syll],
+                        'distance to center (pixels)': gd['dist_to_center_px_mean'][syll],
+                    }
+                except KeyError:
+                    # if a syllable is not in the given group, a KeyError will arise.
+                    print(f'Warning: syllable #{syll} is not in group:{group}')
+
+    return group_syll_info
+
 def _syllable_pdf(group_syll_pdfs, groupby, group, syllable):
     """
     Find one grouping's position heatmap for one syllable.
@@ -143,35 +181,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
             self.syll_select.index = curr_syll
             self.syll_select._initializing_traits_ = False
 
-    def get_mean_group_dict(self, group_df):
-        """
-        Create a dict object to convert to a displayed table containing syllable scalars.
-
-        Args:
-        group_df (pd.DataFrame): DataFrame containing mean syllable scalar data for each session and their groups
-        """
-
-        # Get array of grouped syllable info
-        group_dicts = []
-        for group in self.groups:
-            group_dict = {
-                group: group_df[group_df['group'] == group].drop('group', axis=1).reset_index(drop=True).to_dict()}
-            group_dicts.append(group_dict)
-
-        self.group_syll_info = deepcopy(self.syll_info)
-        # Update syllable info dict
-        for gd in group_dicts:
-            group_name = list(gd)[0]
-            for syll in range(self.max_sylls):
-                self.group_syll_info[syll]['group_info'][group_name] = {
-                    'usage': gd[group_name]['usage'][syll],
-                    'duration (s)': gd[group_name]['duration'][syll],
-                    '2D velocity (mm/frame)': gd[group_name]['velocity_2d_mm_mean'][syll],
-                    '3D velocity (mm/frame)': gd[group_name]['velocity_3d_mm_mean'][syll],
-                    'height (mm)': gd[group_name]['height_ave_mm_mean'][syll],
-                    'distance to center (pixels)': gd[group_name]['dist_to_center_px_mean'][syll],
-                }
-
     def get_mean_syllable_info(self):
         """
         Populate syllable information dict with usage and scalar information.
@@ -188,8 +197,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Get grouped DataFrame
         group_df = df.groupby(['group', 'syllable'], as_index=False).mean(numeric_only=True)
 
-        # Get self.group_info
-        self.get_mean_group_dict(group_df)
+        self.group_syll_info = _group_syll_info(self.syll_info, self.groups, group_df, self.max_sylls)
 
     def set_group_info_widgets(self, group_info):
         """
@@ -464,48 +472,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.config_data['cmap'] = 'jet'
         self.config_data['count'] = 'usage'
 
-    def get_mean_group_dict(self, group_df):
-        """
-        Create a dict object to convert to a displayed table containing syllable scalars.
-
-        Args:
-        group_df (pd.DataFrame): DataFrame containing mean syllable scalar data for each session and their groups
-        """
-
-        # Get array of grouped syllable info
-        group_dicts = []
-        for group in self.groups:
-            group_dict = {
-                group: group_df[group_df['group'] == group].drop('group', axis=1).reset_index(drop=True).to_dict()}
-            group_dicts.append(group_dict)
-
-        self.group_syll_info = deepcopy(self.syll_info)
-
-        for i in range(self.max_sylls):
-            if i not in self.group_syll_info:
-                self.group_syll_info[i] = {'label': '', 'desc': '', 'crowd_movie_path': ''}
-            if 'group_info' not in self.group_syll_info[i]:
-                self.group_syll_info[i]['group_info'] = {}
-
-        # Update syllable info dict
-        for gd in group_dicts:
-            group_name = list(gd.keys())[0]
-            for syll in list(gd[group_name]['syllable'].keys()):
-                # ensure syll is less than max number of syllables
-                if syll < self.max_sylls:
-                    try:
-                        self.group_syll_info[syll]['group_info'][group_name] = {
-                            'usage': gd[group_name]['usage'][syll],
-                            'duration (s)': gd[group_name]['duration'][syll],
-                            '2D velocity (mm/frame)': gd[group_name]['velocity_2d_mm_mean'][syll],
-                            '3D velocity (mm/frame)': gd[group_name]['velocity_3d_mm_mean'][syll],
-                            'height (mm)': gd[group_name]['height_ave_mm_mean'][syll],
-                            'distance to center (pixels)': gd[group_name]['dist_to_center_px_mean'][syll],
-                        }
-                    except KeyError:
-                        # if a syllable is not in the given group, a KeyError will arise.
-                        print(f'Warning: syllable #{syll} is not in group:{group_name}')
-
     def get_session_mean_syllable_info_df(self):
         """
         Populate session-based syllable information dict with usage and scalar information.
@@ -531,7 +497,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Get group DataFrame
         self.group_df = df.groupby(['group', 'syllable'], as_index=False).mean(numeric_only=True)
 
-        self.get_mean_group_dict(self.group_df)
+        self.group_syll_info = _group_syll_info(self.syll_info, self.groups, self.group_df, self.max_sylls)
 
     def get_selected_session_syllable_info(self, sel_sessions):
         """
@@ -628,7 +594,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         clear_output()
 
         # Create syllable info DataFrame. Its row names are the display labels
-        # get_mean_group_dict and get_selected_session_syllable_info gave them;
+        # _group_syll_info and get_selected_session_syllable_info gave them;
         # velocities are per-frame means, labelled mm/frame there.
         syll_info_df = pd.DataFrame(grouped_syll_dict)
 

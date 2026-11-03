@@ -5,10 +5,10 @@ Widgets module containing classes with components for each of the interactive sy
 import numpy as np
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
-from IPython.display import clear_output
 from moseq2_viz.model.util import normalize_usages
+from moseq2_app.util import ClearOutputMixin
 
-class SyllableStatWidgets:
+class SyllableStatWidgets(ClearOutputMixin):
 
     def __init__(self):
         """
@@ -52,17 +52,6 @@ class SyllableStatWidgets:
 
         self.stat_widget_box = VBox([HBox([VBox([self.stat_box, self.error_box]), self.sorting_box, self.session_box])])
     
-    def clear_on_click(self, b=None):
-        """
-        Clear the cell output
-
-        Args:
-        b (button click)
-        """
-
-        clear_output()
-        del self
-
     def on_grouping_update(self, event):
         """
         Update the MultipleSelect widget upon selecting groupby == SubjectName or SessionName. Hides it if groupby == group.
@@ -216,7 +205,7 @@ class SyllableStatBokehCallbacks:
         self.code = self.js_variables + self.js_for_loop + self.js_condition + \
                self.js_condition_pass + self.js_condition_fail + self.js_update
 
-class TransitionGraphWidgets:
+class TransitionGraphWidgets(ClearOutputMixin):
 
     def __init__(self):
         """initialize the transition graph widget.
@@ -253,18 +242,6 @@ class TransitionGraphWidgets:
                                       #VBox([self.speed_thresholder], layout=col2_layout)
                                       ],
                                            layout=ui_layout)
-
-    def clear_on_click(self, b=None):
-        """
-        Clear the cell output
-
-        Args:
-        b (button click)
-
-        Returns:
-        """
-
-        clear_output()
 
     def set_range_widget_values(self):
         """

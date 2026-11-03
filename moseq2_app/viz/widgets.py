@@ -5,10 +5,10 @@ Widgets module containing classes with components for each of the interactive sy
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox
 from bokeh.models.widgets import PreText
-from IPython.display import clear_output
+from moseq2_app.util import ClearOutputMixin
 from moseq2_app.viz.view import display_crowd_movies
 
-class SyllableLabelerWidgets:
+class SyllableLabelerWidgets(ClearOutputMixin):
 
     def __init__(self):
         """
@@ -78,17 +78,6 @@ class SyllableLabelerWidgets:
         # button box
         self.button_box = HBox([self.prev_button, self.set_button, self.next_button], layout=self.ui_layout)
 
-    def clear_on_click(self, b=None):
-        """
-        Clear the cell output
-
-        Args:
-        b (button click)
-        """
-
-        clear_output()
-        del self
-
     def on_next(self, event=None):
         """
         trigger an view update when the user clicks the "Next" button.
@@ -156,7 +145,7 @@ class SyllableLabelerWidgets:
         # Update button style
         self.set_button.button_style = 'success'
 
-class CrowdMovieCompareWidgets:
+class CrowdMovieCompareWidgets(ClearOutputMixin):
 
     def __init__(self):
         """
@@ -195,16 +184,6 @@ class CrowdMovieCompareWidgets:
                                                      border='solid',
                                                      width='100%',
                                                      justify_content='space-around'))
-
-    def clear_on_click(self, b=None):
-        """
-        Clear the cell output
-
-        Args:
-        b (buttion click)
-        """
-
-        clear_output()
 
     def select_session(self, event=None):
         """
