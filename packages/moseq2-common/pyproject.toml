@@ -37,12 +37,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The video libraries moseq2_common.frames needs. moseq2-extract, moseq2-pca
-# and moseq2-viz require this extra; moseq2-model does not.
+# The video libraries moseq2_common.frames and moseq2_common.video need.
+# moseq2-extract, moseq2-pca and moseq2-viz require this extra; moseq2-model
+# does not.
 video = [
     "av>=17.1.0",
     "matplotlib>=3.10.9",
     "opencv-python-headless>=5.0.0.93",
+    "tqdm>=4.70.1",
 ]
 
 [build-system]
