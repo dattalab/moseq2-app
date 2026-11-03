@@ -2,8 +2,9 @@
 
 ``moseq2-common`` holds the code the other five share, starting with the YAML
 helpers. It releases with them from one tag, so each requires it at exactly
-the version it is itself. It needs only numpy and ruamel.yaml, and requiring it
-must not make a core package pull in a sibling: ``python -m pip install
+the version it is itself. Its base install needs only numpy and ruamel.yaml
+(the video libraries come with its ``video`` extra), and requiring it must not
+make a core package pull in a sibling: ``python -m pip install
 moseq2-model`` installs moseq2-model and moseq2-common, nothing else from
 MoSeq2.
 
@@ -40,8 +41,25 @@ def moseq2_requirements(package):
 
 
 def test_moseq2_common_needs_only_numpy_and_ruamel():
-    names = {Requirement(r).name for r in distribution("moseq2-common").requires or []}
+    reqs = [Requirement(r) for r in distribution("moseq2-common").requires or []]
+    names = {req.name for req in reqs if req.marker is None}
     assert names == {"numpy", "ruamel.yaml"}
+
+
+def test_the_video_extra_holds_the_video_libraries():
+    reqs = [Requirement(r) for r in distribution("moseq2-common").requires or []]
+    video = {
+        req.name for req in reqs
+        if req.marker is not None and req.marker.evaluate({"extra": "video"})
+    }
+    assert video == {"av", "matplotlib", "opencv-python-headless"}
+
+
+@pytest.mark.parametrize("package", CORE)
+def test_extract_pca_and_viz_require_the_video_extra(package):
+    req = moseq2_requirements(package)["moseq2-common"]
+    expected = set() if package == "moseq2-model" else {"video"}
+    assert req.extras == expected
 
 
 @pytest.mark.parametrize("package", ("moseq2-app",) + CORE)

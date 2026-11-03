@@ -16,7 +16,8 @@ from moseq2_pca.viz import plot_pca_results, changepoint_dist
 from os.path import abspath, join, exists, splitext, basename, dirname
 from moseq2_pca.helpers.data import get_pca_paths, get_pca_yaml_data, load_pcs_for_cp
 from moseq2_pca.pca.util import apply_pca_dask, apply_pca_local, train_pca_dask, get_changepoints_dask
-from moseq2_pca.util import recursive_find_h5s, select_strel, initialize_dask, set_dask_config, close_dask, \
+from moseq2_common.frames import select_strel
+from moseq2_pca.util import recursive_find_h5s, initialize_dask, set_dask_config, close_dask, \
             h5_to_dict, check_timestamps, check_frame_shapes, check_frames_match_pca, \
             check_training_memory, dask_messages_to
 
