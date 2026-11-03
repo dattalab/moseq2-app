@@ -522,6 +522,33 @@ def plot_syll_stats_with_sem(scalar_df, syll_info=None, sig_sylls=None, stat='us
     return fig, legend
 
 
+def _draw_position_heatmap(fig, a, avg_hist, normalize, norm_color, title, fontsize):
+    """
+    Draw one averaged position PDF on an axis, with its colorbar and title.
+
+    Args:
+    fig (pyplot figure): figure holding the axis, for the colorbar.
+    a (pyplot axis): axis to draw on.
+    avg_hist (np.ndarray): 2d averaged position PDF.
+    normalize (bool): flag to normalize the pdf between 0-1 before drawing.
+    norm_color (mpl.colors Color Scheme or None): color scheme to use when plotting the heatmap.
+    title (str): axis title.
+    fontsize (int): title font size.
+    """
+
+    if normalize:
+        _min_val = (avg_hist[avg_hist > 0]).min()
+        avg_hist = (avg_hist + _min_val) / (avg_hist.max() + _min_val)
+
+    im = a.imshow(avg_hist, norm=norm_color)
+    # fraction to make the colorbar match image height
+    fig.colorbar(im, ax=a, fraction=0.046, pad=0.04, format='%.0e')
+
+    a.set_xticks([])
+    a.set_yticks([])
+    a.set_title(title, fontsize=fontsize)
+
+
 def plot_mean_group_heatmap(pdfs, groups, normalize=True, norm_color=mpl.colors.LogNorm()):
     """
     Compute and plot the overall group mean of the computed PDFs.
@@ -547,17 +574,7 @@ def plot_mean_group_heatmap(pdfs, groups, normalize=True, norm_color=mpl.colors.
     for a, group in zip(ax.flat, uniq_groups):
         idx = groups == group
         avg_hist = pdfs[idx].mean(axis=0)
-        if normalize:
-            _min_val = (avg_hist[avg_hist > 0]).min()
-            avg_hist = (avg_hist + _min_val) / (avg_hist.max() + _min_val)
-
-        im = a.imshow(avg_hist, norm=norm_color)
-        # fraction to make the colorbar match image height
-        fig.colorbar(im, ax=a, fraction=0.046, pad=0.04, format='%.0e')
-
-        a.set_xticks([])
-        a.set_yticks([])
-        a.set_title(group, fontsize=14)
+        _draw_position_heatmap(fig, a, avg_hist, normalize, norm_color, group, 14)
 
     return fig
 
@@ -595,20 +612,8 @@ def plot_verbose_heatmap(pdfs, sessions, groups, subjectNames, normalize=False, 
         names = np.asarray(subjectNames)[idx]
         for sess, name, a in zip(tmp_sessions, names, ax[:, i]):
             idx = np.array(sessions) == sess
-
             avg_hist = pdfs[idx].mean(axis=0)
-
-            if normalize:
-                _min_val = (avg_hist[avg_hist > 0]).min()
-                avg_hist = (avg_hist + _min_val) / (avg_hist.max() + _min_val)
-
-            im = a.imshow(avg_hist, norm=norm_color)
-            fig.colorbar(im, ax=a, fraction=0.046, pad=0.04, format='%.0e')
-
-            a.set_xticks([])
-            a.set_yticks([])
-
-            a.set_title(f'{group}: {name}', fontsize=10)
+            _draw_position_heatmap(fig, a, avg_hist, normalize, norm_color, f'{group}: {name}', 10)
 
     return fig
 

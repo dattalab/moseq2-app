@@ -11,6 +11,65 @@ from moseq2_viz.model.util import get_Xy_values
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 
+def _make_embedder(embedding, n_components):
+    """
+    Build the PCA or LDA embedder that `run_2d_embedding` and `run_2d_scalar_embedding` fit.
+
+    Args:
+    embedding (str): type of embedding, 'lda' or 'pca' (any case).
+    n_components (int): number of components to compute.
+
+    Returns:
+    embedder (sklearn estimator or None): the unfitted embedder, or None (after printing why) for any other embedding.
+    """
+
+    if embedding.lower() == "lda":
+        return LDA(
+            solver="eigen",
+            shrinkage="auto",
+            n_components=n_components,
+            store_covariance=True,
+        )
+    if embedding.lower() == "pca":
+        return PCA(n_components=n_components)
+    print('Unsupported input. Only input embedding="lda" or "pca".')
+    return None
+
+
+def _embed_and_plot(
+    embedder, X, y, mapping, rev_mapping, output_file, embedding, plot_all_subjects
+):
+    """
+    Fit the embedder to X and plot the first two dimensions of the embedding.
+
+    Args:
+    embedder (sklearn estimator): unfitted embedder from `_make_embedder`.
+    X (np.ndarray), y (np.ndarray), mapping (dict), rev_mapping (dict): the output of `get_Xy_values`.
+    output_file (str): path to saved outputted figure.
+    embedding (str): type of embedding, used in the axis labels.
+    plot_all_subjects (bool): indicates whether to plot individual subject embeddings along with their respective group means.
+
+    Returns:
+    fig (matplotlib.figure): figure containing plotted 2d embedding, or None when the embedding has fewer than two dimensions.
+    ax (matplotlib.axes): axes instance for plotted figure, or None.
+    """
+
+    L = embedder.fit_transform(X, y)
+    if L.shape[1] <= 1:
+        print("Not enough dimensions to plot, try a different embedding method.")
+        return None, None
+
+    return plot_embedding(
+        L,
+        y,
+        mapping,
+        rev_mapping,
+        output_file=output_file,
+        embedding=embedding,
+        plot_all_subjects=plot_all_subjects,
+    )
+
+
 def run_2d_embedding(
     mean_df,
     stat="usage",
@@ -35,17 +94,8 @@ def run_2d_embedding(
     ax (matplonlib.axes): axes instance for plotted figure.
     """
 
-    if embedding.lower() == "lda":
-        embedder = LDA(
-            solver="eigen",
-            shrinkage="auto",
-            n_components=n_components,
-            store_covariance=True,
-        )
-    elif embedding.lower() == "pca":
-        embedder = PCA(n_components=n_components)
-    else:
-        print('Unsupported input. Only input embedding="lda" or "pca".')
+    embedder = _make_embedder(embedding, n_components)
+    if embedder is None:
         return None, None
 
     syllable_df = mean_df.groupby(
@@ -56,22 +106,9 @@ def run_2d_embedding(
 
     X, y, mapping, rev_mapping = get_Xy_values(syllable_df, unique_groups, stat=stat)
 
-    L = embedder.fit_transform(X, y)
-    if L.shape[1] <= 1:
-        print("Not enough dimensions to plot, try a different embedding method.")
-        return None, None
-
-    fig, ax = plot_embedding(
-        L,
-        y,
-        mapping,
-        rev_mapping,
-        output_file=output_file,
-        embedding=embedding,
-        plot_all_subjects=plot_all_subjects,
+    return _embed_and_plot(
+        embedder, X, y, mapping, rev_mapping, output_file, embedding, plot_all_subjects
     )
-
-    return fig, ax
 
 
 def run_2d_scalar_embedding(
@@ -96,18 +133,8 @@ def run_2d_scalar_embedding(
     ax (matplonlib axes): axes instance for plotted figure.
     """
 
-    # Initialize embedding method
-    if embedding.lower() == "lda":
-        embedder = LDA(
-            solver="eigen",
-            shrinkage="auto",
-            n_components=n_components,
-            store_covariance=True,
-        )
-    elif embedding.lower() == "pca":
-        embedder = PCA(n_components=n_components)
-    else:
-        print('Unsupported input. Only input embedding="lda" or "pca".')
+    embedder = _make_embedder(embedding, n_components)
+    if embedder is None:
         return None, None
 
     # Get group mean scalar values
@@ -131,25 +158,9 @@ def run_2d_scalar_embedding(
         scalar_mean_df, unique_groups, stat=feats
     )
 
-    # Embed the data
-    L = embedder.fit_transform(X, y)
-
-    if L.shape[1] <= 1:
-        print("Not enough dimensions to plot, try a different embedding method.")
-        return None, None
-
-    # Plot the 2D embedding
-    fig, ax = plot_embedding(
-        L,
-        y,
-        mapping,
-        reverse_mapping,
-        output_file=output_file,
-        embedding=embedding,
-        plot_all_subjects=plot_all_subjects,
+    return _embed_and_plot(
+        embedder, X, y, mapping, reverse_mapping, output_file, embedding, plot_all_subjects
     )
-
-    return fig, ax
 
 
 def plot_embedding(
