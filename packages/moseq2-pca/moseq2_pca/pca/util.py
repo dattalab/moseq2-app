@@ -12,7 +12,8 @@ from tqdm.auto import tqdm
 import dask.array.linalg as lng
 from dask.distributed import as_completed, progress
 from moseq2_common.timestamps import read_timestamps, timestamp_unit, timestamps_path
-from moseq2_pca.util import (clean_frames, insert_nans, read_yaml, get_changepoints, get_rps,
+from moseq2_common.yaml import read_yaml
+from moseq2_pca.util import (clean_frames, insert_nans, get_changepoints, get_rps,
                              frame_rate_from_timestamps)
 
 

@@ -10,7 +10,6 @@ import time
 import dask
 import logging
 import click
-from click.core import ParameterSource
 import psutil
 import warnings
 import platform
@@ -28,65 +27,6 @@ from tqdm.auto import tqdm
 from dask.distributed import Client
 from dask_jobqueue import SLURMCluster
 from os.path import join, exists, abspath, expanduser
-
-
-# from https://stackoverflow.com/questions/46358797/
-# python-click-supply-arguments-and-options-from-a-configuration-file
-def command_with_config(config_file_param_name):
-    """
-    Helper function to assign variables from a config file. 
-    Hierachy of CLI prameters: params from cli options > params from config_file > default params
-    
-    Args:
-    config_file_param_name (str): parameter name to update with config file variable.
-
-    Returns:
-    custom_command_class (click.Command): updated Click Command containing parameters from inputted config file.
-    """
-
-    class custom_command_class(click.Command):
-
-        def invoke(self, ctx):
-            config_file = ctx.params[config_file_param_name]
-
-            if config_file is not None:
-                # read params from config_file
-                config_data = read_yaml(config_file)
-
-                # set config_data['output_file'] ['output_dir'] ['input_dir'] to None to avoid overwriting previous files
-                config_data['input_dir'] = None
-                config_data['output_dir'] = None
-                config_data['output_file'] = None
-
-                for param, value in ctx.params.items():
-                    # set params to the params in config file when the param is not none;
-                    # a falsy value such as 0 or False is a setting like any other
-                    if param in config_data and config_data[param] is not None:
-                        if type(value) is tuple and type(config_data[param]) is int:
-                            ctx.params[param] = tuple([config_data[param]])
-                        elif type(value) is tuple:
-                            ctx.params[param] = tuple(config_data[param])
-                        else:
-                            ctx.params[param] = config_data[param]
-
-                        # a value the user typed on the command line outranks the
-                        # config file. click records where each value came from, which
-                        # answers that directly; comparing the resolved value against
-                        # the declared default cannot, because the two coincide
-                        # whenever someone passes an option at its default value.
-                        if ctx.get_parameter_source(param) is ParameterSource.COMMANDLINE:
-                            ctx.params[param] = value
-
-                # removed flags
-                flag_list = ['missing_data', 'use_fft', 'verbose', 'from_end']
-                combined = {k:v for k,v in ctx.params.items() if k not in flag_list}
-                # combine params with config_params
-                config_data = {**config_data, **combined}
-                # write parameters to config_file
-                write_yaml(config_data, config_file)
-            return super(custom_command_class, self).invoke(ctx)
-
-    return custom_command_class
 
 
 def recursive_find_h5s(root_dir=os.getcwd(),
@@ -121,7 +61,7 @@ def recursive_find_h5s(root_dir=os.getcwd(),
     h5s = filter(lambda f: exists(yaml_string.format(f.replace(ext, ''))), h5s)
     h5s = list(filter(has_frames, h5s))
     yamls = list(map(lambda f: yaml_string.format(f.replace(ext, '')), h5s))
-    dicts = list(map(read_yaml, yamls))
+    dicts = list(map(_read_yaml, yamls))
 
     return h5s, dicts, yamls
 
@@ -356,25 +296,6 @@ def insert_nans(timestamps, data, fps=None):
         filled_data = np.squeeze(filled_data)
 
     return filled_data, data_idx, filled_timestamps
-
-
-def read_yaml(yaml_file):
-    """
-    Read yaml file and return dictionary representation of file contents.
-
-    Args:
-    yaml_file (str): path to yaml file
-
-    Returns:
-    return_dict (dict): dict of yaml file contents
-    """
-
-    try:
-        return_dict = _read_yaml(yaml_file)
-    except IOError:
-        return_dict = {}
-
-    return return_dict
 
 
 def _frame_shapes(h5s, dicts, h5_path='/frames'):
@@ -1214,20 +1135,3 @@ def get_changepoints(scores, k=5, sigma=3, peak_height=.5, peak_neighbors=1,
         cps = cps[np.argwhere(normed_df[cps] > peak_height)]
 
     return cps, normed_df
-
-
-def combine_new_config(config_file, config_data):
-    """
-    Read config file and combine new config params with it
-
-    Args:
-        config_file (str): path to config.yaml
-        config_data (dict): dictionary of config data
-    """
-    # open the config file
-    temp_config = _read_yaml(config_file)
-    # combining config data with the existing config file
-    config_data = {**temp_config, **config_data}
-    # ensure output_file and output_dir are not in config_data or reusing config for extraction will fail
-    config_data = {k:v for k, v in config_data.items() if k not in ('output_dir', 'output_file')}
-    write_yaml(config_data, config_file)

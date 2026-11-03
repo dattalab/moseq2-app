@@ -3,10 +3,10 @@ Helper functions for reading and loading PCA data.
 """
 
 import h5py
-from moseq2_common.yaml import read_yaml as _read_yaml
+from moseq2_common.yaml import read_yaml
 from os.path import join, exists, splitext
 from moseq2_common.frames import select_strel
-from moseq2_pca.util import read_yaml
+
 
 def get_pca_paths(config_data, output_dir):
     """
@@ -64,7 +64,7 @@ def load_pcs_for_cp(pca_file, config_data):
 
     if exists(pca_yaml):
         with open(pca_yaml, 'r') as f:
-            pca_config = _read_yaml(f)
+            pca_config = read_yaml(f)
 
             missing_data = pca_config.get('missing_data', False)
             if missing_data:
