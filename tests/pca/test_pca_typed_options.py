@@ -1,7 +1,6 @@
 """An option typed on ``train-pca``'s command line outranks the config file,
 including when the typed value equals the option's default (moseq2-extract#24
-names the extract side; ``moseq2_pca.util.command_with_config`` is the same
-merge). An option not typed takes the config file's value."""
+names the extract side). An option not typed takes the config file's value."""
 
 from __future__ import annotations
 
@@ -9,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_pca.cli as pca_cli
+import moseq2_pca.steps as pca_steps
 from moseq2_common.yaml import write_yaml
 
 
@@ -21,8 +21,7 @@ def received(monkeypatch):
         calls.append(dict(config))
         return config
 
-    monkeypatch.setattr(pca_cli, "train_pca_wrapper", record)
-    monkeypatch.setattr(pca_cli, "combine_new_config", lambda *a, **k: None)
+    monkeypatch.setattr(pca_steps, "train_pca_wrapper", record)
     return calls
 
 
@@ -82,8 +81,7 @@ def changepoints_received(monkeypatch):
         calls.append(dict(config))
         return config
 
-    monkeypatch.setattr(pca_cli, "compute_changepoints_wrapper", record)
-    monkeypatch.setattr(pca_cli, "combine_new_config", lambda *a, **k: None)
+    monkeypatch.setattr(pca_steps, "compute_changepoints_wrapper", record)
     return calls
 
 

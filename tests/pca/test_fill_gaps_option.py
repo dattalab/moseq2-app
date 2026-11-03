@@ -14,6 +14,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_pca.cli as pca_cli
+import moseq2_pca.steps as pca_steps
 from moseq2_common.yaml import write_yaml
 
 
@@ -26,8 +27,7 @@ def received(monkeypatch):
         calls.append(dict(config))
         return config, True
 
-    monkeypatch.setattr(pca_cli, "apply_pca_wrapper", record)
-    monkeypatch.setattr(pca_cli, "combine_new_config", lambda *a, **k: None)
+    monkeypatch.setattr(pca_steps, "apply_pca_wrapper", record)
     return calls
 
 
