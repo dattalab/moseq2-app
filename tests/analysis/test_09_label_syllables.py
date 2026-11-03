@@ -37,7 +37,7 @@ import pytest
 
 from moseq2_app.main import label_syllables
 from moseq2_viz.model.util import parse_model_results
-from moseq2_viz.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 from conftest import LABELLING
 from video import index_is_at_the_front, probe
@@ -388,7 +388,7 @@ def relabelled(tmp_path_factory, analysis_project, labeled):
     Returns the count labelled, the label file and the dropdown's options
     after each reopening, and the label file after the save.
     """
-    from moseq2_app.util import write_yaml
+    from moseq2_common.yaml import write_yaml
 
     from widgets import capture_display
 
@@ -539,7 +539,7 @@ def test_an_unlabelled_syllable_picked_from_the_list_shows_blank_boxes(
     list after a labelled one shows empty boxes, and pressing Next without
     typing leaves it unlabelled rather than giving it the other's name.
     """
-    from moseq2_app.util import write_yaml
+    from moseq2_common.yaml import write_yaml
 
     from widgets import capture_display
 

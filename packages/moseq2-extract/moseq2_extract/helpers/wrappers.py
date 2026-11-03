@@ -14,7 +14,7 @@ import numpy as np
 import urllib.request
 from copy import deepcopy
 from moseq2_common.h5 import h5_to_dict
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 from tqdm.auto import tqdm
 from cytoolz import partial
 from moseq2_extract.io.image import write_image
@@ -23,7 +23,7 @@ from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from os.path import join, exists, dirname, basename, abspath, splitext
 from moseq2_extract.io.video import load_movie_data, get_movie_info, write_frames
 from moseq2_extract.extract.flip_classifier import load_flip_classifier
-from moseq2_extract.util import mouse_threshold_filter, filter_warnings, read_yaml
+from moseq2_extract.util import mouse_threshold_filter, filter_warnings
 from moseq2_extract.helpers.data import (
     handle_extract_metadata,
     create_extract_h5,

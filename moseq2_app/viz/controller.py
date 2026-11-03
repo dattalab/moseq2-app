@@ -15,8 +15,7 @@ import ipywidgets as widgets
 from bokeh.layouts import column
 from bokeh.plotting import figure
 from os.path import exists
-from moseq2_extract.util import read_yaml
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_viz.util import get_sorted_index
 from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output

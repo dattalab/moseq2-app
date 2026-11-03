@@ -27,7 +27,7 @@ def check_video_parameters(index: dict) -> dict:
     Returns:
     vid_parameters (dict): a dictionary with a subset of the used extraction parameters.
     """
-    from moseq2_viz.util import read_yaml
+    from moseq2_common.yaml import read_yaml
 
     # define constants
     check_parameters = ["crop_size", "fps"]

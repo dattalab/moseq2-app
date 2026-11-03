@@ -11,7 +11,7 @@ from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_common.h5 import h5_to_dict
 from moseq2_common.timestamps import read_timestamps
-from moseq2_viz.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 
 def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):

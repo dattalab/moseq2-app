@@ -6,8 +6,8 @@ import os
 import uuid
 import json
 from glob import glob, escape as glob_escape
-from moseq2_common.yaml import write_yaml as _write_yaml
-from moseq2_viz.util import get_sorted_index, read_yaml
+from moseq2_common.yaml import read_yaml, write_yaml as _write_yaml
+from moseq2_viz.util import get_sorted_index
 from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
 from collections import Counter

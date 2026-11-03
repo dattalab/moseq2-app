@@ -19,11 +19,10 @@ import warnings
 from pathlib import Path
 
 import pytest
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 from moseq2_extract.gui import extract_found_sessions, generate_config_command
 from moseq2_extract.helpers.wrappers import NoFlipClassifierWarning, extract_wrapper
-from moseq2_extract.util import read_yaml
 
 from fixtures import fetch_azure_mkv
 

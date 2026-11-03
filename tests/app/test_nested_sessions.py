@@ -28,9 +28,8 @@ from commands import split_command
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.util import update_config
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.gui import extract_found_sessions, generate_config_command
-from moseq2_extract.util import read_yaml
 
 EXTRACT_NOTEBOOK = "MoSeq2-Extract-Modeling-Notebook.ipynb"
 

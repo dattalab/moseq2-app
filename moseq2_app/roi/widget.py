@@ -21,7 +21,8 @@ from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
 from moseq2_extract.session_config import recording_config
-from moseq2_app.util import write_yaml, read_yaml, read_and_clean_config, update_config
+from moseq2_app.util import read_and_clean_config, update_config
+from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.extract.proc import get_bground_im_file, apply_roi, threshold_chunk
 
 

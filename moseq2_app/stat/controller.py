@@ -12,7 +12,8 @@ from collections import defaultdict
 from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
-from moseq2_viz.util import get_sorted_index, read_yaml
+from moseq2_viz.util import get_sorted_index
+from moseq2_common.yaml import read_yaml
 from moseq2_viz.model.stat import run_kruskal, run_pairwise_stats
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)

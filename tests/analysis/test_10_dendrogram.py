@@ -110,7 +110,7 @@ def test_each_leaf_names_the_syllable_it_stands_for(dendrogram, analysis_paths, 
     syllable's number, so a syllable is identifiable whether or not it
     has been named yet.
     """
-    from moseq2_viz.util import read_yaml
+    from moseq2_common.yaml import read_yaml
 
     figure, _ = dendrogram
     labels = [tick.get_text() for tick in figure.axes[0].get_xticklabels()]
@@ -159,8 +159,7 @@ def test_a_label_file_naming_more_syllables_than_the_tree_still_draws(analysis_p
     """
     import matplotlib.pyplot as plt
 
-    from moseq2_app.util import write_yaml
-    from moseq2_viz.util import read_yaml
+    from moseq2_common.yaml import read_yaml, write_yaml
 
     syll_info = read_yaml(analysis_paths["syll_info"])
     for syllable in syll_info:

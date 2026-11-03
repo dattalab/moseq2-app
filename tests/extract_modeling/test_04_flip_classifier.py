@@ -33,7 +33,7 @@ import pytest
 
 from moseq2_extract.extract.flip_classifier import load_flip_classifier
 from moseq2_extract.gui import download_flip_command
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml
 
 BASE = "https://moseq-data.s3.amazonaws.com/flip-classifiers/"
 

@@ -14,7 +14,7 @@ import numpy as np
 from glob import glob
 from copy import deepcopy
 from ruamel.yaml.comments import CommentedSeq
-from moseq2_common.yaml import read_yaml as _read_yaml
+import moseq2_common.yaml
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -67,7 +67,7 @@ def command_with_config(config_file_param_name):
 
             if config_file is not None:
 
-                config_data = read_yaml(config_file)
+                config_data = moseq2_common.yaml.read_yaml(config_file)
                 # set config_data['output_file'] ['output_dir'] ['input_dir'] to None to avoid overwriting previous files
                 # assuming users would either input their own paths or use the default path
                 config_data['input_dir'] = None
@@ -90,7 +90,7 @@ def command_with_config(config_file_param_name):
                 ctx.params = combined
                 
                 # add new parameters to the original config file
-                config_data = read_yaml(config_file)
+                config_data = moseq2_common.yaml.read_yaml(config_file)
                 
                 # remove flags from combined so the flag values in config.yaml won't get overwritten
                 flag_list = ['manual_set_depth_range', 'use_plane_bground', 'progress_bar', 'delete', 'compute_raw_scalars', 'skip_completed', 'skip_checks', 'get_cmd', 'run_cmd']
@@ -443,32 +443,6 @@ def load_metadata(metadata_file):
 
     return metadata
 
-def load_found_session_paths(input_dir, exts, max_depth=None):
-    """
-    Find the recordings with the given extensions under input_dir.
-
-    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
-    folder, at most max_depth folders below input_dir, following symlinked folders. What it
-    passed over, and each recording without a metadata.json, is printed.
-
-    Args:
-    input_dir (str): path to project base directory holding all the session sub-folders.
-    exts (list or str): list of extensions to search for, or a single extension in string form.
-    max_depth (int): how many folders below input_dir to search; defaults to 5.
-
-    Returns:
-    files (list): sorted list of all paths to found depth files
-    """
-    from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
-
-    search = find_recordings(
-        input_dir, extensions=exts, max_depth=DEFAULT_MAX_DEPTH if max_depth is None else max_depth
-    )
-    message = search.report()
-    if message:
-        print(message)
-    return search.recordings
-
 def get_strels(config_data):
     """
     Get dictionary object of cv2 StructuringElements for image filtering given
@@ -677,7 +651,7 @@ def recursive_find_h5s(root_dir=os.getcwd(),
     h5s = filter(lambda f: exists(yaml_string.format(f.replace(ext, ''))), h5s)
     h5s = list(filter(has_frames, h5s))
     yamls = list(map(lambda f: yaml_string.format(f.replace(ext, '')), h5s))
-    dicts = list(map(read_yaml, yamls))
+    dicts = list(map(moseq2_common.yaml.read_yaml, yamls))
 
     return h5s, dicts, yamls
 
@@ -791,18 +765,6 @@ def build_path(keys: dict, format_string: str, snake_case=True) -> str:
 
     return clean_file_str(format_string.format(**keys))
 
-def read_yaml(yaml_file):
-    """
-    Read yaml file into a dictionary
-
-    Args:
-    yaml_file (str): path to yaml file
-
-    Returns:
-    return_dict (dict): dict of yaml contents
-    """
-    return _read_yaml(yaml_file)
-
 def mouse_threshold_filter(h5file, thresh=0):
     """
     Filter frames in h5 files by threshold value.
@@ -861,46 +823,6 @@ def camel_to_snake(s):
     subbed = _underscorer1.sub(r'\1_\2', s)
     return _underscorer2.sub(r'\1_\2', subbed).lower()
 
-
-def recursive_find_unextracted_dirs(root_dir=os.getcwd(),
-                                    session_pattern=r'session_\d+\.(?:tgz|tar\.gz)',
-                                    extension='.dat',
-                                    yaml_path='proc/results_00.yaml',
-                                    metadata_path='metadata.json',
-                                    skip_checks=False,
-                                    max_depth=None):
-    """
-    Find the recordings under root_dir whose extraction is missing or incomplete.
-
-    The search is ``moseq2_extract.recordings.find_recordings``: one recording per session
-    folder, at most max_depth folders below root_dir, following symlinked folders. What it
-    passed over, and each recording without a metadata.json, is printed.
-
-    Args:
-    root_dir (str): path to base directory to start recursive search for unextracted folders.
-    session_pattern (str): not used; every .tar.gz or .tgz archive is a session.
-    extension (str): file extension to search for
-    yaml_path (str): path to an extraction's results yaml, relative to the recording's folder
-    metadata_path (str): not used; a recording without a metadata.json is included with a warning.
-    skip_checks (bool): include recordings whose extraction already finished
-    max_depth (int): how many folders below root_dir to search; defaults to 5.
-
-    Returns:
-    proc_dirs (1d-list): list of paths to each unextracted session's depth file
-    """
-    from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings
-
-    search = find_recordings(
-        root_dir,
-        extensions=[extension],
-        max_depth=DEFAULT_MAX_DEPTH if max_depth is None else max_depth,
-        skip_extracted=not skip_checks,
-        results_yaml=yaml_path,
-    )
-    message = search.report()
-    if message:
-        print(message)
-    return search.recordings
 
 def click_param_annot(click_cmd):
     """

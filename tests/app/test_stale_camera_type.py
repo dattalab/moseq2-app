@@ -34,8 +34,7 @@ from moseq2_app.gui.progress import update_progress
 import moseq2_app.util as app_util
 from moseq2_app.util import update_config
 from moseq2_extract.gui import aggregate_extract_results_command, generate_config_command
-from moseq2_common.yaml import write_yaml
-from moseq2_extract.util import read_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 from cells import code_cell
 from fixtures import fetch_azure_mkv, fetch_raw_sessions

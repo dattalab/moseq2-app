@@ -27,9 +27,9 @@ from click.testing import CliRunner
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.gui as extract_gui
 from commands import split_command
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.gui import extract_command, extract_found_sessions, generate_config_command
-from moseq2_extract.util import detect_and_set_camera_parameters, read_yaml
+from moseq2_extract.util import detect_and_set_camera_parameters
 
 SESSIONS = ("session_0", "session_1")
 
