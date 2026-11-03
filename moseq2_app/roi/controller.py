@@ -7,12 +7,12 @@ import base64
 from bokeh.io import show
 import ipywidgets as widgets
 from bokeh.models import Div, CustomJS, Slider
-from IPython.display import clear_output
+from moseq2_app.util import ClearOutputMixin
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_extract.io.video import get_video_info
 
 
-class InteractiveExtractionViewer:
+class InteractiveExtractionViewer(ClearOutputMixin):
 
     def __init__(self, data_path, flipped=False):
         """
@@ -30,16 +30,6 @@ class InteractiveExtractionViewer:
             description='Clear Output', disabled=False, tooltip='Close Cell Output')
 
         self.clear_button.on_click(self.clear_on_click)
-
-    def clear_on_click(self, b=None):
-        """
-        Clear the cell output
-
-        Args:
-        b (button click)
-        """
-
-        clear_output()
 
     def get_extraction(self, input_file):
         """

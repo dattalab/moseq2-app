@@ -12,11 +12,28 @@ from glob import glob
 from shutil import copy2
 from collections import defaultdict
 from contextlib import contextmanager
+from IPython.display import clear_output
 from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_extract.util import check_filter_sizes, recursive_find_h5s
 from moseq2_extract.recordings import find_recordings
 from moseq2_viz.model.util import compute_behavioral_statistics
+
+
+class ClearOutputMixin:
+    """
+    The Clear Output button's handler, shared by the notebook tools that show one.
+    """
+
+    def clear_on_click(self, b=None):
+        """
+        Clear the cell output
+
+        Args:
+        b (button click)
+        """
+
+        clear_output()
 
 
 def read_and_clean_config(config_file):
