@@ -8,7 +8,8 @@ from copy import deepcopy
 from tqdm.auto import tqdm
 from dtaidistance import dtw_ndim
 from cytoolz import keyfilter, curry
-from moseq2_viz.util import strided_app, h5_to_dict
+from moseq2_common.h5 import h5_to_dict
+from moseq2_viz.util import strided_app
 from scipy.spatial.distance import squareform, pdist
 from moseq2_viz.model.util import (
     whiten_pcs,

@@ -566,58 +566,6 @@ def get_metadata_path(h5file):
             raise KeyError('acquisition metadata not found')
 
 
-def h5_to_dict(h5file, path):
-    """
-    Read all contents from h5 and returns them in a nested dict object.
-
-    Args:
-    h5file (str): path to h5 file
-    path (str): path to group within h5 file
-
-    Returns:
-    ans (dict): dictionary of all h5 group contents
-    """
-
-    ans = {}
-
-    if type(h5file) is str:
-        with h5py.File(h5file, 'r') as f:
-            ans = h5_to_dict(f, path)
-            return ans
-
-    for key, item in h5file[path].items():
-        if isinstance(item, h5py._hl.dataset.Dataset):
-            ans[key] = _read_dataset(item)
-        elif isinstance(item, h5py._hl.group.Group):
-            ans[key] = h5_to_dict(h5file, path + key + '/')
-    return ans
-
-
-def _read_dataset(dataset):
-    """Read one dataset, decoding variable-length UTF-8 strings to `str`.
-
-    h5py 3 returns the stored bytes for a string dataset and supplies
-    `asstr()` to decode them; h5py 2 decodes variable-length UTF-8 on read and
-    has no `asstr()`. Decoding here keeps a session's uuid, subject name and
-    acquisition timestamps coming back as `str` on either, which matters
-    because callers compare those against strings read from YAML indexes and
-    use them as dictionary keys, where `b'...'` and `'...'` do not match.
-
-    Only variable-length UTF-8 is decoded. Fixed-length and ASCII string
-    datasets come back as `bytes` under h5py 2 as well, so decoding those would
-    introduce a difference rather than remove one.
-
-    A dataset with a null dataspace, which has `shape` of None and is how an
-    extraction records a parameter left unset, is read directly. It holds no
-    value to decode, and `asstr()` raises on one.
-    """
-    info = h5py.check_string_dtype(dataset.dtype)
-    if (info is not None and info.length is None and info.encoding == 'utf-8'
-            and dataset.shape is not None and hasattr(dataset, 'asstr')):
-        return dataset.asstr()[()]
-    return dataset[()]
-
-
 def set_dask_config(memory={'target': 0.85, 'spill': False, 'pause': False, 'terminate': 0.95}):
     """
     Set initial dask configuration parameters

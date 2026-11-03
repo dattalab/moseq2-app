@@ -16,7 +16,8 @@ from sklearn.cluster import KMeans
 from typing import Iterator, Any, Dict
 from cytoolz.curried import get
 from os.path import join, basename, dirname
-from moseq2_viz.util import h5_to_dict, star
+from moseq2_common.h5 import h5_to_dict
+from moseq2_viz.util import star
 from collections import defaultdict, OrderedDict
 from scipy.spatial.distance import jensenshannon
 from moseq2_viz.model.trans_graph import get_transitions

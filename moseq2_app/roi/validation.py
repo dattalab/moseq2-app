@@ -9,7 +9,8 @@ from copy import deepcopy
 from os.path import exists
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
-from moseq2_viz.util import h5_to_dict, read_timestamps, read_yaml
+from moseq2_common.h5 import h5_to_dict
+from moseq2_viz.util import read_timestamps, read_yaml
 
 
 def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
