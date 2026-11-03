@@ -52,7 +52,7 @@ def test_the_video_extra_holds_the_video_libraries():
         req.name for req in reqs
         if req.marker is not None and req.marker.evaluate({"extra": "video"})
     }
-    assert video == {"av", "matplotlib", "opencv-python-headless"}
+    assert video == {"av", "matplotlib", "opencv-python-headless", "tqdm"}
 
 
 @pytest.mark.parametrize("package", CORE)

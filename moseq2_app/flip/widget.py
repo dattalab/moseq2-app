@@ -10,7 +10,7 @@ from moseq2_common.yaml import read_yaml
 from collections import defaultdict
 from moseq2_extract.extract.proc import get_flips
 from moseq2_extract.util import gen_batch_sequence
-from moseq2_extract.io.video import write_frames_preview
+from moseq2_common.video import write_frames_preview
 from moseq2_app.flip.train import SAVE_AND_RETRAIN
 
 

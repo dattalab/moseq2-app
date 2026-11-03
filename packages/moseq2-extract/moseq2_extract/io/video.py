@@ -5,12 +5,10 @@ Video and video-metadata read/write functions.
 import os
 import av
 import functools
-from fractions import Fraction
-import cv2
 import tarfile
 import numpy as np
 from tqdm.auto import tqdm
-import matplotlib.pyplot as plt
+from moseq2_common.video import VideoWriter, frame_dimensions
 
 
 def get_raw_info(filename, bit_depth=16, frame_size=(512, 424)):
@@ -196,62 +194,6 @@ def get_video_info(filename, mapping="DEPTH", threads=8, count_frames=False, **k
 
 
 
-def _frame_dimensions(frames, frame_size):
-    """The width and height to size an output stream with.
-
-    ``frame_size`` wins when it is given, as either a ``(width, height)``
-    pair or a ``"WxH"`` string. Otherwise the frames say: an ndarray by its
-    shape, or a bare ``(width, height)`` pair passed in place of one by a
-    caller opening the file before its first chunk has arrived.
-    """
-    if frame_size:
-        if isinstance(frame_size, str):
-            width, height = frame_size.split("x")
-            return int(width), int(height)
-        return int(frame_size[0]), int(frame_size[1])
-    if isinstance(frames, np.ndarray):
-        return int(frames.shape[2]), int(frames.shape[1])
-    return int(frames[0]), int(frames[1])
-
-
-class _VideoWriter:
-    """An open output file, written one frame at a time.
-
-    Extraction writes its output in chunks and keeps the file open between
-    them. ``communicate`` flushes whatever the encoder is still holding,
-    writes the container's trailer and closes the file; calling it twice is
-    harmless.
-    """
-
-    def __init__(self, filename, codec, pix_fmt, frame_size, fps, threads):
-        # The mp4 index goes ahead of the frames, so a browser can show the
-        # first frame and seek without fetching the whole file. Other
-        # containers ignore the flag.
-        self.container = av.open(str(filename), "w", container_options={"movflags": "+faststart"})
-        # A rate is a rational, and callers hand this one in as whatever
-        # their config or CLI made of it: an int, a float from a `type=float`
-        # option, or a string from a yaml file. 1000 is enough denominator
-        # for the broadcast rates (30000/1001 and friends) a camera reports.
-        rate = Fraction(str(fps)).limit_denominator(1000)
-        self.stream = self.container.add_stream(codec, rate=rate)
-        self.stream.width, self.stream.height = frame_size
-        self.stream.pix_fmt = pix_fmt
-        self.stream.thread_type = "AUTO"
-        self.stream.codec_context.thread_count = threads
-
-    def write(self, frame, format):
-        """Encode one ``(height, width)`` or ``(height, width, 3)`` array."""
-        self.container.mux(self.stream.encode(av.VideoFrame.from_ndarray(frame, format=format)))
-
-    def communicate(self, *args, **kwargs):
-        """Flush the encoder, write the trailer and close the file."""
-        if self.container is not None:
-            self.container.mux(self.stream.encode())
-            self.container.close()
-            self.container = None
-        return None, None
-
-
 def write_frames(
     filename,
     frames,
@@ -278,22 +220,22 @@ def write_frames(
     pixel_format (str): format video color scheme
     codec (str): encoder to write with
     close_pipe (bool): indicates to close the open pipe to video when done writing.
-    pipe (_VideoWriter): the already open file to keep writing to.
+    pipe (VideoWriter): the already open file to keep writing to.
     frame_dtype (str): indicates the data type to use when writing the videos
     slices (int): unused, kept so a config splatted in as keywords still fits
     slicecrc (int): unused, kept so a config splatted in as keywords still fits
     frame_size (tuple): shape/dimensions of image.
 
     Returns:
-    pipe (_VideoWriter): indicates whether video writing is complete.
+    pipe (VideoWriter): indicates whether video writing is complete.
     """
 
     if not pipe:
-        pipe = _VideoWriter(
+        pipe = VideoWriter(
             filename,
             codec=codec,
             pix_fmt=pixel_format,
-            frame_size=_frame_dimensions(frames, frame_size),
+            frame_size=frame_dimensions(frames, frame_size),
             fps=fps,
             threads=threads,
         )
@@ -459,133 +401,6 @@ def read_mkv(
         movie_dtype=movie_dtype,
         **kwargs,
     )
-
-
-def write_frames_preview(
-    filename,
-    frames=np.empty((0,)),
-    threads=6,
-    fps=30,
-    pixel_format="rgb24",
-    codec="h264",
-    slices=24,
-    slicecrc=1,
-    frame_size=None,
-    depth_min=0,
-    depth_max=80,
-    cmap="jet",
-    pipe=None,
-    close_pipe=True,
-    frame_range=None,
-    progress_bar=False,
-):
-    """
-    Write out a false-colored mp4 a person can watch in a browser.
-
-    Args:
-    filename (str): path to file to write to.
-    frames (np.ndarray): frames to write, or a (width, height) pair to size
-    the file with when no frames have arrived yet.
-    threads (int): number of threads to write video
-    fps (int): frames per second
-    pixel_format (str): format of the frames handed to the encoder
-    codec (str): encoder to write with
-    slices (int): unused, kept so a config splatted in as keywords still fits
-    slicecrc (int): unused, kept so a config splatted in as keywords still fits
-    frame_size (tuple): shape/dimensions of image.
-    depth_min (int): minimum mouse depth from floor in (mm)
-    depth_max (int): maximum mouse depth from floor in (mm)
-    cmap (str): color map to use.
-    pipe (_VideoWriter): the already open file to keep writing to.
-    close_pipe (bool): indicates to close the open pipe to video when done writing.
-    frame_range (range()): frame indices to write on video
-    progress_bar (bool): If True, displays a TQDM progress bar for the video writing progress.
-
-    Returns:
-    pipe (_VideoWriter): indicates whether video writing is complete.
-    """
-
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    white = (255, 255, 255)
-
-    if isinstance(frames, np.ndarray):
-        txt_pos = (5, frames.shape[-1] - 40)
-
-        # H.264 cannot encode an odd width or height.
-        if not np.mod(frames.shape[1], 2) == 0:
-            frames = np.pad(frames, ((0, 0), (0, 1), (0, 0)), "constant", constant_values=0)
-
-        if not np.mod(frames.shape[2], 2) == 0:
-            frames = np.pad(frames, ((0, 0), (0, 0), (0, 1)), "constant", constant_values=0)
-
-    if not pipe:
-        pipe = _VideoWriter(
-            filename,
-            codec=codec,
-            # The output pixel format, which is what decides whether a browser
-            # can play the result. Left to the encoder's own preference, an
-            # rgb24 input lands on yuv444p, giving a High 4:4:4 Predictive
-            # stream; browser H.264 is 8-bit 4:2:0 only, so the movie is
-            # undecodable in the preview widget that displays it. The crowd
-            # movie writer in moseq2-viz sets the same pair.
-            pix_fmt="yuv420p",
-            frame_size=_frame_dimensions(frames, frame_size),
-            fps=fps,
-            threads=threads,
-        )
-
-    if isinstance(frames, np.ndarray):
-        # scale frames to appropriate depth ranges
-        use_cmap = plt.get_cmap(cmap)
-        for i in tqdm(
-            range(frames.shape[0]),
-            disable=not progress_bar,
-            desc=f"Writing frames to {filename}",
-        ):
-            disp_img = frames[i, :].copy().astype("float32")
-            disp_img = (disp_img - depth_min) / (depth_max - depth_min)
-            disp_img[disp_img < 0] = 0
-            disp_img[disp_img > 1] = 1
-            disp_img = np.delete(use_cmap(disp_img), 3, 2) * 255
-            # OpenCV 5 asserts img.depth() == CV_8U in putText, where 4.x drew
-            # onto a float image without complaint. The colormap hands back
-            # float64 in 0-255, so the cast to uint8 that used to happen at the
-            # pipe write below now happens here, before the frame number is
-            # drawn.
-            #
-            # This is not pixel-identical, and the difference is confined to
-            # the text. It is drawn with LINE_AA, so its antialiased edges
-            # blend against whatever precision the image carries, and blending
-            # in uint8 rather than in float64 moves the boundary pixels of the
-            # digits. Every other pixel is unchanged: the cast is the same
-            # truncation wherever it runs. The artifact is the preview movie's
-            # frame-number overlay, which is for looking at rather than
-            # measuring.
-            disp_img = disp_img.astype("uint8")
-            if frame_range is not None:
-                try:
-                    cv2.putText(
-                        disp_img,
-                        str(frame_range[i]),
-                        txt_pos,
-                        font,
-                        1,
-                        white,
-                        2,
-                        cv2.LINE_AA,
-                    )
-                except (IndexError, ValueError):
-                    # len(frame_range) M < len(frames) or
-                    # txt_pos is outside of the frame dimensions
-                    print("Could not overlay frame number on preview on video.")
-
-            pipe.write(disp_img, format=pixel_format)
-
-    if close_pipe:
-        pipe.communicate()
-        return None
-    else:
-        return pipe
 
 
 def load_movie_data(

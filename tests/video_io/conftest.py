@@ -1,8 +1,8 @@
 """Files the video tests read, and the two they write to read back.
 
 Every other directory in this suite walks a notebook cell. These tests walk
-functions instead: ``moseq2_extract.io.video`` and the one writer in
-``moseq2_viz.io.video`` are what every cell that touches a recording goes
+functions instead: ``moseq2_extract.io.video`` and the movie writer in
+``moseq2_common.video`` are what every cell that touches a recording goes
 through, and a cell that extracts a mouse cannot say which of a reader, a
 probe or a writer broke.
 
