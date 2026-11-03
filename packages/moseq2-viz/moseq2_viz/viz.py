@@ -14,7 +14,7 @@ from tqdm.auto import tqdm
 from os.path import dirname
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
-from moseq2_common.frames import clean_frames
+import moseq2_common.frames
 from moseq2_viz.model.util import sort_syllables_by_stat, sort_syllables_by_stat_difference
 
 
@@ -229,7 +229,7 @@ def make_crowd_matrix(slices, nexamples=50, pad=30, raw_size=(512, 424), outmovi
             clean_params = dict(kwargs)
             if 'medfilter_space' in clean_params:
                 clean_params['medfilter_space'] = _odd_median_kernels(clean_params['medfilter_space'])
-            frames = clean_frames((h5[frame_path][idx_slice] / scale).astype('uint8'), **clean_params)
+            frames = moseq2_common.frames.clean_frames((h5[frame_path][idx_slice] / scale).astype('uint8'), **clean_params)
 
             # flip the mouse in the correct orientation if necessary
             if 'flips' in h5['metadata/extraction']:

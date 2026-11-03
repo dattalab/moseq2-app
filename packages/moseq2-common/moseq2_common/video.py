@@ -120,12 +120,19 @@ def write_frames_preview(
     pipe (VideoWriter): the already open file to keep writing to.
     close_pipe (bool): close the file once these frames are written.
     progress_bar (bool): show a progress bar while writing.
-    unused (dict): ignored, so a config splatted in as keywords still fits.
+    unused (dict): ignored, so a config splatted in as keywords still fits;
+        ``frame_range``, the name ``frame_numbers`` had before 1.6.0, is refused.
 
     Returns:
     pipe (VideoWriter or str): the open file when ``close_pipe`` is False,
         otherwise ``filename``.
     """
+
+    if "frame_range" in unused:
+        raise TypeError(
+            f"write_frames_preview() was given frame_range= for {filename}; since moseq2 1.6.0 "
+            "the frame numbers to draw are passed as frame_numbers=. Rename the keyword."
+        )
 
     font = cv2.FONT_HERSHEY_SIMPLEX
     white = (255, 255, 255)
