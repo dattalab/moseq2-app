@@ -14,6 +14,8 @@ from copy import deepcopy
 from cytoolz import first
 from collections import OrderedDict
 from moseq2_common.slurm import sbatch_command
+from moseq2_common.yaml import write_yaml
+from moseq2_model.options import LearnModelOptions
 from moseq2_model.train.models import ARHMM
 from os.path import basename, getctime, join, exists
 
@@ -550,79 +552,40 @@ def count_frames(data_dict=None, input_file=None, var_name="scores"):
     return total_frames
 
 
-def shim_kappa_scan_flags(config_data):
-    """
-    The learn-model flags a kappa scan writes into each of its commands (L4, removed by PR 3.5).
-
-    Only some of the fitting settings are written, some only when set, as
-    1.5.0 wrote them.
-
-    Args:
-    config_data (dict): Configuration parameters dict.
-
-    Returns:
-    parameters (str): String containing CLI command parameter flags.
-    """
-
-    parameters = f' --npcs {config_data["npcs"]} --num-iter {config_data["num_iter"]} '
-
-    if isinstance(config_data["index"], str):
-        if exists(config_data["index"]):
-            parameters += f'-i {config_data["index"]} '
-
-    if config_data["separate_trans"]:
-        parameters += "--separate-trans "
-
-    if config_data["robust"]:
-        parameters += "--robust "
-
-    if config_data["e_step"]:
-        parameters += "--e-step "
-
-    if config_data["hold_out"]:
-        parameters += f'--hold-out --nfolds {config_data["nfolds"]} '
-
-    if config_data["max_states"]:
-        parameters += f'--max-states {config_data["max_states"]} '
-
-    # Forward only options already supported by the learn-model CLI.
-    for key in ('nlags', 'whiten', 'alpha', 'gamma', 'var_name',
-                'hold_out_seed', 'noise_level', 'percent_split'):
-        if config_data.get(key) is not None:
-            parameters += f'--{key.replace(chr(95), chr(45))} {config_data[key]} '
-
-    return parameters
-
-
 def create_command_strings(
-    input_file, output_dir, config_data, kappas, model_name_format="model-{:03d}-{}.p"
+    input_file, output_dir, config_data, kappas, settings_name, model_name_format="model-{:03d}-{}.p"
 ):
     """
-    Create the CLI learn-model command strings with parameter flags based on the contents of the configuration dict.
+    Write each kappa's learn-model settings to a file in ``output_dir`` and return the commands that fit them.
+
+    Each fit's settings are every learn-model option ``config_data`` holds, with
+    that fit's kappa, written to ``settings_name.format(i, kappa)``; its command
+    runs ``learn-model --config-file`` on that file.
 
     Args:
     input_file (str): Path to PC Scores
-    output_dir (str): Path to directory to save models in.
+    output_dir (str): Path to directory to save models and their settings files in.
     config_data (dict): Configuration parameters dict.
     kappas (list): List of kappa values for model training commands.
+    settings_name (str): File name format string of each fit's settings file, given the model's number and kappa.
     model_name_format (str): Filename string format string.
 
     Returns:
-    command_string (str): CLI learn-model command strings with the requested parameters separated by newline characters
+    command_string (str): CLI learn-model command strings separated by newline characters
     """
-
-    # Get base command and parameter flags
-    base_command = f"moseq2-model learn-model {input_file} "
-    parameters = shim_kappa_scan_flags(config_data)
+    index = config_data.get("index")
+    index_flag = f" -i {index}" if isinstance(index, str) and exists(index) else ""
+    os.makedirs(output_dir, exist_ok=True)
 
     commands = []
     for i, k in enumerate(kappas):
-        # Create CLI command
+        k = int(k)
+        settings_file = join(output_dir, settings_name.format(i, k))
+        settings = LearnModelOptions.resolve(config=config_data, explicit={"kappa": float(k)})
+        write_yaml(settings.as_dict(), settings_file)
         cmd = (
-            base_command
-            + join(output_dir, model_name_format.format(i, k))
-            + parameters
-            + f"--kappa {k}"
+            f"moseq2-model learn-model {input_file} {join(output_dir, model_name_format.format(i, k))}"
+            f" --config-file {settings_file}{index_flag}"
         )
 
         # On SLURM, each fit is its own job

@@ -15,24 +15,21 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_model.cli as model_cli
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 SESSIONS = {"s0": 120, "s1": 140, "s2": 160}
 
-#: The script 1.5.0's kappa-scan builder wrote for the declared defaults with
-#: cluster_type slurm, ncpus 0, three models and a prefix, on the scores below
-#: (420 frames), with the paths relative to the working folder.
-SCAN_SCRIPT_1_5_0 = (
+#: The script the kappa-scan step writes for the declared defaults with cluster_type slurm, ncpus 0, three
+#: models and a prefix, on the scores below (420 frames), with the paths relative to the working folder.
+#: Each command passes its fit's settings file to --config-file.
+SCAN_SCRIPT = (
     'set -e\n'
     'sbatch -c 8 --mem=5GB -p short -t 3:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
-    'models/model-000-1.p --npcs 10 --num-iter 100 --max-states 100 --nlags 3 --whiten all --alpha 5.7 '
-    '--gamma 1000.0 --var-name scores --hold-out-seed -1 --noise-level 0 --percent-split 0 --kappa 1"\n'
+    'models/model-000-1.p --config-file models/model-000-1-settings.yaml"\n'
     'sbatch -c 8 --mem=5GB -p short -t 3:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
-    'models/model-001-100.p --npcs 10 --num-iter 100 --max-states 100 --nlags 3 --whiten all --alpha 5.7 '
-    '--gamma 1000.0 --var-name scores --hold-out-seed -1 --noise-level 0 --percent-split 0 --kappa 100"\n'
+    'models/model-001-100.p --config-file models/model-001-100-settings.yaml"\n'
     'sbatch -c 8 --mem=5GB -p short -t 3:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
-    'models/model-002-10000.p --npcs 10 --num-iter 100 --max-states 100 --nlags 3 --whiten all --alpha 5.7 '
-    '--gamma 1000.0 --var-name scores --hold-out-seed -1 --noise-level 0 --percent-split 0 --kappa 10000"'
+    'models/model-002-10000.p --config-file models/model-002-10000-settings.yaml"'
 )
 
 
@@ -140,8 +137,11 @@ def test_kappa_scan_commands_are_unchanged(tmp_path, scores, steps, options, mon
 
     result = steps.kappa_scan("pca_scores.h5", "models", opts)
 
-    assert result.script.read_text().splitlines() == SCAN_SCRIPT_1_5_0.splitlines()
-    assert result.commands == SCAN_SCRIPT_1_5_0
+    assert result.script.read_text().splitlines() == SCAN_SCRIPT.splitlines()
+    assert result.commands == SCAN_SCRIPT
+    for i, kappa in enumerate((1, 100, 10000)):
+        settings = read_yaml(str(tmp_path / "models" / steps.KAPPA_SCAN_SETTINGS_NAME.format(i, kappa)))
+        assert settings == options.LearnModelOptions(kappa=float(kappa)).as_dict()
 
 
 def test_learn_model_reads_config_file(tmp_path, scores, steps, monkeypatch):
