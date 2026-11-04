@@ -64,7 +64,7 @@ _EXTRACTION_ORDER = (
     "frame_dtype", "write_movie", "chunk_overlap", "temporal_filter_size", "spatial_filter_size",
     "tail_filter_shape", "tail_filter_size", "tail_filter_iters", "cable_filter_size", "cable_filter_shape",
     "cable_filter_iters", "tracking_model_init", "tracking_model_segment", "tracking_model_ll_clip",
-    "tracking_model_mask_threshold", "tracking_model_ll_threshold", "use_tracking_model", "use_cc",
+    "use_tracking_model", "use_cc",
     "widen_radius", "graduate_walls", "flip_classifier_smoothing", "flip_classifier", "compute_raw_scalars",
     "detected_true_depth", "max_height", "min_height", "num_frames", "crop_size",
 )

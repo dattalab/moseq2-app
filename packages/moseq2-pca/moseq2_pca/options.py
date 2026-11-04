@@ -93,8 +93,6 @@ class ApplyPCAOptions(PCAInputOptions, DaskOptions):
     pca_path: str = option('/components', '--pca-path', type=str, help='Path to pca components in h5 file')
     pca_file: str | None = option(None, '--pca-file', type=click.Path(), help='Path to PCA results')
     fps: int = option(30, '--fps', type=int, help='Frames per second (frame rate)')
-    detrend_window: float = option(0, '--detrend-window', type=float,
-                                   help="Length of detrend window (in seconds, 0 for no detrending)")
     verbose: bool = option(False, '--verbose', '-v', is_flag=True, help='Print sessions as they are being loaded.')
     overwrite_pca_apply: bool = option(False, '--overwrite-pca-apply', type=bool,
                                        help='Used to bypass the pca overwrite question. If True: skip question, '
@@ -105,8 +103,6 @@ class ApplyPCAOptions(PCAInputOptions, DaskOptions):
 class ChangepointsOptions(PCAInputOptions, DaskOptions):
     """``compute-changepoints``."""
 
-    pca_file_components: str | None = option(None, '--pca-file-components', type=click.Path(),
-                                             help="Path to PCA components")
     pca_file_scores: str | None = option(None, '--pca-file-scores', type=click.Path(), help='Path to PCA results')
     pca_path: str = option('/components', '--pca-path', type=str, help='Path to pca components')
     neighbors: int = option(1, '--neighbors', type=int, help="Neighbors to use for peak identification")

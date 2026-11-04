@@ -80,8 +80,6 @@ temporal_filter_size:
 threads: 8
 tracking_model_init: raw
 tracking_model_ll_clip: -100
-tracking_model_ll_threshold: -100
-tracking_model_mask_threshold: -16
 tracking_model_segment: true
 use_cc: true
 use_plane_bground: false

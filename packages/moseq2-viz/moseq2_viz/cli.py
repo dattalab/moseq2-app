@@ -170,7 +170,7 @@ def plot_verbose_position_heatmaps(ctx, index_file, output_file, **_):
 @click_options(TransitionGraphOptions, order=(
     "index_file", "model_fit", "max_syllable", "n_explained", "group", "output_file", "normalize",
     "edge_threshold", "usage_threshold", "layout", "keep_orphans", "orphan_weight", "arrows", "sort", "count",
-    "edge_scaling", "node_scaling", "scale_node_by_usage", "width_per_group",
+    "scale_node_by_usage", "width_per_group",
 ), others={
     "index_file": _argument("index-file"),
     "model_fit": _argument("model-fit"),

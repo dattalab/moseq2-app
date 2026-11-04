@@ -149,9 +149,6 @@ class TransitionGraphOptions(SyllableCoverageOptions):
     sort: bool = option(True, "--sort", type=bool, help="Sort syllables by usage")
     count: str = option("usage", "--count", type=click.Choice(["usage", "frames"]),
                         help="How to quantify syllable usage")
-    edge_scaling: float = option(250, "--edge-scaling", type=float,
-                                 help="Scale factor from transition probabilities to edge width")
-    node_scaling: float = option(1e5, "--node-scaling", type=float, help="Scale factor for nodes by usage")
     scale_node_by_usage: bool = option(True, "--scale-node-by-usage", type=bool,
                                        help="Scale node sizes by usages probabilities")
     width_per_group: float = option(8, "--width-per-group", type=float, help="Width for figure canvas per group")

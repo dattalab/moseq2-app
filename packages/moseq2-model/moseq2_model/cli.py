@@ -32,7 +32,7 @@ _INDEX_HELP = "Path to moseq2-index.yaml for group definitions"
 
 # The help order of each command, as 1.5.0 lists its options.
 _MODEL_ORDER = ("check_every", "robust", "separate_trans", "nlags", "noise_level", "alpha", "gamma", "load_groups",
-                "percent_split", "progressbar", "whiten", "npcs", "max_states", "save_model", "save_every", "e_step",
+                "percent_split", "progressbar", "whiten", "npcs", "max_states", "save_model", "e_step",
                 "var_name", "num_iter", "ncpus", "nfolds", "hold_out_seed", "hold_out")
 LEARN_MODEL_ORDER = ("input_file", "dest_file", *_MODEL_ORDER, "kappa", "checkpoint_freq", "use_checkpoint", "index",
                      "config_file", "default_group", "verbose")

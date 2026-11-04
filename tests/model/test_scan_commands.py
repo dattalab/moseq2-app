@@ -27,7 +27,7 @@ from moseq2_model.options import LearnModelOptions
 SCAN_FITTING = dict(
     check_every=7, robust=True, separate_trans=True, nlags=5, noise_level=0.2, alpha=100.0, gamma=500.0,
     load_groups=False, percent_split=30, progressbar=False, whiten="each", npcs=8, max_states=20,
-    save_model=False, save_every=3, e_step=True, num_iter=50, ncpus=4, nfolds=3, hold_out_seed=17,
+    save_model=False, e_step=True, num_iter=50, ncpus=4, nfolds=3, hold_out_seed=17,
     hold_out=True,
 )
 #: The learn-model options a kappa scan does not take on the command line; the notebook's config.yaml holds them.

@@ -190,3 +190,16 @@ def test_read_config_names_a_missing_empty_or_unreadable_file(tmp_path, content)
     with pytest.raises(ConfigFileError) as caught:
         read_config(path)
     assert str(path) in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "content, holds",
+    [("- 1\n- 2\n", "a list"), ("5\n", "a single value"), ("just some text\n", "a single value")],
+    ids=["list", "number", "text"],
+)
+def test_read_config_names_what_the_file_holds_in_plain_words(tmp_path, content, holds):
+    path = tmp_path / "config.yaml"
+    path.write_text(content)
+    with pytest.raises(ConfigFileError) as caught:
+        read_config(path)
+    assert f"holds {holds}, not settings written as `name: value` lines" in str(caught.value)
