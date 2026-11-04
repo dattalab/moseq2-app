@@ -33,8 +33,8 @@ from moseq2_extract.helpers.data import (
     copy_manifest_results,
     check_completion_status,
 )
+from moseq2_common.frames import select_strel
 from moseq2_extract.util import (
-    select_strel,
     gen_batch_sequence,
     scalar_attributes,
     convert_raw_to_avi_function,
