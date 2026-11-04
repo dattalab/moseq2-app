@@ -59,8 +59,6 @@ temporal_filter_size: [0]
 threads: 8
 tracking_model_init: raw
 tracking_model_ll_clip: -100
-tracking_model_ll_threshold: -100
-tracking_model_mask_threshold: -16
 tracking_model_segment: true
 use_cc: true
 use_checkpoint: false
@@ -76,7 +74,6 @@ cores: 1
 dask_cache_path: /data/_pca
 dask_port: '8787'
 data_size: 4603980800
-detrend_window: 0
 dims: 300
 gaussfilter_space: [1.5, 1]
 gaussfilter_time: 0
@@ -119,7 +116,6 @@ overwrite_pca: false
 overwrite_pca_apply: false
 overwrite_pca_train: false
 pca_file: /data/_pca/pca.h5
-pca_file_components: /data/_pca/pca.h5
 pca_file_scores: /data/_pca/pca_scores.h5
 pca_path: /components
 percent_split: 0

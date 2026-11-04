@@ -135,14 +135,6 @@ class ExtractOptions(RoiOptions):
                                           help="Segment likelihood mask from tracking model")
     tracking_model_ll_clip: float = option(-100, "--tracking-model-ll-clip", type=float,
                                            help="Clip log-likelihoods below this value")
-    tracking_model_mask_threshold: float = option(
-        -16, "--tracking-model-mask-threshold", type=float, arena=True,
-        help="Threshold on log-likelihood to include pixels for centroid and angle calculation",
-    )
-    tracking_model_ll_threshold: float = option(
-        -100, "--tracking-model-ll-threshold", type=float,
-        help="Threshold on log-likelihood for pixels to use for update during tracking",
-    )
     use_tracking_model: bool = option(
         False, "--use-tracking-model", type=bool, arena=True,
         help="Use an expectation-maximization style model to aid mouse tracking. Useful for data with cables",

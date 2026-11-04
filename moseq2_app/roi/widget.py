@@ -239,7 +239,6 @@ class ArenaMaskWidget:
         session['tail_filter_size'] = (self.session_data.tail_filter_size, ) * 2
 
         session['use_tracking_model'] = self.session_data.tracking_model_flag
-        session['tracking_model_mask_threshold'] = self.session_data.tracking_model_mask_thresh
 
 
     def save_session_parameters(self):
@@ -363,7 +362,6 @@ class ArenaMaskData(param.Parameterized):
     flip_classifier_smoothing = param.Integer(default=51, bounds=(1, None), label="Flip classifier smoothing (frames)")
 
     tracking_model_flag = param.Boolean(default=False, label="Use tracking model")
-    tracking_model_mask_thresh = param.Number(default=-16, bounds=(None, 0), label="Tracking model mouse likelihood threshold")
 
     cable_filters = param.Integer(default=0, bounds=(0, None), label="Cable filter iterations")
     cable_filter_shape = param.Selector(objects=['rectangle', 'ellipse'], default='rectangle', label="Cable filter shape")
@@ -410,7 +408,6 @@ class ArenaMaskData(param.Parameterized):
         self.flip_classifier_smoothing = session_config['flip_classifier_smoothing']
 
         self.tracking_model_flag = session_config['use_tracking_model']
-        self.tracking_model_mask_thresh = session_config['tracking_model_mask_threshold']
 
         self.cable_filters = session_config['cable_filter_iters']
         self.cable_filter_shape = session_config['cable_filter_shape']
@@ -571,7 +568,6 @@ class ArenaMaskView(Viewer):
         # TODO: add flip classifier
         flip_classifier_smoothing = _link_data(pn.widgets.NumberInput, "flip_classifier_smoothing", height=40)
         tracking_model_flag = _link_data(pn.widgets.Checkbox, "tracking_model_flag", height=20)
-        tracking_model_mask_thresh = _link_data(pn.widgets.FloatInput, "tracking_model_mask_thresh", height=40)
 
         cable_filters = _link_data(pn.widgets.IntInput, "cable_filters", height=40)
         cable_filter_shape = _link_data(pn.widgets.Select, "cable_filter_shape", height=40)
@@ -608,7 +604,6 @@ class ArenaMaskView(Viewer):
             compress,
             pn.pane.Markdown("#### Tracking model parameters", height=20, width=300),
             tracking_model_flag,
-            tracking_model_mask_thresh,
             pn.pane.Markdown("#### Cable filtering parameters", height=20, width=300),
             cable_filters,
             cable_filter_shape,

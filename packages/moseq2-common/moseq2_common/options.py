@@ -152,8 +152,9 @@ def read_config(path: str | os.PathLike) -> dict:
     if data is None:
         raise ConfigFileError(f"The config file {path} is empty. {advice}")
     if not isinstance(data, Mapping):
+        holds = "a list" if isinstance(data, list) else "a single value"
         raise ConfigFileError(
-            f"The config file {path} holds a {type(data).__name__}, not settings "
+            f"The config file {path} holds {holds}, not settings "
             f"written as `name: value` lines. {advice}"
         )
     return dict(data)

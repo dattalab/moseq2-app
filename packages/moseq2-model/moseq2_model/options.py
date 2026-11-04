@@ -47,8 +47,6 @@ class ModelOptions(Options):
     npcs: int = option(10, '--npcs', type=int, help="Number of PCs to use")
     max_states: int = option(100, '--max-states', '-m', type=int, help="Maximum number of states")
     save_model: bool = option(True, '--save-model', type=bool, help="Save model object at the end of training")
-    save_every: int = option(-1, '--save-every', '-s', type=int,
-                             help="Increment to save labels and model object (-1 for just last)")
     e_step: bool = option(False, '--e-step', is_flag=True,
                           help="Compute the expected state sequence for each recordings")
     var_name: str = option('scores', '--var-name', type=str, help="Variable name in input file with PCs")
