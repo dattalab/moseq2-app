@@ -43,11 +43,6 @@ class BestModelOptions(Options):
 
 
 @dataclass(frozen=True, kw_only=True)
-class MakeDfOptions(Options):
-    """``make-df``, which has no settings: its output file's extension picks the format."""
-
-
-@dataclass(frozen=True, kw_only=True)
 class SyllableCoverageOptions(Options):
     """How many syllables a step includes."""
 

@@ -183,3 +183,96 @@ def test_arena_tool_settings_are_the_arena_fields(options):
     widget.set_session_config_vars()
 
     assert set(arena_fields(options.ExtractOptions)) == set(widget.session_config["session"])
+
+
+def test_the_aggregate_function_takes_its_defaults_from_the_options_class(project, called, monkeypatch):
+    """A default changed in ``AggregateOptions`` reaches the notebook's aggregation."""
+    import moseq2_extract.gui as gui
+
+    @dataclasses.dataclass(frozen=True, kw_only=True)
+    class Changed(gui.AggregateOptions):
+        mouse_threshold: float = 5.0
+
+    monkeypatch.setattr(gui, "AggregateOptions", Changed)
+    root, _, _ = project
+    gui.aggregate_extract_results_command(str(root), "{session_name}", "aggregate_results/")
+    gui.aggregate_extract_results_command(str(root), "{session_name}", "aggregate_results/", mouse_threshold=2.0)
+
+    assert [(o.format, o.mouse_threshold) for o in called["aggregate_results"]] == [
+        ("{session_name}", 5.0), ("{session_name}", 2.0)]
+
+
+def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monkeypatch, steps):
+    """Every extraction option typed on batch-extract's command line, and only those, reaches
+    each recording; num_frames, skip_completed and the cluster type travel in the options."""
+    root, _, config = project
+    seen = {}
+
+    def batch_extract(input_dir, opts, **kwargs):
+        seen.update(kwargs, opts=opts)
+        return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
+
+    monkeypatch.setattr(steps, "batch_extract", batch_extract)
+    invoke("batch-extract", root, "--config-file", config, "--bg-roi-depth-range", 600, 700, "--fps", 25,
+           "--noise-tolerance", 30, "--num-frames", 9, "--skip-completed", "--cluster-type", "local",
+           "--output-dir", "out", "--output-file", "o.h5", "--max-depth", 2, "--ncpus", 2)
+
+    assert seen["output_dir"] == "out"
+    assert seen["explicit"] == {"bg_roi_depth_range": (600.0, 700.0), "manual_set_depth_range": True, "fps": 25,
+                                "noise_tolerance": 30, "output_file": "o.h5"}
+    assert (seen["opts"].num_frames, seen["opts"].skip_completed, seen["opts"].max_depth) == (9, True, 2)
+
+
+def test_batch_extract_without_typed_options_hands_the_step_none(project, monkeypatch, steps):
+    root, _, config = project
+    seen = {}
+
+    def batch_extract(input_dir, opts, **kwargs):
+        seen.update(kwargs)
+        return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
+
+    monkeypatch.setattr(steps, "batch_extract", batch_extract)
+    invoke("batch-extract", root, "--config-file", config)
+
+    assert (seen["output_dir"], seen["explicit"]) == (None, {})
+
+
+def test_a_typed_depth_range_means_manual_is_one_named_shim(project, called):
+    """find-roi, extract and batch-extract share ``shim_typed_depth_range_is_manual``."""
+    root, recording, config = project
+    assert callable(extract_cli.shim_typed_depth_range_is_manual)
+    invoke("find-roi", recording, "--config-file", config, "--bg-roi-depth-range", 600, 700)
+    invoke("extract", recording, "--config-file", config, "--bg-roi-depth-range", 600, 700)
+    invoke("extract", recording, "--config-file", config)
+    assert [o.manual_set_depth_range for o in called["find_roi"] + called["extract"]] == [True, True, False]
+
+
+def test_the_notebook_slurm_settings_are_a_named_shim(tmp_path):
+    """``batch-extract``'s defaults overlaid with config.yaml, the config file's path absolute."""
+    from moseq2_extract.gui import shim_notebook_slurm_config
+
+    flat = shim_notebook_slurm_config({"prefix": "module load x;", "config_file": None, "extra": 1}, "config.yaml")
+
+    assert flat["prefix"] == "module load x;"
+    assert flat["extra"] == 1
+    assert flat["config_file"].endswith("config.yaml") and flat["config_file"].startswith("/")
+    assert flat["memory"] == "5GB"
+    assert "input_folder" not in flat
+
+
+def test_recording_settings_is_the_dict_extraction_hands_its_wrapper(steps):
+    """One function gives the arena tool what extraction is handed: config.yaml, the entry's
+    arena settings and any setting config.yaml lacks, then every declared option resolved,
+    a list config.yaml holds kept as that list."""
+    from moseq2_extract.session_config import recording_config, recording_options, recording_settings
+
+    config_data = {"bg_roi_depth_range": [600, 700], "noise_tolerance": 20, "fps": 30, "extra": 1}
+    entry = {"noise_tolerance": 15, "fps": 25, "only_in_entry": 2, "crop_size": [70, 70]}
+
+    settings = recording_settings(config_data, entry)
+
+    assert settings == steps._settings(recording_options(config_data, entry), recording_config(config_data, entry)[0])
+    assert (settings["noise_tolerance"], settings["fps"], settings["only_in_entry"], settings["extra"]) == (15, 30, 2, 1)
+    assert settings["bg_roi_depth_range"] == [600, 700]
+    assert settings["crop_size"] == [70, 70]
+    assert settings["max_height"] == 120

@@ -20,10 +20,14 @@ Where an entry holds a value for another setting that differs from
 ``run_slurm_extract`` (each SLURM job's ``config.yaml``). It resolves each
 recording's options with ``recording_options`` (``ExtractOptions.resolve``) and
 its whole settings dict, every key ``config.yaml`` holds included, with
-``recording_config``, which the arena tool also uses for the arena it shows and
-its preview extraction, with the values the tool holds as the entry.
+``recording_config``. Both take from the entry what ``entry_settings`` gives.
+``recording_settings`` lays the options over the settings dict, as the
+extraction steps do before calling the work function; the arena tool uses it
+for the arena it shows and its preview extraction, with the values the tool
+holds as the entry.
 """
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from os.path import basename, exists
@@ -192,6 +196,25 @@ def recording_configs(config_file, recordings, cli_options=None):
     return resolved
 
 
+def entry_settings(config_data, entry):
+    """
+    The settings a recording's entry gives: those in ``ARENA_TOOL_SETTINGS``, and any setting
+    ``config_data`` does not hold. config.yaml gives every other setting.
+
+    Args:
+    config_data (dict): config.yaml as read.
+    entry (dict): the recording's entry in session_config.yaml, or None when it has none.
+
+    Returns:
+    (dict): {setting: the entry's value}, in the entry's order.
+    """
+    return {
+        setting: value
+        for setting, value in (entry or {}).items()
+        if setting in ARENA_TOOL_SETTINGS or setting not in config_data
+    }
+
+
 def recording_options(config_data, entry, cli_options=None):
     """
     The ``ExtractOptions`` one recording is extracted with, by ``recording_config``'s rule.
@@ -208,14 +231,9 @@ def recording_options(config_data, entry, cli_options=None):
     Returns:
     (ExtractOptions): the options the recording is extracted with.
     """
-    from_entry = {
-        setting: value
-        for setting, value in (entry or {}).items()
-        if setting in ARENA_TOOL_SETTINGS or setting not in config_data
-    }
     declared = {f.name for f in fields(ExtractOptions)}
     typed = {setting: value for setting, value in (cli_options or {}).items() if setting in declared}
-    return ExtractOptions.resolve(config=config_data, entry=from_entry, explicit=typed)
+    return ExtractOptions.resolve(config=config_data, entry=entry_settings(config_data, entry), explicit=typed)
 
 
 def recording_config(config_data, entry, cli_options=None):
@@ -238,10 +256,11 @@ def recording_config(config_data, entry, cli_options=None):
         ``ARENA_TOOL_SETTINGS`` whose entry value differs from config.yaml's and is reported.
     """
     typed = cli_options or {}
+    from_entry = entry_settings(config_data, entry)
     config = deepcopy(config_data)
     differing = {}
     for setting, value in (entry or {}).items():
-        if setting in ARENA_TOOL_SETTINGS or setting not in config_data:
+        if setting in from_entry:
             config[setting] = deepcopy(value)
         elif (
             setting not in _NOT_REPORTED
@@ -251,3 +270,42 @@ def recording_config(config_data, entry, cli_options=None):
             differing[setting] = value
     config.update(deepcopy(typed))
     return config, differing
+
+
+def recording_settings(config_data, entry):
+    """
+    The whole settings dict extraction hands its work function for one recording.
+
+    ``recording_config``'s dict with every option ``recording_options`` resolves over it,
+    a tuple-valued option the dict holds as a list kept as that list (``shim_config_lists``),
+    as the extraction steps build it. The arena tool computes its arena and preview with it.
+
+    Args:
+    config_data (dict): config.yaml as read.
+    entry (dict): the recording's entry in session_config.yaml, or None when it has none.
+
+    Returns:
+    (dict): the recording's settings.
+    """
+    config, _ = recording_config(config_data, entry)
+    opts = recording_options(config_data, entry)
+    return {**config, **shim_config_lists(opts.as_dict(), config)}
+
+
+def shim_config_lists(resolved: Mapping, flat: Mapping) -> dict:
+    """``resolved``, with each tuple that ``flat`` holds as a list of the same items given as that list.
+
+    Removed with ``shim_flat_config`` by PR 4.1, which then has to choose one
+    behaviour. The notebook's and ``batch-extract``'s extractions hand the
+    wrapper ``config.yaml``'s lists, where ``extract FILE`` hands it tuples, and
+    ``write_image`` scales ``first_frame.tiff`` to ``bg_roi_depth_range`` only
+    when the range is a tuple: on those two paths ``first_frame.tiff`` is written
+    unscaled, and ``extract FILE`` writes it scaled.
+    """
+    def as_held(name, value):
+        held = flat.get(name)
+        if isinstance(value, tuple) and isinstance(held, list) and tuple(held) == value:
+            return held
+        return value
+
+    return {name: as_held(name, value) for name, value in resolved.items()}

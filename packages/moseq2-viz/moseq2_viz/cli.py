@@ -19,7 +19,6 @@ from moseq2_viz.options import (
     BestModelOptions,
     CrowdMovieOptions,
     HeatmapOptions,
-    MakeDfOptions,
     ScalarSummaryOptions,
     StatsPlotOptions,
     TransitionGraphOptions,
@@ -89,14 +88,12 @@ def copy_h5_metadata_to_yaml(input_dir):
     name="make-df",
     help="Make a dataframe containing syllable and scalar information from an index and model fit file",
 )
-@click_options(MakeDfOptions, order=("model_fit", "index_file", "output_file"), others={
-    "model_fit": _argument("model-fit"),
-    "index_file": _argument("index-file"),
-    "output_file": _output_file(Path.cwd() / "moseq_df.csv", "Filename to store dataframe"),
-})
-@click.pass_context
-def make_df(ctx, model_fit, index_file, output_file):
-    steps.make_df(model_fit, index_file, output_file, shim_click_defaults(ctx, MakeDfOptions))
+# no settings: the output file's extension picks the format
+@_argument("model-fit")
+@_argument("index-file")
+@_output_file(Path.cwd() / "moseq_df.csv", "Filename to store dataframe")
+def make_df(model_fit, index_file, output_file):
+    steps.make_df(model_fit, index_file, output_file)
     print(f"Dataframe successfully generated at:\n    {Path(output_file)}")
 
 

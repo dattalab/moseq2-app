@@ -14,11 +14,12 @@ from click.testing import CliRunner
 import moseq2_viz.cli as viz_cli
 
 #: Each command, its step in ``moseq2_viz.steps``, its options class in
-#: ``moseq2_viz.options`` and the files it takes as arguments.
+#: ``moseq2_viz.options`` (None for ``make-df``, which has no settings) and the
+#: files it takes as arguments.
 COMMANDS = {
     "add-group": ("add_group", "AddGroupOptions", ("index.yaml",)),
     "get-best-model": ("get_best_model", "BestModelOptions", ("models", "changepoints.h5", "best")),
-    "make-df": ("make_df", "MakeDfOptions", ("model.p", "index.yaml")),
+    "make-df": ("make_df", None, ("model.p", "index.yaml")),
     "make-crowd-movies": ("make_crowd_movies", "CrowdMovieOptions", ("index.yaml", "model.p")),
     "plot-scalar-summary": ("plot_scalar_summary", "ScalarSummaryOptions", ("index.yaml",)),
     "plot-group-position-heatmaps": ("plot_group_position_heatmaps", "HeatmapOptions", ("index.yaml",)),
@@ -53,7 +54,7 @@ def called(monkeypatch, steps):
 
     def recorder(step):
         def record(*args, **kwargs):
-            calls[step].append(next(a for a in [*args, *kwargs.values()] if hasattr(a, "as_dict")))
+            calls[step].append(next((a for a in [*args, *kwargs.values()] if hasattr(a, "as_dict")), None))
         return record
 
     for step in calls:
@@ -77,7 +78,7 @@ def test_every_viz_command_calls_its_step(command, files, called, options):
                                 catch_exceptions=False)
     assert result.exit_code == 0, result.output
     assert len(called[step]) == 1
-    assert type(called[step][0]) is getattr(options, cls)
+    assert type(called[step][0]) is (type(None) if cls is None else getattr(options, cls))
 
 
 def test_get_best_fit_model_calls_the_step(tmp_path, monkeypatch, steps, options):
@@ -105,3 +106,47 @@ def test_get_best_fit_model_calls_the_step(tmp_path, monkeypatch, steps, options
     assert calls == [(paths["base_model_path"], str(changepoints),
                       str(tmp_path / "plots" / "model_vs_pc_changepoints"),
                       options.BestModelOptions(plot_all=True, objective="duration (median match)"))]
+
+
+def test_get_best_fit_model_takes_its_defaults_from_the_options_class(tmp_path, monkeypatch, steps):
+    """A default changed in ``BestModelOptions`` reaches the notebook's model selection."""
+    import dataclasses
+
+    import moseq2_viz.gui as gui
+
+    @dataclasses.dataclass(frozen=True, kw_only=True)
+    class Changed(gui.BestModelOptions):
+        fps: int = 25
+        ext: str = "pkl"
+
+    calls = []
+
+    class Figure:
+        def show(self, warn=True):
+            pass
+
+    def record(model_dir, cp_path, output_file, opts):
+        calls.append(opts)
+        return steps.BestModelResult(best_model_info={}, figure=Figure(), figure_files=[])
+
+    monkeypatch.setattr(gui, "BestModelOptions", Changed)
+    monkeypatch.setattr(steps, "get_best_model", record)
+    changepoints = tmp_path / "changepoints.h5"
+    changepoints.write_text("")
+    paths = {"base_model_path": str(tmp_path / "models"), "changepoints_path": str(changepoints),
+             "plot_path": str(tmp_path / "plots"), "pca_dirname": str(tmp_path)}
+
+    gui.get_best_fit_model(paths, plot_all=True)
+    gui.get_best_fit_model(paths, fps=30)
+
+    assert [(o.plot_all, o.fps, o.ext, o.objective) for o in calls] == [
+        (True, 25, "pkl", "duration (mean match)"), (False, 30, "pkl", "duration (mean match)")]
+
+
+def test_steps_take_no_argument_no_caller_passes(steps, options):
+    """``make_crowd_movies`` renders from ``opts.session_names``; ``make_df`` has no settings."""
+    import inspect
+
+    assert "sessions" not in inspect.signature(steps.make_crowd_movies).parameters
+    assert list(inspect.signature(steps.make_df).parameters) == ["model_fit", "index_file", "output_file"]
+    assert not hasattr(options, "MakeDfOptions")

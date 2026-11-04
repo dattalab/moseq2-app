@@ -13,7 +13,7 @@ wrapper takes.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,7 +34,6 @@ from moseq2_viz.options import (
     BestModelOptions,
     CrowdMovieOptions,
     HeatmapOptions,
-    MakeDfOptions,
     ScalarSummaryOptions,
     StatsPlotOptions,
     TransitionGraphOptions,
@@ -97,7 +96,7 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
                            figure_files=_figures(output_file) if output_file is not None else [])
 
 
-def make_df(model_fit: str, index_file: str, output_file: str | Path, opts: MakeDfOptions) -> MakeDfResult:
+def make_df(model_fit: str, index_file: str, output_file: str | Path) -> MakeDfResult:
     """Write the syllable and scalar dataframe, and its statistics, as ``.csv`` or ``.parquet``."""
     output_file = Path(output_file)
     extension = output_file.suffix[1:]
@@ -109,17 +108,13 @@ def make_df(model_fit: str, index_file: str, output_file: str | Path, opts: Make
 
 
 def make_crowd_movies(index_file: str, model_path: str, output_dir: str, opts: CrowdMovieOptions, *,
-                      sessions: Sequence[str] | None = None,
                       shim_flat_config: Mapping | None = None) -> CrowdMoviesResult:
     """Write a crowd movie for each syllable into ``output_dir``.
 
-    ``sessions``, when given, names the sessions to render from in place of
-    ``opts.session_names``. ``shim_flat_config`` (R2, removed by PR 4.1) is a
-    notebook front end's whole settings dict, passed under the options.
+    ``shim_flat_config`` (R2, removed by PR 4.1) is a notebook front end's whole
+    settings dict, passed under the options.
     """
     settings = {**(shim_flat_config or {}), **opts.as_dict()}
-    if sessions is not None:
-        settings["session_names"] = tuple(sessions)
     return CrowdMoviesResult(movies=make_crowd_movies_wrapper(index_file, model_path, output_dir, settings))
 
 

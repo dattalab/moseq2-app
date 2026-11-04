@@ -234,13 +234,13 @@ def read_config_option(config_file) -> dict | None:
 
 
 def shim_click_defaults(ctx: click.Context, cls: type[O], config: Mapping | None = None) -> O:
-    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removing PR to be named).
+    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removed by PR 4.1).
 
     click converts each default through its option's type (extract's ``--fps``
     30 becomes 30.0, pca's ``--gaussfilter-space`` (1.5, 1) becomes (1.5, 1.0),
     and a ``multiple`` option's None becomes ()), and 1.5.0's command line ran
     on those values where the notebook ran on the declared ones. A null in
-    ``config`` keeps the default.
+    ``config`` keeps the default. PR 4.1 gives both front ends one resolution.
     """
     defaults = {name: ctx.params[name] for name in cls().as_dict()}
     settings = {name: value for name, value in (config or {}).items() if value is not None}
@@ -248,7 +248,7 @@ def shim_click_defaults(ctx: click.Context, cls: type[O], config: Mapping | None
 
 
 def shim_flags_without_default(*names: str) -> Callable[[F], F]:
-    """Declare the flags ``names`` with no default, as 1.5.0 did (removing PR to be named).
+    """Declare the flags ``names`` with no default, as 1.5.0 did (removed by PR 4.1).
 
     Their options classes hold False, and a flag not typed is False either way;
     this keeps each option's declared default what 1.5.0's command line reports.

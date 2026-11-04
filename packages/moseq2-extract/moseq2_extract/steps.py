@@ -33,6 +33,7 @@ from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
 from moseq2_extract.recordings import find_recordings
+from moseq2_extract.session_config import shim_config_lists
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
 _WRAPPER_ARGUMENTS = ("num_frames", "skip_completed")
@@ -73,25 +74,6 @@ def _settings(opts, shim_flat_config, leave_out=()):
     flat = shim_flat_config or {}
     resolved = {name: value for name, value in opts.as_dict().items() if name not in leave_out}
     return {**flat, **shim_config_lists(resolved, flat)}
-
-
-def shim_config_lists(resolved: Mapping, flat: Mapping) -> dict:
-    """``resolved``, with each tuple that ``flat`` holds as a list of the same items given as that list.
-
-    New divergence, removed with ``shim_flat_config`` by PR 4.1, which then has to
-    choose one behaviour. The notebook's and ``batch-extract``'s extractions hand
-    the wrapper ``config.yaml``'s lists, where ``extract FILE`` hands it tuples, and
-    ``write_image`` scales ``first_frame.tiff`` to ``bg_roi_depth_range`` only when
-    the range is a tuple: on those two paths ``first_frame.tiff`` is written
-    unscaled, and ``extract FILE`` writes it scaled.
-    """
-    def as_held(name, value):
-        held = flat.get(name)
-        if isinstance(value, tuple) and isinstance(held, list) and tuple(held) == value:
-            return held
-        return value
-
-    return {name: as_held(name, value) for name, value in resolved.items()}
 
 
 def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
