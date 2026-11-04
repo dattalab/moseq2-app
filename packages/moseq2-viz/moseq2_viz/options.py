@@ -9,6 +9,7 @@ settings: they are the steps' arguments and plain options in ``cli.py``.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import click
@@ -53,14 +54,31 @@ class SyllableCoverageOptions(Options):
                               help="Percent of usage to cover when --max-syllable is not set (default: 99)")
 
 
+def available_cpus() -> int:
+    """The CPUs this process may run on.
+
+    Its CPU affinity where the operating system reports one (Linux, which is how a
+    SLURM allocation smaller than the node shows), else the machine's count (macOS,
+    Windows).
+    """
+    if hasattr(os, "sched_getaffinity"):
+        return len(os.sched_getaffinity(0))
+    return os.cpu_count() or 1
+
+
 @dataclass(frozen=True, kw_only=True)
 class CrowdMovieOptions(SyllableCoverageOptions):
-    """``make-crowd-movies``."""
+    """``make-crowd-movies``, the syllable labeler and the crowd-movie comparison tool.
 
-    max_examples: int = option(40, "--max-examples", "-m", type=int, help="number of examples to show")
+    ``processes`` left as None becomes the number of CPUs available to the process
+    (``available_cpus``).
+    """
+
+    max_examples: int = option(20, "--max-examples", "-m", type=int, help="number of examples to show")
     processes: int | None = option(
         None, "--processes", type=int,
-        help="number of processes to use for rendering crowd movies. Default None uses every process")
+        help="number of processes to use for rendering crowd movies (default: every CPU "
+             "available to this process)")
     separate_by: str = option("default", "--separate-by",
                               type=click.Choice(["default", "groups", "sessions", "subjects"]),
                               help="generate crowd movies by specified grouping")
@@ -75,22 +93,26 @@ class CrowdMovieOptions(SyllableCoverageOptions):
                                       help="x sigma and y sigma for Gaussian spatial filter to apply to data")
     medfilter_space: tuple = option((0,), "--medfilter-space", type=int, multiple=True,
                                     help="kernel size for median spatial filter")
-    min_height: int = option(5, "--min-height", type=int, help="Minimum height for scaling videos")
-    max_height: int = option(80, "--max-height", type=int, help="Maximum height for scaling videos")
+    min_height: int = option(10, "--min-height", type=int, help="Minimum height for scaling videos")
+    max_height: int = option(120, "--max-height", type=int, help="Maximum height for scaling videos")
     raw_size: tuple = option((512, 424), "--raw-size", type=(int, int), help="frame dimension of original videos")
     scale: float = option(1, "--scale", type=float, help="Scaling from pixel units to mm")
     cmap: str = option("jet", "--cmap", type=str,
                        help="Name of valid Matplotlib colormap for false-coloring images")
     max_dur: int = option(60, "--max-dur",
                           help="Exclude syllables longer than this number of frames (None for no limit)")
-    min_dur: int = option(0, "--min-dur", help="Exclude syllables shorter than this number of frames")
+    min_dur: int = option(4, "--min-dur", help="Exclude syllables shorter than this number of frames")
     legacy_jitter_fix: bool = option(False, "--legacy-jitter-fix", type=bool,
                                      help="Set to true if you notice jitter in your crowd movies")
     frame_path: str = option("frames", "--frame-path", type=str, help="Path to depth frames in h5 file")
     progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, help="Show verbose progress bars.")
-    pad: int = option(30, "--pad", help="Pad crowd movie videos with this many frames.")
+    pad: int = option(10, "--pad", help="Pad crowd movie videos with this many frames.")
     seed: int = option(0, "--seed", type=int,
                        help="Defines random seed for selecting syllable instances to plot")
+
+    def __post_init__(self):
+        if self.processes is None:
+            object.__setattr__(self, "processes", available_cpus())
 
 
 @dataclass(frozen=True, kw_only=True)
