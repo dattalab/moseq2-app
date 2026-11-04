@@ -15,9 +15,11 @@ setting, are read by the same rule and not rewritten.
 Where an entry holds a value for another setting that differs from
 ``config.yaml``'s, ``RecordingConfigs.message`` says so, one line per setting.
 
-``recording_configs`` is what every extraction path uses: ``extract_command``
-(the notebook's local extraction and ``batch-extract``) and
-``run_slurm_extract`` (each SLURM job's ``config.yaml``). It resolves each
+``recording_configs`` is what the notebook's and ``batch-extract``'s
+extractions use: ``extract_command`` (the local extraction) and
+``run_slurm_extract`` (each SLURM job's ``config.yaml``). ``extract FILE`` lays
+``recording_entry_settings``, the entry's settings by the same rule, over
+``config.yaml`` before resolving its options. ``recording_configs`` resolves each
 recording's options with ``recording_options`` (``ExtractOptions.resolve``) and
 its whole settings dict, every key ``config.yaml`` holds included, with
 ``recording_config``. Both take from the entry what ``entry_settings`` gives.
@@ -194,6 +196,34 @@ def recording_configs(config_file, recordings, cli_options=None):
         resolved.configs[recording] = config
         resolved.options[recording] = recording_options(config_data, entry, typed)
     return resolved
+
+
+def recording_entry_settings(config_data, recording):
+    """
+    The settings ``recording``'s entry in session_config.yaml gives over config.yaml, by
+    ``entry_settings``'s rule, a null left out so it keeps config.yaml's value.
+
+    ``extract FILE`` lays these over config.yaml. session_config.yaml is the file
+    config.yaml's ``session_config_path`` names, as for ``recording_configs``.
+
+    Args:
+    config_data (dict): config.yaml as read, or None without one.
+    recording (str): path to the recording.
+
+    Returns:
+    (dict): {setting: the entry's value}; empty when there is no session_config.yaml or no entry.
+    """
+    config_data = config_data or {}
+    session_config_path = config_data.get("session_config_path") or ""
+    session_configs = (read_yaml(session_config_path) or {}) if exists(session_config_path) else {}
+    key = session_config_key(session_configs, recording)
+    if key is None:
+        return {}
+    return {
+        setting: value
+        for setting, value in entry_settings(config_data, session_configs[key]).items()
+        if value is not None
+    }
 
 
 def entry_settings(config_data, entry):
