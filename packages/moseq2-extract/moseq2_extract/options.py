@@ -8,7 +8,9 @@ on (the recording or folder, ``--output-dir``, ``--output-file``) and
 options in ``cli.py``.
 
 ``RoiOptions`` holds ``find-roi``'s settings, which ``extract`` and
-``batch-extract`` share; ``ExtractOptions`` adds the rest of ``extract``'s, and
+``batch-extract`` share; ``ExtractOptions`` adds the frame cleaning
+(``moseq2_common.frames.CleaningOptions``, which flip-classifier training
+shares) and the rest of ``extract``'s, and
 ``BatchExtractOptions`` adds the folder search and the SLURM job settings. The
 fields marked ``arena=True`` are the settings the arena tool sets for each
 recording (``session_config.ARENA_TOOL_SETTINGS``).
@@ -20,6 +22,7 @@ from dataclasses import dataclass
 
 import click
 
+from moseq2_common.frames import CleaningOptions
 from moseq2_common.options import Options, option
 from moseq2_common.slurm import SlurmOptions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
@@ -75,8 +78,8 @@ class RoiOptions(Options):
 
 
 @dataclass(frozen=True, kw_only=True)
-class ExtractOptions(RoiOptions):
-    """``extract``: everything ``find-roi`` takes, and the extraction itself."""
+class ExtractOptions(RoiOptions, CleaningOptions):
+    """``extract``: everything ``find-roi`` takes, the frame cleaning, and the extraction itself."""
 
     # as SlurmOptions.cluster_type, which batch-extract takes it from
     cluster_type: str = option("local", "--cluster-type", type=click.Choice(["local", "slurm"]),
@@ -113,22 +116,6 @@ class ExtractOptions(RoiOptions):
                                help="Write a results output movie including an extracted mouse")
     chunk_overlap: int = option(0, "--chunk-overlap", type=int, arena=True,
                                 help="Frames overlapped in each chunk. Useful for cable tracking")
-    temporal_filter_size: tuple = option((0,), "--temporal-filter-size", "-t", type=int, multiple=True, arena=True,
-                                         help="Time prefilter kernel (median filter, must be odd)")
-    spatial_filter_size: tuple = option((3,), "--spatial-filter-size", "-s", type=int, multiple=True, arena=True,
-                                        help="Space prefilter kernel (median filter, must be odd)")
-    tail_filter_shape: str = option("ellipse", "--tail-filter-shape", type=str, arena=True,
-                                    help="Tail filter shape")
-    tail_filter_size: tuple = option((9, 9), "--tail-filter-size", type=(int, int), arena=True,
-                                     help="Tail filter size")
-    tail_filter_iters: int = option(1, "--tail-filter-iters", type=int, arena=True,
-                                    help="Number of tail filter iterations")
-    cable_filter_size: tuple = option((5, 5), "--cable-filter-size", type=(int, int), arena=True,
-                                      help="Cable filter size (in pixels)")
-    cable_filter_shape: str = option("rectangle", "--cable-filter-shape", type=str, arena=True,
-                                     help="Cable filter shape (rectangle or ellipse)")
-    cable_filter_iters: int = option(0, "--cable-filter-iters", type=int, arena=True,
-                                     help="Number of cable filter iterations")
     tracking_model_init: str = option("raw", "--tracking-model-init", type=str,
                                       help="Method for tracking model initialization")
     tracking_model_segment: bool = option(True, "--tracking-model-segment", type=bool,
@@ -161,8 +148,6 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
     )
     max_height: int = option(120, "--max-height", type=int, arena=True,
                              help="Max mouse height threshold from floor (mm)")
-    min_height: int = option(10, "--min-height", type=int, arena=True,
-                             help="Min mouse height threshold from floor (mm)")
     num_frames: int | None = option(None, "--num-frames", "-n", type=int,
                                     help="Number of frames to extract. Will extract full session if set to None.")
     crop_size: tuple = option((80, 80), "--crop-size", "-c", type=(int, int), arena=True,
