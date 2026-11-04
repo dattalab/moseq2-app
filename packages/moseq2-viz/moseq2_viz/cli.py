@@ -11,7 +11,7 @@ from pathlib import Path
 
 import click
 
-from moseq2_common.options import click_options, explicit_values
+from moseq2_common.options import click_options, shim_click_defaults, shim_flags_without_default
 from moseq2_viz import steps
 from moseq2_viz.helpers.wrappers import copy_h5_metadata_to_yaml_wrapper
 from moseq2_viz.options import (
@@ -30,34 +30,6 @@ from moseq2_viz.options import (
 @click.version_option()
 def cli():
     pass
-
-
-def shim_click_defaults(ctx, cls):
-    """Resolve ``cls`` from click's defaults and the typed options (removing PR to be named).
-
-    click converts each default through its option's type (``--scale``'s 1
-    becomes 1.0, ``--gaussfilter-space``'s (0, 0) becomes (0.0, 0.0), and a
-    ``multiple`` option's None becomes ()), and 1.5.0's commands ran on those
-    values rather than the declared ones.
-    """
-    defaults = {name: ctx.params[name] for name in cls().as_dict()}
-    return cls.resolve(config=defaults, explicit=explicit_values(ctx, cls))
-
-
-def shim_flags_without_default(*names):
-    """Declare the flags ``names`` with no default, as 1.5.0 did (removing PR to be named).
-
-    Their options classes hold False, and a flag not typed is False either way;
-    this keeps each option's declared default what 1.5.0's command line reports.
-    """
-    def apply(function):
-        function.__click_params__ = [
-            click.Option([param.name, *param.opts], is_flag=True, type=param.type, help=param.help)
-            if param.name in names else param
-            for param in function.__click_params__
-        ]
-        return function
-    return apply
 
 
 def _argument(name):

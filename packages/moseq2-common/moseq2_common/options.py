@@ -12,6 +12,10 @@ help text live together. From that class:
 - ``explicit_values`` returns the options the user typed on the command line,
   including one typed at its default value.
 
+The commands share ``read_config_option``, which reads ``--config-file``, and
+two shims that keep 1.5.0's command line: ``shim_click_defaults`` and
+``shim_flags_without_default``.
+
 A field is *tuple-valued* when it is declared ``multiple=True`` or with a tuple
 ``type`` (``type=(float, float)``); its default is a tuple, and ``resolve``
 hands it a tuple whatever shape ``config.yaml`` holds.
@@ -38,6 +42,9 @@ __all__ = [
     "explicit_values",
     "option",
     "read_config",
+    "read_config_option",
+    "shim_click_defaults",
+    "shim_flags_without_default",
 ]
 
 _KEY = "moseq2_option"
@@ -214,3 +221,44 @@ def explicit_values(ctx: click.Context, cls: type[Options]) -> dict:
         for f in dataclasses.fields(cls)
         if ctx.get_parameter_source(f.name) is ParameterSource.COMMANDLINE
     }
+
+
+def read_config_option(config_file) -> dict | None:
+    """``config.yaml``'s settings, or None without ``--config-file``; a file that cannot be read stops the command."""
+    if not config_file:
+        return None
+    try:
+        return read_config(config_file)
+    except ConfigFileError as error:
+        raise click.ClickException(str(error)) from None
+
+
+def shim_click_defaults(ctx: click.Context, cls: type[O], config: Mapping | None = None) -> O:
+    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removing PR to be named).
+
+    click converts each default through its option's type (extract's ``--fps``
+    30 becomes 30.0, pca's ``--gaussfilter-space`` (1.5, 1) becomes (1.5, 1.0),
+    and a ``multiple`` option's None becomes ()), and 1.5.0's command line ran
+    on those values where the notebook ran on the declared ones. A null in
+    ``config`` keeps the default.
+    """
+    defaults = {name: ctx.params[name] for name in cls().as_dict()}
+    settings = {name: value for name, value in (config or {}).items() if value is not None}
+    return cls.resolve(config={**defaults, **settings}, explicit=explicit_values(ctx, cls))
+
+
+def shim_flags_without_default(*names: str) -> Callable[[F], F]:
+    """Declare the flags ``names`` with no default, as 1.5.0 did (removing PR to be named).
+
+    Their options classes hold False, and a flag not typed is False either way;
+    this keeps each option's declared default what 1.5.0's command line reports.
+    Applied above ``click_options``, so the options are already on the function.
+    """
+    def apply(function: F) -> F:
+        function.__click_params__ = [
+            click.Option([param.name, *param.opts], is_flag=True, type=param.type, help=param.help)
+            if param.name in names else param
+            for param in function.__click_params__
+        ]
+        return function
+    return apply
