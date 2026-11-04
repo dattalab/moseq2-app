@@ -6,6 +6,10 @@ extraction's cleaning settings.
 ``clean_frames``. Extraction and flip-classifier training both clean through
 them, so a classifier is trained on frames cleaned as extraction cleans them.
 
+A median filter takes only odd kernel sizes. ``odd_kernel`` rounds an even
+size up to the next odd one; ``clean_frames`` applies it to each spatial
+median kernel.
+
 This module imports OpenCV, which comes with the ``video`` extra:
 ``python -m pip install "moseq2-common[video]"``. moseq2-extract, moseq2-pca
 and moseq2-viz require that extra.
@@ -13,13 +17,14 @@ and moseq2-viz require that extra.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+import warnings
 
 import cv2
 import numpy as np
 
 from moseq2_common.options import Options, option
 
-__all__ = ["CleaningOptions", "clean_frames", "cleaning_arguments", "select_strel"]
+__all__ = ["CleaningOptions", "clean_frames", "cleaning_arguments", "odd_kernel", "select_strel"]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -44,6 +49,27 @@ class CleaningOptions(Options):
                                      help="Number of cable filter iterations")
     min_height: int = option(10, "--min-height", type=int, arena=True,
                              help="Min mouse height threshold from floor (mm)")
+
+
+def odd_kernel(size: int) -> int:
+    """The median filter kernel size to use for ``size``: an even size rounds up to the next odd one.
+
+    Median filters take only odd kernel sizes. A size of zero or less, which
+    turns the filter off, is returned unchanged, as is an odd size. Rounding
+    an even size up warns, naming both sizes.
+
+    Args:
+    size (int): the kernel size asked for.
+
+    Returns:
+    size (int): ``size`` when it is odd or not positive, otherwise ``size + 1``.
+    """
+    size = int(size)
+    if size > 0 and size % 2 == 0:
+        warnings.warn(f"Median filters take only odd kernel sizes, so the median kernel size {size} "
+                      f"rounds up to {size + 1}. To filter with a different size, set an odd one.")
+        return size + 1
+    return size
 
 
 def cleaning_arguments(opts: CleaningOptions) -> dict:
@@ -101,14 +127,15 @@ def clean_frames(frames: np.ndarray, *, medfilter_space=None, gaussfilter_space=
 
     1. the tail filter: pixels where the frame's morphological opening by
        ``tail_filter`` is not above ``tail_threshold`` are set to zero;
-    2. a median filter for each kernel size in ``medfilter_space``, in turn
-       (skipped unless every size is positive);
+    2. a median filter for each kernel size in ``medfilter_space``, in turn,
+       an even size rounded up by ``odd_kernel`` (skipped unless every size
+       is positive);
     3. a Gaussian filter with a (21, 21) kernel and the x and y sigmas in
        ``gaussfilter_space`` (skipped unless both are positive).
 
     Args:
     frames (numpy.ndarray): frames to filter, shape (n, height, width).
-    medfilter_space (sequence of int): median kernel sizes, each odd.
+    medfilter_space (sequence of int): median kernel sizes.
     gaussfilter_space (sequence of float): x and y sigma of the Gaussian.
     tail_filter (numpy.ndarray): structuring element, as ``select_strel`` builds.
     tail_threshold (int): height a pixel's opening must exceed to be kept.
@@ -124,6 +151,7 @@ def clean_frames(frames: np.ndarray, *, medfilter_space=None, gaussfilter_space=
             out[i] = out[i] * mask.astype(frames.dtype)
 
     if medfilter_space is not None and np.all(np.array(medfilter_space) > 0):
+        medfilter_space = [odd_kernel(medfilt) for medfilt in medfilter_space]
         for i in range(frames.shape[0]):
             for medfilt in medfilter_space:
                 out[i] = cv2.medianBlur(out[i], medfilt)
