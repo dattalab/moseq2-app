@@ -126,7 +126,8 @@ def test_a_scan_spans_a_range_of_kappas(model_settings, configured, project, no_
     finally:
         restore(configured)
 
-    kappas = [float(k) for k in re.findall(r"--kappa (\S+)", commands)]
+    # each fit's kappa is in the settings file its command passes to --config-file
+    kappas = [read_yaml(path)["kappa"] for path in re.findall(r'--config-file ([^\s"]+)', commands)]
     assert len(kappas) == SCAN["n_models"]
     assert kappas == sorted(kappas)
     assert kappas[-1] > kappas[0] * 10, f"the scan barely moves: {kappas[0]} to {kappas[-1]}"

@@ -27,6 +27,11 @@ from pathlib import Path
 from moseq2_model.helpers.wrappers import apply_model_wrapper, kappa_scan_fit_models_wrapper, learn_model_wrapper
 from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
 
+#: The file name of each kappa-scan fit's settings, in the scan's output folder beside its model, given the
+#: model's number and kappa (``model-000-1000-settings.yaml``). The fit's command runs
+#: ``learn-model --config-file`` on it, so the fit gets every learn-model option the scan was given.
+KAPPA_SCAN_SETTINGS_NAME = "model-{:03d}-{}-settings.yaml"
+
 
 @dataclass(frozen=True)
 class LearnModelResult:
@@ -61,9 +66,15 @@ def learn_model(input_file: str, dest_file: str, opts: LearnModelOptions, *, ind
 
 def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, index: str | None = None,
                shim_flat_config: Mapping | None = None) -> KappaScanResult:
-    """Write ``opts.out_script``, one ``learn-model`` command per kappa, each saving its model in ``output_dir``."""
+    """Write ``opts.out_script``, one ``learn-model`` command per kappa, each saving its model in ``output_dir``.
+
+    Each fit's learn-model settings go to a ``KAPPA_SCAN_SETTINGS_NAME`` file in ``output_dir``, which its
+    command passes to ``--config-file``: the scan's fitting options, and from ``shim_flat_config`` the
+    learn-model options the scan does not declare (``checkpoint_freq``, ``use_checkpoint``,
+    ``default_group``, ``verbose``).
+    """
     commands = kappa_scan_fit_models_wrapper(input_file, _settings(opts, {'index': index}, shim_flat_config),
-                                             output_dir)
+                                             output_dir, KAPPA_SCAN_SETTINGS_NAME)
     return KappaScanResult(script=Path(opts.out_script), commands=commands)
 
 

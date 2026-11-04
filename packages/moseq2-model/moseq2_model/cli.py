@@ -87,7 +87,9 @@ def apply_model(ctx, model_file, pc_file, dest_file, index, **_):
     steps.apply_model(model_file, pc_file, dest_file, opts, index=index)
 
 
-@cli.command(name="kappa-scan", help="Batch train multiple model to scan over different kappa values.")
+@cli.command(name="kappa-scan", help="Batch train multiple model to scan over different kappa values. Each "
+             "model's learn-model settings are written to a file beside it, which its command passes to "
+             "learn-model --config-file.")
 @click_options(KappaScanOptions, order=KAPPA_SCAN_ORDER, others={
     "input_file": click.argument("input_file", type=click.Path(exists=True)),
     "output_dir": click.argument("output_dir", type=click.Path(exists=False)),
