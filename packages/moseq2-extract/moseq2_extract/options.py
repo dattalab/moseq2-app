@@ -168,7 +168,6 @@ class BatchExtractOptions(ExtractOptions, SlurmOptions):
     extract_out_script: str = option("extract_out.sh", "--extract-out-script", type=click.Path(),
                                      help="Name of bash script file to save extract commands.")
     ncpus: int = option(1, "--ncpus", type=int, help="CPUs each extraction job requests (slurm only)")
-    get_cmd: bool = option(True, "--get-cmd", is_flag=True, help="Print scan command strings.")
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -90,7 +90,6 @@ class KappaScanOptions(ModelOptions, SlurmOptions):
     min_kappa: float | None = option(None, '--min-kappa', type=float,
                                      help="Minimum kappa value to begin scan from.")
     max_kappa: float | None = option(None, '--max-kappa', type=float, help="Maximum kappa value to end scan on.")
-    get_cmd: bool = option(False, '--get-cmd', is_flag=True, help="Print scan command strings.")
 
 
 @dataclass(frozen=True, kw_only=True)
