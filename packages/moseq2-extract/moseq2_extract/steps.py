@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from os.path import abspath, join
 from pathlib import Path
 
+from moseq2_common.options import read_config
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
@@ -107,10 +108,13 @@ def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
 
 def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str,
                   output_dir: str | None = None, explicit: Mapping | None = None,
-                  select: Callable[[Sequence[str]], Sequence[str]] | None = None,
-                  shim_list_finished: bool = False,
-                  shim_flat_config: Mapping | None = None) -> BatchExtractResult:
+                  select: Callable[[Sequence[str]], Sequence[str]] | None = None) -> BatchExtractResult:
     """Find the recordings under ``input_dir`` and extract each, here or as SLURM jobs.
+
+    The search looks for ``opts.extensions`` down to ``opts.max_depth`` folders
+    below ``input_dir`` and, unless ``opts.skip_checks`` is set, leaves out each
+    recording whose ``results_00.yaml`` in its output folder records a finished
+    extraction. The command line and the notebook both list recordings this way.
 
     Each recording is extracted with ``config.yaml``'s settings, the arena tool's
     settings from its entry in ``session_config.yaml``, and ``explicit`` (options
@@ -122,23 +126,14 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
         ``skip_completed`` apply to every recording.
     config_file: the project's ``config.yaml``.
     output_dir: each recording's output folder, below its own folder; None takes
-        ``config.yaml``'s for a local extraction, and ``shim_flat_config``'s (else
-        ``proc``) for the search and the SLURM jobs.
+        ``config.yaml``'s ``output_dir``, else ``proc``.
     explicit: options typed on the command line, applied over each recording's settings.
     select: picks the recordings to extract from those found (the notebook's prompt).
-    shim_list_finished: list recordings already extracted too, as the notebook does,
-        whatever ``skip_checks`` holds (L8, removed by PR 3.2).
-    shim_flat_config: the notebook's SLURM settings, ``batch-extract``'s defaults
-        overlaid with ``config.yaml`` (survey 3.1, removed by PR 3.2).
     """
-    flat = shim_flat_config or {}
-    folder = output_dir if output_dir is not None else flat.get("output_dir", "proc")
-    if shim_list_finished:
-        search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth)
-    else:
-        search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth,
-                                 skip_extracted=not opts.skip_checks,
-                                 results_yaml=join(folder, "results_00.yaml"))
+    folder = output_dir if output_dir is not None else (read_config(config_file).get("output_dir") or "proc")
+    search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth,
+                             skip_extracted=not opts.skip_checks,
+                             results_yaml=join(folder, "results_00.yaml"))
     message = search.report()
     if message:
         print(message)
@@ -155,7 +150,7 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
                                   failures=failures, script=None)
 
     typed = {**(explicit or {}), **({"output_dir": output_dir} if output_dir is not None else {})}
-    job = {**flat, **opts.as_dict(), "config_file": abspath(config_file), "output_dir": folder}
+    job = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": folder}
     run_slurm_extract(input_dir, to_extract, job, opts.skip_completed, num_frames=opts.num_frames,
                       cli_options=typed or None)
     # run_slurm_extract records where it wrote the script

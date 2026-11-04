@@ -247,19 +247,6 @@ def test_a_typed_depth_range_means_manual_is_one_named_shim(project, called):
     assert [o.manual_set_depth_range for o in called["find_roi"] + called["extract"]] == [True, True, False]
 
 
-def test_the_notebook_slurm_settings_are_a_named_shim(tmp_path):
-    """``batch-extract``'s defaults overlaid with config.yaml, the config file's path absolute."""
-    from moseq2_extract.gui import shim_notebook_slurm_config
-
-    flat = shim_notebook_slurm_config({"prefix": "module load x;", "config_file": None, "extra": 1}, "config.yaml")
-
-    assert flat["prefix"] == "module load x;"
-    assert flat["extra"] == 1
-    assert flat["config_file"].endswith("config.yaml") and flat["config_file"].startswith("/")
-    assert flat["memory"] == "5GB"
-    assert "input_folder" not in flat
-
-
 def test_recording_settings_is_the_dict_extraction_hands_its_wrapper(steps):
     """One function gives the arena tool what extraction is handed: config.yaml, the entry's
     arena settings and any setting config.yaml lacks, then every declared option resolved,

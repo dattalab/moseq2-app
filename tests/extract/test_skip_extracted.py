@@ -1,13 +1,15 @@
 """Rerunning an extraction skips the recordings already extracted, quietly.
 
-The notebook's extraction cell lists every recording in the project and, with
-``skip_extracted = True`` (its default), leaves ``extract_wrapper`` to skip the
-ones whose ``results_00.yaml`` says the extraction completed. A skipped
-recording prints ``Skipping...`` and nothing else: the checks that guard an
-extraction (the flip-classifier warning, the frame timestamps, the frame
-count) are about a recording that is about to be extracted, and a finished
-one is not. A project extracted before frame timestamps were required can hold
-a finished session without a ``depth_ts.txt``; a rerun skips it like any other.
+With ``skip_extracted = True`` (its default), the notebook's extraction cell
+leaves out the recordings whose ``results_00.yaml`` says the extraction
+completed, as ``moseq2-extract batch-extract`` does without ``--skip-checks``,
+and names them in one message. The checks that guard an extraction (the
+flip-classifier warning, the frame timestamps, the frame count) are about a
+recording that is about to be extracted, and a finished one is not. A project
+extracted before frame timestamps were required can hold a finished session
+without a ``depth_ts.txt``; a rerun leaves it out like any other.
+``extract_wrapper`` called on a finished recording with ``skip=True`` prints
+``Skipping...`` and nothing else.
 
 A recording not yet extracted still gets every check.
 """
@@ -61,21 +63,18 @@ def rerun(project, capsys):
 def test_a_rerun_skips_finished_sessions_with_or_without_timestamps(extracted_project, capsys):
     out, err, caught = rerun(extracted_project, capsys)
 
-    assert out.count("Skipping...") == len(SESSIONS), out
-    assert "Extracted 0 of 0 recordings (2 already extracted and skipped)." in out, out
+    assert f"{len(SESSIONS)} recording(s) already extracted were left out" in out, out
+    assert "To include them, set skip_extracted to False (in the notebook)" in out, out
     assert "failed" not in out and "No frame timestamps" not in out, out
-    assert out.rstrip().endswith("Extractions Complete."), out
 
 
-def test_a_rerun_prints_only_skipping_for_each_session(extracted_project, capsys):
+def test_a_rerun_extracts_nothing_and_warns_about_no_flip_classifier(extracted_project, capsys):
     out, err, caught = rerun(extracted_project, capsys)
 
     flip = [w for w in caught if issubclass(w.category, NoFlipClassifierWarning)]
     assert flip == [], [str(w.message) for w in flip]
     assert "without a flip classifier" not in out + err
-    for name in SESSIONS:
-        recording = extracted_project / name / "depth.avi"
-        assert f"Processing: {recording}\nSkipping...\n" in out, out
+    assert "Processing:" not in out, out
 
 
 # ---------------------------------------------------------------- single recordings

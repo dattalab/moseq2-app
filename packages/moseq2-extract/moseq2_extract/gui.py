@@ -8,11 +8,10 @@ and calls the step in ``moseq2_extract.steps`` (or ``moseq2_extract.setup``).
 import os
 import re
 from dataclasses import replace
-from os.path import abspath, exists, join
+from os.path import exists, join
 
 from moseq2_common.options import read_config
 from moseq2_extract import setup, steps
-from moseq2_extract.cli import batch_extract
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
 from moseq2_extract.session_config import recording_configs
@@ -130,21 +129,6 @@ def generate_config_command(output_file, camera_type="k2"):
     return "Configuration file has been successfully generated."
 
 
-def shim_notebook_slurm_config(config, config_file):
-    """``batch-extract``'s click defaults overlaid with ``config``, ``config_file`` made absolute.
-
-    The settings the notebook's SLURM extraction jobs run with (survey 3.1,
-    removed by PR 3.2), where ``batch-extract``'s run on its resolved options.
-    Each job reads ``config_file``; the one ``generate-config`` writes holds
-    ``config_file: null``, which would otherwise reach every command.
-    """
-    return {
-        **{param.name: param.default for param in batch_extract.params if not param.required},
-        **config,
-        "config_file": abspath(config_file),
-    }
-
-
 @filter_warnings
 def extract_found_sessions(
     input_dir,
@@ -163,7 +147,8 @@ def extract_found_sessions(
     ext (str or list): file extension(s) for depth files to search for. Defaults to every type the
         pipeline reads (.dat, .mkv, .avi, .tar.gz); None means the same.
     extract_all (bool): if True, auto searches for all sessions, else, prompts user to select sessions individually.
-    skip_extracted (bool): indicates whether to skip already extracted session.
+    skip_extracted (bool): leave out the recordings already extracted, as ``moseq2-extract batch-extract``
+        does without ``--skip-checks``.
     max_depth (int): how many folders below input_dir to search for recordings.
 
     """
@@ -175,14 +160,12 @@ def extract_found_sessions(
     opts = BatchExtractOptions.resolve(config=config, explicit={
         "extensions": RECORDING_EXTENSIONS if ext is None else ext,
         "max_depth": max_depth,
+        "skip_checks": not skip_extracted,
         "skip_completed": skip_extracted,
     })
     result = steps.batch_extract(
         input_dir, opts, config_file=config_file,
         select=lambda found: get_selected_sessions(found, extract_all),
-        # every recording is listed; the extraction skips the extracted ones when skip_extracted is set
-        shim_list_finished=True,  # L8, removed by PR 3.2
-        shim_flat_config=shim_notebook_slurm_config(config, config_file),
     )
     # the local extraction ends with a summary naming each recording that failed
     if opts.cluster_type == "local" and result.found and not result.failures:
