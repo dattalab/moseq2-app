@@ -30,7 +30,7 @@ class SlurmOptions(Options):
     partition: str = option("short", "--partition", type=str, help="Partition name (slurm only)")
     get_cmd: bool = option(True, "--get-cmd/--no-get-cmd", is_flag=True,
                            help="Print the commands after writing them to the script.")
-    run_cmd: bool = option(False, "--run-cmd", is_flag=True, help="Run scan command strings.")
+    run_cmd: bool = option(False, "--run-cmd", is_flag=True, help="Run the commands written to the script.")
 
 
 def sbatch_command(command: str, *, ncpus: int, memory: str, partition: str,
