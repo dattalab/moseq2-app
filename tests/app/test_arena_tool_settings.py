@@ -20,7 +20,7 @@ import shutil
 import numpy as np
 import pytest
 
-import moseq2_extract.gui as extract_gui
+import moseq2_extract.steps as extract_steps
 from moseq2_app.util import update_config
 from moseq2_extract.gui import extract_command, generate_config_command
 from moseq2_common.yaml import read_yaml
@@ -93,7 +93,7 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
 
     received = {}
     monkeypatch.setattr(
-        extract_gui,
+        extract_steps,
         "extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(config),
     )

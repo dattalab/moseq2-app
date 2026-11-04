@@ -14,6 +14,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
+import moseq2_extract.steps as extract_steps
 from moseq2_common.yaml import write_yaml
 
 
@@ -21,8 +22,8 @@ from moseq2_common.yaml import write_yaml
 def received(monkeypatch):
     """What each command hands its wrapper, instead of running it."""
     calls = []
-    monkeypatch.setattr(extract_cli, "get_roi_wrapper", lambda f, config, out: calls.append(config))
-    monkeypatch.setattr(extract_cli, "extract_wrapper", lambda f, out, config, **kw: calls.append(config))
+    monkeypatch.setattr(extract_steps, "get_roi_wrapper", lambda f, config, out: calls.append(config))
+    monkeypatch.setattr(extract_steps, "extract_wrapper", lambda f, out, config, **kw: calls.append(config))
     return calls
 
 

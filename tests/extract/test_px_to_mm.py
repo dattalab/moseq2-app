@@ -21,6 +21,16 @@ from moseq2_common.scalars import convert_pxs_to_mm
 
 DEPTH = 500.0
 
+#: The settings extract_chunk takes from its caller, which has no defaults for them.
+CHUNK_SETTINGS = dict(
+    use_tracking_model=False, spatial_filter_size=(3,), temporal_filter_size=None, tail_filter_iters=1,
+    cable_filter_iters=0, min_height=10, max_height=100, use_cc=False, tracking_model_segment=True,
+    flip_classifier=None, flip_classifier_smoothing=51, frame_dtype="uint8", progress_bar=True,
+    crop_size=(80, 80), centroid_hampel_span=5, centroid_hampel_sig=3, angle_hampel_span=5,
+    angle_hampel_sig=3, model_smoothing_clips=(-300, -150), tracking_model_init="raw",
+    compute_raw_scalars=False,
+)
+
 
 def test_integer_pixels_give_the_same_millimetres_as_float_ones():
     """Millimetres are not rounded to whole numbers because the pixels were."""
@@ -98,8 +108,10 @@ def test_extraction_measures_a_frame_with_the_camera_that_wrote_it(compute_raw_s
     ))
 
     scalars = extract_chunk(
-        chunk, roi=roi, bground=bground, true_depth=floor, min_height=10, max_height=100,
-        centroid_hampel_span=0, angle_hampel_span=0, compute_raw_scalars=compute_raw_scalars, **strels,
+        chunk, roi=roi, bground=bground, true_depth=floor, **{
+            **CHUNK_SETTINGS, "min_height": 10, "max_height": 100, "centroid_hampel_span": 0,
+            "angle_hampel_span": 0, "compute_raw_scalars": compute_raw_scalars,
+        }, **strels,
     )["scalars"]
 
     azure_narrow = floor * 2 * np.tan(np.deg2rad(np.array([75.0, 65.0]) / 2)) / np.array([width, height])

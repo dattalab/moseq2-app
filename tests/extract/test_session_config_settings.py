@@ -25,7 +25,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
-import moseq2_extract.gui as extract_gui
+import moseq2_extract.steps as extract_steps
 from commands import split_command
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.gui import extract_command, extract_found_sessions, generate_config_command
@@ -87,7 +87,7 @@ def local(monkeypatch):
         calls[input_file] = {"config": config_data, "num_frames": num_frames}
         return output_dir
 
-    monkeypatch.setattr(extract_gui, "extract_wrapper", record)
+    monkeypatch.setattr(extract_steps, "extract_wrapper", record)
     return calls
 
 
@@ -101,16 +101,17 @@ def slurm(monkeypatch):
         lambda *_: pytest.fail("a job was submitted"),
     )
     calls = {}
-    monkeypatch.setattr(
-        extract_cli,
-        "extract_wrapper",
-        lambda f, out, config, num_frames=None, skip=False: calls.update(
-            {f: {"config": config, "num_frames": num_frames}}
-        ),
-    )
 
     def go(root, write_commands):
         write_commands()
+        # stood in for only now, so a local extraction in the same test reaches the local fixture's
+        monkeypatch.setattr(
+            extract_steps,
+            "extract_wrapper",
+            lambda f, out, config, num_frames=None, skip=False: calls.update(
+                {f: {"config": config, "num_frames": num_frames}}
+            ),
+        )
         script = (root / "extract_out.sh").read_text()
         for line in filter(str.strip, script.splitlines()):
             command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]

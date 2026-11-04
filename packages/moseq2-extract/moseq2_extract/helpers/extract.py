@@ -3,6 +3,7 @@ Extraction-helper utility functions.
 """
 
 import numpy as np
+from moseq2_common.slurm import sbatch_command
 from moseq2_common.yaml import write_yaml
 from os.path import exists, basename, dirname, join, abspath
 from os import makedirs, system
@@ -432,10 +433,14 @@ def run_slurm_extract(
 
         # construct command
         frames = f" --num-frames {num_frames}" if num_frames is not None else ""
-        base_command = f'moseq2-extract extract --config-file {config_file}{frames} {depth_file}; "\n'
-        prefix = f'sbatch -c {config_data["ncpus"] if config_data["ncpus"] > 0 else 1} --mem={config_data["memory"]} '
-        prefix += f'-p {config_data["partition"]} -t {config_data["wall_time"]} --wrap "{config_data["prefix"]}'
-        commands += prefix + base_command
+        commands += sbatch_command(
+            f"moseq2-extract extract --config-file {config_file}{frames} {depth_file}; ",
+            ncpus=config_data["ncpus"] if config_data["ncpus"] > 0 else 1,
+            memory=config_data["memory"],
+            partition=config_data["partition"],
+            wall_time=config_data["wall_time"],
+            prefix=config_data["prefix"],
+        ) + "\n"
 
     # Ensure output directory exists
     config_data["extract_out_script"] = join(

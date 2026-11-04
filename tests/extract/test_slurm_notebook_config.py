@@ -19,6 +19,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
+import moseq2_extract.steps as extract_steps
 from commands import split_command
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.gui import extract_found_sessions
@@ -60,7 +61,7 @@ def jobs(monkeypatch):
     )
     received = []
     monkeypatch.setattr(
-        extract_cli,
+        extract_steps,
         "extract_wrapper",
         lambda f, out, config, num_frames=None, skip=False: received.append(config),
     )

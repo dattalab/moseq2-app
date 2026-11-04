@@ -18,6 +18,16 @@ from moseq2_extract.extract.proc import clean_frames
 
 SQUARE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
+#: The settings extract_chunk takes from its caller, which has no defaults for them.
+CHUNK_SETTINGS = dict(
+    use_tracking_model=False, spatial_filter_size=(3,), temporal_filter_size=None, tail_filter_iters=1,
+    cable_filter_iters=0, min_height=10, max_height=100, use_cc=False, tracking_model_segment=True,
+    flip_classifier=None, flip_classifier_smoothing=51, frame_dtype="uint8", progress_bar=True,
+    crop_size=(80, 80), centroid_hampel_span=5, centroid_hampel_sig=3, angle_hampel_span=5,
+    angle_hampel_sig=3, model_smoothing_clips=(-300, -150), tracking_model_init="raw",
+    compute_raw_scalars=False,
+)
+
 
 def body_with_tail():
     """A 20 x 20 body with a tail 4 pixels wide and 12 long."""
@@ -70,8 +80,6 @@ def test_extraction_hands_both_filters_their_iterations(monkeypatch):
     with pytest.raises(Stop):
         extract_module.extract_chunk(
             np.zeros((2, 20, 20), np.uint8),
-            cable_filter_iters=2,
-            tail_filter_iters=3,
-            progress_bar=False,
+            **{**CHUNK_SETTINGS, "cable_filter_iters": 2, "tail_filter_iters": 3, "progress_bar": False},
         )
     assert (seen["iters_min"], seen["iters_tail"]) == (2, 3)

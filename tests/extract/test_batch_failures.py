@@ -19,6 +19,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
+import moseq2_extract.steps as extract_steps
 import moseq2_extract.gui as extract_gui
 from moseq2_extract.helpers.extract import run_local_extract
 
@@ -61,7 +62,7 @@ def recordings(root):
 
 
 def test_the_batch_ends_with_a_summary_of_its_failures(project, monkeypatch, capsys):
-    monkeypatch.setattr(extract_gui, "extract_wrapper", stand_in())
+    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in())
 
     failures = run_local_extract(recordings(project), str(project / "config.yaml"))
 
@@ -83,7 +84,7 @@ def test_the_batch_ends_with_a_summary_of_its_failures(project, monkeypatch, cap
 
 
 def test_a_batch_without_failures_says_how_many_were_extracted(project, monkeypatch, capsys):
-    monkeypatch.setattr(extract_gui, "extract_wrapper", stand_in(fails=()))
+    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=()))
 
     failures = run_local_extract(recordings(project), str(project / "config.yaml"))
 
@@ -94,7 +95,7 @@ def test_a_batch_without_failures_says_how_many_were_extracted(project, monkeypa
 
 
 def test_the_notebook_reports_failures_instead_of_complete(project, monkeypatch, capsys):
-    monkeypatch.setattr(extract_gui, "extract_wrapper", stand_in())
+    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in())
 
     extract_gui.extract_found_sessions(str(project), str(project / "config.yaml"), [".avi"])
 
@@ -104,7 +105,7 @@ def test_the_notebook_reports_failures_instead_of_complete(project, monkeypatch,
 
 
 def test_the_notebook_says_complete_when_nothing_failed(project, monkeypatch, capsys):
-    monkeypatch.setattr(extract_gui, "extract_wrapper", stand_in(fails=()))
+    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=()))
 
     extract_gui.extract_found_sessions(str(project), str(project / "config.yaml"), [".avi"])
 
@@ -113,7 +114,7 @@ def test_the_notebook_says_complete_when_nothing_failed(project, monkeypatch, ca
 
 @pytest.mark.parametrize("fails, status", [((FAILS,), 1), ((), 0)], ids=["one-fails", "none-fail"])
 def test_batch_extract_exits_non_zero_when_a_recording_failed(project, monkeypatch, fails, status):
-    monkeypatch.setattr(extract_gui, "extract_wrapper", stand_in(fails=fails))
+    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=fails))
 
     result = CliRunner().invoke(
         extract_cli.cli,

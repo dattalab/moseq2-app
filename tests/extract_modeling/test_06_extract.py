@@ -132,10 +132,11 @@ def chosen(monkeypatch):
     """
     recorded = []
 
-    def record(to_extract, config_file, skip_extracted=False):
+    def record(to_extract, config_file, skip_extracted=False, **kwargs):
         recorded.extend(to_extract)
+        return []
 
-    monkeypatch.setattr("moseq2_extract.gui.run_local_extract", record)
+    monkeypatch.setattr("moseq2_extract.steps.run_local_extract", record)
     return recorded
 
 

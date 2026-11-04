@@ -1,25 +1,22 @@
 """
 GUI front-end operations accessible from a jupyter notebook.
+
+Each function reads the project's ``config.yaml``, resolves the step's settings
+and calls the step in ``moseq2_extract.steps`` (or ``moseq2_extract.setup``).
 """
 
 import os
 import re
-from moseq2_common.yaml import read_yaml, write_yaml
-from os.path import abspath, basename, exists, join
-from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
-from moseq2_extract.helpers.wrappers import (
-    extract_wrapper,
-    flip_file_wrapper,
-    aggregate_extract_results_wrapper,
-)
-from moseq2_extract.util import filter_warnings
-from moseq2_extract.recordings import (
-    DEFAULT_MAX_DEPTH,
-    RECORDING_EXTENSIONS,
-    find_recordings,
-)
-from moseq2_extract.session_config import recording_configs
+from dataclasses import replace
+from os.path import abspath, exists, join
+
+from moseq2_common.options import read_config
+from moseq2_extract import setup, steps
 from moseq2_extract.cli import batch_extract
+from moseq2_extract.options import AggregateOptions, BatchExtractOptions
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
+from moseq2_extract.session_config import recording_configs
+from moseq2_extract.util import filter_warnings
 
 
 _SELECTION_ITEM = re.compile(r"(e?)\s*(\d+)(?:\s*-\s*(\d+))?", re.IGNORECASE)
@@ -119,31 +116,16 @@ def generate_config_command(output_file, camera_type="k2"):
     (str): status message.
     """
 
-    from .cli import extract
-
-    objs = extract.params
-
-    params = {tmp.name: tmp.default for tmp in objs if not tmp.required}
-    if camera_type == "azure":
-        params["bg_roi_depth_range"] = [550, 650]
-        params["spatial_filter_size"] = [5]
-        params["tail_filter_size"] = [15, 15]
-        params["crop_size"] = [120, 120]
-        params["camera_type"] = "azure"
-
     # Check if the file already exists, and prompt user if they would like to overwrite pre-existing file
     if exists(output_file):
         ow = input(
             "This file already exists, would you like to overwrite it? [y -> yes, n -> no] "
         )
-        if ow.lower() == "y":
-            # Updating config file
-            write_yaml(params, output_file)
-        else:
+        if ow.lower() != "y":
             return "Configuration file has been retained"
     else:
         print("Creating configuration file.")
-        write_yaml(params, output_file)
+    setup.generate_config(output_file, camera_type, overwrite=True)
 
     return "Configuration file has been successfully generated."
 
@@ -174,39 +156,31 @@ def extract_found_sessions(
     if not exists(config_file):
         raise IOError(f"Config file {config_file} does not exist")
 
-    # every recording is listed; run_local_extract skips the extracted ones when skip_extracted is set
-    search = find_recordings(
-        input_dir,
-        extensions=RECORDING_EXTENSIONS if ext is None else ext,
-        max_depth=max_depth,
+    config = read_config(config_file)
+    opts = BatchExtractOptions.resolve(config=config, explicit={
+        "extensions": RECORDING_EXTENSIONS if ext is None else ext,
+        "max_depth": max_depth,
+        "skip_completed": skip_extracted,
+        "num_frames": None,  # shim L7: config.yaml's num_frames is not used here; removed by PR 3.1
+    })
+    # the SLURM jobs' settings: batch-extract's defaults overlaid with config.yaml
+    # (survey 3.1, removed by PR 3.2). Each job reads this config file; the one
+    # generate-config writes holds config_file: null, which would otherwise reach every command
+    flat_config = {
+        **{param.name: param.default for param in batch_extract.params if not param.required},
+        **config,
+        "config_file": abspath(config_file),
+    }
+    result = steps.batch_extract(
+        input_dir, opts, config_file=config_file,
+        select=lambda found: get_selected_sessions(found, extract_all),
+        # every recording is listed; the extraction skips the extracted ones when skip_extracted is set
+        shim_list_finished=True,  # L8, removed by PR 3.2
+        shim_flat_config=flat_config,
     )
-    message = search.report()
-    if message:
-        print(message)
-    if not search.recordings:
-        return
-
-    to_extract = get_selected_sessions(search.recordings, extract_all)
-
-    # read in the config file
-    config_data = read_yaml(config_file)
-
-    if config_data["cluster_type"] == "local":
-        # run_local_extract ends with a summary naming each recording that failed
-        if not run_local_extract(to_extract, config_file, skip_extracted):
-            print("Extractions Complete.")
-    else:
-        # Get default CLI params
-        params = {
-            tmp.name: tmp.default for tmp in batch_extract.params if not tmp.required
-        }
-        # merge default params and config data, preferring values in config data
-        config_data = {**params, **config_data}
-        # each job reads this config file; the one generate-config writes holds
-        # config_file: null, which would otherwise reach every command
-        config_data["config_file"] = abspath(config_file)
-
-        run_slurm_extract(input_dir, to_extract, config_data, skip_extracted)
+    # the local extraction ends with a summary naming each recording that failed
+    if opts.cluster_type == "local" and result.found and not result.failures:
+        print("Extractions Complete.")
 
 
 @filter_warnings
@@ -230,16 +204,17 @@ def aggregate_extract_results_command(
     indexpath (str): path to generated index file (moseq2-index.yaml).
     """
 
+    # the project's folder, where the command line's is the working directory's (PR 4.5)
     output_dir = join(input_dir, output_dir)
 
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    indexpath = aggregate_extract_results_wrapper(
-        input_dir, format, output_dir, mouse_threshold
+    result = steps.aggregate_results(
+        input_dir, output_dir, AggregateOptions(format=format, mouse_threshold=mouse_threshold)
     )
 
-    return indexpath
+    return None if result.index_file is None else str(result.index_file)
 
 
 def download_flip_command(output_dir, config_file="", selection=1):
@@ -254,7 +229,7 @@ def download_flip_command(output_dir, config_file="", selection=1):
     Returns:
     """
 
-    flip_file_wrapper(config_file, output_dir, selected_flip=selection)
+    setup.download_flip_file(config_file, output_dir, selection)
 
 
 @filter_warnings
@@ -289,15 +264,13 @@ def extract_command(
     """
 
     resolved = recording_configs(config_file, [input_file], cli_options)
-    config_data = resolved.configs[input_file]
     if explain_settings:
         message = resolved.message()
         if message:
             print(message)
 
-    if output_dir is None:
-        output_dir = config_data.get("output_dir", "proc")
+    opts = replace(resolved.options[input_file], num_frames=num_frames, skip_completed=skip)
+    # the recording's whole settings dict, whose keys the extraction records (R2, removed by PR 4.1)
+    result = steps.extract(input_file, output_dir, opts, shim_flat_config=resolved.configs[input_file])
 
-    return extract_wrapper(
-        input_file, output_dir, config_data, num_frames=num_frames, skip=skip
-    )
+    return None if result.h5_file is None else str(result.h5_file.parent)
