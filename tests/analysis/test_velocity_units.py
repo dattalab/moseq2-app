@@ -103,6 +103,7 @@ def comparison(analysis_paths, sorted_index, monkeypatch_module, tmp_path_factor
     only the crowd movies (slow to render, and not what is tested here) are
     replaced by an empty file of known size.
     """
+    import moseq2_viz.steps as viz_steps
     from moseq2_app.viz import controller
     from moseq2_app.viz.controller import CrowdMovieComparison
 
@@ -122,7 +123,7 @@ def comparison(analysis_paths, sorted_index, monkeypatch_module, tmp_path_factor
     obj.session_dict = {i: {"session_info": {}} for i in range(obj.max_sylls)}
     obj.get_session_mean_syllable_info_df()
 
-    monkeypatch_module.setattr(controller, "make_crowd_movies_wrapper",
+    monkeypatch_module.setattr(viz_steps, "make_crowd_movies_wrapper",
                                lambda *args, **kwargs: {g: [str(movie)] for g in obj.groups})
     monkeypatch_module.setattr(controller, "get_video_info", lambda path: {"dims": (100, 100)})
     return obj

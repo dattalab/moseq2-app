@@ -24,8 +24,81 @@ from moseq2_app.viz.view import display_crowd_movies
 from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
-from moseq2_viz.helpers.wrappers import make_crowd_movies_wrapper, init_wrapper_function
+from moseq2_app import steps
+from moseq2_viz.helpers.wrappers import init_wrapper_function
+from moseq2_viz.options import CrowdMovieOptions
 from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syllable_pdfs)
+
+def shim_labeler_crowd_movie_settings(config_data, max_sylls, max_examples, select_median_duration_instances):
+    """
+    config.yaml with the syllable labeler's own crowd-movie settings over it.
+
+    L2, removed by PR 3.6: the labeler, the comparison tool and ``make-crowd-movies``
+    each render with their own settings.
+
+    Args:
+    config_data (dict): config.yaml as read.
+    max_sylls (int): number of syllables to render.
+    max_examples (int): number of examples in each movie.
+    select_median_duration_instances (bool): pick examples whose duration is closest to the median.
+
+    Returns:
+    (dict): the settings the labeler renders its crowd movies with.
+    """
+    return {
+        **config_data,
+        'separate_by': '',
+        'specific_syllable': None,
+        'max_syllable': max_sylls,
+        'max_examples': max_examples,
+        'select_median_duration_instances': select_median_duration_instances,
+        'gaussfilter_space': [0, 0],
+        'medfilter_space': [0],
+        'sort': True,
+        'pad': 10,
+        'min_dur': 3,
+        'max_dur': 60,
+        'raw_size': (512, 424),
+        'scale': 1,
+        'legacy_jitter_fix': False,
+        'cmap': 'jet',
+        'count': 'usage',
+    }
+
+
+def shim_comparison_crowd_movie_settings(config_data, max_sylls):
+    """
+    config.yaml with the crowd-movie comparison tool's own crowd-movie settings over it.
+
+    L2, removed by PR 3.6, as ``shim_labeler_crowd_movie_settings``. The tool then sets
+    ``separate_by``, ``session_names``, ``specific_syllable`` and ``max_examples`` in it as
+    the user picks them.
+
+    Args:
+    config_data (dict): config.yaml as read.
+    max_sylls (int): number of labeled syllables.
+
+    Returns:
+    (dict): the settings the comparison tool renders its crowd movies with.
+    """
+    return {
+        **config_data,
+        'max_syllable': max_sylls,
+        'separate_by': 'groups',
+        'specific_syllable': None,
+        'gaussfilter_space': [0, 0],
+        'medfilter_space': [0],
+        'sort': True,
+        'pad': 10,
+        'min_dur': 4,
+        'max_dur': 60,
+        'raw_size': (512, 424),
+        'scale': 1,
+        'legacy_jitter_fix': False,
+        'cmap': 'jet',
+        'count': 'usage',
+    }
+
 
 def _blank_syll_entry():
     return {'label': '', 'desc': '', 'crowd_movie_path': '', 'group_info': {}}
@@ -297,36 +370,6 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Display all widgets
         display(grid, self.button_box)
 
-    def set_default_cm_parameters(self, config_data):
-        """
-        Set default crowd movie generation parameters that may be manually updated.
-
-        Args:
-        config_data (dict): Dict of main moseq configuration parameters.
-
-        Returns:
-        config_data (dict): updated config parameter dictionary.
-        """
-
-        config_data['separate_by'] = ''
-        config_data['specific_syllable'] = None
-        config_data['max_syllable'] = self.max_sylls
-        config_data['max_examples'] = self.max_examples
-        config_data['select_median_duration_instances'] = self.select_median_duration_instances
-        config_data['gaussfilter_space'] = [0, 0]
-        config_data['medfilter_space'] = [0]
-        config_data['sort'] = True
-        config_data['pad'] = 10
-        config_data['min_dur'] = 3
-        config_data['max_dur'] = 60
-        config_data['raw_size'] = (512, 424)
-        config_data['scale'] = 1
-        config_data['legacy_jitter_fix'] = False
-        config_data['cmap'] = 'jet'
-        config_data['count'] = 'usage'
-
-        return config_data
-
     def get_crowd_movie_paths(self, index_path, model_path, config_data, crowd_movie_dir):
         """
         Populate the syllable information dict with the respective crowd movie paths.
@@ -335,11 +378,17 @@ class SyllableLabeler(SyllableLabelerWidgets):
         crowd_movie_dir (str): Path to directory containing all the generated crowd movies
         """
 
+        def render():
+            settings = shim_labeler_crowd_movie_settings(config_data, self.max_sylls, self.max_examples,
+                                                         self.select_median_duration_instances)
+            return steps.render_syllable_movies(model_path, index_path, crowd_movie_dir,
+                                                CrowdMovieOptions.resolve(config=settings),
+                                                syllables=range(self.max_sylls), shim_flat_config=settings)['all']
+
         if not os.path.exists(crowd_movie_dir):
             print('Crowd movies not found. Generating movies...')
-            config_data = self.set_default_cm_parameters(config_data)
             # Generate movies if directory does not exist
-            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, crowd_movie_dir, config_data)['all']
+            crowd_movie_paths = render()
         else:
             # get existing crowd movie paths
             crowd_movie_paths = [f for f in glob(crowd_movie_dir + '*') if '.mp4' in f]
@@ -350,10 +399,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         if any(i not in movie_ids for i in range(self.max_sylls)):
             print('Crowd movie list is incomplete. Generating movies...')
-            config_data = self.set_default_cm_parameters(config_data)
-
-            # Generate movies if directory does not exist
-            crowd_movie_paths = make_crowd_movies_wrapper(index_path, model_path, crowd_movie_dir, config_data)['all']
+            crowd_movie_paths = render()
 
         # Get syll_info paths
         info_cm_paths = [s['crowd_movie_path'] for s in self.syll_info.values()]
@@ -436,7 +482,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         self.cm_trigger_button.on_click(self.on_click_trigger_button)
         self.clear_button.on_click(self.clear_on_click)
 
-        self.set_default_cm_parameters()
+        self.config_data = shim_comparison_crowd_movie_settings(self.config_data, self.max_sylls)
 
         # Set Syllable select widget options
         # Get dropdown options with labels
@@ -448,26 +494,6 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # `.split(' - ')`, which has nothing to split under `None`.
         if len(self.cm_syll_select.options) > 0:
             self.cm_syll_select.index = 0
-
-    def set_default_cm_parameters(self):
-        """
-        set default parameter for rendering crowd movie parameters.
-        """
-
-        self.config_data['max_syllable'] = self.max_sylls
-        self.config_data['separate_by'] = 'groups'
-        self.config_data['specific_syllable'] = None
-        self.config_data['gaussfilter_space'] = [0, 0]
-        self.config_data['medfilter_space'] = [0]
-        self.config_data['sort'] = True
-        self.config_data['pad'] = 10
-        self.config_data['min_dur'] = 4
-        self.config_data['max_dur'] = 60
-        self.config_data['raw_size'] = (512, 424)
-        self.config_data['scale'] = 1
-        self.config_data['legacy_jitter_fix'] = False
-        self.config_data['cmap'] = 'jet'
-        self.config_data['count'] = 'usage'
 
     def get_session_mean_syllable_info_df(self):
         """
@@ -571,7 +597,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         syll_number = int(self.cm_syll_select.value.split(' - ')[0])
 
         # Compute paths to crowd movies
-        path_dict = make_crowd_movies_wrapper(self.index_path, self.model_path, self.output_dir, self.config_data)
+        path_dict = steps.render_syllable_movies(self.model_path, self.index_path, self.output_dir,
+                                                 CrowdMovieOptions.resolve(config=self.config_data),
+                                                 syllables=[syll_number], shim_flat_config=self.config_data)
 
         if cm_source == 'group':
             g_iter = self.groups
