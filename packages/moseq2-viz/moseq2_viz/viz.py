@@ -80,28 +80,6 @@ def _validate_and_order_syll_stats_params(complete_df, stat='usage', ordering='s
     return ordering, groups, colors, figsize
 
 
-def _odd_median_kernels(medfilter_space):
-    """
-    Round each even median kernel size down to the odd size below it, with a warning.
-
-    Args:
-    medfilter_space (list): median kernel sizes, or None.
-
-    Returns:
-    medfilter_space (list): the sizes with each even one reduced by one, or the input unchanged when any size is not positive.
-    """
-
-    if medfilter_space is None or not np.all(np.array(medfilter_space) > 0):
-        return medfilter_space
-    odd = []
-    for medfilt in medfilter_space:
-        if medfilt % 2 == 0:
-            warnings.warn(f'medfilter_space kernel must be odd. Reducing {medfilt} to {medfilt - 1}')
-            medfilt -= 1
-        odd.append(medfilt)
-    return odd
-
-
 def save_fig(fig, output_file, suffix=None, **kwargs):
     """
     Save matplotlib figures to PNG and PDF formats.
@@ -226,10 +204,7 @@ def make_crowd_matrix(slices, nexamples=50, pad=30, raw_size=(512, 424), outmovi
                 centroid_y += raw_size[1] // 2
 
             angles = h5['scalars/angle'][idx_slice]
-            clean_params = dict(kwargs)
-            if 'medfilter_space' in clean_params:
-                clean_params['medfilter_space'] = _odd_median_kernels(clean_params['medfilter_space'])
-            frames = moseq2_common.frames.clean_frames((h5[frame_path][idx_slice] / scale).astype('uint8'), **clean_params)
+            frames = moseq2_common.frames.clean_frames((h5[frame_path][idx_slice] / scale).astype('uint8'), **kwargs)
 
             # flip the mouse in the correct orientation if necessary
             if 'flips' in h5['metadata/extraction']:

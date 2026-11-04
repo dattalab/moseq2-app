@@ -20,7 +20,7 @@ import scipy.signal
 from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
-from moseq2_common.frames import clean_frames as clean_frames_spatial
+from moseq2_common.frames import clean_frames as clean_frames_spatial, odd_kernel
 from moseq2_common.timestamps import timestamps_path
 from moseq2_common.yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
@@ -118,6 +118,8 @@ def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
     Filter spatial/temporal noise from frames using Median and Gaussian filters,
     given kernel sizes for each respective requested filter. The spatial filters
     are moseq2_common.frames.clean_frames; the temporal filters follow them.
+    An even median kernel, spatial or temporal, rounds up to the next odd size
+    (moseq2_common.frames.odd_kernel).
 
     Args:
     frames (numpy.ndarray): frames to filter.
@@ -138,6 +140,7 @@ def clean_frames(frames, medfilter_space=None, gaussfilter_space=None,
                                tail_filter=tailfilter, tail_threshold=tail_threshold)
 
     if medfilter_time is not None and np.all(np.array(medfilter_time) > 0):
+        medfilter_time = [odd_kernel(medfilt) for medfilt in medfilter_time]
         for idx, i in np.ndenumerate(frames[0]):
             for medfilt in medfilter_time:
                 out[:, idx[0], idx[1]] = \

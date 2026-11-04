@@ -3,12 +3,13 @@ import pickle
 import joblib
 import numpy as np
 from pathlib import Path
+from dataclasses import replace
 from functools import partial
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
-from moseq2_common.frames import CleaningOptions, cleaning_arguments
+from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
 from moseq2_extract.extract.proc import clean_frames
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
@@ -77,7 +78,13 @@ def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> 
     shifts = np.random.randint(-5, 5, size=(len(frames), 2))
     shifted_frames = np.array([np.roll(f, tuple(s), axis=(0, 1)) for f, s in zip(frames, shifts)]).astype(np.uint8)
 
-    # remove noise from frames as extraction does: heights below min_height to zero, then clean_frames
+    # remove noise from frames as extraction does: heights below min_height to zero, then clean_frames,
+    # with an even median kernel rounded up to the next odd size
+    cleaning = replace(
+        cleaning,
+        spatial_filter_size=tuple(odd_kernel(k) for k in cleaning.spatial_filter_size),
+        temporal_filter_size=tuple(odd_kernel(k) for k in cleaning.temporal_filter_size),
+    )
     cleaned_frames = clean_frames(
         np.where(frames < cleaning.min_height, 0, frames),
         **cleaning_arguments(cleaning),

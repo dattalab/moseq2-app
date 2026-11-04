@@ -4,8 +4,11 @@ PCA and crowd movies each had their own ``clean_frames``, with the same tail
 filter, median filter and Gaussian filter, and PCA had a ``select_strel`` that
 builds the tail filter's structuring element. Both live in
 ``moseq2_common.frames`` now. PCA adds its temporal filters after the shared
-spatial ones; crowd movies round an even median kernel down before calling it,
-as they did before.
+spatial ones.
+
+A median filter takes only odd kernel sizes. PCA, crowd movies and flip
+training round an even size up to the next odd one, through
+``moseq2_common.frames.odd_kernel``, as extraction does.
 """
 
 from __future__ import annotations
@@ -86,11 +89,28 @@ def test_clean_frames_leaves_its_input_unchanged():
     np.testing.assert_array_equal(frames, before)
 
 
-def test_crowd_movies_still_round_an_even_median_kernel_down(tmp_path, monkeypatch):
-    """A crowd movie asked for a median kernel of 4 filters with 3, and says so."""
-    from moseq2_viz.viz import make_crowd_matrix
+def recorded_median_kernels(monkeypatch):
+    """Every kernel size OpenCV's and scipy's median filters are handed, in a list that fills as they run."""
+    import scipy.signal
 
-    path = tmp_path / "session.h5"
+    kernels = []
+    median_blur, medfilt = cv2.medianBlur, scipy.signal.medfilt
+
+    def blur(src, ksize):
+        kernels.append(ksize)
+        return median_blur(src, ksize)
+
+    def filt(volume, kernel_size=None):
+        kernels.append(int(np.atleast_1d(kernel_size)[0]))
+        return medfilt(volume, kernel_size)
+
+    monkeypatch.setattr(cv2, "medianBlur", blur)
+    monkeypatch.setattr(scipy.signal, "medfilt", filt)
+    return kernels
+
+
+def crowd_movie_session(path):
+    """A 40-frame session with the scalars a crowd movie reads, written to ``path``."""
     rng = np.random.default_rng(0)
     with h5py.File(path, "w") as f:
         f["frames"] = rng.integers(0, 60, size=(40, 100, 100), dtype="uint8")
@@ -99,26 +119,69 @@ def test_crowd_movies_still_round_an_even_median_kernel_down(tmp_path, monkeypat
         f["scalars/angle"] = np.zeros(40)
         f.create_group("metadata/extraction")
 
-    kernels = []
-    median_blur = cv2.medianBlur
 
-    def record(src, ksize):
-        kernels.append(ksize)
-        return median_blur(src, ksize)
+def clean_for_pca(tmp_path):
+    from moseq2_pca.util import clean_frames as clean_frames_pca
 
-    monkeypatch.setattr(cv2, "medianBlur", record)
-    with pytest.warns(UserWarning, match="Reducing 4 to 3"):
-        make_crowd_matrix(
-            [((10, 15), "uuid", str(path))],
-            nexamples=1,
-            pad=2,
-            max_dur=10,
-            raw_size=(100, 100),
-            crop_size=(20, 20),
-            medfilter_space=[4],
-            gaussfilter_space=[0, 0],
-        )
-    assert kernels and set(kernels) == {3}
+    frames = np.random.default_rng(0).integers(0, 60, size=(12, 20, 20)).astype("float32")
+    clean_frames_pca(frames, medfilter_space=[4], medfilter_time=[4])
+
+
+def clean_for_a_crowd_movie(tmp_path):
+    from moseq2_viz.viz import make_crowd_matrix
+
+    crowd_movie_session(tmp_path / "session.h5")
+    make_crowd_matrix(
+        [((10, 15), "uuid", str(tmp_path / "session.h5"))],
+        nexamples=1,
+        pad=2,
+        max_dur=10,
+        raw_size=(100, 100),
+        crop_size=(20, 20),
+        medfilter_space=[4],
+        gaussfilter_space=[0, 0],
+    )
+
+
+def clean_for_flip_training(tmp_path):
+    import pickle
+
+    from moseq2_app.flip.train import create_training_dataset
+    from moseq2_common.frames import CleaningOptions
+
+    crowd_movie_session(tmp_path / "session.h5")
+    with open(tmp_path / "flip-training-frame-ranges.p", "wb") as f:
+        pickle.dump(({"s": str(tmp_path / "session.h5")}, {"s": [(False, slice(0, 10))]}), f)
+    create_training_dataset(
+        str(tmp_path / "flip-training-frame-ranges.p"),
+        CleaningOptions(spatial_filter_size=(4,), temporal_filter_size=(4,)),
+    )
+
+
+@pytest.mark.parametrize(
+    "clean",
+    [clean_for_pca, clean_for_a_crowd_movie, clean_for_flip_training],
+    ids=["pca", "crowd_movies", "flip_training"],
+)
+def test_an_even_median_kernel_rounds_up_everywhere(clean, tmp_path, monkeypatch):
+    """Asked for a median kernel of 4, each step filters with 5, as extraction does, and says so.
+
+    PCA's spatial and temporal median filters, crowd movies' spatial one and
+    flip training's spatial and temporal ones, which are extraction's
+    settings. Every size reaching OpenCV or scipy is 5.
+    """
+    kernels = recorded_median_kernels(monkeypatch)
+    with pytest.warns(UserWarning, match="rounds up to 5"):
+        clean(tmp_path)
+    assert kernels and set(kernels) == {5}
+
+
+def test_odd_kernel_keeps_odd_sizes_and_sizes_that_turn_the_filter_off():
+    from moseq2_common.frames import odd_kernel
+
+    assert [odd_kernel(size) for size in (0, 1, 3, 5)] == [0, 1, 3, 5]
+    with pytest.warns(UserWarning, match="rounds up to 7"):
+        assert odd_kernel(6) == 7
 
 
 def test_viz_no_longer_offers_clean_frames():
