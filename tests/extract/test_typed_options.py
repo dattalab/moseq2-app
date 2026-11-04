@@ -19,7 +19,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
-import moseq2_extract.gui as extract_gui
+import moseq2_extract.steps as extract_steps
 from commands import split_command
 from moseq2_common.yaml import write_yaml
 
@@ -35,7 +35,7 @@ def received(monkeypatch):
     """What ``extract`` hands its wrapper, instead of running it."""
     calls = []
     monkeypatch.setattr(
-        extract_cli, "extract_wrapper", lambda f, out, config, **kw: calls.append(config)
+        extract_steps, "extract_wrapper", lambda f, out, config, **kw: calls.append(config)
     )
     return calls
 
@@ -111,7 +111,7 @@ def extracted(monkeypatch):
             {"config": config_data, "num_frames": num_frames, "output_dir": output_dir}
         )
 
-    monkeypatch.setattr(extract_gui, "extract_wrapper", record)
+    monkeypatch.setattr(extract_steps, "extract_wrapper", record)
     return calls
 
 
@@ -193,11 +193,10 @@ def slurm_extracted(monkeypatch, received):
     )
     nums = []
     monkeypatch.setattr(
-        extract_cli,
+        extract_steps,
         "extract_wrapper",
         lambda f, out, config, num_frames=None, skip=False: (
-            received.append(config),
-            nums.append(num_frames),
+            received.append(config) or nums.append(num_frames)
         ),
     )
 

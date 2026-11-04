@@ -18,54 +18,27 @@ Where an entry holds a value for another setting that differs from
 ``recording_configs`` is what every extraction path uses: ``extract_command``
 (the notebook's local extraction and ``batch-extract``) and
 ``run_slurm_extract`` (each SLURM job's ``config.yaml``). It resolves each
-recording with ``recording_config``, which the arena tool also uses for the arena
-it shows and its preview extraction, with the values the tool holds as the entry.
+recording's options with ``recording_options`` (``ExtractOptions.resolve``) and
+its whole settings dict, every key ``config.yaml`` holds included, with
+``recording_config``, which the arena tool also uses for the arena it shows and
+its preview extraction, with the values the tool holds as the entry.
 """
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from os.path import basename, exists
 
+from moseq2_common.options import arena_fields
 from moseq2_common.yaml import read_yaml
+from moseq2_extract.options import ExtractOptions
 from moseq2_extract.recordings import session_config_key
 
 #: The settings the arena tool sets for a recording, which extraction takes from
-#: the recording's entry in ``session_config.yaml``. moseq2-app's
-#: ``ArenaMaskWidget.set_session_config_vars`` writes exactly these keys.
-ARENA_TOOL_SETTINGS = (
-    # arena detection
-    "bg_roi_depth_range",
-    "manual_set_depth_range",
-    "bg_roi_weights",
-    "bg_roi_shape",
-    "bg_roi_index",
-    "bg_roi_dilate",
-    "dilate_iterations",
-    # the mouse
-    "min_height",
-    "max_height",
-    "crop_size",
-    # cleaning
-    "spatial_filter_size",
-    "temporal_filter_size",
-    "tail_filter_iters",
-    "tail_filter_shape",
-    "tail_filter_size",
-    "cable_filter_iters",
-    "cable_filter_shape",
-    "cable_filter_size",
-    "noise_tolerance",
-    # tracking model, flip smoothing, output
-    "use_tracking_model",
-    "tracking_model_mask_threshold",
-    "flip_classifier_smoothing",
-    "compress",
-    "chunk_overlap",
-    # camera formats
-    "pixel_format",
-    "movie_dtype",
-    "frame_dtype",
-)
+#: the recording's entry in ``session_config.yaml``: arena detection, the mouse's
+#: height and crop, the cleaning filters, noise tolerance, the tracking model,
+#: flip smoothing, compression, chunk overlap and the camera formats.
+#: moseq2-app's ``ArenaMaskWidget.set_session_config_vars`` writes exactly these keys.
+ARENA_TOOL_SETTINGS = arena_fields(ExtractOptions)
 
 #: Settings an entry may hold that extraction never read from it, so a
 #: difference in them is not reported: file bookkeeping, and the values
@@ -121,6 +94,7 @@ class RecordingConfigs:
     config_file (str): path to config.yaml.
     session_config_path (str): path to session_config.yaml, or "" when there is none.
     config_data (dict): config.yaml as read.
+    options (dict): recording path -> the ``ExtractOptions`` it is extracted with.
     """
 
     configs: dict
@@ -128,6 +102,7 @@ class RecordingConfigs:
     config_file: str = ""
     session_config_path: str = ""
     config_data: dict = field(default_factory=dict)
+    options: dict = field(default_factory=dict)
 
     def message(self, recordings=None):
         """
@@ -193,7 +168,7 @@ def recording_configs(config_file, recordings, cli_options=None):
     cli_options (dict): parameters typed on the command line.
 
     Returns:
-    (RecordingConfigs): each recording's settings, and the differences to report.
+    (RecordingConfigs): each recording's settings and options, and the differences to report.
     """
     config_data = read_yaml(config_file) or {}
     session_config_path = config_data.get("session_config_path") or ""
@@ -213,7 +188,34 @@ def recording_configs(config_file, recordings, cli_options=None):
         if differing:
             resolved.differences[recording] = (key, differing)
         resolved.configs[recording] = config
+        resolved.options[recording] = recording_options(config_data, entry, typed)
     return resolved
+
+
+def recording_options(config_data, entry, cli_options=None):
+    """
+    The ``ExtractOptions`` one recording is extracted with, by ``recording_config``'s rule.
+
+    ``ExtractOptions.resolve`` over config.yaml, then the entry's settings in
+    ``ARENA_TOOL_SETTINGS`` and any setting ``config_data`` does not hold, then the
+    options in ``cli_options`` that ``ExtractOptions`` declares.
+
+    Args:
+    config_data (dict): config.yaml as read.
+    entry (dict): the recording's entry in session_config.yaml, or None when it has none.
+    cli_options (dict): parameters typed on the command line.
+
+    Returns:
+    (ExtractOptions): the options the recording is extracted with.
+    """
+    from_entry = {
+        setting: value
+        for setting, value in (entry or {}).items()
+        if setting in ARENA_TOOL_SETTINGS or setting not in config_data
+    }
+    declared = {f.name for f in fields(ExtractOptions)}
+    typed = {setting: value for setting, value in (cli_options or {}).items() if setting in declared}
+    return ExtractOptions.resolve(config=config_data, entry=from_entry, explicit=typed)
 
 
 def recording_config(config_data, entry, cli_options=None):

@@ -714,7 +714,7 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
     selected_flip (int or str): int: index of desired flip classifier; str: path to flip file
 
     Returns:
-    None
+    output_filename (str): path to the downloaded classifier.
     """
 
     # The classifiers published before 2026 are scikit-learn 0.20 pickles, and a
@@ -778,6 +778,8 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
     except Exception as e:
         print("Could not update configuration file flip classifier path")
         print("Unexpected error:", e)
+
+    return output_filename
 
 
 def _copy_frames(

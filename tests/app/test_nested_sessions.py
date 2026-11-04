@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 import moseq2_extract.cli as extract_cli
+import moseq2_extract.steps as extract_steps
 from cells import code_cell
 from commands import split_command
 from moseq2_app.gui.progress import get_session_paths
@@ -66,8 +67,8 @@ def chosen(monkeypatch):
     """The recordings handed to the local extraction loop; nothing is extracted."""
     recorded = []
     monkeypatch.setattr(
-        "moseq2_extract.gui.run_local_extract",
-        lambda to_extract, config_file, skip_extracted=False: recorded.extend(to_extract),
+        "moseq2_extract.steps.run_local_extract",
+        lambda to_extract, config_file, skip_extracted=False, **kw: recorded.extend(to_extract) or [],
     )
     return recorded
 
@@ -303,7 +304,7 @@ def test_an_older_file_keyed_by_a_shared_folder_name_is_explained(grouped, capsy
 def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, monkeypatch):
     received = {}
     monkeypatch.setattr(
-        "moseq2_extract.gui.extract_wrapper",
+        "moseq2_extract.steps.extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
             {input_file: config["noise_tolerance"]}
         ),
@@ -326,7 +327,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
     )
     received = {}
     monkeypatch.setattr(
-        extract_cli,
+        extract_steps,
         "extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
             {input_file: config["noise_tolerance"]}
@@ -355,7 +356,7 @@ def test_extraction_reads_a_file_keyed_by_folder_name(tmp_path, monkeypatch):
     is keyed by folder name, as it always was, and extraction reads it."""
     received = {}
     monkeypatch.setattr(
-        "moseq2_extract.gui.extract_wrapper",
+        "moseq2_extract.steps.extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
             {input_file: config["noise_tolerance"]}
         ),

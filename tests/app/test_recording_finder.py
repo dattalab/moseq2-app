@@ -53,8 +53,8 @@ def callers(monkeypatch, tmp_path):
     """
     chosen = []
     monkeypatch.setattr(
-        "moseq2_extract.gui.run_local_extract",
-        lambda to_extract, config_file, skip_extracted=False: chosen.extend(to_extract),
+        "moseq2_extract.steps.run_local_extract",
+        lambda to_extract, config_file, skip_extracted=False, **kw: chosen.extend(to_extract) or [],
     )
     config = tmp_path / "extract_config.yaml"
     config.write_text("cluster_type: local\n")

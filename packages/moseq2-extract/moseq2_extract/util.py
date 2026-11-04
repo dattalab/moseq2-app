@@ -13,7 +13,6 @@ import warnings
 import numpy as np
 from glob import glob
 from copy import deepcopy
-from ruamel.yaml.comments import CommentedSeq
 import moseq2_common.yaml
 from typing import Pattern
 from cytoolz import valmap
@@ -41,68 +40,6 @@ def filter_warnings(func):
             return func(*args, **kwargs)
     return apply_warning_filters
 
-
-# from https://stackoverflow.com/questions/46358797/
-# python-click-supply-arguments-and-options-from-a-configuration-file
-def command_with_config(config_file_param_name):
-    """
-    Override default CLI variables with the values contained within the config.yaml being passed.
-
-    Args:
-    config_file_param_name (str): path to config file.
-
-    Returns:
-    custom_command_class (function): decorator function to update click.Command parameters with the config_file
-    parameter values.
-    """
-
-    class custom_command_class(click.Command):
-
-        def invoke(self, ctx):
-            # grab the config file
-            config_file = ctx.params[config_file_param_name]
-            param_defaults = {p.human_readable_name: p.default for p in self.params
-                              if isinstance(p, click.core.Option)}
-            param_defaults = {k: tuple(v) if type(v) is list else v for k, v in param_defaults.items()}
-
-            if config_file is not None:
-
-                config_data = moseq2_common.yaml.read_yaml(config_file)
-                # set config_data['output_file'] ['output_dir'] ['input_dir'] to None to avoid overwriting previous files
-                # assuming users would either input their own paths or use the default path
-                config_data['input_dir'] = None
-                config_data['output_dir'] = None
-                config_data['output_file'] = None
-
-                # modified to only use keys that are actually defined in options and the value is not not none
-                config_data = {k: tuple(v) if isinstance(v, CommentedSeq) else v
-                               for k, v in config_data.items() if k in param_defaults.keys() and v is not None}
-
-                # a value typed on the command line outranks the config file, which
-                # outranks the default. click records where each value came from;
-                # comparing a value with the option's default cannot tell, because
-                # the two coincide whenever someone types the default.
-                combined = dict(ctx.params)
-                for k, v in config_data.items():
-                    if ctx.get_parameter_source(k) is not click.core.ParameterSource.COMMANDLINE:
-                        combined[k] = v
-
-                ctx.params = combined
-                
-                # add new parameters to the original config file
-                config_data = moseq2_common.yaml.read_yaml(config_file)
-                
-                # remove flags from combined so the flag values in config.yaml won't get overwritten
-                flag_list = ['manual_set_depth_range', 'use_plane_bground', 'progress_bar', 'delete', 'compute_raw_scalars', 'skip_completed', 'skip_checks', 'get_cmd', 'run_cmd']
-                combined = {k:v for k, v in combined.items() if k not in flag_list}
-                # combine original config data and the combined params prioritizing the combined
-                config_data = {**config_data, **combined}
-                # with open(config_file, 'w') as f:
-                #     yaml.safe_dump(config_data, f)
-
-            return super().invoke(ctx)
-
-    return custom_command_class
 
 def set_bground_to_plane_fit(bground_im, plane, output_dir):
     """
