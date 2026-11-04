@@ -27,11 +27,13 @@ def extract_chunk(
     use_tracking_model,
     spatial_filter_size,
     temporal_filter_size,
+    tail_filter_shape,
+    tail_filter_size,
     tail_filter_iters,
+    cable_filter_shape,
+    cable_filter_size,
     cable_filter_iters,
     iters_min=0,
-    strel_tail=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
-    strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)),
     min_height,
     max_height,
     mask_threshold=-20,
@@ -72,11 +74,13 @@ def extract_chunk(
     use_tracking_model (bool): The EM tracker uses expectation-maximization to fit improve mouse detection.
     spatial_filter_size (tuple): spatial kernel size used in median filtering.
     temporal_filter_size (tuple): temporal kernel size used in median filtering.
+    tail_filter_shape (str): shape of the tail filter's element; ``none`` turns the tail filter off.
+    tail_filter_size (tuple): size of the tail filter's element; zero turns the tail filter off.
     tail_filter_iters (int): number of filtering iterations on mouse tail
-    cable_filter_iters (int): number of erosions with strel_min, to thin a cable out of the frame
+    cable_filter_shape (str): shape of the cable filter's element; ``none`` turns the cable filter off.
+    cable_filter_size (tuple): size of the cable filter's element; zero turns the cable filter off.
+    cable_filter_iters (int): number of erosions with the cable filter's element, to thin a cable out of the frame
     iters_min (int): the same count under its older name; cable_filter_iters takes precedence when set
-    strel_tail (cv2::StructuringElement): filtering kernel size to filter out mouse tail.
-    strel_min (cv2::StructuringElement): filtering kernel size to filter mouse body in cable recording cases.
     min_height (int): minimum (mm) distance of mouse to floor.
     max_height (int): maximum (mm) distance of mouse to floor.
     mask_threshold (int): Threshold on log-likelihood to include pixels for centroid and angle calculation
@@ -147,12 +151,14 @@ def extract_chunk(
     cleaning = cleaning_arguments(CleaningOptions(
         spatial_filter_size=spatial_filter_size,
         temporal_filter_size=temporal_filter_size,
+        tail_filter_shape=tail_filter_shape,
+        tail_filter_size=tuple(tail_filter_size),
         tail_filter_iters=tail_filter_iters,
+        cable_filter_shape=cable_filter_shape,
+        cable_filter_size=tuple(cable_filter_size),
         cable_filter_iters=cable_filter_iters or iters_min,
         min_height=min_height,
     ))
-    # shim D6: the structuring elements get_strels built with extraction's select_strel, removed by PR 3.10
-    cleaning.update(strel_tail=strel_tail, strel_min=strel_min)
     filtered_frames = clean_frames(chunk, **cleaning, frame_dtype=frame_dtype, progress_bar=progress_bar)
 
     # If we need it, compute the EM parameters (for tracking in presence of occluders)

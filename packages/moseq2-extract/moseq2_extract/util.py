@@ -381,30 +381,6 @@ def load_metadata(metadata_file):
 
     return metadata
 
-def get_strels(config_data):
-    """
-    Get dictionary object of cv2 StructuringElements for image filtering given
-    a dict of configurations parameters.
-
-    Args:
-    config_data (dict): dict containing cv2 Structuring Element parameters
-
-    Returns:
-    str_els (dict): dict containing cv2 StructuringElements used for image filtering. An
-        entry is None when its shape is ``none`` or its size is zero, and the filter
-        it belongs to is then skipped.
-    """
-
-    str_els = {
-        'strel_dilate': select_strel(config_data['bg_roi_shape'], tuple(config_data['bg_roi_dilate'])),
-        'strel_erode': select_strel(config_data['bg_roi_shape'], tuple(config_data['bg_roi_erode'])),
-        'strel_tail': select_strel(config_data['tail_filter_shape'], tuple(config_data['tail_filter_size'])),
-        'strel_min': select_strel(config_data['cable_filter_shape'], tuple(config_data['cable_filter_size']))
-    }
-
-    return str_els
-
-
 def scalar_attributes():
     """
     Gets scalar attributes dict with names paired with descriptions.

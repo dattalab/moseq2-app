@@ -16,7 +16,6 @@ from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings, session_config_key, session_keys
 from moseq2_extract.io.video import load_movie_data
-from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
@@ -69,12 +68,10 @@ def shim_arena_preview(recording, frames_to_extract, background, mask, settings)
     # filter for included mouse height range
     frames = threshold_chunk(frames, settings['min_height'], settings['max_height'])
 
-    struct_elements = get_strels(settings)
     extraction = extract_chunk(raw_frames.copy(),
                                roi=mask,
                                bground=background,
                                **settings,
-                               **struct_elements,
                                )
     return extraction['depth_frames'], frames
 

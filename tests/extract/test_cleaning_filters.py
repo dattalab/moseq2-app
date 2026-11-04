@@ -20,8 +20,9 @@ SQUARE = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
 #: The settings extract_chunk takes from its caller, which has no defaults for them.
 CHUNK_SETTINGS = dict(
-    use_tracking_model=False, spatial_filter_size=(3,), temporal_filter_size=None, tail_filter_iters=1,
-    cable_filter_iters=0, min_height=10, max_height=100, use_cc=False, tracking_model_segment=True,
+    use_tracking_model=False, spatial_filter_size=(3,), temporal_filter_size=None,
+    tail_filter_shape="ellipse", tail_filter_size=(9, 9), tail_filter_iters=1,
+    cable_filter_shape="rectangle", cable_filter_size=(5, 5), cable_filter_iters=0, min_height=10, max_height=100, use_cc=False, tracking_model_segment=True,
     flip_classifier=None, flip_classifier_smoothing=51, frame_dtype="uint8", progress_bar=True,
     crop_size=(80, 80), centroid_hampel_span=5, centroid_hampel_sig=3, angle_hampel_span=5,
     angle_hampel_sig=3, model_smoothing_clips=(-300, -150), tracking_model_init="raw",
@@ -85,39 +86,45 @@ def test_extraction_hands_both_filters_their_iterations(monkeypatch):
     assert (seen["iters_min"], seen["iters_tail"]) == (2, 3)
 
 
-#: Extraction's default filter shapes and sizes, as a generated config.yaml has them.
-STREL_SETTINGS = dict(
-    bg_roi_shape="ellipse", bg_roi_dilate=(10, 10), bg_roi_erode=(1, 1),
-    tail_filter_shape="ellipse", tail_filter_size=(9, 9),
-    cable_filter_shape="rectangle", cable_filter_size=(5, 5),
-)
+def cleaned_by_extract_chunk(frames, **settings):
+    """``frames`` as ``extract_chunk`` cleans them with ``settings`` over CHUNK_SETTINGS."""
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def record(chunk, **kwargs):
+        seen["out"] = clean_frames(chunk, **kwargs)
+        raise Stop
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(extract_module, "clean_frames", record)
+        with pytest.raises(Stop):
+            extract_module.extract_chunk(
+                frames, **{**CHUNK_SETTINGS, "spatial_filter_size": (0,), "temporal_filter_size": (0,),
+                           "min_height": 0, "max_height": 255, "progress_bar": False, **settings},
+            )
+    return seen["out"]
 
 
 def test_a_none_tail_filter_shape_turns_the_tail_filter_off():
-    """``tail_filter_shape: none`` leaves the frames as the tail filter found them.
+    """``tail_filter_shape: none`` leaves the tail that the default 9 x 9 ellipse removes.
 
-    A default 9 x 9 ellipse removes the 4-pixel tail; with the shape ``none``
-    there is no element, and ``clean_frames`` skips the opening even though
-    ``tail_filter_iters`` asks for one.
+    With the shape ``none`` there is no element, and extraction skips the
+    opening even though ``tail_filter_iters`` asks for one.
     """
-    from moseq2_extract.util import get_strels
-
     frames = body_with_tail()
-    strels = get_strels({**STREL_SETTINGS, "tail_filter_shape": "none"})
-    assert strels["strel_tail"] is None
-    out = clean_frames(frames, prefilter_space=None, iters_tail=1, strel_tail=strels["strel_tail"])
-    np.testing.assert_array_equal(out, frames)
+    tail = (0, slice(13, 17), slice(27, 37))
+    assert not cleaned_by_extract_chunk(frames, tail_filter_iters=1)[tail].any()
+    off = cleaned_by_extract_chunk(frames, tail_filter_shape="none", tail_filter_iters=1)
+    np.testing.assert_array_equal(off, frames)
 
 
 def test_a_zero_size_cable_filter_turns_the_cable_filter_off():
     """``cable_filter_size: [0, 0]`` gives no element, and the erosion is skipped."""
-    from moseq2_extract.util import get_strels
-
     frames = body_with_tail()
-    strels = get_strels({**STREL_SETTINGS, "cable_filter_size": (0, 0)})
-    assert strels["strel_min"] is None
-    out = clean_frames(frames, prefilter_space=None, iters_min=2, strel_min=strels["strel_min"])
-    np.testing.assert_array_equal(out, frames)
+    off = cleaned_by_extract_chunk(frames, tail_filter_iters=0, cable_filter_size=(0, 0), cable_filter_iters=2)
+    np.testing.assert_array_equal(off, frames)
 
 
 def test_a_none_roi_shape_does_not_dilate_the_graduated_background(monkeypatch, tmp_path):
@@ -125,6 +132,7 @@ def test_a_none_roi_shape_does_not_dilate_the_graduated_background(monkeypatch, 
     walls skips the background's dilation rather than handing OpenCV no kernel,
     which it would replace with a 3 x 3 square."""
     import moseq2_extract.util as util
+    from moseq2_common.frames import select_strel
 
     class Stop(Exception):
         pass
@@ -132,11 +140,9 @@ def test_a_none_roi_shape_does_not_dilate_the_graduated_background(monkeypatch, 
     dilations = []
     monkeypatch.setattr(util.cv2, "dilate", lambda *args, **kwargs: dilations.append(args))
     monkeypatch.setattr(util, "get_bucket_center", lambda *args, **kwargs: (_ for _ in ()).throw(Stop()))
-    strels = util.get_strels({**STREL_SETTINGS, "bg_roi_shape": "none"})
-    assert strels["strel_dilate"] is None
     with pytest.raises(Stop):
         util.graduate_dilated_wall_area(
             np.full((20, 20), 670.0, np.float32), {"true_depth": 670.0, "dilate_iterations": 2},
-            strels["strel_dilate"], str(tmp_path),
+            select_strel("none", (10, 10)), str(tmp_path),
         )
     assert dilations == []

@@ -160,12 +160,13 @@ def cleaned_as_extraction_cleans(frames, config):
     """``frames`` cleaned the way ``extract_chunk`` cleans a chunk with ``config``'s settings.
 
     The height threshold, then ``clean_frames`` with the structuring elements
-    ``get_strels`` builds from the shapes and sizes.
+    ``select_strel`` builds from the shapes and sizes.
     """
+    from moseq2_common.frames import select_strel
     from moseq2_extract.extract.proc import clean_frames, threshold_chunk
-    from moseq2_extract.util import get_strels
 
-    strels = get_strels(config)
+    strels = {"strel_tail": select_strel(config["tail_filter_shape"], tuple(config["tail_filter_size"])),
+              "strel_min": select_strel(config["cable_filter_shape"], tuple(config["cable_filter_size"]))}
     return clean_frames(
         threshold_chunk(frames.copy(), config["min_height"], config["max_height"]),
         prefilter_space=tuple(config["spatial_filter_size"]),
