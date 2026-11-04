@@ -502,7 +502,7 @@ def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
     reuses the directory. A file that is not a crowd movie, such as a
     stray notes.mp4, does not stand in for the one that is missing.
     """
-    from moseq2_app.viz import controller
+    import moseq2_viz.steps as viz_steps
 
     shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
     progress = tmp_path / "progress.yaml"
@@ -521,7 +521,7 @@ def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
         shutil.copy(next(crowd.glob("syllable_*.mp4")), last)
         return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
 
-    monkeypatch.setattr(controller, "make_crowd_movies_wrapper", make_movies)
+    monkeypatch.setattr(viz_steps, "make_crowd_movies_wrapper", make_movies)
     label_syllables(paths, **LABELLING)
 
     assert made, "the movies were not regenerated"
@@ -586,7 +586,7 @@ def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_pro
     used. Typing it opens the labeller with that many syllables, after
     making the crowd movies the project does not have yet.
     """
-    from moseq2_app.viz import controller
+    import moseq2_viz.steps as viz_steps
 
     from widgets import capture_display
 
@@ -606,7 +606,7 @@ def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_pro
             shutil.copy(template, crowd / f"syllable_sorted-id-{syllable}_(usage)_original-id-{syllable}.mp4")
         return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
 
-    monkeypatch.setattr(controller, "make_crowd_movies_wrapper", make_movies)
+    monkeypatch.setattr(viz_steps, "make_crowd_movies_wrapper", make_movies)
     display = capture_display(monkeypatch)
 
     assert label_syllables(paths, **{**LABELLING, "max_syllables": used}) == used
