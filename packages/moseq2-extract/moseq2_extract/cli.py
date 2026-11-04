@@ -12,7 +12,7 @@ from dataclasses import replace
 
 import click
 
-from moseq2_common.options import ConfigFileError, click_options, explicit_values, read_config
+from moseq2_common.options import click_options, read_config_option, shim_click_defaults
 from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
@@ -77,29 +77,6 @@ BATCH_EXTRACT_ORDER = (
 _AVI_ORDER = ("input_file", "mapping", "threads", "delete", "fps", "chunk_size", "output_file")
 
 
-def _read_config_file(config_file):
-    """``config.yaml``'s settings, or None without ``--config-file``; a file that cannot be read stops the command."""
-    if not config_file:
-        return None
-    try:
-        return read_config(config_file)
-    except ConfigFileError as error:
-        raise click.ClickException(str(error)) from None
-
-
-def shim_click_defaults(ctx, cls, config):
-    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removing PR to be named).
-
-    click converts each default through its option's type (``--fps``'s 30
-    becomes 30.0, ``--bg-roi-weights``' (1, 0.1, 1) becomes (1.0, 0.1, 1.0)),
-    and 1.5.0's command line ran on those values where the notebook ran on the
-    declared ones. A null in ``config`` keeps the default.
-    """
-    defaults = {name: ctx.params[name] for name in cls().as_dict()}
-    settings = {name: value for name, value in (config or {}).items() if value is not None}
-    return cls.resolve(config={**defaults, **settings}, explicit=explicit_values(ctx, cls))
-
-
 def _typed_depth_range_is_manual(ctx, opts):
     """Use a --bg-roi-depth-range typed on the command line as given, rather than
     replacing it with the detected range. A range from the config file still
@@ -118,7 +95,7 @@ def _typed_depth_range_is_manual(ctx, opts):
 }))
 @click.pass_context
 def find_roi(ctx, input_file, output_dir, config_file, **_):
-    config = _read_config_file(config_file)
+    config = read_config_option(config_file)
     opts = _typed_depth_range_is_manual(ctx, shim_click_defaults(ctx, RoiOptions, config))
     steps.find_roi(input_file, output_dir, opts)
 
@@ -134,7 +111,7 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 })
 @click.pass_context
 def extract(ctx, input_file, output_dir, config_file, output_file, **_):
-    config = _read_config_file(config_file)
+    config = read_config_option(config_file)
     opts = _typed_depth_range_is_manual(ctx, shim_click_defaults(ctx, ExtractOptions, config))
     # extract FILE reads config.yaml only, never the recording's session_config.yaml entry (L11, removed by PR 3.3).
     # The two paths 1.5.0 recorded among the extraction's parameters (R2, removed by PR 4.1):
@@ -175,7 +152,7 @@ def batch_extract(ctx, input_folder, config_file, **_):
             "Command not run. Please specified a config file using --config-file flag."
         )
         return
-    config = _read_config_file(config_file)
+    config = read_config_option(config_file)
     opts = shim_click_defaults(ctx, BatchExtractOptions, config)
     typed = _typed_extract_options(ctx)
     result = steps.batch_extract(

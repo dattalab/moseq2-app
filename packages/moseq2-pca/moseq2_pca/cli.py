@@ -12,7 +12,7 @@ from os.path import join
 
 import click
 
-from moseq2_common.options import ConfigFileError, click_options, explicit_values, read_config
+from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_pca import steps
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
@@ -66,29 +66,6 @@ CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_components', 'p
                       'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'fps', 'verbose')
 
 
-def _read_config_file(config_file):
-    """``config.yaml``'s settings, or None without ``--config-file``; a file that cannot be read stops the command."""
-    if not config_file:
-        return None
-    try:
-        return read_config(config_file)
-    except ConfigFileError as error:
-        raise click.ClickException(str(error)) from None
-
-
-def shim_click_defaults(ctx, cls, config):
-    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removing PR to be named).
-
-    click converts each default through its option's type (``--timeout``'s 5
-    becomes 5.0, ``--gaussfilter-space``'s (1.5, 1) becomes (1.5, 1.0)), and
-    1.5.0's command line ran on those values where the notebook ran on the
-    declared ones. A null in ``config`` keeps the default.
-    """
-    defaults = {name: ctx.params[name] for name in cls().as_dict()}
-    settings = {name: value for name, value in (config or {}).items() if value is not None}
-    return cls.resolve(config={**defaults, **settings}, explicit=explicit_values(ctx, cls))
-
-
 # 1.5.0's command_with_config left these out of what it wrote back.
 _NOT_WRITTEN_BACK = ('missing_data', 'use_fft', 'verbose', 'from_end')
 
@@ -135,7 +112,7 @@ def shim_camera_swap(opts: TrainPCAOptions) -> TrainPCAOptions:
 @click_options(TrainPCAOptions, order=TRAIN_PCA_ORDER, others=_paths('pca'))
 @click.pass_context
 def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = _read_config_file(config_file)
+    config = read_config_option(config_file)
     opts = shim_click_defaults(ctx, TrainPCAOptions, config)
     shim_write_back_before(ctx, config_file, config, opts)
     result = steps.train_pca(input_dir, output_dir, output_file, shim_camera_swap(opts))
@@ -150,7 +127,7 @@ def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
 })
 @click.pass_context
 def apply_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = _read_config_file(config_file)
+    config = read_config_option(config_file)
     opts = shim_click_defaults(ctx, ApplyPCAOptions, config)
     shim_write_back_before(ctx, config_file, config, opts)
     result = steps.apply_pca(input_dir, output_dir, output_file, opts)
@@ -162,7 +139,7 @@ def apply_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
 @click_options(ChangepointsOptions, order=CHANGEPOINTS_ORDER, others=_paths('changepoints'))
 @click.pass_context
 def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = _read_config_file(config_file)
+    config = read_config_option(config_file)
     opts = shim_click_defaults(ctx, ChangepointsOptions, config)
     shim_write_back_before(ctx, config_file, config, opts)
     result = steps.compute_changepoints(input_dir, output_dir, output_file, opts)

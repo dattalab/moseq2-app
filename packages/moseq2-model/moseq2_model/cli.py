@@ -11,7 +11,7 @@ from os.path import join
 
 import click
 
-from moseq2_common.options import click_options, explicit_values
+from moseq2_common.options import click_options, explicit_values, shim_click_defaults
 from moseq2_model import steps
 from moseq2_model.options import ApplyModelOptions, CountFramesOptions, KappaScanOptions, LearnModelOptions
 from moseq2_model.util import count_frames as count_frames_wrapper
@@ -40,18 +40,6 @@ KAPPA_SCAN_ORDER = ("input_file", "output_dir", "index", "out_script", "n_models
                     "scan_scale", "min_kappa", "max_kappa", "memory", "wall_time", "partition", "get_cmd", "run_cmd",
                     *_MODEL_ORDER)
 APPLY_MODEL_ORDER = ("model_file", "pc_file", "dest_file", "var_name", "index", "load_groups")
-
-
-def shim_click_defaults(ctx, cls):
-    """Resolve ``cls`` from click's defaults and the typed options (removing PR to be named).
-
-    click converts each default through its option's type (``--noise-level``'s
-    0 becomes 0.0), and 1.5.0's command line ran on those values, which reach
-    the model file's ``run_parameters`` and a kappa scan's commands, where the
-    notebook ran on the declared ones.
-    """
-    defaults = {name: ctx.params[name] for name in cls().as_dict()}
-    return cls.resolve(config=defaults, explicit=explicit_values(ctx, cls))
 
 
 @cli.command(name="count-frames", help="Count the number of frames in given h5 file (pca_scores)")
