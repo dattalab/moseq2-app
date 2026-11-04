@@ -74,6 +74,7 @@ def apply_model_command(progress_paths, model_file):
 
     config = read_config(progress_paths["config_file"])
     # the command line's --load-groups defaults to True; the notebook reads it as False when config.yaml has none
+    # (shim R12, removed by PR 4.6)
     opts = ApplyModelOptions.resolve(config=config, explicit={"load_groups": config.get("load_groups", False)})
 
     # apply model to data

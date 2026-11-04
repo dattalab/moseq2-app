@@ -130,6 +130,21 @@ def generate_config_command(output_file, camera_type="k2"):
     return "Configuration file has been successfully generated."
 
 
+def shim_notebook_slurm_config(config, config_file):
+    """``batch-extract``'s click defaults overlaid with ``config``, ``config_file`` made absolute.
+
+    The settings the notebook's SLURM extraction jobs run with (survey 3.1,
+    removed by PR 3.2), where ``batch-extract``'s run on its resolved options.
+    Each job reads ``config_file``; the one ``generate-config`` writes holds
+    ``config_file: null``, which would otherwise reach every command.
+    """
+    return {
+        **{param.name: param.default for param in batch_extract.params if not param.required},
+        **config,
+        "config_file": abspath(config_file),
+    }
+
+
 @filter_warnings
 def extract_found_sessions(
     input_dir,
@@ -163,20 +178,12 @@ def extract_found_sessions(
         "skip_completed": skip_extracted,
         "num_frames": None,  # shim L7: config.yaml's num_frames is not used here; removed by PR 3.1
     })
-    # the SLURM jobs' settings: batch-extract's defaults overlaid with config.yaml
-    # (survey 3.1, removed by PR 3.2). Each job reads this config file; the one
-    # generate-config writes holds config_file: null, which would otherwise reach every command
-    flat_config = {
-        **{param.name: param.default for param in batch_extract.params if not param.required},
-        **config,
-        "config_file": abspath(config_file),
-    }
     result = steps.batch_extract(
         input_dir, opts, config_file=config_file,
         select=lambda found: get_selected_sessions(found, extract_all),
         # every recording is listed; the extraction skips the extracted ones when skip_extracted is set
         shim_list_finished=True,  # L8, removed by PR 3.2
-        shim_flat_config=flat_config,
+        shim_flat_config=shim_notebook_slurm_config(config, config_file),
     )
     # the local extraction ends with a summary naming each recording that failed
     if opts.cluster_type == "local" and result.found and not result.failures:
@@ -185,7 +192,7 @@ def extract_found_sessions(
 
 @filter_warnings
 def aggregate_extract_results_command(
-    input_dir, format, output_dir, mouse_threshold=0.0
+    input_dir, format, output_dir, mouse_threshold=None
 ):
     """
     Find all extracted h5, yaml and mp4 files and copies them all to a
@@ -198,6 +205,7 @@ def aggregate_extract_results_command(
     output_dir (str): path to directory to save all aggregated results
     mouse_threshold (float): min threshold of extracted mouse height to include a session
     in the aggregated sesssions to ensure sessions with no extracted mouse is not included in the aggregated sessions.
+    None takes ``AggregateOptions``' default.
 
 
     Returns:
@@ -210,9 +218,11 @@ def aggregate_extract_results_command(
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    result = steps.aggregate_results(
-        input_dir, output_dir, AggregateOptions(format=format, mouse_threshold=mouse_threshold)
-    )
+    if mouse_threshold is None:
+        # the class default as a float, as the command line runs it (shim_click_defaults' divergence, removed by PR 4.1)
+        mouse_threshold = float(AggregateOptions().mouse_threshold)
+    opts = AggregateOptions.resolve(explicit={"format": format, "mouse_threshold": mouse_threshold})
+    result = steps.aggregate_results(input_dir, output_dir, opts)
 
     return None if result.index_file is None else str(result.index_file)
 

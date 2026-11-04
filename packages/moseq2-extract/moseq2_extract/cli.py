@@ -11,8 +11,9 @@ import os
 from dataclasses import replace
 
 import click
+from click.core import ParameterSource
 
-from moseq2_common.options import click_options, read_config_option, shim_click_defaults
+from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
 from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
@@ -77,13 +78,19 @@ BATCH_EXTRACT_ORDER = (
 _AVI_ORDER = ("input_file", "mapping", "threads", "delete", "fps", "chunk_size", "output_file")
 
 
-def _typed_depth_range_is_manual(ctx, opts):
-    """Use a --bg-roi-depth-range typed on the command line as given, rather than
-    replacing it with the detected range. A range from the config file still
-    follows manual_set_depth_range."""
-    if ctx.get_parameter_source("bg_roi_depth_range") is click.core.ParameterSource.COMMANDLINE:
-        return replace(opts, manual_set_depth_range=True)
-    return opts
+def shim_typed_depth_range_is_manual(ctx) -> dict:
+    """``{"manual_set_depth_range": True}`` when ``--bg-roi-depth-range`` was typed, else ``{}``.
+
+    A range typed on the command line is used as given rather than replaced by
+    the detected range, as in 1.5.0. A range from ``config.yaml`` or in a
+    script's options still follows ``manual_set_depth_range``, so the rule lives
+    in the command bodies of ``find-roi``, ``extract`` and ``batch-extract`` and
+    not in the step. Removed by PR 4.1, which moves it into the step or the
+    options class.
+    """
+    if ctx.get_parameter_source("bg_roi_depth_range") is ParameterSource.COMMANDLINE:
+        return {"manual_set_depth_range": True}
+    return {}
 
 
 @cli.command(
@@ -96,7 +103,7 @@ def _typed_depth_range_is_manual(ctx, opts):
 @click.pass_context
 def find_roi(ctx, input_file, output_dir, config_file, **_):
     config = read_config_option(config_file)
-    opts = _typed_depth_range_is_manual(ctx, shim_click_defaults(ctx, RoiOptions, config))
+    opts = replace(shim_click_defaults(ctx, RoiOptions, config), **shim_typed_depth_range_is_manual(ctx))
     steps.find_roi(input_file, output_dir, opts)
 
 
@@ -112,27 +119,27 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 @click.pass_context
 def extract(ctx, input_file, output_dir, config_file, output_file, **_):
     config = read_config_option(config_file)
-    opts = _typed_depth_range_is_manual(ctx, shim_click_defaults(ctx, ExtractOptions, config))
+    opts = replace(shim_click_defaults(ctx, ExtractOptions, config), **shim_typed_depth_range_is_manual(ctx))
     # extract FILE reads config.yaml only, never the recording's session_config.yaml entry (L11, removed by PR 3.3).
     # The two paths 1.5.0 recorded among the extraction's parameters (R2, removed by PR 4.1):
     steps.extract(input_file, output_dir, opts,
                   shim_flat_config={"config_file": config_file, "output_file": output_file})
 
 
+#: ExtractOptions fields batch-extract hands the step in its options rather than as typed values.
+_IN_BATCH_OPTIONS = ("num_frames", "skip_completed", "cluster_type")
+
+
 def _typed_extract_options(ctx):
     """The extraction options typed on batch-extract's command line, to apply over
-    the config file and each recording's session config. Only options extract
-    itself takes are kept; num_frames and skip_completed are passed separately."""
-    passed_separately = {"input_file", "num_frames", "skip_completed", "config_file", "cluster_type"}
-    names = {p.name for p in extract.params} - passed_separately
-    typed = {
-        k: v
-        for k, v in ctx.params.items()
-        if k in names and ctx.get_parameter_source(k) is click.core.ParameterSource.COMMANDLINE
-    }
-    if "bg_roi_depth_range" in typed:
-        typed["manual_set_depth_range"] = True
-    return typed
+    the config file and each recording's session config: the ``ExtractOptions``
+    fields but ``_IN_BATCH_OPTIONS``, and ``--output-dir`` and ``--output-file``,
+    in the command's order."""
+    typed = set(explicit_values(ctx, ExtractOptions)) - set(_IN_BATCH_OPTIONS)
+    typed |= {name for name in ("output_dir", "output_file")
+              if ctx.get_parameter_source(name) is ParameterSource.COMMANDLINE}
+    return {**{name: value for name, value in ctx.params.items() if name in typed},
+            **shim_typed_depth_range_is_manual(ctx)}
 
 
 @cli.command(

@@ -20,8 +20,7 @@ from moseq2_extract.util import get_strels
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
-from moseq2_extract.session_config import recording_config, recording_options
-from moseq2_extract.steps import shim_config_lists
+from moseq2_extract.session_config import recording_settings
 from moseq2_app.util import read_and_clean_config, update_config
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.extract.proc import get_bground_im_file, apply_roi, threshold_chunk
@@ -257,8 +256,7 @@ class ArenaMaskWidget:
         The tool's settings (``ARENA_TOOL_SETTINGS``) come from the values it holds for the
         recording, which ``set_session_config_vars`` has written into its entry whether or not
         they are saved yet; every other setting comes from config.yaml as it is on disk now.
-        Every setting ``ExtractOptions`` declares is resolved as extraction resolves it
-        (``recording_options``), over the whole settings dict extraction is handed.
+        The settings are the dict extraction hands its work function (``recording_settings``).
 
         Args:
             folder (str): the recording's key in session_config.yaml.
@@ -266,11 +264,7 @@ class ArenaMaskWidget:
         Returns:
             (dict): the recording's settings.
         """
-        config_data = read_yaml(self.config_file) or {}
-        entry = self.session_config[folder]
-        config, _ = recording_config(config_data, entry)
-        opts = recording_options(config_data, entry)
-        return {**config, **shim_config_lists(opts.as_dict(), config)}
+        return recording_settings(read_yaml(self.config_file) or {}, self.session_config[folder])
 
     def compute_arena_mask(self):
         """compute the arena mask with the settings extraction would use (``recording_config``).

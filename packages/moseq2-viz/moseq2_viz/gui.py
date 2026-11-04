@@ -12,10 +12,10 @@ from moseq2_viz.options import BestModelOptions
 def get_best_fit_model(
     progress_paths,
     output_file=None,
-    plot_all=False,
-    fps=30,
-    ext="p",
-    objective="duration (mean match)",
+    plot_all=None,
+    fps=None,
+    ext=None,
+    objective=None,
 ):
     """
     Return the best model in the model foder that is closest to model free changepoint in the given objective.
@@ -27,6 +27,7 @@ def get_best_fit_model(
     fps (int): Frames per second.
     ext (str): File extension to search for models with
     objective (str): The objective to compare the results between the models and the model free changepoint.
+    Each of the four left as None takes ``BestModelOptions``' default.
 
     Returns:
     best_fit_model (str): Path tp best fit model
@@ -49,7 +50,11 @@ def get_best_fit_model(
         model_dir,
         changepoint_path,
         output_file,
-        BestModelOptions(plot_all=plot_all, ext=ext, fps=fps, objective=objective),
+        BestModelOptions.resolve(explicit={
+            name: value
+            for name, value in dict(plot_all=plot_all, ext=ext, fps=fps, objective=objective).items()
+            if value is not None
+        }),
     )
     result.figure.show(warn=False)
 
