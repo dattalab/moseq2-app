@@ -5,6 +5,7 @@ Extraction helper utility for computing scalar feature values performing cleanin
 import cv2
 import numpy as np
 from copy import deepcopy
+from moseq2_common.frames import CleaningOptions, cleaning_arguments
 from moseq2_extract.extract.track import em_tracking, em_get_ll
 from moseq2_extract.extract.proc import (
     crop_and_rotate_frames,
@@ -141,18 +142,18 @@ def extract_chunk(
     if roi is not None:
         chunk = apply_roi(chunk, roi)
 
-    # Denoise the frames before we do anything else
-    filtered_frames = clean_frames(
-        chunk,
-        prefilter_space=spatial_filter_size,
-        prefilter_time=temporal_filter_size,
-        iters_tail=tail_filter_iters,
-        strel_tail=strel_tail,
-        iters_min=cable_filter_iters or iters_min,
-        strel_min=strel_min,
-        frame_dtype=frame_dtype,
-        progress_bar=progress_bar,
-    )
+    # Denoise the frames before we do anything else, with the arguments flip-classifier
+    # training cleans with.
+    cleaning = cleaning_arguments(CleaningOptions(
+        spatial_filter_size=spatial_filter_size,
+        temporal_filter_size=temporal_filter_size,
+        tail_filter_iters=tail_filter_iters,
+        cable_filter_iters=cable_filter_iters or iters_min,
+        min_height=min_height,
+    ))
+    # shim D6: the structuring elements get_strels built with extraction's select_strel, removed by PR 3.10
+    cleaning.update(strel_tail=strel_tail, strel_min=strel_min)
+    filtered_frames = clean_frames(chunk, **cleaning, frame_dtype=frame_dtype, progress_bar=progress_bar)
 
     # If we need it, compute the EM parameters (for tracking in presence of occluders)
     if use_tracking_model:

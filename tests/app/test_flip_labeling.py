@@ -19,6 +19,7 @@ from __future__ import annotations
 import pickle
 import re
 import shutil
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -120,7 +121,7 @@ def test_labeled_ranges_reach_the_trained_classifier(notebook, tmp_path):
     run_cell(CLEAN, notebook)
     run_cell(TRAIN, notebook)
 
-    with np.load(notebook["train_path"]) as data:
+    with np.load(notebook["trained"].training_data) as data:
         assert len(data["frames"]) == 6 * 50
 
     # The classifier is read back the way the notebook's next cell reads it.
@@ -141,10 +142,90 @@ def test_a_right_facing_range_is_trained_as_it_was_shown(notebook):
     run_cell(CLEAN, notebook)
     from moseq2_app.flip.train import create_training_dataset
 
-    with np.load(create_training_dataset(widget.training_data_path, notebook["clean_dataclass"])) as data:
+    with np.load(create_training_dataset(widget.training_data_path, notebook["cleaning"])) as data:
         trained = data["frames"][:10]
     with h5py.File(widget.sessions[session], "r") as f:
         np.testing.assert_array_equal(trained, f["frames"][5:15])
+
+
+#: Cleaning settings unlike extraction's defaults in each way the flip notebook's
+#: own mapping lost: the tail and cable filters' shapes, the cable erosion, the
+#: median kernel and the height threshold.
+CLEANING = {"spatial_filter_size": [5], "tail_filter_shape": "rectangle", "tail_filter_size": [7, 7],
+            "cable_filter_shape": "ellipse", "cable_filter_size": [3, 3], "cable_filter_iters": 1,
+            "min_height": 12}
+
+
+def cleaned_as_extraction_cleans(frames, config):
+    """``frames`` cleaned the way ``extract_chunk`` cleans a chunk with ``config``'s settings.
+
+    The height threshold, then ``clean_frames`` with the structuring elements
+    ``get_strels`` builds from the shapes and sizes.
+    """
+    from moseq2_extract.extract.proc import clean_frames, threshold_chunk
+    from moseq2_extract.util import get_strels
+
+    strels = get_strels(config)
+    return clean_frames(
+        threshold_chunk(frames.copy(), config["min_height"], config["max_height"]),
+        prefilter_space=tuple(config["spatial_filter_size"]),
+        prefilter_time=tuple(config["temporal_filter_size"]),
+        strel_tail=strels["strel_tail"],
+        iters_tail=config["tail_filter_iters"],
+        strel_min=strels["strel_min"],
+        iters_min=config["cable_filter_iters"],
+        frame_dtype=frames.dtype,
+    )
+
+
+def train_with_the_script(frame_ranges_file):
+    """Run ``scripts/train_flip_classifier.py`` on the saved labels, from the command line."""
+    import importlib.util
+
+    from click.testing import CliRunner
+
+    path = Path(__file__).resolve().parents[2] / "scripts" / "train_flip_classifier.py"
+    spec = importlib.util.spec_from_file_location("train_flip_classifier", path)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    result = CliRunner().invoke(script.main, [frame_ranges_file, "--classifier-type", "rf"])
+    assert result.exit_code == 0, result.output
+
+
+@pytest.mark.parametrize("front_end", ["notebook", "script"])
+def test_flip_training_cleans_frames_as_extraction_does(notebook, tmp_path, configured, front_end):
+    """The cleaned third of the training set is what extraction makes of the same frames.
+
+    Extraction cleans each frame before the classifier sees it, so a classifier
+    trained on frames cleaned any other way is applied to frames unlike its
+    training set. The notebook reads extraction's settings from the config file,
+    here set away from the defaults in every cleaning setting; the script, which
+    takes no config file, cleans with extraction's defaults.
+    """
+    from moseq2_common.yaml import read_yaml, write_yaml
+
+    widget = notebook["FF"]
+    session = list(widget.sessions)[0]
+    label(widget, session, 10, 40, left=False)
+    run_cell(SAVE, notebook)
+    config = dict(read_yaml(str(configured)))
+    if front_end == "notebook":
+        config.update(CLEANING)
+        notebook["config_path"] = str(tmp_path / "config.yaml")
+        write_yaml(config, notebook["config_path"])
+        run_cell(CLEAN, notebook)
+        run_cell(TRAIN, notebook)
+    else:
+        train_with_the_script(widget.training_data_path)
+
+    with h5py.File(widget.sessions[session], "r") as f:
+        labeled = f["frames"][10:40]
+    both_ways = np.concatenate((labeled, np.rot90(labeled, 2, axes=(1, 2))), axis=0)
+    # pixels at the height threshold itself, which extraction keeps
+    assert (both_ways == config["min_height"]).any()
+    with np.load(Path(widget.training_data_path).with_name("training_data.npz")) as data:
+        cleaned = data["frames"][2 * len(both_ways):]
+    np.testing.assert_array_equal(cleaned, cleaned_as_extraction_cleans(both_ways, config))
 
 
 def test_training_with_no_labeled_frames_says_what_to_do(notebook):
@@ -339,7 +420,7 @@ def test_training_cleans_with_the_config_parameters(notebook, tmp_path, configur
         strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, tuple(config["cable_filter_size"])),
         iters_min=2,
     )
-    with np.load(notebook["train_path"]) as data:
+    with np.load(notebook["trained"].training_data) as data:
         np.testing.assert_array_equal(data["frames"][-len(expected) :], expected)
 
 
@@ -405,12 +486,12 @@ def test_training_on_older_saved_labels_warns(notebook, recwarn):
     assert "2 range(s) (40 frames)" in message
     assert "1 range(s) (30 frames)" in message
     assert SAVE_AND_RETRAIN in message
-    with np.load(notebook["train_path"]) as data:
+    with np.load(notebook["trained"].training_data) as data:
         assert len(data["frames"]) == 6 * 30
 
     run_cell(SAVE, notebook)
     recwarn.clear()
     run_cell(TRAIN, notebook)
     assert not [w for w in recwarn if "unsaved" in str(w.message)]
-    with np.load(notebook["train_path"]) as data:
+    with np.load(notebook["trained"].training_data) as data:
         assert len(data["frames"]) == 6 * 40

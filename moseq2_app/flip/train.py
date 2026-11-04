@@ -1,4 +1,3 @@
-import cv2
 import h5py
 import pickle
 import joblib
@@ -6,11 +5,10 @@ import numpy as np
 from pathlib import Path
 from functools import partial
 from sklearn.svm import SVC
-from dataclasses import dataclass
-from typing import Optional, Tuple
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
+from moseq2_common.frames import CleaningOptions, cleaning_arguments
 from moseq2_extract.extract.proc import clean_frames
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
@@ -23,25 +21,23 @@ SAVE_AND_RETRAIN = (
 )
 
 
-@dataclass
-class CleanParameters:
-    prefilter_space: tuple = (3,)
-    prefilter_time: Optional[tuple] = None
-    strel_tail: Tuple[int, int] = (9, 9)
-    strel_min: Tuple[int, int] = (5, 5)
-    iters_tail: Optional[int] = 1
-    iters_min: Optional[int] = None
-    height_threshold: int = 10
+def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> Path:
+    """Assemble the labeled frames into a training set and save it beside ``data_index_path``.
 
+    The set holds each labeled frame and its 180 degree rotation, a randomly
+    shifted copy of both, and a copy of both cleaned as extraction cleans its
+    frames with the settings ``cleaning``.
 
-def create_training_dataset(
-    data_index_path: str, clean_parameters: Optional[CleanParameters] = None
-) -> str:
+    Args:
+    data_index_path (str): the saved frame ranges (``flip-training-frame-ranges.p``).
+    cleaning (CleaningOptions): extraction's cleaning settings.
+
+    Returns:
+    out_path (Path): the training set, ``training_data.npz``.
+    """
     np.random.seed(0)
     data_index_path = Path(data_index_path)
     out_path = data_index_path.with_name("training_data.npz")
-    if clean_parameters is None:
-        clean_parameters = CleanParameters()
 
     # load trainingdata index
     if not data_index_path.exists():
@@ -81,17 +77,11 @@ def create_training_dataset(
     shifts = np.random.randint(-5, 5, size=(len(frames), 2))
     shifted_frames = np.array([np.roll(f, tuple(s), axis=(0, 1)) for f, s in zip(frames, shifts)]).astype(np.uint8)
 
-    # remove noise from frames
+    # remove noise from frames as extraction does: heights below min_height to zero, then clean_frames
     cleaned_frames = clean_frames(
-        np.where(frames > clean_parameters.height_threshold, frames, 0),
-        clean_parameters.prefilter_space,
-        clean_parameters.prefilter_time,
-        strel_tail=cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE, clean_parameters.strel_tail
-        ),
-        iters_tail=clean_parameters.iters_tail,
-        strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, clean_parameters.strel_min),
-        iters_min=clean_parameters.iters_min,
+        np.where(frames < cleaning.min_height, 0, frames),
+        **cleaning_arguments(cleaning),
+        frame_dtype=frames.dtype,
     )
     frames = np.concatenate((frames, shifted_frames, cleaned_frames), axis=0)
     print(
