@@ -142,3 +142,24 @@ def test_kappa_scan_commands_are_unchanged(tmp_path, scores, steps, options, mon
 
     assert result.script.read_text().splitlines() == SCAN_SCRIPT_1_5_0.splitlines()
     assert result.commands == SCAN_SCRIPT_1_5_0
+
+
+def test_learn_model_reads_config_file(tmp_path, scores, steps, monkeypatch):
+    received = []
+    monkeypatch.setattr(steps, "learn_model_wrapper", lambda i, d, config: received.append(config))
+    config = tmp_path / "config.yaml"
+    write_yaml({"kappa": 1000, "num_iter": 7}, str(config))
+
+    def learn(*args):
+        result = CliRunner().invoke(
+            model_cli.cli, ["learn-model", str(scores), str(tmp_path / "model.p"), "--config-file", str(config), *args],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0, result.output
+        return received.pop()
+
+    fit = learn()
+    assert (fit["kappa"], fit["num_iter"]) == (1000, 7)
+
+    fit = learn("--kappa", "50")
+    assert (fit["kappa"], fit["num_iter"]) == (50, 7)
