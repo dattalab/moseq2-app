@@ -176,7 +176,6 @@ def extract_found_sessions(
         "extensions": RECORDING_EXTENSIONS if ext is None else ext,
         "max_depth": max_depth,
         "skip_completed": skip_extracted,
-        "num_frames": None,  # shim L7: config.yaml's num_frames is not used here; removed by PR 3.1
     })
     result = steps.batch_extract(
         input_dir, opts, config_file=config_file,
