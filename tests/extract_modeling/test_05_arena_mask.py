@@ -699,7 +699,7 @@ def test_a_plane_background_is_what_extraction_subtracts(plane_run, median_backg
     median background with the saved parameters; the tool shows and subtracts
     the same plane."""
     from moseq2_extract.extract.proc import get_roi
-    from moseq2_extract.util import select_strel
+    from moseq2_common.frames import select_strel
 
     params = dict(plane_run["saved"])
     _, plane = get_roi(

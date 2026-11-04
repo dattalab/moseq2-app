@@ -31,15 +31,15 @@ class CleaningOptions(Options):
     spatial_filter_size: tuple = option((3,), "--spatial-filter-size", "-s", type=int, multiple=True, arena=True,
                                         help="Space prefilter kernel (median filter, must be odd)")
     tail_filter_shape: str = option("ellipse", "--tail-filter-shape", type=str, arena=True,
-                                    help="Tail filter shape")
+                                    help="Tail filter shape (ellipse or rectangle); none turns the tail filter off")
     tail_filter_size: tuple = option((9, 9), "--tail-filter-size", type=(int, int), arena=True,
-                                     help="Tail filter size")
+                                     help="Tail filter size (in pixels); 0 0 turns the tail filter off")
     tail_filter_iters: int = option(1, "--tail-filter-iters", type=int, arena=True,
                                     help="Number of tail filter iterations")
     cable_filter_size: tuple = option((5, 5), "--cable-filter-size", type=(int, int), arena=True,
-                                      help="Cable filter size (in pixels)")
+                                      help="Cable filter size (in pixels); 0 0 turns the cable filter off")
     cable_filter_shape: str = option("rectangle", "--cable-filter-shape", type=str, arena=True,
-                                     help="Cable filter shape (rectangle or ellipse)")
+                                     help="Cable filter shape (rectangle or ellipse); none turns the cable filter off")
     cable_filter_iters: int = option(0, "--cable-filter-iters", type=int, arena=True,
                                      help="Number of cable filter iterations")
     min_height: int = option(10, "--min-height", type=int, arena=True,

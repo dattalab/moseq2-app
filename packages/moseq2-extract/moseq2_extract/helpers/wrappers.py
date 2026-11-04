@@ -33,8 +33,8 @@ from moseq2_extract.helpers.data import (
     copy_manifest_results,
     check_completion_status,
 )
+from moseq2_common.frames import select_strel
 from moseq2_extract.util import (
-    select_strel,
     gen_batch_sequence,
     scalar_attributes,
     convert_raw_to_avi_function,
@@ -47,7 +47,6 @@ from moseq2_extract.util import (
     detect_and_set_camera_parameters,
     get_frame_range_indices,
     check_filter_sizes,
-    get_strels,
 )
 
 
@@ -620,9 +619,6 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
 
     write_yaml(status_dict, status_filename)
 
-    # Get Structuring Elements for extraction
-    str_els = get_strels(config_data)
-
     # Compute ROIs
     roi, bground_im, first_frame = get_roi_wrapper(
         input_file, config_data, output_dir=output_dir
@@ -641,7 +637,10 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     ):
         print("Dilating background and graduating walls")
         bground_im = graduate_dilated_wall_area(
-            bground_im, config_data, str_els["strel_dilate"], output_dir
+            bground_im,
+            config_data,
+            select_strel(config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])),
+            output_dir,
         )
 
     extraction_data = {
@@ -673,7 +672,6 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
             input_file=input_file,
             config_data=config_data,
             scalars=scalars,
-            str_els=str_els,
             output_mov_path=movie_filename,
         )
 

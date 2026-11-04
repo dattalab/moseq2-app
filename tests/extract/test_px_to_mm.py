@@ -23,8 +23,9 @@ DEPTH = 500.0
 
 #: The settings extract_chunk takes from its caller, which has no defaults for them.
 CHUNK_SETTINGS = dict(
-    use_tracking_model=False, spatial_filter_size=(3,), temporal_filter_size=None, tail_filter_iters=1,
-    cable_filter_iters=0, min_height=10, max_height=100, use_cc=False, tracking_model_segment=True,
+    use_tracking_model=False, spatial_filter_size=(3,), temporal_filter_size=None,
+    tail_filter_shape="ellipse", tail_filter_size=(9, 9), tail_filter_iters=1,
+    cable_filter_shape="rectangle", cable_filter_size=(5, 5), cable_filter_iters=0, min_height=10, max_height=100, use_cc=False, tracking_model_segment=True,
     flip_classifier=None, flip_classifier_smoothing=51, frame_dtype="uint8", progress_bar=True,
     crop_size=(80, 80), centroid_hampel_span=5, centroid_hampel_sig=3, angle_hampel_span=5,
     angle_hampel_sig=3, model_smoothing_clips=(-300, -150), tracking_model_init="raw",
@@ -91,7 +92,6 @@ def test_extraction_measures_a_frame_with_the_camera_that_wrote_it(compute_raw_s
     the same camera.
     """
     from moseq2_extract.extract.extract import extract_chunk
-    from moseq2_extract.util import get_strels
 
     floor = 670.0
     nframes, height, width = 10, 576, 640
@@ -101,17 +101,11 @@ def test_extraction_measures_a_frame_with_the_camera_that_wrote_it(compute_raw_s
     chunk[:, ((xx - 320) / 30.0) ** 2 + ((yy - 288) / 12.0) ** 2 < 1] = floor - 30
     roi = np.zeros((height, width), dtype=np.uint8)
     roi[100:476, 120:520] = 1
-    strels = get_strels(dict(
-        bg_roi_shape="ellipse", bg_roi_dilate=(10, 10), bg_roi_erode=(10, 10),
-        tail_filter_shape="ellipse", tail_filter_size=(9, 9),
-        cable_filter_shape="rectangle", cable_filter_size=(5, 5),
-    ))
-
     scalars = extract_chunk(
         chunk, roi=roi, bground=bground, true_depth=floor, **{
             **CHUNK_SETTINGS, "min_height": 10, "max_height": 100, "centroid_hampel_span": 0,
             "angle_hampel_span": 0, "compute_raw_scalars": compute_raw_scalars,
-        }, **strels,
+        },
     )["scalars"]
 
     azure_narrow = floor * 2 * np.tan(np.deg2rad(np.array([75.0, 65.0]) / 2)) / np.array([width, height])

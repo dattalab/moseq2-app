@@ -14,6 +14,7 @@ import numpy as np
 from glob import glob
 from copy import deepcopy
 import moseq2_common.yaml
+from moseq2_common.frames import select_strel
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -379,49 +380,6 @@ def load_metadata(metadata_file):
         metadata = json.load(metadata_file)
 
     return metadata
-
-def get_strels(config_data):
-    """
-    Get dictionary object of cv2 StructuringElements for image filtering given
-    a dict of configurations parameters.
-
-    Args:
-    config_data (dict): dict containing cv2 Structuring Element parameters
-
-    Returns:
-    str_els (dict): dict containing cv2 StructuringElements used for image filtering
-    """
-
-    str_els = {
-        'strel_dilate': select_strel(config_data['bg_roi_shape'], tuple(config_data['bg_roi_dilate'])),
-        'strel_erode': select_strel(config_data['bg_roi_shape'], tuple(config_data['bg_roi_erode'])),
-        'strel_tail': select_strel(config_data['tail_filter_shape'], tuple(config_data['tail_filter_size'])),
-        'strel_min': select_strel(config_data['cable_filter_shape'], tuple(config_data['cable_filter_size']))
-    }
-
-    return str_els
-
-def select_strel(string='e', size=(10, 10)):
-    """
-    Returns structuring element of specified shape.
-
-    Args:
-    string (str): string to indicate whether to use ellipse or rectangle
-    size (tuple): size of structuring element
-
-    Returns:
-    strel (cv2.StructuringElement): selected cv2 StructuringElement to use in video filtering or ROI dilation/erosion.
-    """
-
-    if string[0].lower() == 'e':
-        strel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, size)
-    elif string[0].lower() == 'r':
-        strel = cv2.getStructuringElement(cv2.MORPH_RECT, size)
-    else:
-        strel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, size)
-
-    return strel
-
 
 def scalar_attributes():
     """
@@ -868,7 +826,8 @@ def graduate_dilated_wall_area(bground_im, config_data, strel_dilate, output_dir
     Args:
     bground_im (np.ndarray): the computed background image.
     config_data (dict): dictionary containing helper user configuration parameters.
-    strel_dilate (cv2.structuringElement): dilation structuring element used to dilate background image.
+    strel_dilate (cv2.structuringElement): dilation structuring element used to dilate background image;
+        None skips the dilation.
     output_dir (str): path to save newly computed background to use.
 
     Returns:
@@ -879,7 +838,10 @@ def graduate_dilated_wall_area(bground_im, config_data, strel_dilate, output_dir
     old_bg = deepcopy(bground_im)
 
     # dilate background size to match ROI size and attribute wall noise to cancel out
-    bground_im = cv2.dilate(old_bg, strel_dilate, iterations=config_data.get('dilate_iterations', 5))
+    if strel_dilate is None:
+        bground_im = deepcopy(old_bg)
+    else:
+        bground_im = cv2.dilate(old_bg, strel_dilate, iterations=config_data.get('dilate_iterations', 5))
 
     # determine center of bground roi
     width, height = bground_im.shape[1], bground_im.shape[0]  # shape of bounding box
