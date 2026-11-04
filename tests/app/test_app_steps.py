@@ -2,8 +2,8 @@
 and the arena tool's settings.
 
 The syllable labeler and the crowd-movie comparison tool render their movies through
-``moseq2_app.steps.render_syllable_movies``, with a ``CrowdMovieOptions`` built from
-``config.yaml`` and each tool's own crowd-movie settings. The arena tool resolves a
+``moseq2_app.steps.render_syllable_movies``, with ``CrowdMovieOptions``' defaults and
+what each tool chooses: the syllables, the grouping and the number of examples. The arena tool resolves a
 recording's settings with ``ExtractOptions``, as extraction does.
 """
 
@@ -63,8 +63,8 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     labeler = calls[0]
     assert isinstance(labeler["opts"], CrowdMovieOptions)
     assert labeler["syllables"] == list(range(LABELED))
-    assert (labeler["opts"].max_examples, labeler["opts"].separate_by, labeler["opts"].min_dur) == (20, "", 3)
-    assert labeler["flat"]["select_median_duration_instances"] is False
+    assert (labeler["opts"].max_examples, labeler["opts"].separate_by, labeler["opts"].min_dur) == (20, "default", 4)
+    assert labeler["flat"] == {"select_median_duration_instances": False}
 
     comparison = CrowdMovieComparison(
         config_data=read_yaml(project["config_file"]), index_path=project["index_file"],
@@ -79,6 +79,7 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     compared = calls[1]
     assert isinstance(compared["opts"], CrowdMovieOptions)
     assert compared["syllables"] == [2]
+    assert compared["flat"] is None
     assert (compared["opts"].max_examples, compared["opts"].separate_by, compared["opts"].min_dur) == (7, "groups", 4)
 
 

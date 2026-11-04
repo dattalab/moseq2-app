@@ -20,8 +20,8 @@ def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: st
     Write a crowd movie of each of ``syllables`` into ``crowd_movie_dir``.
 
     ``syllables`` is one syllable, or the first n syllables (``range(n)``), in usage order
-    when ``opts.sort`` is set. ``shim_flat_config`` (R2, removed by PR 4.1) is the tool's
-    whole settings dict, passed under the options.
+    when ``opts.sort`` is set. ``shim_flat_config`` (R2, removed by PR 4.1) holds the
+    settings a tool passes that no options class declares, under the options.
 
     Args:
     model_path (str): path to the trained model.
@@ -29,7 +29,7 @@ def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: st
     crowd_movie_dir (str): folder the movies are written to.
     opts (CrowdMovieOptions): the crowd-movie settings.
     syllables (Sequence[int]): the syllables to render.
-    shim_flat_config (Mapping): the tool's whole settings dict.
+    shim_flat_config (Mapping): the tool's settings no options class declares.
 
     Returns:
     (dict): the movies written, ``{"all": [...]}`` or one list per group or session.

@@ -115,7 +115,7 @@ def comparison(analysis_paths, sorted_index, monkeypatch_module, tmp_path_factor
     obj.model_path = analysis_paths["model_path"]
     obj.index_path = analysis_paths["index_file"]
     obj.output_dir = str(movie.parent)
-    obj.config_data = {}
+    obj.cm_choices = {'separate_by': 'groups'}
     obj.get_pdfs = False
     obj.max_sylls = 5
     obj.syll_info = {i: {"label": f"s{i}", "desc": "", "crowd_movie_path": "", "group_info": {}}

@@ -194,10 +194,10 @@ class CrowdMovieCompareWidgets(ClearOutputMixin):
         """
 
         # Set currently selected sessions
-        self.config_data['session_names'] = list(self.cm_session_sel.value)
+        self.cm_choices['session_names'] = list(self.cm_session_sel.value)
 
         # Update session_syllable info dict
-        self.get_selected_session_syllable_info(self.config_data['session_names'])
+        self.get_selected_session_syllable_info(self.cm_choices['session_names'])
 
     def show_session_select(self, change):
         """
@@ -207,8 +207,8 @@ class CrowdMovieCompareWidgets(ClearOutputMixin):
         change (event): User switches their DropDownMenu selection
         """
 
-        # Handle display syllable selection and update config_data crowd movie generation
-        # source selector.
+        # Show the session selector for a per-session or per-subject source, and
+        # record how the crowd movies are grouped.
         options = [self.sorted_index['files'][s]['metadata'] for s in self.sessions]
 
         if change.new == 'SessionName':
@@ -216,17 +216,17 @@ class CrowdMovieCompareWidgets(ClearOutputMixin):
             self.cm_session_sel.options = sorted([o['SessionName'] for o in options])
             self.cm_session_sel.layout = self.layout_visible
             self.cm_trigger_button.layout.display = 'block'
-            self.config_data['separate_by'] = 'sessions'
+            self.cm_choices['separate_by'] = 'sessions'
         elif change.new == 'SubjectName':
             self.cm_session_sel.options = sorted([o['SubjectName'] for o in options])
             self.cm_session_sel.layout = self.layout_visible
             self.cm_trigger_button.layout.display = 'block'
-            self.config_data['separate_by'] = 'subjects'
+            self.cm_choices['separate_by'] = 'subjects'
         elif change.new == 'group':
             # Hide session selector
             self.cm_session_sel.layout = self.layout_hidden
             self.cm_trigger_button.layout.display = 'none'
-            self.config_data['separate_by'] = 'groups'
+            self.cm_choices['separate_by'] = 'groups'
 
     def on_click_trigger_button(self, b=None):
         """
@@ -241,7 +241,7 @@ class CrowdMovieCompareWidgets(ClearOutputMixin):
         # Compute current selected syllable's session dict.
         grouped_syll_dict = self.session_dict[syll_number]['session_info']
 
-        self.config_data['session_names'] = list(grouped_syll_dict.keys())
+        self.cm_choices['session_names'] = list(grouped_syll_dict.keys())
 
         # Get Crowd Movie Divs
         divs, self.bk_plots = self.generate_crowd_movie_divs(grouped_syll_dict)
