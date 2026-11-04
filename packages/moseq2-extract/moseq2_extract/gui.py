@@ -218,8 +218,11 @@ def aggregate_extract_results_command(
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    typed = {"format": format, **({} if mouse_threshold is None else {"mouse_threshold": mouse_threshold})}
-    result = steps.aggregate_results(input_dir, output_dir, AggregateOptions.resolve(explicit=typed))
+    if mouse_threshold is None:
+        # the class default as a float, as the command line runs it (shim_click_defaults' divergence, removed by PR 4.1)
+        mouse_threshold = float(AggregateOptions().mouse_threshold)
+    opts = AggregateOptions.resolve(explicit={"format": format, "mouse_threshold": mouse_threshold})
+    result = steps.aggregate_results(input_dir, output_dir, opts)
 
     return None if result.index_file is None else str(result.index_file)
 
