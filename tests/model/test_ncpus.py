@@ -18,9 +18,10 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_model.cli as model_cli
+import moseq2_model.steps as model_steps
 from moseq2_model.helpers.data import prepare_model_metadata
 from moseq2_model.train.util import train_model
-from moseq2_model.util import get_parameter_strings
+from moseq2_model.util import create_command_strings
 
 NOTE = (
     "--ncpus sets the CPUs each kappa-scan job requests on SLURM. A single fit "
@@ -39,7 +40,7 @@ def test_the_help_says_what_ncpus_sets(command):
 def learn(tmp_path, monkeypatch):
     """Run learn-model's command line with the fit replaced by a recorder."""
     received = []
-    monkeypatch.setattr(model_cli, "learn_model_wrapper",
+    monkeypatch.setattr(model_steps, "learn_model_wrapper",
                         lambda i, d, config: received.append(config))
     scores = tmp_path / "pca_scores.h5"
     scores.touch()
@@ -67,12 +68,12 @@ def test_the_scan_requests_ncpus_from_slurm_and_does_not_pass_it_on():
     config = dict(npcs=10, num_iter=50, index=None, separate_trans=False, robust=False,
                   e_step=False, hold_out=False, max_states=20, ncpus=4, cluster_type="slurm",
                   memory="5GB", partition="short", wall_time="3:00:00", prefix="")
-    parameters, prefix = get_parameter_strings(config)
-    assert prefix.startswith("sbatch -c 4 ")
-    assert "--ncpus" not in parameters
+    command = create_command_strings("pca_scores.h5", "models", config, [100]).splitlines()[-1]
+    assert command.startswith("sbatch -c 4 ")
+    assert "--ncpus" not in command
 
-    parameters, prefix = get_parameter_strings({**config, "ncpus": 0})
-    assert prefix.startswith("sbatch -c 8 ")
+    command = create_command_strings("pca_scores.h5", "models", {**config, "ncpus": 0}, [100]).splitlines()[-1]
+    assert command.startswith("sbatch -c 8 ")
 
 
 def test_ncpus_is_not_capped_at_the_number_of_training_sessions():

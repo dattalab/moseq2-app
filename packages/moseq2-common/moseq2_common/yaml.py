@@ -9,7 +9,7 @@ The parser stays ``ruamel``, deliberately. ``ruamel``'s safe loader is YAML 1.2;
 PyYAML is YAML 1.1 and reads unquoted ``yes``/``no``/``on``/``off`` as booleans
 and ``06:00:00`` as a sexagesimal integer. moseq2 config and index files contain
 both shapes -- moseq2-model's ``wall_time: 06:00:00`` is interpolated straight
-into an ``sbatch -t`` argument by ``util.get_parameter_strings``, so it must stay
+into an ``sbatch -t`` argument by ``util.create_command_strings``, so it must stay
 a string -- and switching parsers would quietly change how existing user files
 are read.
 
