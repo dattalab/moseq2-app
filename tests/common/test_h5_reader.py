@@ -1,10 +1,11 @@
 """Every package reads ``.h5`` files through one reader in moseq2-common.
 
 Extraction results, PCA scores, changepoints and model exports are read into
-nested dicts by ``moseq2_common.h5.h5_to_dict``. Before it, extract, pca and
-viz each kept their own copy, each with its own fix for h5py 3 handing
-variable-length text back as ``bytes``, so the next h5py or file-format change
-would have been fixed in one copy and missed in the others.
+nested dicts by ``moseq2_common.h5.h5_to_dict``. Before it, extract, pca,
+viz and model each kept their own copy, and each decoded the ``bytes`` h5py 3
+hands back for variable-length text its own way (model's not at all), so the
+next h5py or file-format change would have been fixed in one copy and missed in
+the others.
 
 What the reader returns, by how a value is stored:
 
@@ -15,9 +16,6 @@ What the reader returns, by how a value is stored:
   as it always was;
 - a null dataspace, which is how an extraction records an unset parameter,
   reads as ``h5py.Empty``.
-
-moseq2-model keeps its own copy until its decoding is switched, which changes
-what a model saved as ``.h5`` reads back.
 """
 
 from __future__ import annotations
@@ -104,15 +102,13 @@ def test_nested_groups_read_as_nested_dicts(h5file):
                           h5py.Empty)
 
 
-def test_only_moseq2_common_and_moseq2_model_define_an_h5_reader():
+def test_only_moseq2_common_defines_an_h5_reader():
     found = []
     for pkg in PACKAGES:
         root = Path(importlib.import_module(pkg).__file__).parent
         for path in sorted(root.rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             module = path.relative_to(root.parent).as_posix()
-            if module == "moseq2_model/util.py":
-                continue  # its copy decodes no strings; switching it changes results
             found += [
                 f"{module}:{node.lineno} {node.name}"
                 for node in ast.walk(tree)
