@@ -7,6 +7,10 @@ records no unit; its timestamps are read as milliseconds.
 
 ``read_timestamps`` returns the times in the unit the caller asks for: PCA
 works in seconds, the scalar table and the QC cell in milliseconds.
+
+``frame_steps`` and ``dropped_frames`` find the frames the camera dropped, for
+PCA, which puts an empty row where each one was, and for the QC cell, which
+reports how many there were.
 """
 
 from __future__ import annotations
@@ -16,7 +20,14 @@ import os
 import h5py
 import numpy as np
 
-__all__ = ["TIMESTAMP_UNITS", "timestamps_path", "timestamp_unit", "read_timestamps"]
+__all__ = [
+    "TIMESTAMP_UNITS",
+    "timestamps_path",
+    "timestamp_unit",
+    "read_timestamps",
+    "frame_steps",
+    "dropped_frames",
+]
 
 #: How many of each value of a timestamps dataset's ``unit`` attribute make a
 #: second.
@@ -89,3 +100,48 @@ def read_timestamps(h5file: str | os.PathLike | h5py.File, unit: str) -> tuple[n
         return _read(h5file, unit)
     with h5py.File(h5file, "r") as f:
         return _read(f, unit)
+
+
+def frame_steps(timestamps, period=None) -> np.ndarray:
+    """
+    How many frame periods each gap between consecutive timestamps spans, to
+    the nearest whole number: 1 where no frame was dropped, n + 1 where n were.
+
+    Args:
+    timestamps (numpy.array): each frame's time, in any one unit.
+    period (float): the frame period, in the timestamps' unit; by default the
+        median gap, which the drops themselves do not move.
+
+    Returns:
+    steps (numpy.array): one value per gap, so one fewer than the timestamps.
+    """
+    timestamps = np.asarray(timestamps)
+    gaps = np.diff(timestamps)
+    if len(gaps) == 0:
+        return gaps
+    if period is None:
+        period = np.median(gaps)
+    if not (np.isfinite(period) and period > 0):
+        raise ValueError(
+            f"Cannot count dropped frames: the frame period from these timestamps is "
+            f"{period:g}, and a positive period is needed. The first timestamp differences "
+            f"are [{', '.join(f'{d:g}' for d in gaps[:5])}]. Check the timestamps the "
+            f"session was extracted from (the recording's depth_ts.txt or timestamps.csv) "
+            f"and extract the session again."
+        )
+    return np.round(gaps / period)
+
+
+def dropped_frames(timestamps) -> int:
+    """
+    How many frames the camera dropped, by the rule PCA fills them with: a gap
+    of n frame periods (the median gap) holds n - 1 dropped frames.
+
+    Args:
+    timestamps (numpy.array): each frame's time, in any one unit.
+
+    Returns:
+    dropped (int): the number of dropped frames.
+    """
+    steps = frame_steps(timestamps)
+    return int(np.sum(steps[steps > 1] - 1))
