@@ -716,3 +716,56 @@ def test_a_plane_background_is_what_extraction_subtracts(plane_run, median_backg
     _, _, recorded = plane_run["first extraction"]
     np.testing.assert_allclose(recorded, expected)
     np.testing.assert_allclose(plane_run["background shown"], expected)
+
+
+# ------------------------------------------ the preview against extraction
+
+#: How many frames the preview and the extraction it is compared with take.
+PREVIEW_FRAMES = 30
+
+
+def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sessions):
+    """L13: "Compute extraction" shows what extraction will write.
+
+    ``graduate_walls`` subtracts the floor's depth, measured from the arena,
+    where the mouse sits on the bucket's edge, and with more than one dilation
+    it replaces the background with a gradient built from that depth. The
+    preview has to measure the floor and build the background as extraction
+    does, or the mouse it shows is not the mouse extraction writes.
+
+    The preview extracts frames 1 to ``PREVIEW_FRAMES``; extraction is given
+    the same frames (one frame trimmed from the start), so both run one chunk
+    over the same frames with the same saved settings.
+    """
+    import h5py
+    from moseq2_extract.gui import generate_config_command
+    from moseq2_extract.helpers.wrappers import extract_wrapper
+    from moseq2_extract.session_config import recording_configs
+
+    root = tmp_path / "project"
+    shutil.copytree(raw_sessions / "saline_example_0", root / "saline_example_0")
+    config = root / "config.yaml"
+    generate_config_command(str(config), camera_type="k2")
+    with update_config(str(config)) as config_data:
+        config_data["output_dir"] = "proc"
+        config_data["graduate_walls"] = True
+
+    widget, data, buttons = open_widget(root)
+    data.frames_to_extract = PREVIEW_FRAMES
+    data.mask_dilations = 3
+    click(buttons["Compute extraction"])
+    shown = np.asarray(data.images["Extracted mouse"])
+    click(buttons["Save session parameters"])
+
+    recording = widget.sessions[data.path]
+    settings = recording_configs(str(config), [recording]).configs[recording]
+    assert settings["graduate_walls"] and settings["dilate_iterations"] > 1, (
+        "the saved settings do not graduate the walls, so this compares nothing"
+    )
+    settings["frame_trim"] = [1, 0]
+    output_dir = extract_wrapper(recording, settings["output_dir"], settings, num_frames=PREVIEW_FRAMES + 1)
+    with h5py.File(f"{output_dir}/results_00.h5", "r") as f:
+        extracted = f["frames"][()]
+
+    assert shown.shape == extracted.shape
+    np.testing.assert_array_equal(shown, extracted)

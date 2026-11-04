@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import shutil
 
-import numpy as np
 import pytest
 
 import moseq2_extract.steps as extract_steps
@@ -115,21 +114,14 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
 
 
 def _recorded(monkeypatch, name, calls):
-    """Replace ``name`` in the widget's module with a recorder of each call's arguments.
-
-    ``extract_chunk`` is recorded and not run: a flip classifier for the Kinect v2 expects
-    80-pixel crops, and the test tunes the crop size. Any other function runs as well.
-    """
+    """Replace ``name`` in the widget's module with a recorder of each call's arguments,
+    which then runs the function."""
     import moseq2_app.roi.widget as widget_module
 
     real = getattr(widget_module, name)
 
     def recorder(*args, **kwargs):
         calls.append((args, kwargs))
-        if name == "extract_chunk":
-            n = len(args[0])
-            crop = kwargs["crop_size"]
-            return {"depth_frames": np.zeros((n, crop[1], crop[0]), dtype="uint8")}
         return real(*args, **kwargs)
 
     monkeypatch.setattr(widget_module, name, recorder)
@@ -158,7 +150,7 @@ def test_config_yaml_changes_after_the_tool_reach_the_preview_extraction(project
     assert data.path == "saline_example_0"
     low, high = data.depth_range
     data.depth_range = (low - 5, high + 5)
-    data.crop_size = 100
+    data.tail_filters = 2
     data.frames_to_extract = 5
 
     calls = []
@@ -170,9 +162,23 @@ def test_config_yaml_changes_after_the_tool_reach_the_preview_extraction(project
     assert received["flip_classifier"] == classifier
     assert tuple(received["frame_trim"]) == (100, 0)
     # tuned in the tool and not saved
-    assert tuple(received["crop_size"]) == (100, 100)
+    assert received["tail_filter_iters"] == 2
     assert tuple(received["bg_roi_depth_range"]) == (low - 5, high + 5)
     assert received["manual_set_depth_range"] is True
+
+
+def test_the_preview_stops_on_a_flip_classifier_that_does_not_fit_the_crop_size(project, raw_sessions):
+    """L13: "Compute extraction" runs extraction's flip-classifier check, so a crop size the
+    classifier was not trained on stops the preview with the message extraction gives,
+    naming both sizes, before any frame is extracted."""
+    classifier = f"{raw_sessions}/flip_classifier_k2_c57_10to13weeks.npz"
+    _, widget = _save_then_change_config(project, raw_sessions, {"flip_classifier": classifier})
+    widget.session_data.crop_size = 100
+    widget.session_data.frames_to_extract = 5
+
+    with pytest.raises(ValueError, match=r"Your crop_size is \(100, 100\)") as stopped:
+        click(buttons_of(widget.view)["Compute extraction"])
+    assert "expects 6400 pixels (i.e. crop_size (80, 80))" in str(stopped.value)
 
 
 def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monkeypatch, raw_sessions):
