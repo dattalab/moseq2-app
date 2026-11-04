@@ -16,13 +16,19 @@ from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings, session_config_key, session_keys
 from moseq2_extract.io.video import load_movie_data
+from moseq2_extract.util import check_filter_sizes
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.util import detect_and_set_camera_parameters
-from moseq2_extract.helpers.wrappers import find_arena_candidates, session_output_dir
+from moseq2_extract.helpers.wrappers import (
+    find_arena_candidates,
+    floor_depth_and_background,
+    session_output_dir,
+    validate_flip_classifier,
+)
 from moseq2_extract.session_config import recording_settings
 from moseq2_app.util import read_and_clean_config, update_config
 from moseq2_common.yaml import read_yaml, write_yaml
-from moseq2_extract.extract.proc import get_bground_im_file, apply_roi, threshold_chunk
+from moseq2_extract.extract.proc import get_bground_im_file
 
 
 
@@ -33,47 +39,6 @@ _hover_dict = {
     'Extracted mouse': HoverTool(tooltips=[('Height from floor (mm)', '@image')]),
     'Frame (background subtracted)': HoverTool(tooltips=[('Height from floor (mm)', '@image')]),
 }
-
-
-def shim_arena_preview(recording, frames_to_extract, background, mask, settings):
-    """
-    The arena tool's preview extraction: its own pipeline, ahead of extraction's.
-
-    L13, removed by PR 3.11, when the preview calls the frame-extraction function
-    extraction uses, floor-depth measurement and flip-classifier crop check included.
-
-    Args:
-    recording (str): path to the recording.
-    frames_to_extract (int): number of frames to extract, from the second frame on.
-    background (numpy.ndarray): the recording's background.
-    mask (numpy.ndarray): the arena mask.
-    settings (dict): the recording's settings (``ArenaMaskWidget.recording_config``).
-
-    Returns:
-    (numpy.ndarray): extracted frames
-    frames (numpy.ndarray): raw frames after background subtraction and roi application
-    """
-    # get segmented frame
-    raw_frames = load_movie_data(recording,
-                                 range(1, frames_to_extract + 1),
-                                 **settings,
-                                 frame_size=background.shape[::-1])
-
-    # subtract background
-    frames = (background - raw_frames)
-
-    # filter out regions outside of ROI
-    frames = apply_roi(frames, mask)
-
-    # filter for included mouse height range
-    frames = threshold_chunk(frames, settings['min_height'], settings['max_height'])
-
-    extraction = extract_chunk(raw_frames.copy(),
-                               roi=mask,
-                               bground=background,
-                               **settings,
-                               )
-    return extraction['depth_frames'], frames
 
 
 class ArenaMaskWidget:
@@ -283,23 +248,33 @@ class ArenaMaskWidget:
         return background, rois
 
     def compute_extraction(self):
-        """compute extraction of the given frames, with the settings extraction would use (``recording_config``)
+        """Extract the first frames as extraction will, with the settings it would use (``recording_config``).
+
+        The flip-classifier check, the floor-depth measurement, the background and
+        ``extract_chunk`` are extraction's own, so the preview shows what extraction writes.
 
         Returns:
             (numpy.ndarray): extracted frames
-            frames (numpy.ndarray): raw frames after background subtraction and roi application
+            (numpy.ndarray): the frames after background subtraction, height threshold and arena mask
         """
         self.set_session_config_vars()
 
         folder = self.session_data.path
-        session_config = self.recording_config(folder)
+        settings = self.recording_config(folder)
+        validate_flip_classifier(settings)
+        settings = check_filter_sizes(settings)
 
         # TODO: compute mask only if not already done
         background, rois = self.compute_arena_mask()
         mask = rois[self.session_data.mask_index]
+        background = floor_depth_and_background(background, mask, settings, self._output_dir(folder))
 
-        return shim_arena_preview(self.sessions[folder], self.session_data.frames_to_extract,
-                                  background, mask, session_config)
+        raw_frames = load_movie_data(self.sessions[folder],
+                                     range(1, self.session_data.frames_to_extract + 1),
+                                     **settings,
+                                     frame_size=background.shape[::-1])
+        extraction = extract_chunk(raw_frames, roi=mask, bground=background, **settings)
+        return extraction['depth_frames'], extraction['chunk']
 
     def get_background(self, folder=None):
         """Assuming this will be called by an event-triggered function"""

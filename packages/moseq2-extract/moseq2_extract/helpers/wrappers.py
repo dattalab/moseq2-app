@@ -476,6 +476,44 @@ def validate_flip_classifier(config_data):
     )
 
 
+def floor_depth_and_background(bground_im, roi, config_data, output_dir):
+    """
+    Measure the arena floor's depth and build the background frames are subtracted from.
+
+    Extraction and the arena tool's preview both call this before ``extract_chunk``, so
+    the preview subtracts what extraction subtracts.
+
+    Args:
+    bground_im (numpy.ndarray): the recording's background.
+    roi (numpy.ndarray): the arena mask.
+    config_data (dict): the recording's settings; ``true_depth`` is set in it.
+    output_dir (str): the recording's output folder, where a graduated background is written.
+
+    Returns:
+    bground_im (numpy.ndarray): the background, with graduated walls when
+        ``graduate_walls`` is set and ``dilate_iterations`` is more than 1.
+    """
+    # Debugging option: DTD has no effect on extraction results unless dilate iterations > 1
+    if config_data.get("detected_true_depth", "auto") == "auto":
+        config_data["true_depth"] = np.median(bground_im[roi > 0])
+    else:
+        config_data["true_depth"] = int(config_data["detected_true_depth"])
+
+    print("Detected true depth:", config_data["true_depth"])
+
+    if config_data.get("dilate_iterations", 0) > 1 and config_data.get(
+        "graduate_walls"
+    ):
+        print("Dilating background and graduating walls")
+        bground_im = graduate_dilated_wall_area(
+            bground_im,
+            config_data,
+            select_strel(config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])),
+            output_dir,
+        )
+    return bground_im
+
+
 def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False):
     """
     Extract depth videos.
@@ -624,24 +662,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         input_file, config_data, output_dir=output_dir
     )
 
-    # Debugging option: DTD has no effect on extraction results unless dilate iterations > 1
-    if config_data.get("detected_true_depth", "auto") == "auto":
-        config_data["true_depth"] = np.median(bground_im[roi > 0])
-    else:
-        config_data["true_depth"] = int(config_data["detected_true_depth"])
-
-    print("Detected true depth:", config_data["true_depth"])
-
-    if config_data.get("dilate_iterations", 0) > 1 and config_data.get(
-        "graduate_walls"
-    ):
-        print("Dilating background and graduating walls")
-        bground_im = graduate_dilated_wall_area(
-            bground_im,
-            config_data,
-            select_strel(config_data["bg_roi_shape"], tuple(config_data["bg_roi_dilate"])),
-            output_dir,
-        )
+    bground_im = floor_depth_and_background(bground_im, roi, config_data, output_dir)
 
     extraction_data = {
         "bground_im": bground_im,
