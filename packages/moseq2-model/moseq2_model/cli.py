@@ -11,7 +11,7 @@ from os.path import join
 
 import click
 
-from moseq2_common.options import click_options, explicit_values, shim_click_defaults
+from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
 from moseq2_model import steps
 from moseq2_model.options import ApplyModelOptions, CountFramesOptions, KappaScanOptions, LearnModelOptions
 from moseq2_model.util import count_frames as count_frames_wrapper
@@ -35,7 +35,7 @@ _MODEL_ORDER = ("check_every", "robust", "separate_trans", "nlags", "noise_level
                 "percent_split", "progressbar", "whiten", "npcs", "max_states", "save_model", "save_every", "e_step",
                 "var_name", "num_iter", "ncpus", "nfolds", "hold_out_seed", "hold_out")
 LEARN_MODEL_ORDER = ("input_file", "dest_file", *_MODEL_ORDER, "kappa", "checkpoint_freq", "use_checkpoint", "index",
-                     "default_group", "verbose")
+                     "config_file", "default_group", "verbose")
 KAPPA_SCAN_ORDER = ("input_file", "output_dir", "index", "out_script", "n_models", "prefix", "cluster_type",
                     "scan_scale", "min_kappa", "max_kappa", "memory", "wall_time", "partition", "get_cmd", "run_cmd",
                     *_MODEL_ORDER)
@@ -57,11 +57,14 @@ def count_frames(ctx, input_file, **_):
     "input_file": click.argument("input_file", type=click.Path(exists=True)),
     "dest_file": click.argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)),
     "index": _index(_INDEX_HELP),
+    "config_file": click.option("--config-file", type=click.Path(), default=None,
+                                help="Path to a config.yaml whose settings this fit uses; "
+                                     "options typed on the command line take precedence over it"),
 })
 @click.pass_context
-def learn_model(ctx, input_file, dest_file, index, **_):
+def learn_model(ctx, input_file, dest_file, index, config_file, **_):
     # Train the ARHMM using PC scores located in the INPUT_FILE, and saves the model to DEST_FILE
-    opts = shim_click_defaults(ctx, LearnModelOptions)
+    opts = shim_click_defaults(ctx, LearnModelOptions, read_config_option(config_file))
     if opts.ncpus:
         click.echo(
             "--ncpus sets the CPUs each kappa-scan job requests on SLURM. A single fit "
