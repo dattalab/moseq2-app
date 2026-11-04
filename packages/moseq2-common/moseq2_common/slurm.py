@@ -1,7 +1,7 @@
 """The SLURM options ``batch-extract`` and ``kappa-scan`` share, and their sbatch line.
 
-``ncpus`` and ``get_cmd`` are declared by each command, since their flags,
-defaults and help differ between the two.
+``ncpus`` is declared by each command, since its flags, default and help
+differ between the two.
 """
 
 from __future__ import annotations
@@ -28,6 +28,8 @@ class SlurmOptions(Options):
     memory: str = option("5GB", "--memory", type=str, help="RAM (slurm only)")
     wall_time: str = option("3:00:00", "--wall-time", type=str, help="Wall time (slurm only)")
     partition: str = option("short", "--partition", type=str, help="Partition name (slurm only)")
+    get_cmd: bool = option(True, "--get-cmd/--no-get-cmd", is_flag=True,
+                           help="Print the commands after writing them to the script.")
     run_cmd: bool = option(False, "--run-cmd", is_flag=True, help="Run scan command strings.")
 
 
