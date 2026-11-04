@@ -13,6 +13,7 @@ import numpy as np
 from copy import deepcopy
 from cytoolz import first
 from collections import OrderedDict
+from moseq2_common.h5 import h5_to_dict
 from moseq2_common.slurm import sbatch_command
 from moseq2_common.yaml import write_yaml
 from moseq2_model.options import LearnModelOptions
@@ -348,55 +349,6 @@ def save_arhmm_checkpoint(filename: str, arhmm: dict):
     # Save model
     print(f"Saving Checkpoint {filename}")
     joblib.dump(arhmm, filename, compress=("zlib", 5))
-
-
-def _load_h5_to_dict(file: h5py.File, path: str) -> dict:
-    """
-    Load the contents of an h5 file at a specified path into a dictionary.
-
-    Args:
-    filename (h5py.File): opened h5 file.
-    path (str): path within the h5 file to load data from.
-
-    Returns:
-    (dict): dict containing all of the h5 file contents.
-    """
-
-    ans = {}
-    if isinstance(file[path], h5py._hl.dataset.Dataset):
-        # only use the final path key to add to `ans`
-        ans[path.split("/")[-1]] = file[path][()]
-    else:
-        # Reading in h5 value into dict key-value pair
-        for key, item in file[path].items():
-            if isinstance(item, h5py.Dataset):
-                ans[key] = item[()]
-            elif isinstance(item, h5py.Group):
-                ans[key] = _load_h5_to_dict(file, "/".join([path, key]))
-    return ans
-
-
-def h5_to_dict(h5file, path: str = "/") -> dict:
-    """
-    Load h5 data to dictionary from a user specified path.
-
-    Args:
-    h5file (str or h5py.File): file path to the given h5 file or the h5 file handle
-    path (str): path to the base dataset within the h5 file
-
-    Returns:
-    out (dict): a dict with h5 file contents with the same path structure
-    """
-
-    # Load h5 file according to whether it is separated by Groups
-    if isinstance(h5file, str):
-        with h5py.File(h5file, "r") as f:
-            out = _load_h5_to_dict(f, path)
-    elif isinstance(h5file, (h5py.File, h5py.Group)):
-        out = _load_h5_to_dict(h5file, path)
-    else:
-        raise Exception("file input not understood - need h5 file path or file object")
-    return out
 
 
 def load_data_from_matlab(filename, var_name="features", npcs=10):
