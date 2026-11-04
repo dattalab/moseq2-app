@@ -77,8 +77,8 @@ class CrowdMovieOptions(SyllableCoverageOptions):
     max_examples: int = option(20, "--max-examples", "-m", type=int, help="number of examples to show")
     processes: int | None = option(
         None, "--processes", type=int,
-        help="number of processes to use for rendering crowd movies. Default None uses every CPU "
-             "available to this process")
+        help="number of processes to use for rendering crowd movies (default: every CPU "
+             "available to this process)")
     separate_by: str = option("default", "--separate-by",
                               type=click.Choice(["default", "groups", "sessions", "subjects"]),
                               help="generate crowd movies by specified grouping")
