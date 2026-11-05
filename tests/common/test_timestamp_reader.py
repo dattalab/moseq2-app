@@ -20,7 +20,12 @@ import h5py
 import numpy as np
 import pytest
 
-from moseq2_common.timestamps import read_timestamps, timestamp_unit, timestamps_path
+from moseq2_common.timestamps import (
+    dropped_frames,
+    read_timestamps,
+    timestamp_unit,
+    timestamps_path,
+)
 
 MILLISECONDS = np.arange(10) * 1000 / 30 + 25044816.2766
 
@@ -110,3 +115,19 @@ def test_a_file_without_timestamps_names_the_file(tmp_path):
     with pytest.raises(KeyError) as e:
         read_timestamps(h5, "seconds")
     assert h5 in str(e.value)
+
+
+def test_a_gap_of_n_frame_periods_holds_n_minus_one_dropped_frames():
+    """The period is the median gap, so it is the same in any unit and the drops do not move it.
+
+    Frames 33.02 ms apart with one frame dropped at 100 and three at 200 to 202.
+    """
+    times = np.delete(np.arange(300) * 33.02, [100, 200, 201, 202])
+    assert dropped_frames(times) == 4
+    assert dropped_frames(times / 1000) == 4
+    assert dropped_frames(times[:1]) == 0
+
+
+def test_timestamps_with_no_frame_period_say_what_they_hold():
+    with pytest.raises(ValueError, match=r"frame period from these timestamps is 0.*\[0, 0"):
+        dropped_frames(np.zeros(10))

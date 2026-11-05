@@ -10,42 +10,9 @@ from os.path import exists
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
 from moseq2_common.h5 import h5_to_dict
-from moseq2_common.timestamps import read_timestamps
+from moseq2_common.timestamps import dropped_frames, read_timestamps
 from moseq2_common.yaml import read_yaml
 
-
-def check_timestamp_error_percentage(timestamps, fps=30, scaling_factor=1000):
-    """
-    Return the proportion of dropped frames relative to the respective recorded timestamps and frames per second.
-
-    Args:
-    timestamps (numpy.array): Session's recorded timestamp array.
-    fps (int): Frames per second
-    scaling_factor (float): factor to divide timestamps by to convert timestamp milliseconds into seconds.
-
-    Returns:
-    percentError (float): Percentage of frames that were dropped/missed during acquisition.
-    """
-    # https://www.mathworks.com/help/imaq/examples/determining-the-rate-of-acquisition.html
-    # Find the time difference between frames.
-    diff = np.diff(timestamps)
-
-    # Check if the timestamps are in milliseconds based on the mean difference amount
-    if np.mean(diff) > 10:
-        # rescale the timestamps to seconds
-        diff = diff / scaling_factor
-
-    # Find the average time difference between frames.
-    avgTime = np.mean(diff)
-
-    # Determine the experimental frame rate.
-    expRate = 1 / avgTime
-
-    # Determine the percent error between the determined and actual frame rate.
-    diffRates = abs(fps - expRate)
-    percentError = (diffRates / fps)
-
-    return percentError
 
 def count_nan_rows(scalar_df):
     """
@@ -186,19 +153,20 @@ def make_session_status_dicts(paths):
         status_dicts[stat_dict['uuid']] = deepcopy(flags)
         status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
 
-        # read timestamps from h5
+        # Count dropped frames as PCA fills them, as a share of the frames the
+        # recording would have had without them.
         try:
-            timestamps, unit_recorded = read_timestamps(h5path, "milliseconds")
-            # Count dropped frame percentage. A file that records its unit is read in
-            # milliseconds; one that does not is left to the guess from the gaps' size.
-            if unit_recorded:
-                dropped_frames = check_timestamp_error_percentage(timestamps / 1000, fps=30, scaling_factor=1)
-            else:
-                dropped_frames = check_timestamp_error_percentage(timestamps, fps=30)
-            if dropped_frames >= 0.05:
-                status_dicts[stat_dict['uuid']]['dropped_frames'] = dropped_frames
+            timestamps, _ = read_timestamps(h5path, "milliseconds")
         except KeyError:
             print(f'{h5path} timestamps not found.')
+            continue
+        try:
+            dropped = dropped_frames(timestamps)
+        except ValueError as e:
+            raise ValueError(f'{h5path}: {e}') from e
+        share = dropped / max(len(timestamps) + dropped, 1)
+        if share >= 0.05:
+            status_dicts[stat_dict['uuid']]['dropped_frames'] = share
 
     return status_dicts
 

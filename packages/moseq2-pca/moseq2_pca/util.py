@@ -21,7 +21,7 @@ from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
 from moseq2_common.frames import clean_frames as clean_frames_spatial, odd_kernel
-from moseq2_common.timestamps import timestamps_path
+from moseq2_common.timestamps import frame_steps, timestamps_path
 from moseq2_common.yaml import read_yaml as _read_yaml, write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
@@ -270,7 +270,7 @@ def insert_nans(timestamps, data, fps=None):
             f'frame_rate_from_timestamps, which says what is wrong with them.'
         )
 
-    steps = np.round(gaps / period) if len(gaps) > 0 else gaps
+    steps = frame_steps(timestamps, period)
     data_idx = np.arange(len(timestamps)).astype('float64')
 
     filled_data = deepcopy(data)

@@ -14,11 +14,11 @@ import pandas as pd
 import pytest
 
 from moseq2_app.roi.validation import (
-    check_timestamp_error_percentage,
     count_frames_with_small_areas,
     count_stationary_frames,
     make_session_status_dicts,
 )
+from moseq2_pca.util import insert_nans
 
 
 def test_a_recording_that_never_stops_has_no_stationary_frames():
@@ -39,18 +39,6 @@ def test_a_recording_that_starts_without_a_mouse_counts_every_still_frame():
     for first in (0.0, float("nan")):
         recording = pd.DataFrame({"velocity_2d_mm": [first, 0.0, 0.0, 1.0]})
         assert count_stationary_frames(recording) == 2, first
-
-
-def test_integer_timestamps_are_rescaled_like_float_ones():
-    """Millisecond timestamps are rescaled to seconds before the rate is measured.
-
-    Extraction writes them as floats, but an h5 written any other way can hold
-    integers, and those should give the same answer.
-    """
-    milliseconds = np.arange(10) * 33
-    assert check_timestamp_error_percentage(milliseconds) == check_timestamp_error_percentage(
-        milliseconds.astype(float)
-    )
 
 
 def test_small_areas_are_counted_against_the_recordings_own_mean():
@@ -85,12 +73,40 @@ def _extraction(tmp_path, name, timestamps, unit):
     return str(tmp_path / f"{name}.mp4")
 
 
-def test_the_dropped_frame_check_reads_the_recorded_unit(tmp_path):
-    """Frames 5 ms apart are 200 frames per second when the file says milliseconds.
+def _pca_count(timestamps):
+    """How many empty rows PCA puts in a session's scores for its dropped frames."""
+    filled, _, _ = insert_nans(timestamps / 1000, np.zeros(len(timestamps)))
+    return int(np.isnan(filled).sum())
 
-    Without a recorded unit the check guesses from the size of the gaps, and
-    gaps under 10 read as seconds.
+
+@pytest.mark.parametrize(
+    "recording, timestamps",
+    [
+        # a 15 fps camera that dropped nothing: the mean rate is half of 30 fps
+        ("slow_camera", np.arange(600) * (1000 / 15)),
+        # a Kinect, 33.02 ms a frame, that dropped 40 of 600 frames in two runs
+        ("kinect_drops", np.delete(np.arange(600) * 33.02, np.r_[100:120, 400:420])),
+    ],
+)
+def test_qc_and_pca_count_the_same_dropped_frames(tmp_path, recording, timestamps):
+    """The QC cell reports the share of a recording's frames that PCA fills as dropped.
+
+    PCA puts an empty row in the scores for each frame a gap between timestamps
+    skips, with the frame period taken from the median gap. QC counts the same
+    frames, as a share of the frames the recording would have had, and raises
+    its flag at five percent. A camera running at another rate drops nothing.
     """
-    fast = np.arange(10) * 5.0
-    status = make_session_status_dicts({"fast": _extraction(tmp_path, "fast", fast, "milliseconds")})
-    assert status["fast"]["dropped_frames"] == pytest.approx((200 - 30) / 30)
+    dropped = _pca_count(timestamps)
+    share = dropped / (len(timestamps) + dropped)
+    status = make_session_status_dicts(
+        {recording: _extraction(tmp_path, recording, timestamps, "milliseconds")}
+    )
+    expected = share if share >= 0.05 else False
+    assert status[recording]["dropped_frames"] == pytest.approx(expected), (dropped, share)
+
+
+def test_the_qc_cell_names_the_file_whose_timestamps_have_no_frame_period(tmp_path):
+    """Timestamps that are all equal give no frame period, so no count; the error names the file."""
+    mp4 = _extraction(tmp_path, "stuck", np.zeros(10), "milliseconds")
+    with pytest.raises(ValueError, match=r"stuck\.h5: Cannot count dropped frames"):
+        make_session_status_dicts({"stuck": mp4})
