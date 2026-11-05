@@ -13,7 +13,7 @@ import os
 import click
 from click.core import ParameterSource
 
-from moseq2_common.options import ConfigFileError, click_options, command_settings, explicit_values
+from moseq2_common.options import ConfigFileError, ProjectGroup, click_options, command_settings, explicit_values
 from moseq2_common.project import find_project, is_job_file
 from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
@@ -34,7 +34,7 @@ from moseq2_extract.options import (
 from moseq2_extract.session_config import recording_entry
 
 
-@click.group(context_settings={"show_default": True})
+@click.group(cls=ProjectGroup, context_settings={"show_default": True})
 @click.version_option()
 def cli():
     pass

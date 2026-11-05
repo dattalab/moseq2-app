@@ -19,6 +19,7 @@ import click
 
 from moseq2_common.bookkeeping import session_index
 from moseq2_common.options import (
+    ProjectGroup,
     click_options,
     command_project,
     command_settings,
@@ -40,7 +41,7 @@ from moseq2_viz.options import (
 )
 
 
-@click.group(context_settings={"show_default": True})
+@click.group(cls=ProjectGroup, context_settings={"show_default": True})
 @click.version_option()
 def cli():
     pass

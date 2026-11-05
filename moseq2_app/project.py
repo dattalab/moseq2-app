@@ -5,7 +5,8 @@ The notebooks' project cell.
 ``config.yaml``, and prints what it holds: how many of its recordings are
 extracted, its sessions, and the outputs its ``moseq2-project.yaml`` names.
 Every later cell takes the project folder and reads the bookkeeping file when it
-needs a path, so nothing is kept between cells.
+needs a path, so nothing is kept between cells. A project made by MoSeq2 1.5.0
+or earlier stops here, before anything else runs.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import os
 from pathlib import Path
 
 from moseq2_common.bookkeeping import load
-from moseq2_common.project import Project
+from moseq2_common.project import Project, check_not_old
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
 
 __all__ = ["start", "summary"]
@@ -47,7 +48,8 @@ def start(folder: str | os.PathLike = "./", exts=("dat", "mkv", "avi", "tar.gz")
     The notebook's project: the folder holding (or about to hold) ``config.yaml``.
 
     Prints how many of the project's recordings are extracted and what its
-    ``moseq2-project.yaml`` names.
+    ``moseq2-project.yaml`` names. A project made by MoSeq2 1.5.0 or earlier
+    stops with ``OldProjectError``, saying how to finish it or start again.
 
     Args:
     folder (str): the project folder.
@@ -60,6 +62,7 @@ def start(folder: str | os.PathLike = "./", exts=("dat", "mkv", "avi", "tar.gz")
     from moseq2_app.gui.progress import get_extraction_progress
 
     project = Project.at(Path(folder).absolute())
+    check_not_old(project.folder)
     path_dict, num_extracted = get_extraction_progress(str(project.folder), exts=list(exts), max_depth=max_depth,
                                                        write_missing_metadata=False)
     if path_dict:

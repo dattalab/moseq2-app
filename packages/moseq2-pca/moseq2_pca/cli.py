@@ -16,14 +16,14 @@ from os.path import join
 import click
 
 from moseq2_common.bookkeeping import load, resolve_path
-from moseq2_common.options import click_options, command_settings, explicit_values
+from moseq2_common.options import ProjectGroup, click_options, command_settings, explicit_values
 from moseq2_common.project import find_project
 from moseq2_pca import steps
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
 from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
 
 
-@click.group(context_settings={"show_default": True})
+@click.group(cls=ProjectGroup, context_settings={"show_default": True})
 @click.version_option()
 def cli():
     pass

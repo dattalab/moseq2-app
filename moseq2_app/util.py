@@ -11,12 +11,17 @@ from contextlib import contextmanager
 from typing import Iterator
 from moseq2_common.bookkeeping import Bookkeeping, BookkeepingError, load, relative_path, resolve_path, update
 from moseq2_common.options import SECTIONS, check_top_level, read_config
-from moseq2_common.project import Project
+from moseq2_common.project import Project, outdated_names
 from IPython.display import clear_output
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_extract.util import check_filter_sizes
 from moseq2_extract.session_config import extract_settings
 from moseq2_viz.model.util import compute_behavioral_statistics
+
+#: What the 1.5 notebooks import from here that 1.6.0 removed: each stops with a message to download
+#: the 1.6 notebooks.
+__getattr__ = outdated_names(__name__, ("read_yaml", "setup_model_folders", "update_model_paths",
+                                        "camera_for_pca"))
 
 #: The folder inside the project holding the fitted models.
 MODELS_DIRNAME = "models"
