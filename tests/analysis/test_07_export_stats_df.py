@@ -1,6 +1,6 @@
 """Cell 7: write the syllable statistics out as csv.
 
-    save_path = progress_paths['model_session_path']
+    save_path = analysis.folder
     filename = 'stats_df.csv'
     stats_df.to_csv(join(save_path, filename), index=False)
 
@@ -20,7 +20,6 @@ the file would look complete.
 from __future__ import annotations
 
 import csv
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -29,22 +28,22 @@ from pandas.api.types import is_numeric_dtype
 
 
 @pytest.fixture(scope="module")
-def exported(analysis_paths, stats_df):
+def exported(analysis, stats_df):
     """The cell, run for real, cleaned up afterwards."""
-    path = Path(analysis_paths["model_session_path"]) / "stats_df.csv"
+    path = analysis.folder / "stats_df.csv"
     stats_df.to_csv(path, index=False)
     yield path
     path.unlink(missing_ok=True)
 
 
-def test_the_file_lands_beside_the_other_export_under_its_own_name(exported, analysis_paths):
+def test_the_file_lands_beside_the_other_export_under_its_own_name(exported, analysis):
     """1. Two exports, one folder, no collision.
 
-    Cells 5 and 7 both write into ``model_session_path``. They are told
+    Cells 5 and 7 both write into the model's analysis folder. They are told
     apart by filename alone, so the names have to differ.
     """
     assert exported.exists()
-    assert exported.parent == Path(analysis_paths["model_session_path"])
+    assert exported.parent == analysis.folder
     assert exported.name == "stats_df.csv"
     assert exported.name != "moseq_df.csv", "cell 7 would overwrite cell 5's export"
 

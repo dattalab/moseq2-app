@@ -2,8 +2,6 @@
 Wrapper functions for all the functionality included in moseq2-app.
 """
 
-import os
-import shutil
 import numpy as np
 import ipywidgets as widgets
 from moseq2_common.yaml import read_yaml
@@ -40,23 +38,21 @@ def validate_extractions_wrapper(input_dir):
     # Print Results
     print_validation_results(scalar_df, status_dicts)
 
-def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, crowd_movie_dir, output_file, fig_dir,
-                                         max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
+def interactive_syllable_labeler_wrapper(model_path, index, crowd_movie_dir, output_file, fig_dir,
+                                         crowd_movie_settings, max_syllables=None, n_explained=99):
     """
     launch a syllable crowd movie preview and interactive labeling application.
 
     Args:
     model_path (str): Path to trained model.
+    index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
     crowd_movie_dir (str): Path to crowd movie directory
     output_file (str): Path to syllable label information file
+    fig_dir (str): folder the explained-variance figure is saved in.
+    crowd_movie_settings (dict): config.yaml's ``crowd_movies`` section, the crowd movies' settings.
     max_syllables (int): Maximum number of syllables to preview and label.
+    n_explained (int): Percentage of explained variance that sets the number of syllables when max_syllables is None.
     """
-
-    # Copy index file to modeling session directory
-    modeling_session_dir = os.path.dirname(model_path)
-    new_index_path = os.path.join(modeling_session_dir, os.path.basename(index_file))
-    if os.path.dirname(index_file) != os.path.dirname(new_index_path):
-        shutil.copy2(index_file, new_index_path)
 
     # Load the model
     model = parse_model_results(model_path)
@@ -78,11 +74,9 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     # Make initial syllable information dict
     labeler = SyllableLabeler(model_fit=model,
                               model_path=model_path,
-                              index_file=index_file,
-                              config_file=config_file,
+                              index=index,
+                              crowd_movie_settings=crowd_movie_settings,
                               max_sylls=max_sylls,
-                              select_median_duration_instances=select_median_duration_instances,
-                              max_examples=max_examples,
                               crowd_movie_dir=crowd_movie_dir,
                               save_path=output_file)
 
@@ -91,24 +85,23 @@ def interactive_syllable_labeler_wrapper(model_path, config_file, index_file, cr
     display(labeler.clear_button, labeler.syll_select, output)
     return max_sylls
 
-def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_path, model_path, syll_info_path, output_dir,
+def interactive_crowd_movie_comparison_preview_wrapper(crowd_movie_settings, index, model_path, syll_info_path, output_dir,
                                                get_pdfs=True):
     """
     launch an interactive crowd movie comparison application.
 
     Args:
-    config_filepath (str): path to the project's config file (crowd movies render with the default settings)
-    index_path (str): path to index file with paths to all the extracted sessions
+    crowd_movie_settings (dict): config.yaml's ``crowd_movies`` section, the crowd movies' settings.
+    index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
     model_path (str): path to trained model containing syllable labels.
     syll_info_path (str): path to syllable information file containing syllable labels
     output_dir (str): path to directory to store crowd movies
     get_pdfs (bool): indicates whether to compute and display position heatmaps
     """
 
-    config_data = read_yaml(config_filepath)
     syll_info = read_yaml(syll_info_path)
 
-    cm_compare = CrowdMovieComparison(config_data=config_data, index_path=index_path,
+    cm_compare = CrowdMovieComparison(crowd_movie_settings=crowd_movie_settings, index=index,
                                       model_path=model_path, syll_info=syll_info, output_dir=output_dir,
                                       get_pdfs=get_pdfs)
 
@@ -118,20 +111,20 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     display(cm_compare.clear_button, out)
 
 
-def interactive_plot_transition_graph_wrapper(model_path, index_path, info_path,
+def interactive_plot_transition_graph_wrapper(model_path, index, info_path,
                                               max_syllables=None, plot_vertically=False):
     """
     prepare the data for the interactive graphing function.
 
     Args:
     model_path (str): Path to trained model.
-    index_path (str): Path to index file contained trained data metadata.
+    index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
     info_path (str): Path to user-labeled syllable information file.
     max_syllables (int or None): Limit maximum number of displayed syllables.
     """
 
     # Initialize Transition Graph data structure
-    i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index_path=index_path,
+    i_trans_graph = InteractiveTransitionGraph(model_path=model_path, index=index,
                                                info_path=info_path,
                                                max_sylls=max_syllables, plot_vertically=plot_vertically)
 

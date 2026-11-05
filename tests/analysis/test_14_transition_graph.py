@@ -1,7 +1,7 @@
 """Cell 14: the transition matrices as a graph you can prune.
 
     from moseq2_app.main import interactive_transition_graph
-    interactive_transition_graph(progress_paths, max_syllables=max_syllables,
+    interactive_transition_graph(str(project.folder), max_syllables=max_syllables,
                                  plot_vertically=True)
 
 Cell 12's matrices drawn as networks: a node per syllable, sized by how
@@ -33,21 +33,23 @@ GRAPH = {"plot_vertically": True}
 
 
 @pytest.fixture(scope="module")
-def graph(analysis_paths, labeled):
+def graph(analysis, labeled):
     """The widget behind the cell, built once."""
+    from moseq2_common.bookkeeping import session_index
+
     return InteractiveTransitionGraph(
-        model_path=analysis_paths["model_path"],
-        index_path=analysis_paths["index_file"],
-        info_path=analysis_paths["syll_info"],
+        model_path=str(analysis.model),
+        index=session_index(analysis.project),
+        info_path=str(analysis.syll_info),
         max_sylls=labeled,
         **GRAPH,
     )
 
 
-def test_the_cell_displays_the_thresholds_and_the_graphs(analysis_paths, labeled, displayed):
+def test_the_cell_displays_the_thresholds_and_the_graphs(analysis, labeled, displayed):
     """1. What a user is given: a reset, the two sliders, and the figure."""
     assert (
-        interactive_transition_graph(analysis_paths, max_syllables=labeled, **GRAPH) is None
+        interactive_transition_graph(str(analysis.project.folder), max_syllables=labeled, **GRAPH) is None
     )
 
     assert [type(obj).__name__ for obj in displayed.objects] == ["Button", "HBox", "Output"]

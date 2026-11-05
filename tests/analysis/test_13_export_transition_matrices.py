@@ -29,9 +29,9 @@ import pytest
 
 
 @pytest.fixture(scope="module")
-def exported(analysis_paths, transitions):
+def exported(analysis, transitions):
     """The cell, run for real, cleaned up afterwards."""
-    save_path = analysis_paths["model_session_path"]
+    save_path = analysis.folder
     written = []
 
     for group_name, tm, usage in zip(
@@ -52,7 +52,7 @@ def exported(analysis_paths, transitions):
         path.unlink(missing_ok=True)
 
 
-def test_each_group_gets_a_matrix_and_a_count_file(exported, transitions, analysis_paths):
+def test_each_group_gets_a_matrix_and_a_count_file(exported, transitions, analysis):
     """1. Two files per group, named after it.
 
     Both groups' exports land in one directory, so the group name in the
@@ -61,7 +61,7 @@ def test_each_group_gets_a_matrix_and_a_count_file(exported, transitions, analys
     assert len(exported) == 2 * len(transitions["group"])
     for path in exported:
         assert path.exists(), f"{path.name} was not written"
-        assert path.parent == Path(analysis_paths["model_session_path"])
+        assert path.parent == analysis.folder
 
     for group_name in transitions["group"]:
         names = [path.name for path in exported]

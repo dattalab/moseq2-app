@@ -25,12 +25,12 @@ from moseq2_viz.model.trans_graph import (get_trans_graph_groups, get_group_tran
 
 class InteractiveSyllableStats(SyllableStatWidgets):
 
-    def __init__(self, index_path, model_path, info_path, max_sylls):
+    def __init__(self, index, model_path, info_path, max_sylls):
         """
         Initialize the main data inputted into the current context
 
         Args:
-        index_path (str): Path to index file.
+        index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
         model_path (str): Path to trained model file.
         info_path (str): Path to syllable information file.
         max_sylls (int): Maximum number of syllables to plot.
@@ -41,7 +41,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.model_path = model_path
         self.info_path = info_path
         self.max_sylls = max_sylls
-        self.index_path = index_path
+        self.index = index
 
         self.df = None
 
@@ -128,11 +128,11 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         # Load the model and sort labels - also remaps the ar matrices
         model_data = parse_model_results(self.model_path, sort_labels_by_usage=True, count='usage')
 
-        # Read index file
-        self.sorted_index = get_sorted_index(self.index_path)
+        # the project's sessions, by uuid
+        self.sorted_index = get_sorted_index(self.index)
 
         if not set(model_data['metadata']['uuids']).issubset(set(self.sorted_index['files'])):
-            print('Error: Index file UUIDs do not match model UUIDs.')
+            print('Error: the project\'s session UUIDs do not match model UUIDs.')
 
         # Get max syllables if None is given
         if self.max_sylls is None:
@@ -260,13 +260,13 @@ class InteractiveSyllableStats(SyllableStatWidgets):
 
 
 class InteractiveTransitionGraph(TransitionGraphWidgets):
-    def __init__(self, model_path, index_path, info_path, max_sylls, plot_vertically):
+    def __init__(self, model_path, index, info_path, max_sylls, plot_vertically):
         """
         Initialize variables for interactive transition graph.
 
         Args:
         model_path (str): Path to trained model file
-        index_path (str): Path to index file containing trained session metadata.
+        index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
         info_path (str): Path to labeled syllable info file
         max_sylls (int): Maximum number of syllables to plot.
         """
@@ -274,7 +274,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         super().__init__()
 
         self.model_path = model_path
-        self.index_path = index_path
+        self.index = index
         self.info_path = info_path
         self.max_sylls = max_sylls
         self.plot_vertically = plot_vertically
@@ -282,11 +282,11 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
         # Load Model
         self.model_fit = parse_model_results(model_path)
 
-        # Load Index File
-        self.sorted_index = get_sorted_index(index_path)
+        # the project's sessions, by uuid
+        self.sorted_index = get_sorted_index(index)
 
         if set(self.sorted_index['files']) != set(self.model_fit['metadata']['uuids']):
-            print('Warning: Index file UUIDs do not match model UUIDs.')
+            print('Warning: the project\'s session UUIDs do not match model UUIDs.')
 
         # Load and store transition graph data
         self.initialize_transition_data()

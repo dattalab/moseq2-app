@@ -93,10 +93,6 @@ def fetch_azure_mkv():
     return _fetch_bundle(AZURE_MKV)
 
 
-#: What the analysis bundle's progress file carries where the project root belongs.
-ROOT_SENTINEL = "__PROJECT_ROOT__"
-
-
 def project_1_6_from_bundle(bundle, dest):
     """A copy of the analysis bundle at ``dest``, laid out as a 1.6 project.
 
@@ -105,9 +101,11 @@ def project_1_6_from_bundle(bundle, dest):
     and a ``progress.yaml``. The copy's ``config.yaml`` holds the same settings in
     their stages' sections, with the index's groups as its ``groups``, and its
     ``moseq2-project.yaml`` lists the index's sessions (keyed by ``SessionName``,
-    since the bundle holds no recordings), the PCA files and the model. The index
-    and progress file stay beside them, with the copy's folder in place of the
-    root the progress file was cut with, for the analysis cells that read them.
+    since the bundle holds no recordings), the PCA files and the model. The
+    ``crowd_movies`` section is left empty: 1.5.0 made its crowd movies with
+    their own defaults and read none of them from ``config.yaml``, whose
+    ``gaussfilter_space`` and the like were PCA's. The index and progress file
+    are not copied; nothing in a 1.6 project reads them.
     """
     import shutil
 
@@ -116,22 +114,20 @@ def project_1_6_from_bundle(bundle, dest):
     from moseq2_extract.options import EXTRACT_STAGE
     from moseq2_model.options import MODEL_STAGE
     from moseq2_pca.options import PCA_STAGE
-    from moseq2_viz.options import CROWD_MOVIE_STAGE
 
-    dest = Path(dest)
-    shutil.copytree(bundle, dest, dirs_exist_ok=True)
-    progress = dest / "progress.yaml"
-    if progress.is_file():
-        progress.write_text(progress.read_text().replace(ROOT_SENTINEL, str(dest)))
+    bundle, dest = Path(bundle), Path(dest)
+    shutil.copytree(bundle, dest, dirs_exist_ok=True,
+                    ignore=lambda folder, names: ["moseq2-index.yaml", "progress.yaml"]
+                    if Path(folder) == bundle else [])
 
     flat = read_yaml(str(dest / "config.yaml")) or {}
     config = {"camera_type": flat.get("camera_type", "auto")}
-    for section, stage in (("extract", EXTRACT_STAGE), ("pca", PCA_STAGE), ("model", MODEL_STAGE),
-                           ("crowd_movies", CROWD_MOVIE_STAGE)):
+    for section, stage in (("extract", EXTRACT_STAGE), ("pca", PCA_STAGE), ("model", MODEL_STAGE)):
         names = {name for cls in stage for name in setting_fields(cls)} - {"camera_type"}
         config[section] = {key: value for key, value in flat.items() if key in names}
+    config["crowd_movies"] = {}
 
-    index = read_yaml(str(dest / "moseq2-index.yaml"))
+    index = read_yaml(str(bundle / "moseq2-index.yaml"))
     sessions, groups = {}, {}
     for entry in index["files"]:
         key = str(entry["metadata"]["SessionName"])

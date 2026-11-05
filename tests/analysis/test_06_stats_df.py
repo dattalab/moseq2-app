@@ -1,12 +1,11 @@
-"""Cell 6: collapse the frames into syllable statistics.
+"""Cell 6: the frames collapsed into syllable statistics.
 
-    count = 'usage'
-    syllable_key = 'labels (usage sort)'   # either 'labels (usage sort)', 'labels (original)', or 'labels (frames sort)'
-    groupby = ['group', 'uuid']
-    usage_normalization = True
-    stats_df = compute_behavioral_statistics(moseq_df, count=count, groupby=groupby,
-                                             usage_normalization=usage_normalization,
-                                             syllable_key=syllable_key)
+    stats_df = pd.read_parquet(made.stats_file)
+
+``make-df``'s step, run in cell 4, writes these beside the table:
+``compute_behavioral_statistics`` grouped by group and uuid, syllables
+numbered by usage, usage as a share of each session. The cell reads them;
+its comment shows a user how to compute them grouped another way.
 
 Cell 4's table has a row per frame, which is not a unit anyone compares.
 This cell turns it into the one they do: a session and a syllable. How
@@ -17,15 +16,13 @@ Every remaining cell reads this table. The dendrogram clusters its
 scalars, the fingerprint plots them, and the hypothesis tests in cell 11
 compare its usages between groups.
 
-``count`` is the one real choice. ``usage`` counts how often a syllable
+``count`` is the one real choice for a user computing them again. ``usage`` counts how often a syllable
 *started*, ``frames`` how many frames it occupied, and they rank syllables
 differently: a rare syllable that runs long scores low on one and high on
 the other.
 """
 
 from __future__ import annotations
-
-import re
 
 import numpy as np
 import pytest
@@ -180,18 +177,20 @@ def test_the_table_records_which_labelling_it_was_built_from(stats_df):
     assert stats_df["syllable key"].unique().tolist() == [STATISTICS["syllable_key"]]
 
 
-def test_every_labelling_the_cell_offers_works(moseq_df):
-    """10. Each option in the cell's comment names a real column.
+def test_the_statistics_are_the_ones_the_cell_used_to_compute(moseq_df, stats_df):
+    """10. The step's statistics are ``compute_behavioral_statistics`` with the cell's former settings."""
+    import pandas as pd
+
+    pd.testing.assert_frame_equal(stats_df, compute_behavioral_statistics(moseq_df, **STATISTICS))
+
+
+@pytest.mark.parametrize("key", ["labels (usage sort)", "labels (original)", "labels (frames sort)"])
+def test_every_labelling_the_cell_offers_works(moseq_df, key):
+    """11. Each numbering the cell's comment offers names a real column.
 
     ``syllable_key`` chooses the syllable numbering the table uses: sorted
-    by usage, sorted by frames, or the model's own. The comment beside it
+    by usage, sorted by frames, or the model's own. The comment in the cell
     is where a user learns the choices, so each one has to work as written.
     """
-    line = next(
-        line for line in code_cell(ANALYSIS, 6).splitlines() if line.startswith("syllable_key =")
-    )
-    offered = re.findall(r"'([^']+)'", line.split("#", 1)[1])
-
-    assert len(offered) == 3, line
-    for key in offered:
-        compute_behavioral_statistics(moseq_df, **{**STATISTICS, "syllable_key": key})
+    assert key in code_cell(ANALYSIS, 6)
+    compute_behavioral_statistics(moseq_df, **{**STATISTICS, "syllable_key": key})

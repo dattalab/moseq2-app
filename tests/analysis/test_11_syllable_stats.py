@@ -1,7 +1,7 @@
 """Cell 11: compare the groups, syllable by syllable.
 
     from moseq2_app.main import interactive_syllable_stats
-    interactive_syllable_stats(progress_paths, max_syllable=max_syllables)
+    interactive_syllable_stats(str(project.folder), max_syllable=max_syllables)
 
 The cell the experiment is read out of. It plots a statistic for every
 syllable, sorted however a user asks, with the groups side by side and
@@ -23,7 +23,6 @@ about, and the baseline is re-recorded deliberately.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import ipywidgets as widgets
 import pytest
@@ -42,12 +41,14 @@ STATISTIC = "usage"
 
 
 @pytest.fixture(scope="module")
-def viewer(analysis_paths, labeled):
+def viewer(analysis, labeled):
     """The widget behind the cell, built once."""
+    from moseq2_common.bookkeeping import session_index
+
     return InteractiveSyllableStats(
-        index_path=analysis_paths["index_file"],
-        model_path=analysis_paths["model_path"],
-        info_path=analysis_paths["syll_info"],
+        index=session_index(analysis.project),
+        model_path=str(analysis.model),
+        info_path=str(analysis.syll_info),
         max_sylls=labeled,
     )
 
@@ -66,9 +67,9 @@ def significant(viewer):
     }
 
 
-def test_the_cell_displays_the_controls_and_the_plot(analysis_paths, labeled, displayed):
+def test_the_cell_displays_the_controls_and_the_plot(analysis, labeled, displayed):
     """1. What a user is given: a reset, the controls, and the figure."""
-    assert interactive_syllable_stats(analysis_paths, max_syllable=labeled) is None
+    assert interactive_syllable_stats(str(analysis.project.folder), max_syllable=labeled) is None
 
     assert [type(obj).__name__ for obj in displayed.objects] == ["Button", "VBox", "Output"]
     assert displayed.one(widgets.Button).description == "Clear Output"
@@ -170,29 +171,25 @@ def test_an_unknown_test_name_is_refused(viewer):
 
 
 @pytest.mark.parametrize("cell", [9, 11, 14])
-def test_a_dataframe_left_by_an_older_version_is_not_read(analysis_paths, labeled, displayed, cell):
+def test_a_dataframe_left_by_an_older_version_is_not_read(analysis, labeled, displayed, cell):
     """9. The syllable table is built from the recordings every time.
 
     Releases before 2023 saved it as ``syll_df.parquet`` in the model's
-    folder, and their progress files name it as ``df_info_path``. A file
-    left there holds an older version's columns and whichever model was
-    current then, so no cell reads it, and ``load_parquet``, which older
-    copies of the notebook still pass, changes nothing.
+    folder. A file left there holds an older version's columns and
+    whichever model was current then, so no cell reads it.
     """
     from moseq2_app.main import interactive_transition_graph, label_syllables
 
-    leftover = Path(analysis_paths["model_session_path"]) / "syll_df.parquet"
+    leftover = analysis.folder / "syll_df.parquet"
     leftover.write_bytes(b"written by an older moseq2-app")
-    paths = {**analysis_paths, "df_info_path": str(leftover)}
+    folder = str(analysis.project.folder)
     try:
         if cell == 9:
-            label_syllables(paths, **LABELLING)
+            label_syllables(folder, **LABELLING)
         elif cell == 11:
-            interactive_syllable_stats(paths, max_syllable=labeled, load_parquet=True)
+            interactive_syllable_stats(folder, max_syllable=labeled)
         else:
-            interactive_transition_graph(
-                paths, max_syllables=labeled, plot_vertically=True, load_parquet=True
-            )
+            interactive_transition_graph(folder, max_syllables=labeled, plot_vertically=True)
     finally:
         leftover.unlink(missing_ok=True)
 

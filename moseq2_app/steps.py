@@ -19,7 +19,7 @@ from moseq2_viz import steps as viz_steps
 from moseq2_viz.options import CrowdMovieOptions
 
 
-def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: str, opts: CrowdMovieOptions, *,
+def render_syllable_movies(model_path: str, index: dict, crowd_movie_dir: str, opts: CrowdMovieOptions, *,
                            syllables: Sequence[int]) -> dict:
     """
     Write a crowd movie of each of ``syllables`` into ``crowd_movie_dir``.
@@ -29,7 +29,7 @@ def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: st
 
     Args:
     model_path (str): path to the trained model.
-    index_file (str): path to the index file.
+    index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
     crowd_movie_dir (str): folder the movies are written to.
     opts (CrowdMovieOptions): the crowd-movie settings.
     syllables (Sequence[int]): the syllables to render.
@@ -45,7 +45,7 @@ def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: st
     else:
         raise ValueError(f"Crowd movies are rendered for one syllable or for the first n syllables, "
                          f"and {syllables} is neither. Pass one syllable, or range(n).")
-    return viz_steps.make_crowd_movies(index_file, model_path, crowd_movie_dir, opts).movies
+    return viz_steps.make_crowd_movies(index, model_path, crowd_movie_dir, opts).movies
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,8 @@ def train_flip_classifier(frame_ranges_file: str, out_path: str, config_file: st
     includes a copy of the labeled frames cleaned as extraction cleans them. Each
     session's frames are cleaned with the settings its recording is extracted with:
     ``config_file``'s ``extract`` section, with the recording's entry in the project's
-    session_config.yaml over it (``moseq2_app.flip.train.session_cleaning``), or
+    session_config.yaml over it (each labeled file's recording is the one the project's
+    moseq2-project.yaml lists for it) (``moseq2_app.flip.train.session_cleaning``), or
     extraction's defaults without ``config_file``. A session whose extraction ran with
     other cleaning settings is named, with both values, and trained with the settings
     it has now.

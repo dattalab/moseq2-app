@@ -6,9 +6,9 @@ step that changes it. A numpy value set in the config made that save raise
 user's config was left empty. It now saves the plain value, and a value that
 truly cannot be saved leaves the file as it was.
 
-``progress.yaml`` and ``syll_info.yaml`` were written by their own
-round-trip ``YAML()`` instances with their own indentation. They are written
-in the shared format now; files in the old layout read back the same.
+``syll_info.yaml`` was written by its own round-trip ``YAML()`` instance
+with its own indentation. It is written in the shared format; files in the
+old layout read back the same.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ import numpy as np
 import pytest
 from ruamel.yaml import YAML
 
-from moseq2_app.gui.progress import generate_intital_progressfile, update_progress
 from moseq2_app.util import update_config
 from moseq2_app.viz.controller import SyllableLabeler
 from moseq2_common.yaml import UnwritableValueError, dump_yaml, read_yaml, write_yaml
@@ -60,27 +59,6 @@ def test_update_config_leaves_the_file_alone_when_a_value_cannot_be_saved(tmp_pa
             config["bad"] = 1j
     assert path.read_bytes() == before
     assert str(path) in str(err.value) and "['bad']" in str(err.value)
-
-
-def test_progress_file_is_rewritten_in_the_shared_format(tmp_path):
-    path = tmp_path / "progress.yaml"
-    old = {"base_dir": str(tmp_path), "config_file": "", "plot_path": SPACED, "snapshot": "x"}
-    old_layout(path, old, mapping=2)
-    update_progress(str(path), "config_file", SPACED + ".yaml")
-    saved = read_yaml(path)
-    assert path.read_text() == dump_yaml(saved)
-    assert {k: v for k, v in saved.items() if k != "snapshot"} == {
-        "base_dir": str(tmp_path),
-        "config_file": SPACED + ".yaml",
-        "plot_path": SPACED,
-    }
-    assert saved["snapshot"] != "x"
-
-
-def test_new_progress_file_is_written_in_the_shared_format(tmp_path):
-    path = tmp_path / "progress.yaml"
-    generate_intital_progressfile(str(path))
-    assert path.read_text() == dump_yaml(read_yaml(path))
 
 
 def test_syllable_labels_are_written_in_the_shared_format(tmp_path):

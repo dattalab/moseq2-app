@@ -4,7 +4,7 @@
     preprocessor = MinMaxScaler()
     summary, range_dict = create_fingerprint_dataframe(moseq_df, stats_df,
                                                        n_bins=n_bins, range_type=range_type)
-    plotting_fingerprint(summary, progress_paths['plot_path'], range_dict, preprocessor=preprocessor)
+    plotting_fingerprint(summary, analysis.plots, range_dict, preprocessor=preprocessor)
 
 A fingerprint is one row per recording and, along it, the distribution of
 four things the mouse did: how far from the centre it stayed, how fast it
@@ -22,7 +22,6 @@ hold slightly less than all of a recording's frames.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -53,15 +52,15 @@ def fingerprint(moseq_df, stats_df):
 
 
 @pytest.fixture(scope="module")
-def plotted(analysis_paths, fingerprint):
+def plotted(analysis, fingerprint):
     """Cell 8's second half: the figure, drawn where the cell says."""
     from sklearn.preprocessing import MinMaxScaler
 
     summary, range_dict = fingerprint
     plotting_fingerprint(
-        summary, analysis_paths["plot_path"], range_dict, preprocessor=MinMaxScaler()
+        summary, analysis.plots, range_dict, preprocessor=MinMaxScaler()
     )
-    return Path(analysis_paths["plot_path"])
+    return analysis.plots
 
 
 @pytest.fixture
@@ -170,7 +169,7 @@ def test_the_ranges_the_axes_are_labelled_from_come_back(fingerprint):
 def test_the_figure_is_written_where_the_cell_points_it(plotted):
     """7. In the model's own plot directory, as png and as pdf.
 
-    Cell 2 derived ``plot_path`` from the chosen model's folder, so two
+    The plot directory is in the chosen model's analysis folder, so two
     models analysed in one project keep their figures apart. The
     directory does not exist until something writes to it.
     """
