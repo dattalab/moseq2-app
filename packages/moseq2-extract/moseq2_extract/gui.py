@@ -1,8 +1,9 @@
 """
 GUI front-end operations accessible from a jupyter notebook.
 
-Each function reads the project's ``config.yaml``, resolves the step's settings
-and calls the step in ``moseq2_extract.steps`` (or ``moseq2_extract.setup``).
+Each function reads the ``extract`` section of the project's ``config.yaml``,
+resolves the step's settings and calls the step in ``moseq2_extract.steps`` (or
+``moseq2_extract.setup``).
 """
 
 import os
@@ -10,9 +11,10 @@ import re
 from dataclasses import replace
 from os.path import exists, join
 
-from moseq2_common.options import read_config
+from moseq2_common.options import read_settings
+from moseq2_common.project import find_project
 from moseq2_extract import setup, steps
-from moseq2_extract.options import AggregateOptions, BatchExtractOptions
+from moseq2_extract.options import EXTRACT_STAGE, AggregateOptions, BatchExtractOptions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
 from moseq2_extract.session_config import recording_configs
 from moseq2_extract.util import filter_warnings
@@ -104,12 +106,14 @@ def get_selected_sessions(to_extract, extract_all):
 
 
 @filter_warnings
-def generate_config_command(output_file, camera_type="k2"):
+def generate_config_command(output_file, camera_type="auto"):
     """
     Generate configuration file (config.yaml) to use throughout pipeline.
 
     Args:
     output_file (str): path to saved config file.
+    camera_type (str): ``auto``, ``kinect`` (``k2``) or ``azure``, as ``moseq2-extract generate-config
+        --camera-type`` takes it.
 
     Returns:
     (str): status message.
@@ -137,6 +141,7 @@ def extract_found_sessions(
     extract_all=True,
     skip_extracted=False,
     max_depth=DEFAULT_MAX_DEPTH,
+    run_cmd=False,
 ):
     """
     Find and extract the depth recordings within input_dir
@@ -150,22 +155,25 @@ def extract_found_sessions(
     skip_extracted (bool): leave out the recordings already extracted, as ``moseq2-extract batch-extract``
         does without ``--skip-checks``.
     max_depth (int): how many folders below input_dir to search for recordings.
-
+    run_cmd (bool): with cluster_type slurm, submit the extraction jobs; otherwise they are only
+        written to the script for you to run.
     """
     # error out early
     if not exists(config_file):
         raise IOError(f"Config file {config_file} does not exist")
 
-    config = read_config(config_file)
+    config = read_settings(config_file, BatchExtractOptions, stage_classes=EXTRACT_STAGE)
     opts = BatchExtractOptions.resolve(config=config, explicit={
         "extensions": RECORDING_EXTENSIONS if ext is None else ext,
         "max_depth": max_depth,
         "skip_checks": not skip_extracted,
         "skip_completed": skip_extracted,
+        "run_cmd": run_cmd,
     })
     result = steps.batch_extract(
         input_dir, opts, config_file=config_file,
         select=lambda found: get_selected_sessions(found, extract_all),
+        project=find_project(config_file),
     )
     # the local extraction ends with a summary naming each recording that failed
     if opts.cluster_type == "local" and result.found and not result.failures:
@@ -174,7 +182,7 @@ def extract_found_sessions(
 
 @filter_warnings
 def aggregate_extract_results_command(
-    input_dir, format, output_dir, mouse_threshold=None
+    input_dir, format, output_dir, mouse_threshold=None, config_file=None
 ):
     """
     Find all extracted h5, yaml and mp4 files and copies them all to a
@@ -187,7 +195,8 @@ def aggregate_extract_results_command(
     output_dir (str): path to directory to save all aggregated results
     mouse_threshold (float): min threshold of extracted mouse height to include a session
     in the aggregated sesssions to ensure sessions with no extracted mouse is not included in the aggregated sessions.
-    None takes ``AggregateOptions``' default.
+    None takes config.yaml's ``extract`` section, else ``AggregateOptions``' default.
+    config_file (str): path to config.yaml; None for the project in ``input_dir``.
 
 
     Returns:
@@ -200,10 +209,13 @@ def aggregate_extract_results_command(
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    if mouse_threshold is None:
-        # the class default as a float, as the command line runs it (shim_click_defaults' divergence, removed by PR 4.1)
-        mouse_threshold = float(AggregateOptions().mouse_threshold)
-    opts = AggregateOptions.resolve(explicit={"format": format, "mouse_threshold": mouse_threshold})
+    project = find_project(config_file, cwd=input_dir)
+    config = read_settings(config_file or (project.config_file if project is not None else None),
+                           AggregateOptions, stage_classes=EXTRACT_STAGE)
+    explicit = {"format": format}
+    if mouse_threshold is not None:
+        explicit["mouse_threshold"] = mouse_threshold
+    opts = AggregateOptions.resolve(config=config, explicit=explicit)
     result = steps.aggregate_results(input_dir, output_dir, opts)
 
     return None if result.index_file is None else str(result.index_file)
@@ -262,7 +274,6 @@ def extract_command(
             print(message)
 
     opts = replace(resolved.options[input_file], num_frames=num_frames, skip_completed=skip)
-    # the recording's whole settings dict, whose keys the extraction records (R2, removed by PR 4.1)
-    result = steps.extract(input_file, output_dir, opts, shim_flat_config=resolved.configs[input_file])
+    result = steps.extract(input_file, output_dir, opts)
 
     return None if result.h5_file is None else str(result.h5_file.parent)

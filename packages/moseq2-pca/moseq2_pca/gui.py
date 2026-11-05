@@ -1,26 +1,17 @@
 """
 GUI front-end operations for PCA.
 
-Each function reads the project's ``config.yaml``, resolves the step's settings
-and calls the step in ``moseq2_pca.steps``.
+Each function reads the ``pca`` section of the project's ``config.yaml``,
+resolves the step's settings and calls the step in ``moseq2_pca.steps``.
 """
 
 import warnings
 
-from moseq2_common.options import read_config
+from moseq2_common.options import read_settings
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_pca import steps
-from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
-from .cli import train_pca, apply_pca, compute_changepoints
-
-
-def shim_notebook_config(command, config):
-    """The command's click defaults overlaid with ``config.yaml`` (R2, L12; removed by PR 4.1 and PR 4.3).
-
-    What 1.5.0's notebook functions handed the wrapper under the settings and
-    wrote back to ``config.yaml``, paths included.
-    """
-    return {**{param.name: param.default for param in command.params}, **config}
+from moseq2_pca.cli import recorded_paths, shim_write_back_paths
+from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
 
 
 def shim_index_pca_path(index_file, scores_path):
@@ -40,6 +31,10 @@ def shim_index_pca_path(index_file, scores_path):
         print('moseq2-index not found, did not update paths')
 
 
+def _options(cls, config_file):
+    return cls.resolve(config=read_settings(config_file, cls, stage_classes=PCA_STAGE))
+
+
 def train_pca_command(progress_paths, output_dir, output_file):
     """
     Train PCA through Jupyter notebook, and updates config file.
@@ -52,18 +47,15 @@ def train_pca_command(progress_paths, output_dir, output_file):
     Returns:
     """
     config_file = progress_paths['config_file']
-    config = read_config(config_file)
-    flat_config = shim_notebook_config(train_pca, config)
-    write_yaml(flat_config, config_file)  # shim L12, removed by PR 4.3
+    opts = _options(TrainPCAOptions, config_file)
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         warnings.filterwarnings("ignore", category=UserWarning)
 
-        result = steps.train_pca(progress_paths['train_data_dir'], output_dir, output_file,
-                                 TrainPCAOptions.resolve(config=config), shim_flat_config=flat_config)
+        result = steps.train_pca(progress_paths['train_data_dir'], output_dir, output_file, opts)
 
-    write_yaml(result.shim_config_data, config_file)  # shim L12, removed by PR 4.3
+    shim_write_back_paths(config_file, 'train_pca', result.components_file)
 
 
 def apply_pca_command(progress_paths, output_file):
@@ -78,15 +70,13 @@ def apply_pca_command(progress_paths, output_file):
     (str): success string.
     """
     config_file = progress_paths['config_file']
-    config = read_config(config_file)
+    opts = _options(ApplyPCAOptions, config_file)
 
-    result = steps.apply_pca(progress_paths['train_data_dir'], progress_paths['pca_dirname'], output_file,
-                             ApplyPCAOptions.resolve(config=config),
-                             shim_flat_config=shim_notebook_config(apply_pca, config))
+    result = steps.apply_pca(progress_paths['train_data_dir'], progress_paths['pca_dirname'], output_file, opts,
+                             components_file=recorded_paths(config_file).get('pca_file'))
     success = result.scores_file is not None
 
-    if success and result.shim_config_data is not None:
-        write_yaml(result.shim_config_data, config_file)  # shim L12, removed by PR 4.3
+    shim_write_back_paths(config_file, 'apply_pca', result.scores_file)
 
     # if the scores were not recomputed, the path in progress.yaml is still written to the index
     shim_index_pca_path(progress_paths['index_file'], progress_paths.get('scores_path'))
@@ -110,12 +100,13 @@ def compute_changepoints_command(input_dir, progress_paths, output_file):
     (str): success string.
     """
     config_file = progress_paths['config_file']
-    config = read_config(config_file)
+    opts = _options(ChangepointsOptions, config_file)
+    recorded = recorded_paths(config_file)
 
-    result = steps.compute_changepoints(input_dir, progress_paths['pca_dirname'], output_file,
-                                        ChangepointsOptions.resolve(config=config),
-                                        shim_flat_config=shim_notebook_config(compute_changepoints, config))
+    result = steps.compute_changepoints(input_dir, progress_paths['pca_dirname'], output_file, opts,
+                                        components_file=recorded.get('pca_file'),
+                                        scores_file=recorded.get('pca_file_scores'))
 
-    write_yaml(result.shim_config_data, config_file)  # shim L12, removed by PR 4.3
+    shim_write_back_paths(config_file, 'compute_changepoints', result.changepoints_file)
 
     return 'Model-free syllable changepoints have been successfully computed.'

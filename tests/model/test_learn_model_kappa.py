@@ -30,7 +30,7 @@ def learn_model(tmp_path, settings):
     scores = tmp_path / "pca_scores.h5"
     scores.touch()
     config = tmp_path / "config.yaml"
-    write_yaml(settings, str(config))
+    write_yaml({"model": settings}, str(config))
     result = CliRunner().invoke(
         model_cli.cli,
         ["learn-model", str(scores), str(tmp_path / "model.p"), "--config-file", str(config)],

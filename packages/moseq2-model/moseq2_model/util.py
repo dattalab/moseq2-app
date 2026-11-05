@@ -15,7 +15,7 @@ from cytoolz import first
 from collections import OrderedDict
 from moseq2_common.h5 import h5_to_dict
 from moseq2_common.slurm import sbatch_command
-from moseq2_common.yaml import write_yaml
+from moseq2_common.project import write_job_settings
 from moseq2_model.options import LearnModelOptions
 from moseq2_model.train.models import ARHMM
 from os.path import basename, getctime, join, exists
@@ -505,14 +505,17 @@ def count_frames(data_dict=None, input_file=None, var_name="scores"):
 
 
 def create_command_strings(
-    input_file, output_dir, config_data, kappas, settings_name, model_name_format="model-{:03d}-{}.p"
+    input_file, output_dir, config_data, kappas, settings_name, model_name_format="model-{:03d}-{}.p",
+    learn=None, project=None,
 ):
     """
     Write each kappa's learn-model settings to a file in ``output_dir`` and return the commands that fit them.
 
-    Each fit's settings are every learn-model option ``config_data`` holds, with
-    that fit's kappa, written to ``settings_name.format(i, kappa)``; its command
-    runs ``learn-model --config-file`` on that file.
+    Each fit's settings are every learn-model setting ``config_data`` holds, the
+    rest from ``learn``, with that fit's kappa, written to
+    ``settings_name.format(i, kappa)`` in config.yaml's shape with a ``job:``
+    block naming ``project``; its command runs ``learn-model --config-file`` on
+    that file.
 
     Args:
     input_file (str): Path to PC Scores
@@ -521,6 +524,8 @@ def create_command_strings(
     kappas (list): List of kappa values for model training commands.
     settings_name (str): File name format string of each fit's settings file, given the model's number and kappa.
     model_name_format (str): Filename string format string.
+    learn (LearnModelOptions): the learn-model settings ``config_data`` does not hold; None for their defaults.
+    project (moseq2_common.project.Project): the project the settings files name; None outside a project.
 
     Returns:
     command_string (str): CLI learn-model command strings separated by newline characters
@@ -533,8 +538,9 @@ def create_command_strings(
     for i, k in enumerate(kappas):
         k = int(k)
         settings_file = join(output_dir, settings_name.format(i, k))
-        settings = LearnModelOptions.resolve(config=config_data, explicit={"kappa": float(k)})
-        write_yaml(settings.as_dict(), settings_file)
+        given = {**(learn.settings() if learn is not None else {}), **config_data}
+        settings = LearnModelOptions.resolve(config=given, explicit={"kappa": float(k)})
+        write_job_settings(settings_file, "model", settings.settings(), project=project)
         cmd = (
             f"moseq2-model learn-model {input_file} {join(output_dir, model_name_format.format(i, k))}"
             f" --config-file {settings_file}{index_flag}"

@@ -6,20 +6,12 @@ resolve their settings into one options object and call these. A step needs no
 ``config.yaml``: from a script, pass the paths and an options object, such as
 ``extract("session_1/depth.dat", "proc", ExtractOptions(num_frames=900))``.
 ``batch_extract`` is the exception, since each recording's settings come from
-``config.yaml`` and its entry in ``session_config.yaml``.
+``config.yaml``'s ``extract`` section and its entry in ``session_config.yaml``.
 
 Each step hands its work function (``get_roi_wrapper``, ``extract_wrapper``,
 ``aggregate_extract_results_wrapper`` in ``moseq2_extract.helpers.wrappers``)
-the options as a dict.
-
-``shim_flat_config`` (R2, removed by PR 4.1) is a front end's whole settings
-dict, passed under the options so the wrappers still see the keys no extraction
-option declares. Extraction records every key it is handed among the
-extraction's parameters (``metadata/extraction/parameters`` in the results
-``.h5``), so these keys reach the output: from ``config.yaml``, ``output_dir``
-(the folder a recording is extracted to when none is passed), ``config_file``,
-``output_file``, ``session_config_path`` and anything else the file holds; on
-the command line, ``config_file`` and ``output_file``.
+the options as a dict, and extraction records that dict among the extraction's
+parameters (``metadata/extraction/parameters`` in the results ``.h5``).
 """
 
 from __future__ import annotations
@@ -29,12 +21,11 @@ from dataclasses import dataclass
 from os.path import abspath, join
 from pathlib import Path
 
-from moseq2_common.options import read_config
+from moseq2_common.project import Project
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
 from moseq2_extract.recordings import find_recordings
-from moseq2_extract.session_config import shim_config_lists
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
 _WRAPPER_ARGUMENTS = ("num_frames", "skip_completed")
@@ -70,17 +61,14 @@ class AggregateResult:
     index_file: Path | None
 
 
-def _settings(opts, shim_flat_config, leave_out=()):
-    """The dict a wrapper takes: ``shim_flat_config`` with the options over it."""
-    flat = shim_flat_config or {}
-    resolved = {name: value for name, value in opts.as_dict().items() if name not in leave_out}
-    return {**flat, **shim_config_lists(resolved, flat)}
+def _settings(opts, leave_out=()):
+    """The dict a wrapper takes: the options, but ``leave_out``."""
+    return {name: value for name, value in opts.as_dict().items() if name not in leave_out}
 
 
-def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
-             shim_flat_config: Mapping | None = None) -> FindRoiResult:
+def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions) -> FindRoiResult:
     """Find the arena and background of ``input_file``; write the background and arena images."""
-    settings = _settings(opts, shim_flat_config)
+    settings = _settings(opts)
     get_roi_wrapper(input_file, settings, output_dir)
     # the wrapper records in settings the folder it wrote to
     folder = settings.get("output_dir")
@@ -89,15 +77,11 @@ def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
     return FindRoiResult(roi_files=[path for path in written if path.is_file()])
 
 
-def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
-            shim_flat_config: Mapping | None = None) -> ExtractResult:
-    """Extract ``input_file`` into ``<recording folder>/<output_dir>``.
-
-    ``output_dir`` None takes ``shim_flat_config``'s ``output_dir``, else ``proc``.
-    """
-    settings = _settings(opts, shim_flat_config, leave_out=_WRAPPER_ARGUMENTS)
+def extract(input_file: str, output_dir: str | None, opts: ExtractOptions) -> ExtractResult:
+    """Extract ``input_file`` into ``<recording folder>/<output_dir>`` (``proc`` when None)."""
+    settings = _settings(opts, leave_out=_WRAPPER_ARGUMENTS)
     if output_dir is None:
-        output_dir = settings.get("output_dir", "proc")
+        output_dir = "proc"
     folder = extract_wrapper(input_file, output_dir, settings, num_frames=opts.num_frames,
                              skip=opts.skip_completed)
     if folder is None:
@@ -108,7 +92,8 @@ def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
 
 def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str,
                   output_dir: str | None = None, explicit: Mapping | None = None,
-                  select: Callable[[Sequence[str]], Sequence[str]] | None = None) -> BatchExtractResult:
+                  select: Callable[[Sequence[str]], Sequence[str]] | None = None,
+                  project: Project | None = None) -> BatchExtractResult:
     """Find the recordings under ``input_dir`` and extract each, here or as SLURM jobs.
 
     The search looks for ``opts.extensions`` down to ``opts.max_depth`` folders
@@ -116,21 +101,22 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
     recording whose ``results_00.yaml`` in its output folder records a finished
     extraction. The command line and the notebook both list recordings this way.
 
-    Each recording is extracted with ``config.yaml``'s settings, the arena tool's
-    settings from its entry in ``session_config.yaml``, and ``explicit`` (options
-    typed on the command line) over both (``session_config.recording_configs``).
+    Each recording is extracted with ``config.yaml``'s ``extract`` settings, the
+    arena tool's settings from its entry in ``session_config.yaml``, and
+    ``explicit`` (options typed on the command line) over both
+    (``session_config.recording_configs``).
 
     Args:
     input_dir: the folder to search.
     opts: the search, the cluster type and the SLURM job settings; ``num_frames`` and
         ``skip_completed`` apply to every recording.
     config_file: the project's ``config.yaml``.
-    output_dir: each recording's output folder, below its own folder; None takes
-        ``config.yaml``'s ``output_dir``, else ``proc``.
+    output_dir: each recording's output folder, below its own folder; None for ``proc``.
     explicit: options typed on the command line, applied over each recording's settings.
     select: picks the recordings to extract from those found (the notebook's prompt).
+    project: the project each SLURM job's settings file names (``moseq2_common.project.write_job_settings``).
     """
-    folder = output_dir if output_dir is not None else (read_config(config_file).get("output_dir") or "proc")
+    folder = output_dir if output_dir is not None else "proc"
     search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth,
                              skip_extracted=not opts.skip_checks,
                              results_yaml=join(folder, "results_00.yaml"))
@@ -149,10 +135,9 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
                                   extracted=[Path(p) for p in to_extract if p not in failed],
                                   failures=failures, script=None)
 
-    typed = {**(explicit or {}), **({"output_dir": output_dir} if output_dir is not None else {})}
     job = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": folder}
     run_slurm_extract(input_dir, to_extract, job, opts.skip_completed, num_frames=opts.num_frames,
-                      cli_options=typed or None)
+                      cli_options=dict(explicit) if explicit else None, project=project)
     # run_slurm_extract records where it wrote the script
     return BatchExtractResult(found=list(search.recordings), extracted=[], failures=[],
                               script=Path(job["extract_out_script"]))

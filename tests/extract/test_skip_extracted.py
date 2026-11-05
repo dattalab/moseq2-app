@@ -87,7 +87,9 @@ def test_a_rerun_extracts_nothing_and_warns_about_no_flip_classifier(extracted_p
 def config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     generate_config_command(str(tmp_path / "config.yaml"), camera_type="k2")
-    return read_yaml(str(tmp_path / "config.yaml"))
+    data = read_yaml(str(tmp_path / "config.yaml"))
+    # extraction's settings, as extract_wrapper takes them
+    return {**data["extract"], "camera_type": data["camera_type"]}
 
 
 @pytest.fixture

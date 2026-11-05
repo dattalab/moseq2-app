@@ -210,16 +210,18 @@ def test_flip_training_cleans_frames_as_extraction_does(notebook, tmp_path, conf
     session = list(widget.sessions)[0]
     label(widget, session, 10, 40, left=False)
     run_cell(SAVE, notebook)
-    config = dict(read_yaml(str(configured)))
+    whole = dict(read_yaml(str(configured)))
+    # extraction's settings, which the cleaning settings are among
+    config = dict(whole["extract"])
     if front_end == "notebook":
         config.update(CLEANING)
         notebook["config_path"] = str(tmp_path / "config.yaml")
-        write_yaml(config, notebook["config_path"])
+        write_yaml({**whole, "extract": config}, notebook["config_path"])
         run_cell(CLEAN, notebook)
         run_cell(TRAIN, notebook)
     elif front_end == "script_config_file":
         config.update(CLEANING)
-        write_yaml(config, str(tmp_path / "config.yaml"))
+        write_yaml({**whole, "extract": config}, str(tmp_path / "config.yaml"))
         train_with_the_script(widget.training_data_path, "--config-file", str(tmp_path / "config.yaml"))
     else:
         train_with_the_script(widget.training_data_path)
@@ -402,7 +404,7 @@ def test_training_cleans_with_the_config_parameters(notebook, tmp_path, configur
     from moseq2_extract.extract.proc import clean_frames
 
     config = yaml.safe_load(configured.read_text())
-    config["cable_filter_iters"] = 2
+    config["extract"]["cable_filter_iters"] = 2
     eroding = tmp_path / "config.yaml"
     eroding.write_text(yaml.safe_dump(config))
     notebook["config_path"] = str(eroding)
@@ -417,13 +419,14 @@ def test_training_cleans_with_the_config_parameters(notebook, tmp_path, configur
     with h5py.File(widget.sessions[session], "r") as f:
         labeled = f["frames"][5:15]
     both_ways = np.concatenate((labeled, np.rot90(labeled, 2, axes=(1, 2))), axis=0)
+    extraction = config["extract"]
     expected = clean_frames(
-        np.where(both_ways > config["min_height"], both_ways, 0),
-        config["spatial_filter_size"],
-        config["temporal_filter_size"],
-        strel_tail=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, tuple(config["tail_filter_size"])),
-        iters_tail=config["tail_filter_iters"],
-        strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, tuple(config["cable_filter_size"])),
+        np.where(both_ways > extraction["min_height"], both_ways, 0),
+        extraction["spatial_filter_size"],
+        extraction["temporal_filter_size"],
+        strel_tail=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, tuple(extraction["tail_filter_size"])),
+        iters_tail=extraction["tail_filter_iters"],
+        strel_min=cv2.getStructuringElement(cv2.MORPH_RECT, tuple(extraction["cable_filter_size"])),
         iters_min=2,
     )
     with np.load(notebook["trained"].training_data) as data:

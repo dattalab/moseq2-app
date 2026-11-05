@@ -57,7 +57,7 @@ def callers(monkeypatch, tmp_path):
         lambda to_extract, config_file, skip_extracted=False, **kw: chosen.extend(to_extract) or [],
     )
     config = tmp_path / "extract_config.yaml"
-    config.write_text("cluster_type: local\n")
+    config.write_text("extract:\n  cluster_type: local\n")
 
     def progress(root, exts=ALL, **kw):
         return sorted(get_session_paths(str(root), exts=list(exts), **kw).values())

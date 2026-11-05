@@ -171,7 +171,7 @@ def clean_for_extract_file(tmp_path):
     session = tmp_path / "saline_example_0"
     shutil.copytree(Path(fetch_raw_sessions()) / "saline_example_0", session)
     config = tmp_path / "config.yaml"
-    write_yaml({"spatial_filter_size": [4], "temporal_filter_size": [4]}, str(config))
+    write_yaml({"extract": {"spatial_filter_size": [4], "temporal_filter_size": [4]}}, str(config))
     result = CliRunner().invoke(
         extract_cli.cli,
         ["extract", str(session / "depth.avi"), "--config-file", str(config), "--num-frames", "20"],

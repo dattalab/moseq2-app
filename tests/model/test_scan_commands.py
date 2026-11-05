@@ -31,7 +31,7 @@ SCAN_FITTING = dict(
     hold_out=True,
 )
 #: The learn-model options a kappa scan does not take on the command line; the notebook's config.yaml holds them.
-LEARN_ONLY = dict(checkpoint_freq=10, use_checkpoint=True, default_group="saline", verbose=True)
+LEARN_ONLY = dict(checkpoint_freq=10, use_checkpoint=True, default_group="saline")
 
 
 def _declared(values):
@@ -93,7 +93,7 @@ def test_kappa_scan_jobs_carry_every_learn_model_option(front_end, tmp_path, sca
         from moseq2_model.gui import learn_model_command
 
         config = tmp_path / "config.yaml"
-        write_yaml({**given, "kappa": "scan", "scan_scale": "log", "n_models": 3}, str(config))
+        write_yaml({"model": {**given, "kappa": "scan", "scan_scale": "log", "n_models": 3}}, str(config))
         learn_model_command({"scores_path": str(scores), "model_path": str(models / "model.p"),
                              "config_file": str(config), "index_file": str(index),
                              "base_model_path": str(models)}, get_cmd=False)

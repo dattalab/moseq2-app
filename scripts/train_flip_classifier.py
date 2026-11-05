@@ -2,7 +2,9 @@ import click
 from pathlib import Path
 from moseq2_app.steps import train_flip_classifier
 from moseq2_common.frames import CleaningOptions
-from moseq2_common.options import read_config_option
+from moseq2_common.options import ConfigFileError, read_settings
+from moseq2_common.project import OldProjectError
+from moseq2_extract.options import EXTRACT_STAGE
 
 
 @click.command()
@@ -25,12 +27,18 @@ def main(data_index_path, prefix, classifier_type, config_file):
     if len(prefix) > 0 and not prefix.endswith("_"):
         prefix += "_"
 
+    try:
+        # the extract section of config.yaml, where extraction reads its cleaning settings
+        cleaning = read_settings(config_file, CleaningOptions, stage_classes=EXTRACT_STAGE)
+    except (ConfigFileError, OldProjectError) as error:
+        raise click.ClickException(str(error)) from None
+
     print(f"Training {classifier_type} classifier")
     # cleaned as extraction cleans with the config file's settings, or its defaults
     train_flip_classifier(
         data_index_path,
         Path(data_index_path).with_name(f"{prefix}{classifier_type}_flip_classifier.p"),
-        CleaningOptions.resolve(read_config_option(config_file)),
+        CleaningOptions.resolve(cleaning),
         classifier=classifier_type.upper(),
     )
 

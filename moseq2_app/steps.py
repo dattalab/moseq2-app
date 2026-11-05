@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Sequence
 
 from moseq2_app.flip.train import create_training_dataset, save_classifier, train_classifier
 from moseq2_common.frames import CleaningOptions
@@ -20,13 +20,12 @@ from moseq2_viz.options import CrowdMovieOptions
 
 
 def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: str, opts: CrowdMovieOptions, *,
-                           syllables: Sequence[int], shim_flat_config: Mapping | None = None) -> dict:
+                           syllables: Sequence[int]) -> dict:
     """
     Write a crowd movie of each of ``syllables`` into ``crowd_movie_dir``.
 
     ``syllables`` is one syllable, or the first n syllables (``range(n)``), in usage order
-    when ``opts.sort`` is set. ``shim_flat_config`` (R2, removed by PR 4.1) holds the
-    settings a tool passes that no options class declares, under the options.
+    when ``opts.sort`` is set.
 
     Args:
     model_path (str): path to the trained model.
@@ -34,7 +33,6 @@ def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: st
     crowd_movie_dir (str): folder the movies are written to.
     opts (CrowdMovieOptions): the crowd-movie settings.
     syllables (Sequence[int]): the syllables to render.
-    shim_flat_config (Mapping): the tool's settings no options class declares.
 
     Returns:
     (dict): the movies written, ``{"all": [...]}`` or one list per group or session.
@@ -47,8 +45,7 @@ def render_syllable_movies(model_path: str, index_file: str, crowd_movie_dir: st
     else:
         raise ValueError(f"Crowd movies are rendered for one syllable or for the first n syllables, "
                          f"and {syllables} is neither. Pass one syllable, or range(n).")
-    return viz_steps.make_crowd_movies(index_file, model_path, crowd_movie_dir, opts,
-                                       shim_flat_config=shim_flat_config).movies
+    return viz_steps.make_crowd_movies(index_file, model_path, crowd_movie_dir, opts).movies
 
 
 @dataclass(frozen=True)

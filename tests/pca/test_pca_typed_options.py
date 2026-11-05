@@ -32,7 +32,7 @@ def received(monkeypatch):
 )
 def test_train_pca_rank(typed, expected, tmp_path, received):
     config = tmp_path / "config.yaml"
-    write_yaml({"rank": 50}, str(config))
+    write_yaml({"pca": {"rank": 50}}, str(config))
 
     result = CliRunner().invoke(
         pca_cli.cli,
@@ -59,7 +59,7 @@ def test_train_pca_rank(typed, expected, tmp_path, received):
 )
 def test_train_pca_zero_min_height_from_config(typed, expected, tmp_path, received):
     config = tmp_path / "config.yaml"
-    write_yaml({"min_height": 0}, str(config))
+    write_yaml({"pca": {"min_height": 0}}, str(config))
 
     result = CliRunner().invoke(
         pca_cli.cli,
@@ -98,7 +98,7 @@ def test_compute_changepoints_falsy_config(
     config_values, typed, expected, tmp_path, changepoints_received
 ):
     config = tmp_path / "config.yaml"
-    write_yaml(config_values, str(config))
+    write_yaml({"pca": config_values}, str(config))
 
     result = CliRunner().invoke(
         pca_cli.cli,

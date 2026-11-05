@@ -52,15 +52,13 @@ def test_the_tool_saves_exactly_the_shared_list():
     assert sorted(widget.session_config["session"]) == sorted(ARENA_TOOL_SETTINGS)
 
 
-def open_arena_tool(root, output_dir="proc"):
-    """The notebook's arena cell, which sets ``output_dir`` in config.yaml before opening the tool."""
+def open_arena_tool(root):
+    """The notebook's arena cell."""
     import panel as pn
 
     from moseq2_app.roi.widget import ArenaMaskWidget
 
     pn.extension()
-    with update_config(str(root / "config.yaml")) as config:
-        config["output_dir"] = output_dir
     return ArenaMaskWidget(str(root), str(root / "config.yaml"), str(root / "session_config.yaml"))
 
 
@@ -82,7 +80,7 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
     click(buttons_of(widget.view)["Save session parameters"])
 
     classifier = f"{raw_sessions}/flip_classifier_k2_c57_10to13weeks.npz"
-    with update_config(str(project / "config.yaml")) as config:
+    with update_config(str(project / "config.yaml"), section="extract") as config:
         config["flip_classifier"] = classifier
         config["frame_trim"] = [100, 0]
         config["crop_size"] = [120, 120]
@@ -127,15 +125,15 @@ def _recorded(monkeypatch, name, calls):
     monkeypatch.setattr(widget_module, name, recorder)
 
 
-def _save_then_change_config(project, raw_sessions, settings, output_dir="proc"):
-    """Open the tool, save the first recording, write ``settings`` into config.yaml, and
-    reopen it with the arena cell's ``output_dir`` line set to ``output_dir``."""
+def _save_then_change_config(project, raw_sessions, settings):
+    """Open the tool, save the first recording, write ``settings`` into config.yaml's extract
+    section, and reopen it."""
     widget = open_arena_tool(project)
     click(buttons_of(widget.view)["Save session parameters"])
     saved = read_yaml(str(project / "session_config.yaml"))["saline_example_0"]
-    with update_config(str(project / "config.yaml")) as config:
+    with update_config(str(project / "config.yaml"), section="extract") as config:
         config.update(settings)
-    return saved, open_arena_tool(project, output_dir)
+    return saved, open_arena_tool(project)
 
 
 def test_config_yaml_changes_after_the_tool_reach_the_preview_extraction(project, monkeypatch, raw_sessions):
@@ -183,10 +181,9 @@ def test_the_preview_stops_on_a_flip_classifier_that_does_not_fit_the_crop_size(
 
 def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monkeypatch, raw_sessions):
     """ "Compute arena mask" finds the arena with config.yaml's settings outside the tool's,
-    and caches the background in the folder extraction reads, config.yaml's output_dir
-    (here changed in the arena cell's ``output_dir`` line before it runs again)."""
+    and caches the background in the folder extraction writes to, ``proc``."""
     saved, widget = _save_then_change_config(
-        project, raw_sessions, {"bg_roi_erode": [3, 3], "bg_roi_fill_holes": False}, output_dir="proc_after"
+        project, raw_sessions, {"bg_roi_erode": [3, 3], "bg_roi_fill_holes": False}
     )
     assert saved["bg_roi_fill_holes"] is True
     data = widget.session_data
@@ -201,5 +198,5 @@ def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monke
     assert tuple(received["bg_roi_erode"]) == (3, 3)
     assert received["bg_roi_fill_holes"] is False
     assert received["dilate_iterations"] == 2
-    assert output_dir == str(project / "saline_example_0" / "proc_after")
-    assert (project / "saline_example_0" / "proc_after" / "bground.tiff").exists()
+    assert output_dir == str(project / "saline_example_0" / "proc")
+    assert (project / "saline_example_0" / "proc" / "bground.tiff").exists()

@@ -196,8 +196,8 @@ def test_the_notebook_cell_gets_the_same_check(tmp_path, sessions, workers_have)
 
     workers_have(ESTIMATE / 5)
     config_file = tmp_path / "config.yaml"
-    write_yaml({"cluster_type": "local", "nworkers": 1, "overwrite_pca_train": True,
-                "dask_cache_path": str(tmp_path / "cache")}, str(config_file))
+    write_yaml({"pca": {"cluster_type": "local", "nworkers": 1, "overwrite_pca_train": True,
+                        "dask_cache_path": str(tmp_path / "cache")}}, str(config_file))
     progress = {"train_data_dir": str(sessions), "config_file": str(config_file)}
     with pytest.warns(Warning) as record, pytest.raises(ReachedDask):
         train_pca_command(progress, str(tmp_path / "_pca"), "pca")

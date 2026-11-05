@@ -145,8 +145,7 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
         # photometry, or ephys cables. These sessions in particular include frame-by-frame masks
         # to explicitly tell PCA where the mouse is, removing any noise or obstructions.
         # Note: timestamps for all files are required in order for this operation to work.
-        if config_data['missing_data'] or config_data.get('cable_filter_iters', 0) > 1:
-            config_data['missing_data'] = True # in case cable filter iterations > 1
+        if config_data['missing_data']:
             mask_dsets = [h5py.File(h5, mode='r')[config_data['h5_mask_path']] for h5 in h5s]
             mask_arrays = [da.from_array(dset, chunks=config_data['chunk_size']) for dset in mask_dsets]
             stacked_array_mask = da.concatenate(mask_arrays, axis=0).astype('float32')

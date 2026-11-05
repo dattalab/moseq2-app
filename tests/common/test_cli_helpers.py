@@ -1,10 +1,9 @@
 """The command lines share one copy of their option helpers, in moseq2-common.
 
-Reading ``--config-file`` and turning a bad file into a command-line error,
-starting a command from click's type-converted defaults, and declaring a flag
-with no default are the same few lines in every package's ``cli.py``. Each is
-kept once in ``moseq2_common.options``, so a fix (or the removal of a shim)
-lands once.
+Reading a command's settings from its project's ``config.yaml`` and turning a
+bad file into a command-line error are the same few lines in every package's
+``cli.py``. They are kept once in ``moseq2_common.options``
+(``command_settings``), so a fix lands once.
 
 Each ``cli.py`` is read from its installed source with ``ast``.
 """
@@ -20,8 +19,8 @@ import pytest
 
 from moseq2_common import options
 
-HELPERS = ["read_config_option", "shim_click_defaults", "shim_flags_without_default"]
-COPIED_NAMES = ["_read_config_file", *HELPERS]
+HELPERS = ["command_settings"]
+COPIED_NAMES = ["_read_config_file", "read_config_option", *HELPERS]
 PACKAGES = ["moseq2_extract", "moseq2_pca", "moseq2_model", "moseq2_viz"]
 
 
@@ -42,11 +41,17 @@ def test_cli_defines_no_copy_of_a_shared_helper(pkg):
     assert found == []
 
 
-def test_read_config_option_without_a_file_is_none():
-    assert options.read_config_option(None) is None
+def test_command_settings_outside_a_project_are_empty_and_say_so(tmp_path, monkeypatch, capsys):
+    from moseq2_pca.options import TrainPCAOptions
+
+    monkeypatch.chdir(tmp_path)
+    assert options.command_settings(None, TrainPCAOptions) == {}
+    assert "runs outside a project" in capsys.readouterr().out
 
 
-def test_read_config_option_stops_the_command_on_a_missing_file(tmp_path):
+def test_command_settings_stop_the_command_on_a_missing_file(tmp_path):
+    from moseq2_pca.options import TrainPCAOptions
+
     missing = tmp_path / "config.yaml"
     with pytest.raises(click.ClickException, match=str(missing)):
-        options.read_config_option(missing)
+        options.command_settings(missing, TrainPCAOptions)

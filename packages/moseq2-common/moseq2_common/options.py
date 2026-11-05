@@ -5,16 +5,22 @@ Each step's settings are one frozen dataclass whose fields are made with
 help text live together. From that class:
 
 - ``Options.resolve`` builds the settings a run uses: the class defaults, then
-  ``config.yaml``, then the session's entry in ``session_config.yaml``, then the
-  values passed explicitly (options the user typed, arguments a script passes).
+  ``config.yaml``'s section for the step's stage, then the session's entry in
+  ``session_config.yaml``, then the values passed explicitly (options the user
+  typed, arguments a script passes).
+- ``read_settings`` reads a stage's section of ``config.yaml`` for ``resolve``,
+  printing one message naming the keys no step of that stage reads, which it
+  ignores.
 - ``click_options`` writes the command's ``click.option`` decorators, in the
   order the command's help lists them.
 - ``explicit_values`` returns the options the user typed on the command line,
   including one typed at its default value.
 
-The commands share ``read_config_option``, which reads ``--config-file``, and
-two shims that keep 1.5.0's command line: ``shim_click_defaults`` and
-``shim_flags_without_default``.
+``config.yaml`` has one section per stage, named by each class's ``SECTION``
+(``extract``, ``pca``, ``model``, ``crowd_movies``), and ``camera_type`` at its
+top level. A field declared with ``setting=False`` is a one-run switch: a flag on
+the command line and an argument of the notebook's function, never read from
+``config.yaml``, a session entry or a job file.
 
 A field is *tuple-valued* when it is declared ``multiple=True`` or with a tuple
 ``type`` (``type=(float, float)``); its default is a tuple, and ``resolve``
@@ -24,9 +30,11 @@ hands it a tuple whatever shape ``config.yaml`` holds.
 from __future__ import annotations
 
 import dataclasses
+import difflib
 import os
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, TypeVar
+from pathlib import Path
+from typing import Any, ClassVar, TypeVar
 
 import click
 from click.core import ParameterSource
@@ -35,34 +43,47 @@ from ruamel.yaml import YAMLError
 from moseq2_common.yaml import read_yaml
 
 __all__ = [
+    "SECTIONS",
+    "TOP_LEVEL_KEYS",
     "ConfigFileError",
     "Options",
     "arena_fields",
     "click_options",
+    "command_settings",
     "explicit_values",
     "option",
     "read_config",
-    "read_config_option",
-    "shim_click_defaults",
-    "shim_flags_without_default",
+    "read_settings",
+    "setting_fields",
 ]
 
 _KEY = "moseq2_option"
+
+#: The sections of config.yaml, one per stage.
+SECTIONS = ("extract", "pca", "model", "crowd_movies")
+
+#: The keys config.yaml holds at its top level, outside the sections.
+#: ``session_config_path`` leaves with PR 4.2, the three output paths with PR 4.3
+#: (``moseq2_pca.cli.shim_write_back_paths``); ``job`` is a job settings file's.
+TOP_LEVEL_KEYS = ("camera_type", "groups", "exclude", "job",
+                  "session_config_path", "pca_file", "pca_file_scores", "changepoint_file")
 
 O = TypeVar("O", bound="Options")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
 def option(default, *flags: str, help: str, type=None, multiple: bool = False,
-           is_flag: bool = False, arena: bool = False) -> dataclasses.Field:
+           is_flag: bool = False, arena: bool = False, setting: bool = True) -> dataclasses.Field:
     """Declare one setting: its default, flags, click type and help text.
 
     ``type`` is passed to click unchanged (a Python type, a ``click.ParamType``
     or a tuple of types). ``arena`` marks a setting the arena tool detects for
-    each recording.
+    each recording. ``setting=False`` marks a one-run switch, which ``resolve``
+    never takes from ``config.yaml`` or a session entry and ``generate-config``
+    never writes.
     """
     spec = {"flags": flags, "help": help, "type": type, "multiple": multiple,
-            "is_flag": is_flag, "arena": arena}
+            "is_flag": is_flag, "arena": arena, "setting": setting}
     return dataclasses.field(default=default, metadata={_KEY: spec})
 
 
@@ -86,22 +107,25 @@ def _as_tuple(value):
 class Options:
     """Base class of every step's options."""
 
+    #: The config.yaml section the class reads; None for a class with no section.
+    SECTION: ClassVar[str | None] = None
+
     @classmethod
     def resolve(cls: type[O], config: Mapping | None = None, entry: Mapping | None = None,
                 explicit: Mapping | None = None) -> O:
         """Class defaults, then ``config``, then ``entry``, then ``explicit``.
 
-        From ``config`` and ``entry`` only the keys the class declares are read,
-        and a null never replaces the value before it. A list or a scalar for a
-        tuple-valued field becomes a tuple; every other value is taken as it is.
-        ``explicit`` applies as given, and a key the class does not declare in
-        it raises ``TypeError``.
+        From ``config`` and ``entry`` only the settings the class declares are
+        read (never a ``setting=False`` switch), and a null never replaces the
+        value before it. A list or a scalar for a tuple-valued field becomes a
+        tuple; every other value is taken as it is. ``explicit`` applies as
+        given, and a key the class does not declare in it raises ``TypeError``.
         """
         fields = {f.name: f for f in dataclasses.fields(cls)}
         values = {}
         for layer in (config, entry):
             for name, value in (layer or {}).items():
-                if name not in fields or value is None:
+                if name not in fields or value is None or not _spec(fields[name])["setting"]:
                     continue
                 if _is_tuple_valued(_spec(fields[name])):
                     value = _as_tuple(value)
@@ -118,6 +142,15 @@ class Options:
     def as_dict(self) -> dict:
         """Every field by name, values as held (tuples stay tuples)."""
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
+    def settings(self) -> dict:
+        """The fields a settings file holds: every field but the ``setting=False`` switches."""
+        return {name: value for name, value in self.as_dict().items() if name in setting_fields(type(self))}
+
+
+def setting_fields(cls: type[Options]) -> tuple[str, ...]:
+    """The names of the fields ``config.yaml`` may set (not the ``setting=False`` switches)."""
+    return tuple(f.name for f in dataclasses.fields(cls) if _spec(f)["setting"])
 
 
 class ConfigFileError(ValueError):
@@ -158,6 +191,147 @@ def read_config(path: str | os.PathLike) -> dict:
             f"written as `name: value` lines. {advice}"
         )
     return dict(data)
+
+
+def _closest(key: str, names) -> str | None:
+    """The name in ``names`` closest to ``key``, or None when none is close."""
+    matches = difflib.get_close_matches(key, sorted(names), n=1, cutoff=0.6)
+    return matches[0] if matches else None
+
+
+def check_top_level(config_file, data: Mapping) -> None:
+    """Stop on a config.yaml without sections (1.5.0's) or with a section that does not hold settings."""
+    from moseq2_common.project import OldProjectError, old_project_message
+
+    present = [name for name in SECTIONS if name in data]
+    if not present and _stray_keys(data):
+        raise OldProjectError(old_project_message(Path(config_file), "its settings have no sections"))
+    for name in present:
+        if data[name] is not None and not isinstance(data[name], Mapping):
+            holds = "a list" if isinstance(data[name], list) else "a single value"
+            raise ConfigFileError(
+                f"{config_file}'s `{name}` section holds {holds}, not settings written as "
+                f"`name: value` lines indented below `{name}:`. Correct the section, or replace the "
+                f"file with one written by `moseq2-extract generate-config --output-file {config_file}`."
+            )
+
+
+def _stray_keys(data: Mapping) -> list[str]:
+    """The keys at config.yaml's top level that are neither a section nor a top-level key."""
+    return [key for key in data if key not in SECTIONS and key not in TOP_LEVEL_KEYS]
+
+
+def _ticked(keys) -> str:
+    return ", ".join(f"`{key}`" for key in keys)
+
+
+def _switch_message(config_file, section: str, key: str, field: dataclasses.Field) -> str:
+    flags = [flag for flag in _spec(field)["flags"] for flag in flag.split("/") if flag.startswith("--")]
+    flag = flags[0] if flags else f"--{key.replace('_', '-')}"
+    return (f"`{key}` in the `{section}` section of {config_file} is ignored: it applies to one run and is "
+            f"never read from config.yaml. Pass `{flag}` on the command line, or `{key}=` to the notebook "
+            "function, and delete the line to silence this message.")
+
+
+def _ignored_settings(config_file, section: str, settings: Mapping,
+                     stage_classes: Sequence[type[Options]]) -> tuple[list[str], list[str]]:
+    """The keys of ``section`` no step reads, and the messages that name them.
+
+    The keys no class of ``stage_classes`` declares share one message, each
+    with the declared setting closest to it; a one-run switch
+    (``setting=False``) and ``camera_type``, which is read from the top level
+    only, each get a message of their own.
+    """
+    fields = {}
+    for cls in stage_classes:
+        for field in dataclasses.fields(cls):
+            fields.setdefault(field.name, field)
+    settings_names = {name for name, field in fields.items() if _spec(field)["setting"]}
+    ignored, unknown, messages = [], [], []
+    for key in settings:
+        if key in settings_names and key != "camera_type":
+            continue
+        ignored.append(key)
+        if key == "camera_type":
+            messages.append(
+                f"`camera_type` in the `{section}` section of {config_file} is ignored: camera_type is read "
+                "only from the top level of config.yaml, by every stage. Move the line to the top level "
+                "(no indent), or delete it, to silence this message."
+            )
+        elif key in fields:
+            messages.append(_switch_message(config_file, section, key, fields[key]))
+        else:
+            closest = _closest(key, settings_names - {"camera_type"})
+            unknown.append(f"`{key}`" + (f" (did you mean `{closest}`?)" if closest else ""))
+    if unknown:
+        messages.insert(0, (
+            f"{config_file} has settings in its `{section}` section that no {section} step reads, so they "
+            f"are ignored: {', '.join(unknown)}. Correct or delete those lines to silence this message."
+        ))
+    return ignored, messages
+
+
+def _stray_message(config_file, stray: list[str]) -> str:
+    return (f"{config_file} has settings at its top level, outside the sections, that no step reads, so "
+            f"they are ignored: {_ticked(stray)}. The top level holds only camera_type, groups and exclude; "
+            "move each of those lines into the section of its stage (extract, pca, model or crowd_movies), "
+            "or delete it, to silence this message.")
+
+
+def read_settings(config_file: str | os.PathLike | None, cls: type[Options], *,
+                  stage_classes: Sequence[type[Options]]) -> dict:
+    """The settings ``cls`` reads from ``config_file``: its section, checked, and ``camera_type``.
+
+    The section named by ``cls.SECTION`` is checked against every field of
+    ``stage_classes`` (the classes of every step of that stage), and the
+    top-level ``camera_type`` is added when ``cls`` declares it. A key no step
+    of the stage reads (``_ignored_settings``) and a setting at the top level
+    outside the sections are left out, and a message naming them is printed.
+    A class with no section, or no ``config_file``, reads nothing.
+
+    Raises ``ConfigFileError`` for a file that cannot be read or a section that
+    does not hold settings, and ``moseq2_common.project.OldProjectError`` for a
+    file without sections.
+    """
+    if cls.SECTION is None or not config_file:
+        return {}
+    data = read_config(config_file)
+    check_top_level(config_file, data)
+    stray = _stray_keys(data)
+    if stray:
+        click.echo(_stray_message(config_file, stray))
+    settings = dict(data.get(cls.SECTION) or {})
+    ignored, messages = _ignored_settings(config_file, cls.SECTION, settings, stage_classes)
+    for message in messages:
+        click.echo(message)
+    for key in ignored:
+        del settings[key]
+    names = {f.name for f in dataclasses.fields(cls)}
+    if "camera_type" in names and data.get("camera_type") is not None:
+        settings["camera_type"] = data["camera_type"]
+    return settings
+
+
+def command_settings(config_file, cls: type[Options], *, stage_classes: Sequence[type[Options]] = ()) -> dict:
+    """A command's settings: ``read_settings`` from its project's config, its errors as click's.
+
+    The settings come from ``--config-file`` or, without one, from the
+    ``config.yaml`` of the folder the command runs in. Without either, one line
+    says the command runs outside a project.
+    """
+    from moseq2_common.project import OldProjectError, find_project, standalone_note
+
+    try:
+        project = find_project(config_file)
+    except ConfigFileError as error:
+        raise click.ClickException(str(error)) from None
+    if project is None:
+        click.echo(standalone_note(Path.cwd()))
+    source = config_file or (project.config_file if project is not None else None)
+    try:
+        return read_settings(source, cls, stage_classes=stage_classes or (cls,))
+    except (ConfigFileError, OldProjectError) as error:
+        raise click.ClickException(str(error)) from None
 
 
 def arena_fields(cls: type[Options]) -> tuple[str, ...]:
@@ -222,44 +396,3 @@ def explicit_values(ctx: click.Context, cls: type[Options]) -> dict:
         for f in dataclasses.fields(cls)
         if ctx.get_parameter_source(f.name) is ParameterSource.COMMANDLINE
     }
-
-
-def read_config_option(config_file) -> dict | None:
-    """``config.yaml``'s settings, or None without ``--config-file``; a file that cannot be read stops the command."""
-    if not config_file:
-        return None
-    try:
-        return read_config(config_file)
-    except ConfigFileError as error:
-        raise click.ClickException(str(error)) from None
-
-
-def shim_click_defaults(ctx: click.Context, cls: type[O], config: Mapping | None = None) -> O:
-    """Resolve ``cls`` from click's defaults, ``config`` and the typed options (removed by PR 4.1).
-
-    click converts each default through its option's type (extract's ``--fps``
-    30 becomes 30.0, pca's ``--gaussfilter-space`` (1.5, 1) becomes (1.5, 1.0),
-    and a ``multiple`` option's None becomes ()), and 1.5.0's command line ran
-    on those values where the notebook ran on the declared ones. A null in
-    ``config`` keeps the default. PR 4.1 gives both front ends one resolution.
-    """
-    defaults = {name: ctx.params[name] for name in cls().as_dict()}
-    settings = {name: value for name, value in (config or {}).items() if value is not None}
-    return cls.resolve(config={**defaults, **settings}, explicit=explicit_values(ctx, cls))
-
-
-def shim_flags_without_default(*names: str) -> Callable[[F], F]:
-    """Declare the flags ``names`` with no default, as 1.5.0 did (removed by PR 4.1).
-
-    Their options classes hold False, and a flag not typed is False either way;
-    this keeps each option's declared default what 1.5.0's command line reports.
-    Applied above ``click_options``, so the options are already on the function.
-    """
-    def apply(function: F) -> F:
-        function.__click_params__ = [
-            click.Option([param.name, *param.opts], is_flag=True, type=param.type, help=param.help)
-            if param.name in names else param
-            for param in function.__click_params__
-        ]
-        return function
-    return apply

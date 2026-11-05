@@ -3,8 +3,13 @@
 One class per command. Each field carries its default, its command-line flags,
 its click type and its help text; ``cli.py`` generates the commands' options
 from these classes, and ``steps.py`` takes an instance. The paths a step works
-on (``--input-dir``, ``--output-dir``, ``--output-file``) and ``--config-file``
-are not settings: they are the steps' arguments and plain options in ``cli.py``.
+on (``--input-dir``, ``--output-dir``, ``--output-file``, ``--pca-file``,
+``--pca-file-scores``) and ``--config-file`` are not settings: they are the
+steps' arguments and plain options in ``cli.py``.
+
+The three steps' classes read ``config.yaml``'s ``pca`` section
+(``PCA_STAGE``), whose height range, chunk size and compute resources are PCA's
+own, apart from extraction's.
 """
 
 from __future__ import annotations
@@ -21,6 +26,8 @@ from moseq2_common.options import Options, option
 class PCAInputOptions(Options):
     """Where the extracted frames are and how they are read."""
 
+    SECTION = "pca"
+
     cluster_type: str = option('local', '--cluster-type', type=click.Choice(['local', 'slurm', 'nodask']),
                                help='Compute enviornment the command runs in')
     chunk_size: int = option(4000, '--chunk-size', type=int, help='Number of frames per chunk')
@@ -32,6 +39,8 @@ class PCAInputOptions(Options):
 @dataclass(frozen=True, kw_only=True)
 class DaskOptions(Options):
     """The dask cluster a PCA step runs on."""
+
+    SECTION = "pca"
 
     dask_cache_path: str = option(os.path.join(os.getcwd(), '_pca'), '--dask-cache-path', '-d',
                                   type=click.Path(), help='Path to spill data to disk for dask')
@@ -59,8 +68,7 @@ class TrainPCAOptions(PCAInputOptions, DaskOptions):
     medfilter_time: tuple = option((0,), '--medfilter-time', type=int, multiple=True,
                                    help="kernel size for median temporal filter")
     missing_data: bool = option(False, '--missing-data', is_flag=True, type=bool,
-                                help="Use missing data PCA; will be automatically set to True if "
-                                     "cable-filter-iters > 1 from the extract step.")
+                                help="Use missing data PCA")
     missing_data_iters: int = option(10, '--missing-data-iters', type=int,
                                      help="number of missing data PCA iterations")
     mask_threshold: float = option(-16, '--mask-threshold', type=float,
@@ -82,8 +90,6 @@ class TrainPCAOptions(PCAInputOptions, DaskOptions):
     overwrite_pca_train: bool = option(False, '--overwrite-pca-train', type=bool,
                                        help='Used to bypass the pca overwrite question. If True: skip question, '
                                             'run automatically')
-    camera_type: str = option('k2', '--camera-type', type=str,
-                              help='specify the camera type (k2 or azure), default is k2')
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -91,9 +97,9 @@ class ApplyPCAOptions(PCAInputOptions, DaskOptions):
     """``apply-pca``."""
 
     pca_path: str = option('/components', '--pca-path', type=str, help='Path to pca components in h5 file')
-    pca_file: str | None = option(None, '--pca-file', type=click.Path(), help='Path to PCA results')
     fps: int = option(30, '--fps', type=int, help='Frames per second (frame rate)')
-    verbose: bool = option(False, '--verbose', '-v', is_flag=True, help='Print sessions as they are being loaded.')
+    verbose: bool = option(False, '--verbose', '-v', is_flag=True, setting=False,
+                           help='Print sessions as they are being loaded.')
     overwrite_pca_apply: bool = option(False, '--overwrite-pca-apply', type=bool,
                                        help='Used to bypass the pca overwrite question. If True: skip question, '
                                             'run automatically')
@@ -103,7 +109,6 @@ class ApplyPCAOptions(PCAInputOptions, DaskOptions):
 class ChangepointsOptions(PCAInputOptions, DaskOptions):
     """``compute-changepoints``."""
 
-    pca_file_scores: str | None = option(None, '--pca-file-scores', type=click.Path(), help='Path to PCA results')
     pca_path: str = option('/components', '--pca-path', type=str, help='Path to pca components')
     neighbors: int = option(1, '--neighbors', type=int, help="Neighbors to use for peak identification")
     threshold: float = option(.5, '--threshold', type=float, help="Peak threshold to use for changepoints")
@@ -115,7 +120,8 @@ class ChangepointsOptions(PCAInputOptions, DaskOptions):
     # -d is also --dask-cache-path's short flag, as in 1.5.0; click gives it to --dims
     dims: int = option(300, '-d', '--dims', type=int, help="Number of random projections to use")
     fps: int = option(30, '--fps', type=int, help="Frames per second (frame rate)")
-    verbose: bool = option(False, '--verbose', '-v', is_flag=True, help="Print sessions as they are being loaded.")
+    verbose: bool = option(False, '--verbose', '-v', is_flag=True, setting=False,
+                           help="Print sessions as they are being loaded.")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -124,3 +130,7 @@ class ClipScoresOptions(Options):
 
     from_end: bool = option(False, '--from-end', type=bool, is_flag=True,
                             help="if true clip from end rather than beginning")
+
+
+#: The classes of the PCA steps, whose fields config.yaml's ``pca`` section may set.
+PCA_STAGE = (TrainPCAOptions, ApplyPCAOptions, ChangepointsOptions)

@@ -90,7 +90,7 @@ def project(tmp_path):
     recording.parent.mkdir()
     recording.write_bytes(b"")
     config = tmp_path / "config.yaml"
-    write_yaml({"cluster_type": "local", "noise_tolerance": 20}, str(config))
+    write_yaml({"extract": {"cluster_type": "local", "noise_tolerance": 20}}, str(config))
     return tmp_path, recording, config
 
 
@@ -116,7 +116,7 @@ def test_every_extract_command_calls_its_step(project, called, options):
         assert len(called[name]) == 1, name
         assert type(called[name][0]) is cls, name
     assert called["extract"][0].noise_tolerance == 20
-    assert called["generate_config"] == [(str(root / "new_config.yaml"), "k2")]
+    assert called["generate_config"] == [(str(root / "new_config.yaml"), "auto")]
     assert called["download_flip_file"] == [None]
 
 
@@ -204,7 +204,9 @@ def test_the_aggregate_function_takes_its_defaults_from_the_options_class(projec
 
 def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monkeypatch, steps):
     """Every extraction option typed on batch-extract's command line, and only those, reaches
-    each recording; num_frames, skip_completed and the cluster type travel in the options."""
+    each recording; num_frames, skip_completed and the cluster type travel in the options. A
+    typed depth range is used as given (``RoiOptions.resolve``), and --output-file names no
+    file in a batch."""
     root, _, config = project
     seen = {}
 
@@ -218,8 +220,7 @@ def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monk
            "--output-dir", "out", "--output-file", "o.h5", "--max-depth", 2, "--ncpus", 2)
 
     assert seen["output_dir"] == "out"
-    assert seen["explicit"] == {"bg_roi_depth_range": (600.0, 700.0), "manual_set_depth_range": True, "fps": 25,
-                                "noise_tolerance": 30, "output_file": "o.h5"}
+    assert seen["explicit"] == {"bg_roi_depth_range": (600.0, 700.0), "fps": 25, "noise_tolerance": 30}
     assert (seen["opts"].num_frames, seen["opts"].skip_completed, seen["opts"].max_depth) == (9, True, 2)
 
 
@@ -237,10 +238,9 @@ def test_batch_extract_without_typed_options_hands_the_step_none(project, monkey
     assert (seen["output_dir"], seen["explicit"]) == (None, {})
 
 
-def test_a_typed_depth_range_means_manual_is_one_named_shim(project, called):
-    """find-roi, extract and batch-extract share ``shim_typed_depth_range_is_manual``."""
+def test_a_typed_depth_range_is_used_as_given(project, called):
+    """A --bg-roi-depth-range typed on find-roi or extract is used as given (``RoiOptions.resolve``)."""
     root, recording, config = project
-    assert callable(extract_cli.shim_typed_depth_range_is_manual)
     invoke("find-roi", recording, "--config-file", config, "--bg-roi-depth-range", 600, 700)
     invoke("extract", recording, "--config-file", config, "--bg-roi-depth-range", 600, 700)
     invoke("extract", recording, "--config-file", config)
@@ -248,18 +248,19 @@ def test_a_typed_depth_range_means_manual_is_one_named_shim(project, called):
 
 
 def test_recording_settings_is_the_dict_extraction_hands_its_wrapper(steps):
-    """One function gives the arena tool what extraction is handed: config.yaml, the entry's
-    arena settings and any setting config.yaml lacks, then every declared option resolved,
-    a list config.yaml holds kept as that list."""
-    from moseq2_extract.session_config import recording_config, recording_options, recording_settings
+    """One function gives the arena tool what extraction is handed: the options resolved from
+    config.yaml's settings and the entry's arena settings (and any setting config.yaml lacks),
+    tuples as the options hold them."""
+    from moseq2_extract.session_config import recording_options, recording_settings
 
     config_data = {"bg_roi_depth_range": [600, 700], "noise_tolerance": 20, "fps": 30, "extra": 1}
     entry = {"noise_tolerance": 15, "fps": 25, "only_in_entry": 2, "crop_size": [70, 70]}
 
     settings = recording_settings(config_data, entry)
 
-    assert settings == steps._settings(recording_options(config_data, entry), recording_config(config_data, entry)[0])
-    assert (settings["noise_tolerance"], settings["fps"], settings["only_in_entry"], settings["extra"]) == (15, 30, 2, 1)
-    assert settings["bg_roi_depth_range"] == [600, 700]
-    assert settings["crop_size"] == [70, 70]
+    assert settings == steps._settings(recording_options(config_data, entry))
+    assert (settings["noise_tolerance"], settings["fps"]) == (15, 30)
+    assert "only_in_entry" not in settings and "extra" not in settings
+    assert settings["bg_roi_depth_range"] == (600, 700)
+    assert settings["crop_size"] == (70, 70)
     assert settings["max_height"] == 120

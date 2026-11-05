@@ -95,7 +95,7 @@ def give_each_session_its_own_noise_tolerance(root):
     with a different ``noise_tolerance`` (a setting the arena tool saves) for
     each session, the way a user tuning each recording leaves them different;
     return the noise tolerance by session."""
-    base = read_yaml(str(root / "config.yaml"))
+    base = read_yaml(str(root / "config.yaml"))["extract"]
     tolerance = {key: 11 + number for number, key in enumerate(sorted(GROUPED))}
     write_yaml({key: {**base, "noise_tolerance": value} for key, value in tolerance.items()}, str(root / "session_config.yaml"))
     with update_config(str(root / "config.yaml")) as config:
@@ -117,7 +117,7 @@ def test_extraction_without_extensions_takes_every_recording_type(tmp_path, chos
         empty_session(root, "archived", recording="session_20190320.tar.gz"),
     ))
     config = tmp_path / "config.yaml"
-    config.write_text("cluster_type: local\n")
+    config.write_text("extract:\n  cluster_type: local\n")
 
     extract_found_sessions(str(root), str(config))
 
@@ -131,7 +131,7 @@ def test_extensions_passed_by_an_older_notebook_are_still_obeyed(tmp_path, chose
     dat = empty_session(root, "kinect")
     mkv = empty_session(root, "azure", recording="recording.mkv")
     config = tmp_path / "config.yaml"
-    config.write_text("cluster_type: local\n")
+    config.write_text("extract:\n  cluster_type: local\n")
     capsys.readouterr()
 
     extract_found_sessions(str(root), str(config), [".avi", ".dat", ".tar.gz"])
@@ -284,7 +284,7 @@ def test_an_older_file_keyed_by_a_shared_folder_name_is_explained(grouped, capsy
     holds one ``mouse1`` entry, saved for one of the two folders. The arena tool
     cannot tell which, so it detects parameters for each under its path and
     says so; the unshared name keeps its entry."""
-    old = {**read_yaml(str(grouped / "config.yaml")), "fps": 7}
+    old = {**read_yaml(str(grouped / "config.yaml"))["extract"], "fps": 7}
     write_yaml({"mouse1": old, "saline_example_0": old}, str(grouped / "session_config.yaml"))
     capsys.readouterr()
 
@@ -310,7 +310,7 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
         ),
     )
     tolerance = give_each_session_its_own_noise_tolerance(grouped)
-    with update_config(str(grouped / "config.yaml")) as config:
+    with update_config(str(grouped / "config.yaml"), section="extract") as config:
         config["cluster_type"] = "local"
 
     extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
@@ -334,13 +334,13 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
         ),
     )
     tolerance = give_each_session_its_own_noise_tolerance(grouped)
-    with update_config(str(grouped / "config.yaml")) as config:
+    with update_config(str(grouped / "config.yaml"), section="extract") as config:
         config["cluster_type"] = "slurm"
 
     extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
 
     for key in GROUPED:
-        assert read_yaml(str(grouped / key / "proc" / "config.yaml"))["noise_tolerance"] == tolerance[key], key
+        assert read_yaml(str(grouped / key / "proc" / "config.yaml"))["extract"]["noise_tolerance"] == tolerance[key], key
     script = (grouped / "extract_out.sh").read_text()
     for line in filter(str.strip, script.splitlines()):
         command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
@@ -366,10 +366,10 @@ def test_extraction_reads_a_file_keyed_by_folder_name(tmp_path, monkeypatch):
     b = empty_session(root, "GroupB/mouse2")
     config = root / "config.yaml"
     generate_config_command(str(config), camera_type="k2")
-    base = read_yaml(str(config))
+    base = read_yaml(str(config))["extract"]
     write_yaml({"mouse1": {**base, "noise_tolerance": 11}, "mouse2": {**base, "noise_tolerance": 12}}, str(root / "session_config.yaml"))
     with update_config(str(config)) as data:
-        data["cluster_type"] = "local"
+        data["extract"]["cluster_type"] = "local"
         data["session_config_path"] = str(root / "session_config.yaml")
 
     extract_found_sessions(str(root), str(config), [".dat"])

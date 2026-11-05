@@ -7,6 +7,9 @@ on (``INPUT_FILE``, ``DEST_FILE``, ``OUTPUT_DIR`` and the like) and ``--index``
 are not settings: they are the steps' arguments and plain click parameters in
 ``cli.py``. ``--index`` is one of them because its help differs between
 ``learn-model`` and ``kappa-scan``.
+
+The modeling steps' classes read ``config.yaml``'s ``model`` section
+(``MODEL_STAGE``).
 """
 
 from __future__ import annotations
@@ -22,6 +25,8 @@ from moseq2_common.slurm import SlurmOptions
 @dataclass(frozen=True, kw_only=True)
 class ModelOptions(Options):
     """The fitting settings ``learn-model`` and ``kappa-scan`` share."""
+
+    SECTION = "model"
 
     check_every: int = option(5, '--check-every', type=int,
                               help="Increment to record training and validation log-likelihoods.")
@@ -74,7 +79,7 @@ class LearnModelOptions(ModelOptions):
                                   help="indicate whether to use previously saved checkpoint")
     default_group: str = option('n/a', '--default-group', type=str,
                                 help="Default group name to use for separate-trans")
-    verbose: bool = option(False, '--verbose', '-v', is_flag=True,
+    verbose: bool = option(False, '--verbose', '-v', is_flag=True, setting=False,
                            help="Print syllable log-likelihoods during training.")
 
 
@@ -90,11 +95,16 @@ class KappaScanOptions(ModelOptions, SlurmOptions):
     min_kappa: float | None = option(None, '--min-kappa', type=float,
                                      help="Minimum kappa value to begin scan from.")
     max_kappa: float | None = option(None, '--max-kappa', type=float, help="Maximum kappa value to end scan on.")
+    # what the notebook's kappa-scan jobs requested in 1.5.0; batch-extract keeps SlurmOptions' 5GB, 3:00:00
+    memory: str = option("15GB", "--memory", type=str, help="RAM (slurm only)")
+    wall_time: str = option("06:00:00", "--wall-time", type=str, help="Wall time (slurm only)")
 
 
 @dataclass(frozen=True, kw_only=True)
 class ApplyModelOptions(Options):
     """``apply-model``."""
+
+    SECTION = "model"
 
     var_name: str = option('scores', '--var-name', type=str, help="Variable name in input file with PCs")
     load_groups: bool = option(True, '--load-groups', type=bool,
@@ -106,3 +116,7 @@ class CountFramesOptions(Options):
     """``count-frames``."""
 
     var_name: str = option('scores', '--var-name', type=str, help="Variable name in input file with PCs")
+
+
+#: The classes of the modeling steps, whose fields config.yaml's ``model`` section may set.
+MODEL_STAGE = (LearnModelOptions, KappaScanOptions, ApplyModelOptions)

@@ -2,8 +2,9 @@
 CLI for modeling the data using AR-HMM.
 
 Each command's settings are generated from its options class in
-``moseq2_model.options``; the command resolves the settings and calls its step
-in ``moseq2_model.steps``.
+``moseq2_model.options``; the command reads the ``model`` section of its
+project's ``config.yaml`` (``--config-file`` or the working folder's), resolves
+the settings and calls its step in ``moseq2_model.steps``.
 """
 
 from dataclasses import replace
@@ -12,9 +13,16 @@ from os.path import join
 import click
 from click.core import ParameterSource
 
-from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
+from moseq2_common.options import click_options, command_settings, explicit_values
+from moseq2_common.project import find_project
 from moseq2_model import steps
-from moseq2_model.options import ApplyModelOptions, CountFramesOptions, KappaScanOptions, LearnModelOptions
+from moseq2_model.options import (
+    MODEL_STAGE,
+    ApplyModelOptions,
+    CountFramesOptions,
+    KappaScanOptions,
+    LearnModelOptions,
+)
 from moseq2_model.util import count_frames as count_frames_wrapper
 
 
@@ -65,10 +73,11 @@ def count_frames(ctx, input_file, **_):
 @click.pass_context
 def learn_model(ctx, input_file, dest_file, index, config_file, **_):
     # Train the ARHMM using PC scores located in the INPUT_FILE, and saves the model to DEST_FILE
-    opts = shim_click_defaults(ctx, LearnModelOptions, read_config_option(config_file))
+    config = command_settings(config_file, LearnModelOptions, stage_classes=MODEL_STAGE)
+    opts = LearnModelOptions.resolve(config=config, explicit=explicit_values(ctx, LearnModelOptions))
     if opts.kappa is not None and (isinstance(opts.kappa, bool) or not isinstance(opts.kappa, (int, float))):
         where = "on the command line" if ctx.get_parameter_source("kappa") is ParameterSource.COMMANDLINE \
-            else f"in {config_file}"
+            else f"in the model section of {config_file or 'config.yaml'}"
         raise click.ClickException(
             f"kappa is {opts.kappa!r} {where}, and learn-model fits one model at one kappa. Set kappa to a "
             "number (or delete it to use the number of frames), or run moseq2-model kappa-scan to fit a "
@@ -92,7 +101,8 @@ def learn_model(ctx, input_file, dest_file, index, config_file, **_):
 @click.pass_context
 def apply_model(ctx, model_file, pc_file, dest_file, index, **_):
     # Apply the ARHMM located in MODEL_FILE to the PC scores in PC_FILE, and saves the results to DEST_FILE
-    opts = ApplyModelOptions.resolve(explicit=explicit_values(ctx, ApplyModelOptions))
+    config = command_settings(None, ApplyModelOptions, stage_classes=MODEL_STAGE)
+    opts = ApplyModelOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyModelOptions))
     steps.apply_model(model_file, pc_file, dest_file, opts, index=index)
 
 
@@ -107,8 +117,11 @@ def apply_model(ctx, model_file, pc_file, dest_file, index, **_):
 @click.pass_context
 def kappa_scan_fit_models(ctx, input_file, output_dir, index, **_):
     # Scan through the kappa hyperparameter to find the kappa that best matches the changepoint duration distribution.
-    opts = shim_click_defaults(ctx, KappaScanOptions)
-    steps.kappa_scan(input_file, output_dir, replace(opts, out_script=join(output_dir, opts.out_script)), index=index)
+    config = command_settings(None, KappaScanOptions, stage_classes=MODEL_STAGE)
+    opts = KappaScanOptions.resolve(config=config, explicit=explicit_values(ctx, KappaScanOptions))
+    learn = LearnModelOptions.resolve(config=config)
+    steps.kappa_scan(input_file, output_dir, replace(opts, out_script=join(output_dir, opts.out_script)), index=index,
+                     learn=learn, project=find_project())
 
 
 if __name__ == "__main__":

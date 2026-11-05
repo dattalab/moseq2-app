@@ -308,12 +308,13 @@ class SyllableLabeler(SyllableLabelerWidgets):
         """
 
         def render():
-            # select_median_duration_instances is the labeler's own setting, which no options class declares
             return steps.render_syllable_movies(
                 model_path, index_path, crowd_movie_dir,
-                CrowdMovieOptions.resolve(explicit={'max_examples': self.max_examples}),
+                CrowdMovieOptions.resolve(explicit={
+                    'max_examples': self.max_examples,
+                    'select_median_duration_instances': self.select_median_duration_instances,
+                }),
                 syllables=range(self.max_sylls),
-                shim_flat_config={'select_median_duration_instances': self.select_median_duration_instances},
             )['all']
 
         if not os.path.exists(crowd_movie_dir):

@@ -45,8 +45,8 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     movie = tmp_path / "movie.mp4"
     movie.write_bytes(b"")
 
-    def render(model_path, index_file, crowd_movie_dir, opts, *, syllables, shim_flat_config=None):
-        calls.append({"opts": opts, "syllables": list(syllables), "flat": shim_flat_config})
+    def render(model_path, index_file, crowd_movie_dir, opts, *, syllables):
+        calls.append({"opts": opts, "syllables": list(syllables)})
         if len(calls) == 1:
             return {"all": [_movie(crowd_movie_dir, s) for s in syllables]}
         return {group: [str(movie)] for group in comparison.groups}
@@ -64,7 +64,7 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     assert isinstance(labeler["opts"], CrowdMovieOptions)
     assert labeler["syllables"] == list(range(LABELED))
     assert (labeler["opts"].max_examples, labeler["opts"].separate_by, labeler["opts"].min_dur) == (20, "default", 4)
-    assert labeler["flat"] == {"select_median_duration_instances": False}
+    assert labeler["opts"].select_median_duration_instances is False
 
     comparison = CrowdMovieComparison(
         config_data=read_yaml(project["config_file"]), index_path=project["index_file"],
@@ -79,7 +79,6 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     compared = calls[1]
     assert isinstance(compared["opts"], CrowdMovieOptions)
     assert compared["syllables"] == [2]
-    assert compared["flat"] is None
     assert (compared["opts"].max_examples, compared["opts"].separate_by, compared["opts"].min_dur) == (7, "groups", 4)
 
 
@@ -105,12 +104,12 @@ def test_the_arena_tool_builds_extract_options(arena_project):
 
     from moseq2_app.roi.widget import ArenaMaskWidget
     from moseq2_extract.options import ExtractOptions
-    from moseq2_extract.session_config import recording_options
+    from moseq2_extract.session_config import extract_settings, recording_options
 
     config_file = arena_project / "config.yaml"
     config = read_yaml(str(config_file))
-    del config["use_cc"]
-    config["centroid_hampel_span"] = None
+    del config["extract"]["use_cc"]
+    config["extract"]["centroid_hampel_span"] = None
     write_yaml(config, str(config_file))
 
     pn.extension()
@@ -120,7 +119,7 @@ def test_the_arena_tool_builds_extract_options(arena_project):
     folder = widget.session_data.path
 
     settings = widget.recording_config(folder)
-    expected = recording_options(read_yaml(str(config_file)), widget.session_config[folder]).as_dict()
+    expected = recording_options(extract_settings(str(config_file)), widget.session_config[folder]).as_dict()
     declared = [f.name for f in fields(ExtractOptions)]
     assert {k: _plain(settings.get(k, "<missing>")) for k in declared} == {k: _plain(expected[k]) for k in declared}
     assert (settings["use_cc"], settings["centroid_hampel_span"]) == (True, 0)

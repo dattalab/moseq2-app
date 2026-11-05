@@ -21,6 +21,12 @@ from moseq2_extract.io.image import write_image
 from moseq2_extract.io.video import get_movie_info
 from os.path import join, exists, splitext, basename, abspath, dirname
 
+#: Where graduate_walls centres its wall gradient, in pixels from the bucket's centre (x, y).
+X_BG_OFFSET = -2
+Y_BG_OFFSET = 2
+#: Whether graduate_walls keeps the measured floor inside the bucket rather than the gradient's.
+FLOOR_SLANT = False
+
 
 def filter_warnings(func):
     """
@@ -843,10 +849,10 @@ def graduate_dilated_wall_area(bground_im, config_data, strel_dilate, output_dir
 
     # getting helper user parameters
     true_depth = config_data['true_depth']
-    xoffset = config_data.get('x_bg_offset', -2)
-    yoffset = config_data.get('y_bg_offset', 2)
+    xoffset = X_BG_OFFSET
+    yoffset = Y_BG_OFFSET
     widen_radius = config_data.get('widen_radius', 0)
-    bg_threshold = config_data.get('bg_threshold', np.median(bground_im))
+    bg_threshold = np.median(bground_im)
 
     # getting bground centroid
     cx, cy = get_bucket_center(deepcopy(old_bg), true_depth, threshold=bg_threshold)
@@ -863,7 +869,7 @@ def graduate_dilated_wall_area(bground_im, config_data, strel_dilate, output_dir
     bground_im = np.uint16((bground_im/bground_im.max())*true_depth)
 
     # overlay with actual bucket floor distance
-    if config_data.get('floor_slant', False):
+    if FLOOR_SLANT:
         ret, thresh = cv2.threshold(old_bg, np.median(old_bg), true_depth, 0)
         contours, _ = cv2.findContours(thresh.copy().astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         mask = np.zeros(bground_im.shape, np.uint8)

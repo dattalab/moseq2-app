@@ -845,7 +845,7 @@ def check_training_memory(h5s, config_data):
     if not lengths:
         return
 
-    missing_data = config_data.get('missing_data') or config_data.get('cable_filter_iters', 0) > 1
+    missing_data = config_data.get('missing_data')
     bytes_per_frame = float(np.prod(pixels)) * (4 + (1 if missing_data else 0))
 
     def used_frames(fraction):

@@ -11,9 +11,8 @@ names the Kinect v2 (``k2``, ``kinect``) or ``auto``:
 
 - the arena tool and extraction give an ``.mkv`` recording the Azure settings,
   with a line when the config said the Kinect;
-- the PCA cell picks the Azure filters when every session it trains on was
-  recorded as an ``.mkv``, keeps the stated camera and warns when the sessions
-  mix ``.mkv`` and other recordings, and is unchanged for Kinect projects.
+- PCA trains with the filters config.yaml's ``pca`` section holds, which
+  ``generate-config`` writes for the camera; nothing infers them at run time.
 """
 
 from __future__ import annotations
@@ -23,8 +22,6 @@ import json
 import shutil
 from pathlib import Path
 
-import h5py
-import numpy as np
 import pytest
 from click.testing import CliRunner
 
@@ -33,8 +30,8 @@ import moseq2_extract.helpers.wrappers as extract_wrappers
 from moseq2_app.gui.progress import update_progress
 import moseq2_app.util as app_util
 from moseq2_app.util import update_config
-from moseq2_extract.gui import aggregate_extract_results_command, generate_config_command
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_extract.gui import generate_config_command
+from moseq2_common.yaml import read_yaml
 
 from cells import code_cell
 from fixtures import fetch_azure_mkv, fetch_raw_sessions
@@ -179,139 +176,39 @@ def test_extract_gives_an_mkv_the_azure_settings(tmp_path, detected, camera_type
 # ------------------------------------------------------------------------- PCA (B2)
 
 
-def fake_extracted_session(root, name, recording):
-    """A session folder with a recording and a finished extraction, and its aggregated copy.
-
-    Only what the PCA cell's camera decision reads: the recording's name, the
-    extraction's results_00.h5 and .yaml beside it, and the copies in
-    aggregate_results sharing the extraction's uuid.
-    """
-    session = root / name
-    (session / "proc").mkdir(parents=True)
-    (session / recording).write_bytes(b"")
-    (session / "metadata.json").write_text("{}")
-    uuid = f"uuid-{name}"
-    aggregated = root / "aggregate_results"
-    aggregated.mkdir(exist_ok=True)
-    for stem in (session / "proc" / "results_00", aggregated / f"{name}_results_00"):
-        with h5py.File(f"{stem}.h5", "w") as f:
-            f["frames"] = np.zeros((2, 4, 4), dtype="uint8")
-        write_yaml({"complete": True, "skip": False, "uuid": uuid}, f"{stem}.yaml")
-
-
-def pca_project(root, camera_type, recordings):
-    for i, recording in enumerate(recordings):
-        fake_extracted_session(root, f"session_{i}", recording)
-    config = root / "config.yaml"
-    generate_config_command(str(config), camera_type="k2")
-    with update_config(str(config)) as c:
-        c["camera_type"] = camera_type
-    return config
-
-
 @pytest.fixture
 def run_pca_cell(monkeypatch):
-    """Run the notebook's PCA cell with training replaced by a recorder; return the config it trains with."""
+    """Run the notebook's PCA cell with training replaced by a recorder; return the pca section it trains with."""
     import moseq2_pca.gui
 
     trained = []
     monkeypatch.setattr(moseq2_pca.gui, "train_pca_command",
-                        lambda paths, *args: trained.append(read_yaml(paths["config_file"])))
+                        lambda paths, *args: trained.append(read_yaml(paths["config_file"])["pca"]))
 
     def run(root):
         progress = root / "progress.yaml"
-        progress.write_text("{}\n")
-        update_progress(str(progress), "base_dir", str(root))
-        update_progress(str(progress), "config_file", str(root / "config.yaml"))
         update_progress(str(progress), "train_data_dir", str(root / "aggregate_results") + "/")
         namespace = {"progress_filepath": str(progress), "progress_paths": read_yaml(str(progress))}
         exec(compile(code_cell(NOTEBOOK, PCA_CELL), "<PCA cell>", "exec"), namespace)
-        (config,) = trained
-        return {key: list(config.get(key) or []) for key in AZURE_FILTERS}
+        (section,) = trained
+        return {key: list(section.get(key) or []) for key in AZURE_FILTERS}
 
     return run
 
 
-def azure_extracted_project(root, camera_type):
-    """The azure-mkv fixture extracted and aggregated, with ``config.yaml`` saying ``camera_type``."""
-    recording = project_as_145_left_it(root, camera_type)
-    result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(recording), "--config-file", str(root / "config.yaml"),
-         "--output-dir", str(recording.parent / "proc")],
-    )
-    assert result.exit_code == 0, result.output + repr(result.exception)
-    # the fixture's 60 frames hold no mouse, so its extracted frames are all zero and the
-    # default threshold (a mean above 0) would leave it out
-    aggregate_extract_results_command(str(root), "{session_name}", "aggregate_results/", mouse_threshold=-1)
-
-
 @pytest.mark.parametrize("camera_type", ["k2", "auto"])
-def test_the_pca_cell_uses_the_azure_filters_for_mkv_sessions(tmp_path, capsys, run_pca_cell, camera_type):
-    azure_extracted_project(tmp_path, camera_type)
+def test_the_pca_cell_trains_with_the_filters_config_yaml_holds(tmp_path, capsys, run_pca_cell, camera_type):
+    """generate-config wrote the Azure filters into the pca section; the cell neither sets nor replaces them."""
+    project_as_145_left_it(tmp_path, camera_type)
     capsys.readouterr()
 
     filters = run_pca_cell(tmp_path)
 
     assert filters == AZURE_FILTERS
-    assert camera_lines(capsys.readouterr().out) == [
-        "PCA uses the Azure Kinect and Orbbec Femto filters set in this cell "
-        f"(gaussfilter_space, tailfilter_size): config.yaml says camera_type: {camera_type}, but "
-        f"the 1 session in {tmp_path / 'aggregate_results'}/ was recorded as an .mkv, which only "
-        "those cameras write. Set camera_type: azure in config.yaml."
-    ]
-
-
-def test_the_pca_cell_keeps_the_kinect_filters_for_kinect_sessions(tmp_path, capsys, run_pca_cell):
-    pca_project(tmp_path, "k2", ["depth.dat", "depth.avi", "session_20190320.tar.gz"])
-    capsys.readouterr()
-
-    filters = run_pca_cell(tmp_path)
-
-    assert filters["gaussfilter_space"] == [1.5, 1]
-    assert filters["tailfilter_size"] != [13, 13]
     assert camera_lines(capsys.readouterr().out) == []
 
 
-@pytest.mark.parametrize("camera_type", ["k2", "auto"])
-def test_the_pca_cell_keeps_the_stated_camera_for_mixed_sessions_and_warns(tmp_path, capsys, run_pca_cell,
-                                                                          camera_type):
-    pca_project(tmp_path, camera_type, ["depth.mkv", "depth.mkv", "depth.dat"])
-    capsys.readouterr()
-
-    with pytest.warns(UserWarning) as warned:
-        filters = run_pca_cell(tmp_path)
-
-    assert filters["gaussfilter_space"] == [1.5, 1]
-    messages = [str(w.message) for w in warned if "camera_type" in str(w.message)]
-    assert messages == [
-        f"Not every session in {tmp_path / 'aggregate_results'}/ was recorded as an .mkv: 2 were "
-        "recorded as .mkv (an Azure Kinect or Orbbec Femto) and 1 as another file type "
-        "(.dat, .avi or .tar.gz). "
-        f"PCA uses the filters for config.yaml's camera_type: {camera_type}, which suit the Kinect v2. "
-        "If every session is from an Azure Kinect or Orbbec Femto, set camera_type: azure in "
-        "config.yaml and run this cell again."
-    ]
-
-
-def test_azure_in_the_config_is_azure_whatever_the_sessions(tmp_path):
-    pca_project(tmp_path, "azure", ["depth.dat"])
-    assert app_util.camera_for_pca("azure", str(tmp_path / "aggregate_results"), str(tmp_path)) == "azure"
-
-
-def test_a_session_whose_recording_is_gone_is_counted_as_not_found(tmp_path):
-    pca_project(tmp_path, "k2", ["depth.mkv", "depth.mkv"])
-    shutil.rmtree(tmp_path / "session_1")
-    aggregated = tmp_path / "aggregate_results"
-
-    with pytest.warns(UserWarning) as warned:
-        camera = app_util.camera_for_pca("k2", str(aggregated), str(tmp_path))
-
-    assert camera == "k2"
-    assert [str(w.message) for w in warned if "camera_type" in str(w.message)] == [
-        f"Not every session in {aggregated} was recorded as an .mkv: 1 was recorded as .mkv "
-        f"(an Azure Kinect or Orbbec Femto) and for 1 the recording could not be found under "
-        f"{tmp_path}. PCA uses the filters for config.yaml's camera_type: k2, which suit the "
-        "Kinect v2. If every session is from an Azure Kinect or Orbbec Femto, set camera_type: "
-        "azure in config.yaml and run this cell again."
-    ]
+def test_the_notebook_no_longer_infers_the_camera_for_pca():
+    """The camera's filters are config.yaml's, written by generate-config: nothing decides them at run time."""
+    assert not hasattr(app_util, "camera_for_pca")
+    assert "camera_for_pca" not in code_cell(NOTEBOOK, PCA_CELL)

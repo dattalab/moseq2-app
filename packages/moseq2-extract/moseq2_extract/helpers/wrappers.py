@@ -14,7 +14,7 @@ import numpy as np
 import urllib.request
 from copy import deepcopy
 from moseq2_common.h5 import h5_to_dict
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.yaml import read_yaml, write_config, write_yaml
 from tqdm.auto import tqdm
 from cytoolz import partial
 from moseq2_extract.io.image import write_image
@@ -791,9 +791,9 @@ def flip_file_wrapper(config_file, output_dir, selected_flip=None):
     # Update the config file with the latest path to the flip classifier
     try:
         config_data = read_yaml(config_file)
-        config_data["flip_classifier"] = output_filename
+        config_data.setdefault("extract", {})["flip_classifier"] = output_filename
 
-        write_yaml(config_data, config_file)
+        write_config(config_data, config_file)
     except Exception as e:
         print("Could not update configuration file flip classifier path")
         print("Unexpected error:", e)
