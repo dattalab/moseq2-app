@@ -97,7 +97,7 @@ def interactive_crowd_movie_comparison_preview_wrapper(config_filepath, index_pa
     launch an interactive crowd movie comparison application.
 
     Args:
-    config_filepath (str): path to config file containing crowd movie generation parameters
+    config_filepath (str): path to the project's config file (crowd movies render with the default settings)
     index_path (str): path to index file with paths to all the extracted sessions
     model_path (str): path to trained model containing syllable labels.
     syll_info_path (str): path to syllable information file containing syllable labels

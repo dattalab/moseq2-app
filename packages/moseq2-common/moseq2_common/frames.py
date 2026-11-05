@@ -32,9 +32,9 @@ class CleaningOptions(Options):
     """Extraction's frame cleaning: the height threshold, the median filters, and the tail and cable filters."""
 
     temporal_filter_size: tuple = option((0,), "--temporal-filter-size", "-t", type=int, multiple=True, arena=True,
-                                         help="Time prefilter kernel (median filter, must be odd)")
+                                         help="Time prefilter kernel (median filter; an even size rounds up to the next odd one)")
     spatial_filter_size: tuple = option((3,), "--spatial-filter-size", "-s", type=int, multiple=True, arena=True,
-                                        help="Space prefilter kernel (median filter, must be odd)")
+                                        help="Space prefilter kernel (median filter; an even size rounds up to the next odd one)")
     tail_filter_shape: str = option("ellipse", "--tail-filter-shape", type=str, arena=True,
                                     help="Tail filter shape (ellipse or rectangle); none turns the tail filter off")
     tail_filter_size: tuple = option((9, 9), "--tail-filter-size", type=(int, int), arena=True,

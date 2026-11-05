@@ -10,6 +10,7 @@ from dataclasses import replace
 from os.path import join
 
 import click
+from click.core import ParameterSource
 
 from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
 from moseq2_model import steps
@@ -65,7 +66,15 @@ def count_frames(ctx, input_file, **_):
 def learn_model(ctx, input_file, dest_file, index, config_file, **_):
     # Train the ARHMM using PC scores located in the INPUT_FILE, and saves the model to DEST_FILE
     opts = shim_click_defaults(ctx, LearnModelOptions, read_config_option(config_file))
-    if opts.ncpus:
+    if opts.kappa is not None and (isinstance(opts.kappa, bool) or not isinstance(opts.kappa, (int, float))):
+        where = "on the command line" if ctx.get_parameter_source("kappa") is ParameterSource.COMMANDLINE \
+            else f"in {config_file}"
+        raise click.ClickException(
+            f"kappa is {opts.kappa!r} {where}, and learn-model fits one model at one kappa. Set kappa to a "
+            "number (or delete it to use the number of frames), or run moseq2-model kappa-scan to fit a "
+            "range of kappas."
+        )
+    if ctx.get_parameter_source("ncpus") is ParameterSource.COMMANDLINE and opts.ncpus:
         click.echo(
             "--ncpus sets the CPUs each kappa-scan job requests on SLURM. A single fit "
             "uses the CPUs the job or machine gives it, and --ncpus does not change that."

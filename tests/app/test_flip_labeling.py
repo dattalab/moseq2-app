@@ -179,7 +179,7 @@ def cleaned_as_extraction_cleans(frames, config):
     )
 
 
-def train_with_the_script(frame_ranges_file):
+def train_with_the_script(frame_ranges_file, *args):
     """Run ``scripts/train_flip_classifier.py`` on the saved labels, from the command line."""
     import importlib.util
 
@@ -189,19 +189,20 @@ def train_with_the_script(frame_ranges_file):
     spec = importlib.util.spec_from_file_location("train_flip_classifier", path)
     script = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(script)
-    result = CliRunner().invoke(script.main, [frame_ranges_file, "--classifier-type", "rf"])
+    result = CliRunner().invoke(script.main, [frame_ranges_file, "--classifier-type", "rf", *args])
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("front_end", ["notebook", "script"])
+@pytest.mark.parametrize("front_end", ["notebook", "script", "script_config_file"])
 def test_flip_training_cleans_frames_as_extraction_does(notebook, tmp_path, configured, front_end):
     """The cleaned third of the training set is what extraction makes of the same frames.
 
     Extraction cleans each frame before the classifier sees it, so a classifier
     trained on frames cleaned any other way is applied to frames unlike its
-    training set. The notebook reads extraction's settings from the config file,
-    here set away from the defaults in every cleaning setting; the script, which
-    takes no config file, cleans with extraction's defaults.
+    training set. The notebook, and the script given ``--config-file``, read
+    extraction's settings from the config file, here set away from the defaults
+    in every cleaning setting; the script without one cleans with extraction's
+    defaults.
     """
     from moseq2_common.yaml import read_yaml, write_yaml
 
@@ -216,6 +217,10 @@ def test_flip_training_cleans_frames_as_extraction_does(notebook, tmp_path, conf
         write_yaml(config, notebook["config_path"])
         run_cell(CLEAN, notebook)
         run_cell(TRAIN, notebook)
+    elif front_end == "script_config_file":
+        config.update(CLEANING)
+        write_yaml(config, str(tmp_path / "config.yaml"))
+        train_with_the_script(widget.training_data_path, "--config-file", str(tmp_path / "config.yaml"))
     else:
         train_with_the_script(widget.training_data_path)
 

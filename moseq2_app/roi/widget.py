@@ -316,7 +316,7 @@ class ArenaMaskData(param.Parameterized):
 
     ### advanced arena mask parameters ###
     adv_arena_msk_flag = param.Boolean(label="Show advanced arena mask parameters")
-    mask_shape = param.Selector(objects=['ellipse', 'rectangle'], default='ellipse', label='Dilation shape')
+    mask_shape = param.Selector(objects=['ellipse', 'rectangle', 'none'], default='ellipse', label='Dilation shape')
     dilation_kernel = param.Integer(default=10, bounds=(3, 40), label="Diameter of mask dilation kernel")
 
     mask_weight1 = param.Number(default=1.0, bounds=(0, None), label="Mask area")
@@ -336,12 +336,12 @@ class ArenaMaskData(param.Parameterized):
     tracking_model_flag = param.Boolean(default=False, label="Use tracking model")
 
     cable_filters = param.Integer(default=0, bounds=(0, None), label="Cable filter iterations")
-    cable_filter_shape = param.Selector(objects=['rectangle', 'ellipse'], default='rectangle', label="Cable filter shape")
-    cable_filter_size = param.Integer(default=5, bounds=(3, None), step=2, label="Cable filter size")
+    cable_filter_shape = param.Selector(objects=['rectangle', 'ellipse', 'none'], default='rectangle', label="Cable filter shape")
+    cable_filter_size = param.Integer(default=5, bounds=(0, None), step=2, label="Cable filter size")
 
     tail_filters = param.Integer(default=1, bounds=(0, None), label="Tail filter iterations")
-    tail_filter_shape = param.Selector(objects=['rectangle', 'ellipse'], default='ellipse', label="Tail filter shape")
-    tail_filter_size = param.Integer(default=9, bounds=(3, None), step=2, label="Tail filter size")
+    tail_filter_shape = param.Selector(objects=['rectangle', 'ellipse', 'none'], default='ellipse', label="Tail filter shape")
+    tail_filter_size = param.Integer(default=9, bounds=(0, None), step=2, label="Tail filter size")
 
     spatial_filter = param.String(default="[3]", label="Spatial filter(s)")
     temporal_filter = param.String(default="[0]", label="Temporal filter(s)")
