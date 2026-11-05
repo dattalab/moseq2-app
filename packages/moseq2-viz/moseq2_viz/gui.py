@@ -13,7 +13,7 @@ from moseq2_viz import steps
 from moseq2_viz.options import BestModelOptions
 
 #: The folder inside the project holding the fitted models.
-MODELS_DIRNAME = "models"
+MODELS_DIRNAME = "models/"
 
 
 def shim_progress_paths(progress_paths, output_file):

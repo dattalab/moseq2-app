@@ -161,7 +161,7 @@ def _session_names(data_dir, recordings):
 
 
 def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mkv', 'avi'],
-                      max_depth=DEFAULT_MAX_DEPTH):
+                      max_depth=DEFAULT_MAX_DEPTH, write_missing_metadata=True):
     """
     Find all depth recording sessions and their paths (with given extensions) to work on given base directory.
 
@@ -181,6 +181,7 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
     flipped (bool): indicates whether to show corrected flip videos
     extracted (bool): indicates to return paths to extracted sessions only.
     max_depth (int): how many folders below data_dir to search for recordings.
+    write_missing_metadata (bool): write a default metadata.json into each session folder that has none.
 
     Returns:
     path_dict (dict): session names paired with their respective absolute paths.
@@ -196,7 +197,7 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
         print(message)
     sessions = search.recordings
 
-    for folder, _ in search.without_metadata:
+    for folder, _ in search.without_metadata if write_missing_metadata else ():
         # Generate metadata.json file if it's missing
         generate_missing_metadata(folder, basename(folder))
 
@@ -463,7 +464,8 @@ def incomplete_extraction_message(session, recording, yaml_path):
     )
 
 
-def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi'], max_depth=DEFAULT_MAX_DEPTH):
+def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi'], max_depth=DEFAULT_MAX_DEPTH,
+                            write_missing_metadata=True):
     """
     Count the number of fully extracted sessions, and print the session directory names of the incomplete or missing extractions.
 
@@ -476,7 +478,8 @@ def get_extraction_progress(base_dir, exts=['dat', 'mkv', 'avi'], max_depth=DEFA
     num_extracted (int): Total number of completed extractions
     """
 
-    path_dict = get_session_paths(base_dir, exts=exts, max_depth=max_depth)
+    path_dict = get_session_paths(base_dir, exts=exts, max_depth=max_depth,
+                                  write_missing_metadata=write_missing_metadata)
 
     # Count number of extracted sessions and print names of the missing/incomplete extractions
     num_extracted = 0

@@ -60,7 +60,8 @@ def start(folder: str | os.PathLike = "./", exts=("dat", "mkv", "avi", "tar.gz")
     from moseq2_app.gui.progress import get_extraction_progress
 
     project = Project.at(Path(folder).absolute())
-    path_dict, num_extracted = get_extraction_progress(str(project.folder), exts=list(exts), max_depth=max_depth)
+    path_dict, num_extracted = get_extraction_progress(str(project.folder), exts=list(exts), max_depth=max_depth,
+                                                       write_missing_metadata=False)
     if path_dict:
         print(f"Extraction Progress: {num_extracted} out of {len(path_dict)} session(s) extracted")
     print(summary(project))

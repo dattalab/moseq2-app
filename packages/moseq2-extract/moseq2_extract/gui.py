@@ -182,7 +182,7 @@ def extract_found_sessions(
 
 @filter_warnings
 def aggregate_extract_results_command(
-    project_folder, format="{start_time}_{session_name}_{subject_name}", output_dir="aggregate_results",
+    project_folder, format="{start_time}_{session_name}_{subject_name}", output_dir="aggregate_results/",
     mouse_threshold=None,
 ):
     """

@@ -73,6 +73,17 @@ def test_returns_the_project_and_writes_nothing(fresh_project):
     assert listing(fresh_project) == before
 
 
+def test_a_recording_without_metadata_gets_nothing_written(tmp_path):
+    """The cell only reports: a recording folder without metadata.json is left as it is."""
+    root = build_project(tmp_path / "proj", n_sessions=2)
+    before = listing(root)
+
+    start(str(root))
+
+    assert listing(root) == before
+    assert not (root / "session_0" / "metadata.json").exists()
+
+
 def test_reports_nothing_done_in_a_fresh_project(fresh_project, capsys):
     """The real project at this point in the notebook: four recordings, no work done."""
     start(str(fresh_project))

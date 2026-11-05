@@ -1,7 +1,7 @@
 """Cell 9: gather the extractions into one directory and list the sessions.
 
     recording_format = '{start_time}_{session_name}_{subject_name}'
-    aggregate_results_dirname = 'aggregate_results'
+    aggregate_results_dirname = 'aggregate_results/'
 
     aggregate_extract_results_command(str(project.folder), recording_format, aggregate_results_dirname)
 

@@ -150,13 +150,13 @@ def sessions_folder(project: Project, bookkeeping: Bookkeeping | None = None) ->
 def _metadata(h5: Path, fallback: str) -> dict:
     """The acquisition metadata the session's results yaml holds, beside its ``.h5``."""
     yaml_file = h5.with_suffix(".yaml")
-    metadata = {"SessionName": fallback, "SubjectName": fallback}
     try:
         stored = (read_yaml(str(yaml_file)) or {}).get("metadata")
     except OSError:
         stored = None
-    if isinstance(stored, dict):
-        metadata.update(stored)
+    metadata = dict(stored) if isinstance(stored, dict) else {}
+    metadata.setdefault("SessionName", fallback)
+    metadata.setdefault("SubjectName", fallback)
     return metadata
 
 
