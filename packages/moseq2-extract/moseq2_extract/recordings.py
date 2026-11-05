@@ -124,10 +124,11 @@ class RecordingSearch:
         """What a user needs to know about this search, or an empty string when nothing was left out.
 
         Says where the search looked, how deep, what counts as a recording and
-        which folders it passed over and why, whenever it found nothing or left
-        anything out; and warns for each recording without a metadata.json.
-        When every recording found is already extracted, one line says so, and
-        the rest follows only when a folder was passed over.
+        which folders it passed over and why, whenever it found nothing or passed
+        a folder over; names how many recordings were left out as already
+        extracted whenever any were; and warns for each recording without a
+        metadata.json. When every recording found is already extracted, one line
+        says so, and the rest follows only when a folder was passed over.
         """
         lines = self.warnings()
         if not self.root_exists:
@@ -137,9 +138,15 @@ class RecordingSearch:
             ]
             return "\n".join(lines)
 
+        extracted_line = (
+            f"{len(self.extracted)} recording(s) already extracted were left out, each with a "
+            f"finished extraction recorded beside it (such as {self.extracted[0][1]}). To include "
+            "them, set skip_extracted to False (in the notebook) or add --skip-checks "
+            "(moseq2-extract batch-extract)."
+        ) if self.extracted else None
         left_out = self.passed_over or self.too_deep
         if self.recordings and not left_out:
-            return "\n".join(lines)
+            return "\n".join(lines + ([extracted_line] if extracted_line else []))
 
         all_extracted = not self.recordings and bool(self.extracted)
         if all_extracted:
@@ -182,13 +189,8 @@ class RecordingSearch:
         if passed_over:
             lines.append("Folders passed over:")
             lines += [f"  {folder}: {reason}" for folder, reason in passed_over]
-        if self.extracted and not all_extracted:
-            lines.append(
-                f"{len(self.extracted)} recording(s) already extracted were left out, each with a "
-                f"finished extraction recorded beside it (such as {self.extracted[0][1]}). To include "
-                "them, set skip_extracted to False (in the notebook) or add --skip-checks "
-                "(moseq2-extract batch-extract)."
-            )
+        if extracted_line and not all_extracted:
+            lines.append(extracted_line)
         if self.too_deep:
             deeper = self.max_depth + 5
             lines.append(

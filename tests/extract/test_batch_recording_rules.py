@@ -12,7 +12,8 @@ True, as its cell sets it.
 Each test builds a project of empty recording files and stops the step before
 it extracts anything: the list it would have extracted is what it found.
 
-When every recording is already extracted, both say so in one line.
+When every recording is already extracted, both say so in one line; when only
+some are, they name how many were left out.
 """
 
 from __future__ import annotations
@@ -126,3 +127,7 @@ def test_a_rerun_with_some_recordings_extracted_extracts_the_rest(project, extra
 
     assert sorted(extracted) == [r for r in every_recording(project) if not r.endswith("depth.avi")]
     assert "nothing to extract" not in output, output
+    assert ("1 recording(s) already extracted were left out, each with a finished extraction recorded "
+            f"beside it (such as {project / 'avi_session' / 'proc' / 'results_00.yaml'}). To include them, "
+            "set skip_extracted to False (in the notebook) or add --skip-checks "
+            "(moseq2-extract batch-extract).") in output, output
