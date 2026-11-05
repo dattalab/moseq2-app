@@ -88,18 +88,17 @@ def _syllable_pdf(group_syll_pdfs, groupby, group, syllable):
 
 class SyllableLabeler(SyllableLabelerWidgets):
 
-    def __init__(self, model_fit, model_path, index_file, config_file, max_sylls, 
-                 select_median_duration_instances, max_examples, crowd_movie_dir, save_path):
+    def __init__(self, model_fit, model_path, index, crowd_movie_settings, max_sylls, crowd_movie_dir, save_path):
         """
         Initialize syllable labeler widget with class context parameters, and create the syllable information dict.
 
         Args:
         model_fit (dict): Loaded trained model dict.
-        index_file (str): Path to saved index file.
-        config_file (str): Path to config.yaml; not read, since the labeler renders with
-            ``CrowdMovieOptions``' defaults.
+        model_path (str): Path to the trained model.
+        index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
+        crowd_movie_settings (dict): config.yaml's ``crowd_movies`` section, which the crowd movies are rendered with.
         max_sylls (int): Maximum number of syllables to preview and label.
-        select_median_duration_instances (bool): boolean flag to select examples with syallable duration closer to median.
+        crowd_movie_dir (str): Path to the crowd movie directory.
         save_path (str): Path to save syllable label information dictionary.
         """
 
@@ -110,18 +109,17 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # by passing max_syllables=None to the wrapper/main.py function::label_syllables. Otherwise, if a integer
         # is inputted, then self.max_sylls is set to that same integer.
         self.max_sylls = max_sylls
-        self.select_median_duration_instances = select_median_duration_instances
-        self.max_examples = max_examples
+        self.crowd_movie_settings = crowd_movie_settings
 
         self.model_fit = model_fit
         self.model_path = model_path
-        self.sorted_index = get_sorted_index(index_file)
+        self.sorted_index = get_sorted_index(index)
 
         index_uuids = sorted(self.sorted_index['files'])
         model_uuids = sorted(set(self.model_fit['metadata']['uuids']))
 
         if not set(model_uuids).issubset(set(index_uuids)):
-            print('Error: Some model UUIDs were not found in the provided index file.')
+            print('Error: Some model UUIDs were not found in the project\'s sessions.')
 
         # The label file can hold entries for more or fewer syllables than are offered now, since the
         # count depends on explained_variance, a typed max_syllables and the moseq2-viz version. Each
@@ -140,7 +138,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         self.get_mean_syllable_info()
 
         # Populate syllable info dict with relevant syllable information
-        self.get_crowd_movie_paths(index_file, model_path, crowd_movie_dir)
+        self.get_crowd_movie_paths(index, model_path, crowd_movie_dir)
 
         # Get dropdown options with labels
         self.option_dict = {f'{i} - {x["label"]}': self.syll_info[i] for i, x in enumerate(self.syll_info.values())}
@@ -299,21 +297,20 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # Display all widgets
         display(grid, self.button_box)
 
-    def get_crowd_movie_paths(self, index_path, model_path, crowd_movie_dir):
+    def get_crowd_movie_paths(self, index, model_path, crowd_movie_dir):
         """
         Populate the syllable information dict with the respective crowd movie paths.
 
         Args:
+        index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
+        model_path (str): Path to the trained model.
         crowd_movie_dir (str): Path to directory containing all the generated crowd movies
         """
 
         def render():
             return steps.render_syllable_movies(
-                model_path, index_path, crowd_movie_dir,
-                CrowdMovieOptions.resolve(explicit={
-                    'max_examples': self.max_examples,
-                    'select_median_duration_instances': self.select_median_duration_instances,
-                }),
+                model_path, index, crowd_movie_dir,
+                CrowdMovieOptions.resolve(config=self.crowd_movie_settings),
                 syllables=range(self.max_sylls),
             )['all']
 
@@ -354,14 +351,14 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
 class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
-    def __init__(self, config_data, index_path, model_path, syll_info, output_dir, get_pdfs):
+    def __init__(self, crowd_movie_settings, index, model_path, syll_info, output_dir, get_pdfs):
         """
         Initialize class object context parameters.
 
         Args:
-        config_data (dict or str): config.yaml, or its path; not read, since the tool renders with
-            ``CrowdMovieOptions``' defaults.
-        index_path (str): Path to loaded index file.
+        crowd_movie_settings (dict): config.yaml's ``crowd_movies`` section, which the movies are rendered with,
+            under the grouping and number of examples chosen in the tool.
+        index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
         model_path (str): Path to loaded model.
         syll_info (dict): Dict object containing labeled syllable information.
         output_dir (str): Path to directory to store crowd movies.
@@ -370,7 +367,8 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         super().__init__()
 
-        self.index_path = index_path
+        self.index = index
+        self.crowd_movie_settings = crowd_movie_settings
         self.model_path = model_path
 
         self.get_pdfs = get_pdfs
@@ -390,7 +388,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         # Prepare current context's base session syllable info dict
         self.session_dict = {i: {'session_info': {}} for i in range(self.max_sylls)}
 
-        _, self.sorted_index = init_wrapper_function(index_file=index_path, output_dir=output_dir)
+        _, self.sorted_index = init_wrapper_function(index_file=index, output_dir=output_dir)
         self.model_fit = parse_model_results(model_path)
 
         # Set Session MultipleSelect widget options
@@ -525,8 +523,9 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
         syll_number = int(self.cm_syll_select.value.split(' - ')[0])
 
         # Compute paths to crowd movies
-        path_dict = steps.render_syllable_movies(self.model_path, self.index_path, self.output_dir,
-                                                 CrowdMovieOptions.resolve(explicit=self.cm_choices),
+        path_dict = steps.render_syllable_movies(self.model_path, self.index, self.output_dir,
+                                                 CrowdMovieOptions.resolve(config=self.crowd_movie_settings,
+                                                                           explicit=self.cm_choices),
                                                  syllables=[syll_number])
 
         if cm_source == 'group':

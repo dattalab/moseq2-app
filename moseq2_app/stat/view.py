@@ -1306,11 +1306,11 @@ def plot_interactive_transition_graph(graphs, pos, group, group_names, usages,
     gp = gridplot(formatted_plots, sizing_mode='scale_both', ncols=ncols, width=width, height=height)
     show(gp)
 
-def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllable = 40, color_by_cluster=False):
+def plot_dendrogram(index, model_path, syll_info_path, save_dir, max_syllable = 40, color_by_cluster=False):
     """plot a static dentrogram
 
     Args:
-        index_file (str): path to index file
+        index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``)
         model_path (str): path to the model
         syll_info_path (str): path to syll_info
         save_dir (str): 
@@ -1325,7 +1325,7 @@ def plot_dendrogram(index_file, model_path, syll_info_path, save_dir, max_syllab
         color_threshold = 0
     
     # compute similarity between syllables based on the AR matrix
-    sorted_index = get_sorted_index(index_file)
+    sorted_index = get_sorted_index(index)
     # X is a (max_syllable, max_syllable) size square matrix
     X = get_behavioral_distance(sorted_index, model_path, max_syllable=max_syllable, distances='ar[init]')['ar[init]']
     # need to run squareform on X because linkage expects a 1-d array

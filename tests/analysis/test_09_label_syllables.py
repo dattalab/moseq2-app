@@ -1,12 +1,8 @@
 """Cell 9: make the syllables watchable, and label them.
 
-    crowd_dir = join(progress_paths['model_session_path'], 'crowd_movies/')
-    syll_infopath = join(progress_paths['model_session_path'], 'syll_info.yaml')
-    explained_variance, max_syllables, max_examples = 99, None, 20
-    max_syllables = label_syllables(progress_paths, max_syllables=max_syllables,
-                                    n_explained=explained_variance,
-                                    select_median_duration_instances=select_median_duration_instances,
-                                    max_examples=max_examples)
+    explained_variance, max_syllables = 99, None
+    max_syllables = label_syllables(str(project.folder), max_syllables=max_syllables,
+                                    n_explained=explained_variance)
 
 Everything before this cell describes syllables in numbers. This is where
 they become something to look at. For each syllable the cell cuts twenty
@@ -22,7 +18,9 @@ and the tail is syllables that occur a handful of times in twelve hours.
 and discards the rest, and cells 10, 11, 12 and 14 are all cut off there.
 
 Generating the movies is the longest step in the notebook. A second run
-of the cell finds them on disk and reuses them.
+of the cell finds them on disk and reuses them. How they are made (the
+number of examples, how long an instance must be) is config.yaml's
+``crowd_movies`` section, as for ``make-crowd-movies``.
 """
 
 from __future__ import annotations
@@ -36,6 +34,7 @@ import numpy as np
 import pytest
 
 from moseq2_app.main import label_syllables
+from moseq2_app.util import current_analysis
 from moseq2_viz.model.util import parse_model_results
 from moseq2_common.yaml import read_yaml
 
@@ -54,18 +53,18 @@ FIGURE = "syllable_needed_explained_variance"
 
 
 @pytest.fixture(scope="module")
-def syll_info(analysis_paths, labeled):
+def syll_info(analysis, labeled):
     """The label file the cell writes and the labeller reads back."""
-    return read_yaml(analysis_paths["syll_info"])
+    return read_yaml(str(analysis.syll_info))
 
 
 @pytest.fixture(scope="module")
-def movies(analysis_paths, labeled):
+def movies(analysis, labeled):
     """Every crowd movie the cell generated."""
-    return sorted(Path(analysis_paths["crowd_dir"]).glob("*.mp4"))
+    return sorted(analysis.crowd_movies.glob("*.mp4"))
 
 
-def test_the_cell_settles_on_fewer_syllables_than_the_model_has(analysis_paths, labeled):
+def test_the_cell_settles_on_fewer_syllables_than_the_model_has(analysis, labeled):
     """1. The number every later cell is cut off at.
 
     The model was fit with far more states than a mouse uses. Keeping the
@@ -73,7 +72,7 @@ def test_the_cell_settles_on_fewer_syllables_than_the_model_has(analysis_paths, 
     dendrogram, the transition matrices and the statistics widget from
     being dominated by syllables seen a handful of times.
     """
-    model = parse_model_results(analysis_paths["model_path"])
+    model = parse_model_results(str(analysis.model))
     used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
 
     assert isinstance(labeled, (int, np.integer)), f"the cell returned {labeled!r}"
@@ -95,20 +94,20 @@ def syllable_coverage(model_path):
     return 100 * np.cumsum(usages / usages.sum()) / np.max(np.cumsum(usages / usages.sum()))
 
 
-def test_the_number_is_where_the_curve_crosses_the_threshold(analysis_paths, labeled):
+def test_the_number_is_where_the_curve_crosses_the_threshold(analysis, labeled):
     """2. What the returned number is, exactly.
 
     It is the fewest syllables, best used first, that reach the requested
     share of the cumulative usage curve: that many reach it and one fewer
     falls short.
     """
-    coverage = syllable_coverage(analysis_paths["model_path"])
+    coverage = syllable_coverage(str(analysis.model))
 
     assert coverage[labeled - 1] >= LABELLING["n_explained"]
     assert coverage[labeled - 2] < LABELLING["n_explained"]
 
 
-def test_the_syllables_actually_kept_cover_what_was_asked_for(analysis_paths, labeled):
+def test_the_syllables_actually_kept_cover_what_was_asked_for(analysis, labeled):
     """3. What a user believes they set.
 
     ``explained_variance = 99`` reads as an instruction to keep enough
@@ -117,7 +116,7 @@ def test_the_syllables_actually_kept_cover_what_was_asked_for(analysis_paths, la
     value, so the share they actually cover is the one at the position
     before the crossing.
     """
-    coverage = syllable_coverage(analysis_paths["model_path"])
+    coverage = syllable_coverage(str(analysis.model))
     kept = coverage[labeled - 1]
 
     assert kept >= LABELLING["n_explained"], (
@@ -126,14 +125,14 @@ def test_the_syllables_actually_kept_cover_what_was_asked_for(analysis_paths, la
     )
 
 
-def test_the_curve_the_cut_off_was_read_off_is_drawn(analysis_paths, labeled):
+def test_the_curve_the_cut_off_was_read_off_is_drawn(analysis, labeled):
     """4. A user checks the number against this figure.
 
     Cumulative explained variance against syllable count, with a line
     where the cell cut. Written as png and pdf into the model's plot
     directory.
     """
-    plots = Path(analysis_paths["plot_path"])
+    plots = analysis.plots
     for extension in ("png", "pdf"):
         path = plots / f"{FIGURE}.{extension}"
         assert path.exists(), f"{path.name} was not written"
@@ -228,7 +227,7 @@ def test_the_label_file_has_an_empty_entry_per_syllable(syll_info, labeled):
 
 
 def test_the_cell_offers_a_syllable_at_a_time_with_a_way_to_start_over(
-    analysis_paths, labeled, displayed
+    analysis, labeled, displayed
 ):
     """10. What a user is given.
 
@@ -238,7 +237,7 @@ def test_the_cell_offers_a_syllable_at_a_time_with_a_way_to_start_over(
     that outlive it: a dropdown holding every syllable, a button to clear
     the output, and the area the view is redrawn into.
     """
-    assert label_syllables(analysis_paths, **LABELLING) == labeled
+    assert label_syllables(str(analysis.project.folder), **LABELLING) == labeled
 
     shown = [type(obj).__name__ for obj in displayed.objects]
     assert shown[-3:] == ["Button", "Dropdown", "Output"], shown
@@ -255,7 +254,7 @@ def test_the_cell_offers_a_syllable_at_a_time_with_a_way_to_start_over(
     ]
 
 
-def test_the_dropdown_opens_on_the_first_syllable(analysis_paths, labeled, displayed):
+def test_the_dropdown_opens_on_the_first_syllable(analysis, labeled, displayed):
     """11. A labeller with nothing selected shows nothing.
 
     Every control in the labeller indexes the syllable list by the
@@ -263,7 +262,7 @@ def test_the_dropdown_opens_on_the_first_syllable(analysis_paths, labeled, displ
     Newer ipywidgets leaves a dropdown unselected when its options are
     assigned, so the selection is made explicitly.
     """
-    label_syllables(analysis_paths, **LABELLING)
+    label_syllables(str(analysis.project.folder), **LABELLING)
 
     dropdown = displayed.one(widgets.Dropdown)
     assert dropdown.index == 0, "the labeller opens with no syllable chosen"
@@ -306,11 +305,9 @@ def moved(tmp_path_factory, analysis_project, labeled):
     """
     root = tmp_path_factory.mktemp("moved")
     shutil.copytree(analysis_project, root, dirs_exist_ok=True)
-    progress = root / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(root)))
-    paths = read_yaml(str(progress))
+    paths = current_analysis(str(root))
 
-    crowd = Path(paths["crowd_dir"])
+    crowd = paths.crowd_movies
     first = next(m for m in crowd.glob("*.mp4") if int(MOVIE_NAME.search(m.name)["sorted_id"]) == 0)
     ids = MOVIE_NAME.search(first.name)
     older = crowd / (
@@ -320,8 +317,8 @@ def moved(tmp_path_factory, analysis_project, labeled):
     first.rename(older)
     (crowd / "notes.mp4").write_bytes(b"not a crowd movie")
 
-    label_syllables(paths, **LABELLING)
-    return read_yaml(paths["syll_info"]), crowd, older
+    label_syllables(str(paths.project.folder), **LABELLING)
+    return read_yaml(str(paths.syll_info)), crowd, older
 
 
 def test_every_syllable_finds_its_movie_beside_an_unrelated_one(moved, labeled):
@@ -394,9 +391,7 @@ def relabelled(tmp_path_factory, analysis_project, labeled):
 
     root = tmp_path_factory.mktemp("relabelled")
     shutil.copytree(analysis_project, root, dirs_exist_ok=True)
-    progress = root / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(root)))
-    paths = read_yaml(str(progress))
+    paths = current_analysis(str(root))
 
     typed = labeled - 3
     lower = typed - 4
@@ -404,22 +399,22 @@ def relabelled(tmp_path_factory, analysis_project, labeled):
     with pytest.MonkeyPatch.context() as patch:
         display = capture_display(patch)
 
-        label_syllables(paths, **{**LABELLING, "max_syllables": typed})
-        syll_info = read_yaml(paths["syll_info"])
+        label_syllables(str(paths.project.folder), **{**LABELLING, "max_syllables": typed})
+        syll_info = read_yaml(str(paths.syll_info))
         for syllable in range(typed):
             syll_info[syllable].update(_typed(syllable))
-        write_yaml(syll_info, paths["syll_info"])
+        write_yaml(syll_info, str(paths.syll_info))
 
         for name, count in (("raised", None), ("lowered", lower)):
             display.clear()
-            label_syllables(paths, **{**LABELLING, "max_syllables": count})
+            label_syllables(str(paths.project.folder), **{**LABELLING, "max_syllables": count})
             dropdown = display.of_type(widgets.Dropdown)[-1]
-            seen[name] = read_yaml(paths["syll_info"]), list(dropdown.options)
+            seen[name] = read_yaml(str(paths.syll_info)), list(dropdown.options)
 
         name, save = _labeller_controls(display)
         name.value = "renamed"
         save.click()
-        seen["saved"] = read_yaml(paths["syll_info"])
+        seen["saved"] = read_yaml(str(paths.syll_info))
 
     return typed, lower, seen, paths
 
@@ -475,7 +470,7 @@ def test_saving_writes_the_shown_syllables_and_keeps_the_rest(relabelled, labele
         assert after[syllable] == before[syllable], syllable
 
 
-def test_a_count_beyond_what_the_model_uses_is_refused(relabelled, analysis_paths):
+def test_a_count_beyond_what_the_model_uses_is_refused(relabelled, analysis):
     """18. There is nothing to label past the model's last syllable.
 
     Every syllable the labeller offers is one the recordings contain. A
@@ -483,14 +478,14 @@ def test_a_count_beyond_what_the_model_uses_is_refused(relabelled, analysis_path
     number it can be, and the label file is not touched.
     """
     *_, paths = relabelled
-    model = parse_model_results(analysis_paths["model_path"])
+    model = parse_model_results(str(analysis.model))
     used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
-    before = Path(paths["syll_info"]).read_bytes()
+    before = paths.syll_info.read_bytes()
 
     with pytest.raises(ValueError, match=rf"\b{used}\b"):
-        label_syllables(paths, **{**LABELLING, "max_syllables": used + 1})
+        label_syllables(str(paths.project.folder), **{**LABELLING, "max_syllables": used + 1})
 
-    assert Path(paths["syll_info"]).read_bytes() == before
+    assert paths.syll_info.read_bytes() == before
 
 
 def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
@@ -505,11 +500,9 @@ def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
     import moseq2_viz.steps as viz_steps
 
     shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
-    progress = tmp_path / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
-    paths = read_yaml(str(progress))
+    paths = current_analysis(str(tmp_path))
 
-    crowd = Path(paths["crowd_dir"])
+    crowd = paths.crowd_movies
     last = next(m for m in crowd.glob("*.mp4") if int(MOVIE_NAME.search(m.name)["sorted_id"]) == labeled - 1)
     last.unlink()
     (crowd / "notes.mp4").write_bytes(b"not a crowd movie")
@@ -522,10 +515,10 @@ def test_a_missing_movie_is_made_even_beside_an_unrelated_one(
         return {"all": sorted(str(m) for m in crowd.glob("syllable_*.mp4"))}
 
     monkeypatch.setattr(viz_steps, "make_crowd_movies_wrapper", make_movies)
-    label_syllables(paths, **LABELLING)
+    label_syllables(str(paths.project.folder), **LABELLING)
 
     assert made, "the movies were not regenerated"
-    movie = Path(read_yaml(paths["syll_info"])[labeled - 1]["crowd_movie_path"])
+    movie = Path(read_yaml(str(paths.syll_info))[labeled - 1]["crowd_movie_path"])
     assert movie == last and movie.exists(), movie
 
 
@@ -544,20 +537,18 @@ def test_an_unlabelled_syllable_picked_from_the_list_shows_blank_boxes(
     from widgets import capture_display
 
     shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
-    progress = tmp_path / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
-    paths = read_yaml(str(progress))
+    paths = current_analysis(str(tmp_path))
     display = capture_display(monkeypatch)
 
     typed = labeled - 3
-    label_syllables(paths, **{**LABELLING, "max_syllables": typed})
-    syll_info = read_yaml(paths["syll_info"])
+    label_syllables(str(paths.project.folder), **{**LABELLING, "max_syllables": typed})
+    syll_info = read_yaml(str(paths.syll_info))
     for syllable in range(typed):
         syll_info[syllable].update(_typed(syllable))
-    write_yaml(syll_info, paths["syll_info"])
+    write_yaml(syll_info, str(paths.syll_info))
 
     display.clear()
-    label_syllables(paths, **LABELLING)
+    label_syllables(str(paths.project.folder), **LABELLING)
     dropdown = display.of_type(widgets.Dropdown)[-1]
     view = display.of_type(widgets.AppLayout)[-1]
     name, desc = (
@@ -576,7 +567,7 @@ def test_an_unlabelled_syllable_picked_from_the_list_shows_blank_boxes(
     assert (name.value, desc.value) == ("", "")
 
     next_button.click()
-    assert {k: read_yaml(paths["syll_info"])[blank][k] for k in ("label", "desc")} == {"label": "", "desc": ""}
+    assert {k: read_yaml(str(paths.syll_info))[blank][k] for k in ("label", "desc")} == {"label": "", "desc": ""}
 
 
 def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_project, labeled, monkeypatch):
@@ -591,13 +582,11 @@ def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_pro
     from widgets import capture_display
 
     shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
-    progress = tmp_path / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
-    paths = read_yaml(str(progress))
-    model = parse_model_results(paths["model_path"])
+    paths = current_analysis(str(tmp_path))
+    model = parse_model_results(str(paths.model))
     used = len({int(label) for labels in model["labels"] for label in np.unique(labels) if label >= 0})
 
-    crowd = Path(paths["crowd_dir"])
+    crowd = paths.crowd_movies
     template = next(crowd.glob("syllable_*.mp4"))
 
     def make_movies(index_file, model_path, output_dir, config_data):
@@ -609,5 +598,5 @@ def test_a_count_equal_to_what_the_model_uses_is_accepted(tmp_path, analysis_pro
     monkeypatch.setattr(viz_steps, "make_crowd_movies_wrapper", make_movies)
     display = capture_display(monkeypatch)
 
-    assert label_syllables(paths, **{**LABELLING, "max_syllables": used}) == used
+    assert label_syllables(str(paths.project.folder), **{**LABELLING, "max_syllables": used}) == used
     assert len(display.of_type(widgets.Dropdown)[-1].options) == used

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import shutil
-from pathlib import Path
 
 # Before anything imports matplotlib. Nothing here has a display.
 os.environ.setdefault("MPLBACKEND", "Agg")
@@ -46,12 +45,6 @@ def analysis_bundle():
     return fetch_analysis_bundle()
 
 
-#: What the bundle's progress file carries where the project root belongs. A
-#: real progress file holds absolute paths into the directory it was written
-#: in, so the bundle cannot ship one until it knows where it landed.
-ROOT_SENTINEL = "__PROJECT_ROOT__"
-
-
 @pytest.fixture(scope="session")
 def analysis_project(tmp_path_factory, analysis_bundle):
     """A writable copy of the finished project the analysis notebook opens.
@@ -64,28 +57,21 @@ def analysis_project(tmp_path_factory, analysis_bundle):
     the dendrogram, the transition matrix and the group comparisons are only
     worth testing against syllables that are not.
 
-    The index relocates on its own, holding paths relative to itself, which is
-    what ``parse_index`` joins them against. The progress file cannot: every
-    cell reads absolute paths out of it. Substituting the sentinel for the
-    directory the copy landed in is what turns it into a real one.
+    The bundle is a project 1.5.0 made; ``project_1_6_from_bundle`` lays the
+    copy out as a 1.6 project, whose ``moseq2-project.yaml`` holds every path
+    relative to the project folder, so the copy works wherever it landed.
+    The analysis cells write into it.
     """
-    root = tmp_path_factory.mktemp("analysis")
-    shutil.copytree(analysis_bundle, root, dirs_exist_ok=True)
+    from fixtures import project_1_6_from_bundle
 
-    progress = root / "progress.yaml"
-    progress.write_text(progress.read_text().replace(ROOT_SENTINEL, str(root)))
-    return root
+    return project_1_6_from_bundle(analysis_bundle, tmp_path_factory.mktemp("analysis"))
 
 
 @pytest.fixture(scope="session")
 def analysis_project_1_6(tmp_path_factory, analysis_bundle):
-    """A writable copy of the finished project, laid out as a 1.6 project.
+    """A second copy of the finished project, for the ``moseq2-viz`` commands.
 
-    The bundle is a project 1.5.0 made; ``project_1_6_from_bundle`` gives its
-    copy a sectioned ``config.yaml`` holding the groups and a
-    ``moseq2-project.yaml`` listing its sessions, PCA files and model, which is
-    what the ``moseq2-viz`` commands read. Shared and read-only: a test that
-    writes into it takes its own copy.
+    Shared and read-only: a test that writes into it takes its own copy.
     """
     from fixtures import project_1_6_from_bundle
 
@@ -93,74 +79,62 @@ def analysis_project_1_6(tmp_path_factory, analysis_bundle):
 
 
 @pytest.fixture(scope="session")
-def analysis_progress(analysis_project):
-    """Cell 1: read the finished project's paths back out of its progress file.
+def analysis_started(analysis_project):
+    """Cell 1: name the project and show what it holds.
 
-    Every later cell in the analysis notebook addresses the project through
-    this dictionary rather than through the directory, so this is the only
-    cell that knows where the project is.
-
-    ``from_CLI`` stays False, which is the path a user arriving from the
-    extraction and modeling notebook takes and the one the notebook ships
-    with. The other branch is cell 1's own test.
+    Every later cell takes the project folder and reads what it needs from
+    the project's ``moseq2-project.yaml``, so this is the only cell that
+    knows where the project is.
     """
-    from moseq2_app.gui.progress import restore_progress_vars
+    from moseq2_app.project import start
 
-    return restore_progress_vars(
-        progress_file=str(analysis_project / "progress.yaml"),
-        init=False,
-        overwrite=False,
-    )
+    return start(str(analysis_project))
 
 
 @pytest.fixture(scope="session")
-def model_dict(analysis_progress):
-    """Cell 2, first half: give every model in the project its own folder.
+def analysis(analysis_started):
+    """Cell 2: the model the notebook analyses, and the folder its analysis goes in.
 
-    A project can hold several models fit at different kappas, all sitting
-    together in ``models/``. Everything the analysis notebook produces
-    afterwards belongs to one of them, so the cell gives each its own
-    directory, copies the model into it, and returns where each one went.
+    The project's current model, as the extraction and modeling notebook left
+    it. Everything the analysis notebook produces afterwards belongs to that
+    model: the figures, the crowd movies, the syllable labels and the
+    dataframes, all inside its analysis folder.
     """
-    from moseq2_app.util import setup_model_folders
+    from moseq2_app.util import choose_model
 
-    return setup_model_folders(analysis_progress)
+    return choose_model(str(analysis_started.folder))
 
 
 @pytest.fixture(scope="session")
-def analysis_paths(analysis_project, analysis_progress, model_dict):
-    """Cell 2, second half: point the progress file at the chosen model.
+def sorted_index(analysis):
+    """The project's sessions, by uuid, as the analysis reads them.
 
-    This is the dictionary the rest of the analysis notebook runs on. Beyond
-    the model itself it names the four places the later cells write: the
-    figures, the crowd movies, the syllable labels and the dataframe cache,
-    all inside that model's folder.
-    """
-    from os.path import basename
-
-    from moseq2_app.util import update_model_paths
-
-    best_model = basename(analysis_progress["model_path"])
-    return update_model_paths(best_model, model_dict, str(analysis_project / "progress.yaml"))
-
-
-@pytest.fixture(scope="session")
-def sorted_index(analysis_paths):
-    """Cell 4, first half: read the index and put the sessions in a fixed order.
-
-    ``parse_index`` resolves each session's paths against the index file's
-    own directory, which is what lets the project be moved. Everything
+    Built from ``moseq2-project.yaml`` and ``config.yaml``'s groups. Everything
     downstream addresses sessions by uuid, and this is where that mapping
     comes from.
     """
+    from moseq2_common.bookkeeping import session_index
     from moseq2_viz.util import parse_index
 
-    _, index = parse_index(analysis_paths["index_file"])
+    _, index = parse_index(session_index(analysis.project))
     return index
 
 
 @pytest.fixture(scope="session")
-def moseq_df(analysis_paths, sorted_index):
+def made_df(analysis):
+    """Cell 4, first half: ``make-df``'s step writes the dataframe and its statistics.
+
+    Both go into the model's analysis folder as parquet, which reads back
+    with the types they were written with.
+    """
+    from moseq2_common.bookkeeping import session_index
+    from moseq2_viz.steps import make_df
+
+    return make_df(str(analysis.model), session_index(analysis.project), analysis.folder / "moseq_df.parquet")
+
+
+@pytest.fixture(scope="session")
+def moseq_df(made_df):
     """Cell 4, second half: one row per frame, scalars beside syllable labels.
 
     The join the whole notebook rests on. Each recording's extraction
@@ -172,14 +146,14 @@ def moseq_df(analysis_paths, sorted_index):
     Big enough to be worth building once: seven hundred thousand rows over
     the fixture's twenty sessions.
     """
-    from moseq2_viz.scalars.util import scalars_to_dataframe
+    import pandas as pd
 
-    return scalars_to_dataframe(sorted_index, model_path=analysis_paths["model_path"])
+    return pd.read_parquet(made_df.dataframe_file)
 
 
-#: What cell 6 asks for: usage as a probability rather than a raw count,
-#: one row per session per syllable, syllables numbered by how much they
-#: are used.
+#: What ``make-df``'s step computes its statistics with: usage as a probability
+#: rather than a raw count, one row per session per syllable, syllables
+#: numbered by how much they are used.
 STATISTICS = {
     "count": "usage",
     "groupby": ["group", "uuid"],
@@ -189,8 +163,8 @@ STATISTICS = {
 
 
 @pytest.fixture(scope="session")
-def stats_df(moseq_df):
-    """Cell 6: one row per session per syllable.
+def stats_df(made_df):
+    """Cell 6: one row per session per syllable, as ``make-df``'s step wrote it.
 
     Collapses the frame-by-frame table into the unit every later cell
     works in. How much each session used each syllable, how long its bouts
@@ -198,23 +172,22 @@ def stats_df(moseq_df):
     it. The dendrogram, the fingerprint, the hypothesis tests and the
     transition graphs all read this.
     """
-    from moseq2_viz.model.util import compute_behavioral_statistics
+    import pandas as pd
 
-    return compute_behavioral_statistics(moseq_df, **STATISTICS)
+    return pd.read_parquet(made_df.stats_file)
 
 
 #: What cell 9 asks for. ``max_syllables=None`` makes the cell work out how
-#: many syllables are worth looking at instead of being told.
+#: many syllables are worth looking at instead of being told. How the crowd
+#: movies are made is config.yaml's ``crowd_movies`` section.
 LABELLING = {
     "max_syllables": None,
     "n_explained": 99,
-    "select_median_duration_instances": False,
-    "max_examples": 20,
 }
 
 
 @pytest.fixture(scope="session")
-def labeled(analysis_project, analysis_paths):
+def labeled(analysis):
     """Cell 9: build a crowd movie for every syllable, and open the labeller.
 
     Up to here a syllable is a number. This is the cell that makes it
@@ -228,18 +201,9 @@ def labeled(analysis_project, analysis_paths):
     Returns the number of syllables the cell settled on, which cells 10,
     11, 12 and 14 all take as their ``max_syllables``.
     """
-    from os.path import join
-
-    from moseq2_app.gui.progress import update_progress
     from moseq2_app.main import label_syllables
 
-    progress_file = str(analysis_project / "progress.yaml")
-    session = analysis_paths["model_session_path"]
-
-    update_progress(progress_file, "crowd_dir", join(session, "crowd_movies/"))
-    paths = update_progress(progress_file, "syll_info", join(session, "syll_info.yaml"))
-
-    return label_syllables(paths, **LABELLING)
+    return label_syllables(str(analysis.project.folder), **LABELLING)
 
 
 #: How cell 12 normalises its transition matrices: every entry is the share
@@ -248,7 +212,7 @@ TRANSITION_NORMALIZE = "bigram"
 
 
 @pytest.fixture(scope="session")
-def transitions(analysis_paths, labeled):
+def transitions(analysis, labeled):
     """Cell 12's computing half: a matrix and a usage count per group.
 
     Usage says how often a syllable happens; a transition matrix says
@@ -261,7 +225,7 @@ def transitions(analysis_paths, labeled):
     from moseq2_viz.model.trans_graph import get_group_trans_mats, get_trans_graph_groups
     from moseq2_viz.model.util import parse_model_results, relabel_by_usage
 
-    model_data = parse_model_results(analysis_paths["model_path"])
+    model_data = parse_model_results(str(analysis.model))
     model_data["labels"] = relabel_by_usage(model_data["labels"], count="usage")[0]
 
     label_group, uuids = get_trans_graph_groups(model_data)

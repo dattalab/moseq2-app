@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from moseq2_app.gui.progress import check_progress, get_session_paths, get_sessions, restore_progress_vars
+from moseq2_app.gui.progress import get_session_paths, get_sessions
 from moseq2_extract.cli import batch_extract
 from moseq2_extract.gui import extract_found_sessions, generate_config_command
 
@@ -181,8 +181,9 @@ def test_an_empty_project_says_where_it_looked_and_what_counts(tmp_path, capsys)
     generate_config_command(str(config), camera_type="k2")
     capsys.readouterr()
 
-    restore_progress_vars(str(root / "progress.yaml"), init=True)
-    check_progress(str(root / "progress.yaml"))
+    from moseq2_app.project import start
+
+    start(str(root))
     progress_out = capsys.readouterr().out
 
     from moseq2_app.roi.widget import ArenaMaskWidget

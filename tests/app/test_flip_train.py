@@ -135,8 +135,8 @@ DEFAULT_STORED = {"spatial_filter_size": [3], "temporal_filter_size": [0], "tail
 
 @pytest.fixture
 def flip_project(tmp_path):
-    """Two extracted sessions, each with five labeled frames, and a config.yaml; session_b's
-    arena-tool entry in session_config.yaml sets a spatial filter of 5."""
+    """Two extracted sessions, each with five labeled frames, listed in moseq2-project.yaml, and a
+    config.yaml; session_b's arena-tool entry in session_config.yaml sets a spatial filter of 5."""
     from moseq2_extract.gui import generate_config_command
 
     root = tmp_path / "project"
@@ -147,6 +147,10 @@ def flip_project(tmp_path):
     for i, name in enumerate(("session_a", "session_b")):
         frames = rng.integers(0, 80, size=(10, 20, 20)).astype(np.uint8)
         h5s[name] = _extracted_session(root, name, f"uuid-{i}", frames, DEFAULT_STORED)
+    write_yaml({"sessions": {f"{name}/depth.dat": {"recording": f"{name}/depth.dat",
+                                                   "folder": h5.relative_to(root).as_posix(), "uuid": f"uuid-{i}"}
+                             for i, (name, h5) in enumerate(h5s.items())}},
+               str(root / "moseq2-project.yaml"))
     write_yaml({"session_b/depth.dat": {"spatial_filter_size": [5]}}, str(root / "session_config.yaml"))
     index = root / "flip-training-frame-ranges.p"
     with index.open("wb") as f:
@@ -204,7 +208,6 @@ def test_training_warns_when_a_session_was_extracted_with_other_cleaning_setting
     assert ((5,), 10) in calls
 
 
-@pytest.mark.xfail(reason="PR 4.3b", strict=True)
 def test_a_sessions_recording_is_found_through_the_bookkeeping_file(tmp_path, monkeypatch):
     """Labeled sessions are aggregated files with no uuid and no results yaml beside them: the project's
     moseq2-project.yaml says which recording each one is, so session_b's arena-tool entry reaches training."""
@@ -238,3 +241,23 @@ def test_a_sessions_recording_is_found_through_the_bookkeeping_file(tmp_path, mo
     train_flip_classifier(str(index), str(tmp_path / "flip.p"), str(root / "config.yaml"))
 
     assert sorted(calls) == [((3,), 10), ((5,), 10)]
+
+
+def test_a_labeled_session_the_project_does_not_list_is_named(flip_project, monkeypatch, tmp_path, capsys):
+    """A labeled file that is none of the project's sessions has no recording, so no arena-tool entry:
+    training says so, naming the file and the bookkeeping file, and cleans it with config.yaml's settings."""
+    from moseq2_app.steps import train_flip_classifier
+
+    root, index = flip_project
+    (root / "moseq2-project.yaml").write_text("sessions: {}\n")
+    calls = _cleaning_calls(monkeypatch)
+    monkeypatch.setattr(train, "train_classifier", lambda *a, **kw: None)
+    monkeypatch.setattr(train, "save_classifier", lambda *a, **kw: None)
+
+    train_flip_classifier(str(index), str(tmp_path / "flip.p"), str(root / "config.yaml"))
+
+    out = capsys.readouterr().out
+    assert str(root / "session_b" / "proc" / "results_00.h5") in out
+    assert str(root / "moseq2-project.yaml") in out
+    assert {spatial for spatial, _ in calls} == {(3,)}
+    assert sum(frames for _, frames in calls) == 20

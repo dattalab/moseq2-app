@@ -5,8 +5,9 @@ The defaults: examples of at least 4 frames, 20 examples, 10 frames of padding, 
 range of 10 to 120 mm, and as many workers as there are CPUs available to the process
 (its CPU affinity where the operating system reports one, as on Linux and inside a SLURM
 allocation smaller than the node; the machine's count on macOS and Windows, which do not).
-Each front end still chooses what it renders: the syllables, how the movies are grouped,
-and the number of examples the labeler's notebook cell or the comparison tool's slider sets.
+A setting in config.yaml's ``crowd_movies`` section changes it for all three. Each front
+end still chooses what it renders: the syllables, and for the comparison tool how the
+movies are grouped and the number of examples its slider sets.
 """
 
 from __future__ import annotations
@@ -33,12 +34,25 @@ def _movie(crowd_movie_dir, syllable):
 
 
 @pytest.fixture
-def project(tmp_path, analysis_project):
-    """A copy of the analysis project, with its progress file pointing into the copy."""
-    shutil.copytree(analysis_project, tmp_path / "project")
-    progress = tmp_path / "project" / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path / "project")))
-    return read_yaml(str(progress))
+def project(tmp_path, analysis_project_1_6):
+    """A copy of the analysis project's settings and bookkeeping, reading the analysis project's files.
+
+    Only the two yaml files are copied: the sessions they list are found through the
+    bookkeeping file's paths, which are made absolute, so the model and sessions are read
+    where they are and the labeler's outputs land in the copy.
+    """
+    from moseq2_common.yaml import write_yaml
+
+    root = tmp_path / "project"
+    (root / "models").mkdir(parents=True)
+    shutil.copy2(analysis_project_1_6 / "config.yaml", root / "config.yaml")
+    shutil.copy2(analysis_project_1_6 / "models" / "model.p", root / "models" / "model.p")
+    bookkeeping = read_yaml(str(analysis_project_1_6 / "moseq2-project.yaml"))
+    for session in bookkeeping["sessions"].values():
+        session["folder"] = str(analysis_project_1_6 / session["folder"])
+    bookkeeping["pca"] = {name: str(analysis_project_1_6 / path) for name, path in bookkeeping["pca"].items()}
+    write_yaml(bookkeeping, str(root / "moseq2-project.yaml"))
+    return root
 
 
 @pytest.fixture
@@ -71,9 +85,11 @@ def _cpus():
 
 def test_three_crowd_movie_front_ends_share_one_set_of_defaults(project, analysis_project_1_6, rendered, tmp_path,
                                                                 monkeypatch, displayed):
-    from moseq2_app.gui.wrappers import interactive_syllable_labeler_wrapper
+    from moseq2_app.main import label_syllables
     from moseq2_app.viz import controller
     from moseq2_app.viz.controller import CrowdMovieComparison
+    from moseq2_common.bookkeeping import session_index
+    from moseq2_common.project import Project
     from moseq2_viz.cli import cli
     from moseq2_viz.options import CrowdMovieOptions
 
@@ -90,17 +106,13 @@ def test_three_crowd_movie_front_ends_share_one_set_of_defaults(project, analysi
                                       "-o", str(tmp_path / "cli")], catch_exceptions=False)
     assert result.exit_code == 0, result.output
 
-    # the Analysis notebook's labeler cell, with the number of examples the cell sets
-    interactive_syllable_labeler_wrapper(
-        project["model_path"], project["config_file"], project["index_file"],
-        str(tmp_path / "crowd_movies") + "/", str(tmp_path / "syll_info.yaml"), str(tmp_path),
-        max_syllables=3, max_examples=20,
-    )
+    # the Analysis notebook's labeler cell
+    label_syllables(str(project), max_syllables=3)
 
     # the comparison tool, previewing a syllable by group at its slider's number of examples
     comparison = CrowdMovieComparison(
-        config_data=read_yaml(project["config_file"]), index_path=project["index_file"],
-        model_path=project["model_path"],
+        crowd_movie_settings={}, index=session_index(Project.at(project)),
+        model_path=str(project / "models" / "model.p"),
         syll_info={i: {"label": f"s{i}", "desc": "", "crowd_movie_path": ""} for i in range(3)},
         output_dir=str(tmp_path / "comparison") + "/", get_pdfs=False,
     )
@@ -111,6 +123,35 @@ def test_three_crowd_movie_front_ends_share_one_set_of_defaults(project, analysi
     shared = sorted(set(reference) - CHOSEN)
     for front_end, settings in zip(("make-crowd-movies", "labeler", "comparison"), calls):
         assert {k: settings[k] for k in shared} == {k: reference[k] for k in shared}, front_end
+
+
+def test_the_crowd_movies_section_reaches_the_labeler_and_the_comparison_tool(project, rendered, tmp_path,
+                                                                             monkeypatch, displayed):
+    """The Analysis notebook's labeler and comparison tool render with the settings config.yaml's
+    ``crowd_movies`` section holds, as ``make-crowd-movies`` does."""
+    import ipywidgets
+
+    from moseq2_app.main import interactive_crowd_movie_comparison, label_syllables
+    from moseq2_app.util import update_config
+    from moseq2_app.viz import controller
+    from moseq2_app.viz.controller import CrowdMovieComparison
+
+    calls, groups = rendered
+    monkeypatch.setattr(controller, "get_video_info", lambda path: {"dims": (100, 100)})
+    with update_config(str(project / "config.yaml"), section="crowd_movies") as section:
+        section.update({"max_examples": 7, "min_dur": 6})
+
+    label_syllables(str(project), max_syllables=3)
+    interactive_crowd_movie_comparison(str(project), str(tmp_path / "comparison"), get_pdfs=False)
+    tool = next(callback.__self__ for button in displayed.of_type(ipywidgets.Button)
+                for callback in button._click_handlers.callbacks
+                if isinstance(getattr(callback, "__self__", None), CrowdMovieComparison))
+    groups.extend(tool.groups)
+    tool.crowd_movie_preview(tool.cm_syll_select.value, "group", tool.num_examples.value)
+
+    labeler, compared = calls[0], calls[-1]
+    assert (labeler["max_examples"], labeler["min_dur"]) == (7, 6)
+    assert compared["min_dur"] == 6
 
 
 @pytest.mark.parametrize("affinity", [True, False], ids=["affinity", "no-affinity"])

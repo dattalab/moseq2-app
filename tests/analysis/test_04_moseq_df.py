@@ -1,7 +1,7 @@
 """Cell 4: line the scalars up against the syllables.
 
-    _, sorted_index = parse_index(progress_paths['index_file'])
-    moseq_df = scalars_to_dataframe(sorted_index, model_path=progress_paths['model_path'])
+    made = make_df(str(analysis.model), session_index(project), analysis.folder / 'moseq_df.parquet')
+    moseq_df = pd.read_parquet(made.dataframe_file)
 
 The join the rest of the notebook rests on. Extraction measured a mouse
 frame by frame: where it was, how fast, how big, which way it faced. The
@@ -11,8 +11,11 @@ afterwards is a groupby on it: what a group's syllable usage looks like,
 how fast the mouse moves during one syllable, which syllables separate
 two conditions.
 
-The two halves fail differently. ``parse_index`` resolving the wrong
-paths gives an immediate read error. A misaligned join gives a table of
+The cell runs ``make-df``'s step, the one the command line runs, which
+writes the table and its per-syllable statistics into the model's analysis
+folder; the cell reads the table back. The two halves of the step fail
+differently. Resolving the wrong session paths gives an immediate read
+error. A misaligned join gives a table of
 the right shape, full of scalars attributed to the wrong syllable, and
 nothing downstream can tell.
 """
@@ -56,24 +59,25 @@ SCALARS = (
 IDENTITY = ("uuid", "group", "SessionName", "SubjectName", "StartTime", "h5_path")
 
 
-def test_the_index_resolves_every_session_it_names(sorted_index):
+def test_the_project_resolves_every_session_it_names(sorted_index):
     """1. The project can be read from wherever it was put.
 
-    The index holds each session's paths relative to itself, and
-    ``parse_index`` joins them against the index file's own directory. A
-    project that was copied or downloaded resolves; one whose index kept
-    the absolute paths of the machine it was built on does not, and the
-    failure is a missing file several cells later.
+    ``moseq2-project.yaml`` holds each session's paths relative to the
+    project folder, and the sessions the analysis reads are resolved against
+    the folder the project is in now. A project that was copied or
+    downloaded resolves; one that kept the absolute paths of the machine it
+    was built on would not, and the failure would be a missing file several
+    cells later.
     """
-    assert sorted_index["files"], "the index names no sessions"
+    assert sorted_index["files"], "the project names no sessions"
     for uuid, entry in sorted_index["files"].items():
         for path in entry["path"]:
             assert Path(path).is_absolute(), f"{uuid} kept a relative path: {path}"
-            assert Path(path).exists(), f"the index names {path}, which is not there"
-    assert Path(sorted_index["pca_path"]).exists(), "the scores file the index names is missing"
+            assert Path(path).exists(), f"the project names {path}, which is not there"
+    assert Path(sorted_index["pca_path"]).exists(), "the scores file the project names is missing"
 
 
-def test_there_is_one_row_for_every_frame_the_model_labelled(analysis_paths, moseq_df):
+def test_there_is_one_row_for_every_frame_the_model_labelled(analysis, moseq_df):
     """2. Nothing was dropped and nothing was duplicated.
 
     The model holds one label array per session. Each of those frames gets
@@ -83,7 +87,7 @@ def test_there_is_one_row_for_every_frame_the_model_labelled(analysis_paths, mos
     """
     from moseq2_viz.model.util import parse_model_results
 
-    model = parse_model_results(analysis_paths["model_path"])
+    model = parse_model_results(str(analysis.model))
     expected = {
         uuid: len(labels)
         for uuid, labels in zip(model["metadata"]["uuids"], model["labels"])
@@ -94,20 +98,20 @@ def test_there_is_one_row_for_every_frame_the_model_labelled(analysis_paths, mos
     assert len(moseq_df) == sum(expected.values())
 
 
-def test_every_session_in_the_index_is_in_the_table(sorted_index, moseq_df):
-    """3. The index and the model agree about which recordings these are.
+def test_every_session_in_the_project_is_in_the_table(sorted_index, moseq_df):
+    """3. The project and the model agree about which recordings these are.
 
-    ``parse_index`` keys the sessions by uuid, which is the identifier the
-    model also stores, so this is the join the whole notebook runs on.
+    The sessions are keyed by uuid, which is the identifier the model also
+    stores, so this is the join the whole notebook runs on.
     """
     assert set(moseq_df["uuid"]) == set(sorted_index["files"])
 
 
-def test_each_row_carries_the_group_the_index_assigns_its_session(sorted_index, moseq_df):
+def test_each_row_carries_the_group_config_yaml_assigns_its_session(sorted_index, moseq_df):
     """4. Where every group comparison in the notebook comes from.
 
     The group is a property of the recording, set by hand in the
-    extraction and modeling notebook and stored in the index. It reaches
+    extraction and modeling notebook and stored in config.yaml's ``groups``. It reaches
     the statistics only by being copied onto each of that recording's
     rows here.
     """
@@ -178,3 +182,16 @@ def test_unlabelled_frames_are_negative_rather_than_missing(moseq_df):
     unlabelled = moseq_df["labels (original)"] < 0
     assert unlabelled.any(), "no frame is unlabelled; the padding convention has changed"
     assert (moseq_df.loc[unlabelled, "labels (usage sort)"] < 0).all()
+
+
+def test_the_step_writes_the_table_and_its_statistics_into_the_analysis_folder(analysis, made_df, moseq_df):
+    """10. What ``make-df`` writes, beside the model's other analysis outputs.
+
+    The table cell 4 reads back is the file the step wrote, and its
+    statistics (cell 6) are written beside it, so the command line's
+    ``make-df`` and the notebook compute the two tables in one place.
+    """
+    assert made_df.dataframe_file == analysis.folder / "moseq_df.parquet"
+    assert made_df.stats_file == analysis.folder / "moseq_df_stats.parquet"
+    assert made_df.dataframe_file.is_file() and made_df.stats_file.is_file()
+    assert len(moseq_df) > 0

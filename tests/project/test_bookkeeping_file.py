@@ -311,7 +311,6 @@ def test_a_moved_project_runs_its_next_step(cli_project, tmp_path):
 # ------------------------------------------------------------------ models
 
 
-@pytest.mark.xfail(reason="PR 4.3b", strict=True)
 def test_a_refit_model_is_what_the_analysis_reads(project_copy):
     """Choosing a model for the analysis copies nothing, so a refit under the same name is what it reads."""
     from moseq2_common.bookkeeping import load, resolve_path

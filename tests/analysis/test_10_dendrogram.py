@@ -1,7 +1,7 @@
 """Cell 10: which syllables are versions of the same movement.
 
     from moseq2_app.main import show_dendrogram
-    show_dendrogram(progress_paths, max_syllable=max_syllables, color_by_cluster=False)
+    show_dendrogram(str(project.folder), max_syllable=max_syllables, color_by_cluster=False)
 
 The model's syllables are not independent. Several will be slow forward
 walks that differ only in speed, and a few will be near-duplicates the
@@ -22,7 +22,6 @@ number alone.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -34,14 +33,14 @@ FIGURE = "syllable_dendrogram"
 
 
 @pytest.fixture(scope="module")
-def dendrogram(analysis_paths, labeled):
+def dendrogram(analysis, labeled):
     """Cell 10, run once. Returns the figure it drew and where it saved it."""
     import matplotlib.pyplot as plt
 
     plt.close("all")
-    assert show_dendrogram(analysis_paths, max_syllable=labeled, color_by_cluster=False) is None
+    assert show_dendrogram(str(analysis.project.folder), max_syllable=labeled, color_by_cluster=False) is None
     figure = plt.gcf()
-    yield figure, Path(analysis_paths["plot_path"])
+    yield figure, analysis.plots
     plt.close("all")
 
 
@@ -103,7 +102,7 @@ def test_there_is_one_leaf_per_syllable_being_analysed(dendrogram, labeled):
     assert len(labels) == labeled, f"{len(labels)} leaves for {labeled} syllables"
 
 
-def test_each_leaf_names_the_syllable_it_stands_for(dendrogram, analysis_paths, labeled):
+def test_each_leaf_names_the_syllable_it_stands_for(dendrogram, analysis, labeled):
     """6. A tree of unnamed branches is not readable.
 
     Leaves are built as the name a user typed in cell 9 followed by the
@@ -114,7 +113,7 @@ def test_each_leaf_names_the_syllable_it_stands_for(dendrogram, analysis_paths, 
 
     figure, _ = dendrogram
     labels = [tick.get_text() for tick in figure.axes[0].get_xticklabels()]
-    syll_info = read_yaml(analysis_paths["syll_info"])
+    syll_info = read_yaml(str(analysis.syll_info))
 
     for text in labels:
         name, _, number = text.rpartition("-")
@@ -125,7 +124,7 @@ def test_each_leaf_names_the_syllable_it_stands_for(dendrogram, analysis_paths, 
     assert len({text.rpartition("-")[2] for text in labels}) == labeled, "a syllable appears twice"
 
 
-def test_the_distances_are_a_symmetric_comparison_of_every_pair(analysis_paths, labeled):
+def test_the_distances_are_a_symmetric_comparison_of_every_pair(analysis, labeled):
     """7. What the tree is built from.
 
     ``ar[init]`` compares the autoregressive matrix of each syllable
@@ -133,12 +132,13 @@ def test_the_distances_are_a_symmetric_comparison_of_every_pair(analysis_paths, 
     only as meaningful as this: it has to be symmetric, zero down the
     diagonal and positive elsewhere, or the clustering is reading noise.
     """
+    from moseq2_common.bookkeeping import session_index
     from moseq2_viz.model.dist import get_behavioral_distance
     from moseq2_viz.util import get_sorted_index
 
-    index = get_sorted_index(analysis_paths["index_file"])
+    index = get_sorted_index(session_index(analysis.project))
     distances = get_behavioral_distance(
-        index, analysis_paths["model_path"], max_syllable=labeled, distances="ar[init]"
+        index, str(analysis.model), max_syllable=labeled, distances="ar[init]"
     )["ar[init]"]
 
     assert distances.shape == (labeled, labeled)
@@ -150,7 +150,7 @@ def test_the_distances_are_a_symmetric_comparison_of_every_pair(analysis_paths, 
     assert np.isfinite(distances).all()
 
 
-def test_a_label_file_naming_more_syllables_than_the_tree_still_draws(analysis_paths, labeled, tmp_path):
+def test_a_label_file_naming_more_syllables_than_the_tree_still_draws(analysis, labeled):
     """8. The tree takes the names of the syllables it draws.
 
     Cell 9 keeps every name a user typed, including names for syllables
@@ -161,17 +161,19 @@ def test_a_label_file_naming_more_syllables_than_the_tree_still_draws(analysis_p
 
     from moseq2_common.yaml import read_yaml, write_yaml
 
-    syll_info = read_yaml(analysis_paths["syll_info"])
+    as_labeled = analysis.syll_info.read_bytes()
+    syll_info = read_yaml(str(analysis.syll_info))
     for syllable in syll_info:
         syll_info[syllable]["label"] = f"name {syllable}"
-    info = tmp_path / "syll_info.yaml"
-    write_yaml(syll_info, str(info))
     fewer = labeled - 4
-    paths = {**analysis_paths, "syll_info": str(info), "plot_path": str(tmp_path / "plots")}
 
     plt.close("all")
-    show_dendrogram(paths, max_syllable=fewer, color_by_cluster=False)
-    labels = [tick.get_text() for tick in plt.gcf().axes[0].get_xticklabels()]
-    plt.close("all")
+    try:
+        write_yaml(syll_info, str(analysis.syll_info))
+        show_dendrogram(str(analysis.project.folder), max_syllable=fewer, color_by_cluster=False)
+        labels = [tick.get_text() for tick in plt.gcf().axes[0].get_xticklabels()]
+    finally:
+        analysis.syll_info.write_bytes(as_labeled)
+        plt.close("all")
 
     assert sorted(labels) == sorted(f"name {syllable}-{syllable}" for syllable in range(fewer))

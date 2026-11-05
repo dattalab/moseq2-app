@@ -1,7 +1,7 @@
 """Cell 12: how one syllable leads to the next, per group.
 
     normalize = 'bigram'
-    model_data = parse_model_results(progress_paths['model_path'])
+    model_data = parse_model_results(str(analysis.model))
     model_data['labels'] = relabel_by_usage(model_data['labels'], count='usage')[0]
     label_group, uuids = get_trans_graph_groups(model_data)
     group = list(set(label_group))
@@ -10,7 +10,7 @@
     fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True, squeeze=False)
     ax = ax[0]
     ...
-    fig.savefig(join(progress_paths['plot_path'], f'{normalize}_transition_matrix.{ext}'))
+    fig.savefig(analysis.plots / f'{normalize}_transition_matrix.{ext}')
 
 Usage says how often a syllable happens; this says what it follows and
 what follows it. Two groups can use the same syllables equally often and
@@ -33,6 +33,7 @@ from __future__ import annotations
 import os
 from os.path import join
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -70,14 +71,14 @@ def draw_matrices(trans_mats, group, max_syllables, normalize, plot_path):
         "group": group,
         "max_syllables": max_syllables,
         "normalize": normalize,
-        "progress_paths": {"plot_path": plot_path},
+        "analysis": SimpleNamespace(plots=Path(plot_path)),
     }
     exec(source[source.index("fig, ax = plt.subplots("):], namespace)
     return namespace["fig"]
 
 
 @pytest.fixture(scope="module")
-def figure(analysis_paths, labeled, transitions):
+def figure(analysis, labeled, transitions):
     """The cell's plotting half, run for real."""
     import matplotlib.pyplot as plt
 
@@ -87,9 +88,9 @@ def figure(analysis_paths, labeled, transitions):
         transitions["group"],
         labeled,
         NORMALIZE,
-        analysis_paths["plot_path"],
+        analysis.plots,
     )
-    yield drawn, Path(analysis_paths["plot_path"])
+    yield drawn, analysis.plots
     plt.close("all")
 
 
@@ -145,7 +146,7 @@ def test_bigram_normalisation_makes_the_whole_matrix_a_distribution(transitions)
         assert matrix.sum() == pytest.approx(1.0), name
 
 
-def test_row_normalisation_asks_a_different_question(analysis_paths, labeled, transitions):
+def test_row_normalisation_asks_a_different_question(analysis, labeled, transitions):
     """4. ``normalize`` is a real choice.
 
     Row-normalized, each row is the distribution over what follows that
@@ -153,7 +154,7 @@ def test_row_normalisation_asks_a_different_question(analysis_paths, labeled, tr
     syllable occurred. That answers "what does the mouse do next" rather
     than "what does it do most".
     """
-    model_data = parse_model_results(analysis_paths["model_path"])
+    model_data = parse_model_results(str(analysis.model))
     model_data["labels"] = relabel_by_usage(model_data["labels"], count="usage")[0]
     label_group, _ = get_trans_graph_groups(model_data)
 
@@ -216,7 +217,7 @@ def test_the_figure_is_named_after_what_it_shows(figure):
 
 
 def test_an_experiment_with_one_condition_still_plots(
-    analysis_paths, labeled, transitions, tmp_path
+    analysis, labeled, transitions, tmp_path
 ):
     """9. The first thing anyone runs is a pilot.
 

@@ -1,6 +1,6 @@
 """Cell 5: write the frame-by-frame table out as csv.
 
-    save_path = progress_paths['model_session_path']
+    save_path = analysis.folder
     filename = 'moseq_df.csv'
     moseq_df.to_csv(join(save_path, filename), index=False)
 
@@ -22,7 +22,6 @@ nothing else.
 from __future__ import annotations
 
 import csv
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -35,23 +34,23 @@ SAMPLED = ("uuid", "group", "labels (usage sort)", "velocity_3d_mm", "timestamps
 
 
 @pytest.fixture(scope="module")
-def exported(analysis_paths, moseq_df):
+def exported(analysis, moseq_df):
     """The cell, run for real, cleaned up afterwards."""
-    path = Path(analysis_paths["model_session_path"]) / "moseq_df.csv"
+    path = analysis.folder / "moseq_df.csv"
     moseq_df.to_csv(path, index=False)
     yield path
     path.unlink(missing_ok=True)
 
 
-def test_the_file_lands_where_the_cell_prints_that_it_did(exported, analysis_paths):
+def test_the_file_lands_where_the_cell_prints_that_it_did(exported, analysis):
     """1. Inside the model's own folder, named moseq_df.csv.
 
     The cell prints this path and a user goes looking for it. Cell 2 put
-    ``model_session_path`` inside the model's directory so that two models
-    analysed in one project do not overwrite each other's exports.
+    the analysis folder beside the model, named after it, so that two
+    models analysed in one project do not overwrite each other's exports.
     """
     assert exported.exists()
-    assert exported.parent == Path(analysis_paths["model_session_path"])
+    assert exported.parent == analysis.folder
     assert exported.name == "moseq_df.csv"
 
 

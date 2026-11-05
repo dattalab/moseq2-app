@@ -2,8 +2,9 @@
 and the arena tool's settings.
 
 The syllable labeler and the crowd-movie comparison tool render their movies through
-``moseq2_app.steps.render_syllable_movies``, with ``CrowdMovieOptions``' defaults and
-what each tool chooses: the syllables, the grouping and the number of examples. The arena tool resolves a
+``moseq2_app.steps.render_syllable_movies``, with the settings of config.yaml's
+``crowd_movies`` section and what each tool chooses: the syllables, and the comparison
+tool's grouping and number of examples. The arena tool resolves a
 recording's settings with ``ExtractOptions``, as extraction does.
 """
 
@@ -26,12 +27,13 @@ def _movie(crowd_movie_dir, syllable):
 
 
 @pytest.fixture
-def project(tmp_path, analysis_project, analysis_paths):
-    """A copy of the analysis project, with its progress file pointing into the copy."""
-    shutil.copytree(analysis_project, tmp_path, dirs_exist_ok=True)
-    progress = tmp_path / "progress.yaml"
-    progress.write_text(progress.read_text().replace(str(analysis_project), str(tmp_path)))
-    return read_yaml(str(progress))
+def project(analysis_project_1_6):
+    """The analysis project's sessions and model; the tools' outputs go into the test's own folder."""
+    from moseq2_common.bookkeeping import session_index
+    from moseq2_common.project import Project
+
+    return {"index": session_index(Project.at(analysis_project_1_6)),
+            "model_path": str(analysis_project_1_6 / "models" / "model.p")}
 
 
 def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tmp_path, monkeypatch, displayed):
@@ -55,9 +57,9 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     monkeypatch.setattr(controller, "get_video_info", lambda path: {"dims": (100, 100)})
 
     interactive_syllable_labeler_wrapper(
-        project["model_path"], project["config_file"], project["index_file"],
-        str(tmp_path / "crowd_movies") + "/", str(tmp_path / "syll_info.yaml"), str(tmp_path),
-        max_syllables=LABELED, max_examples=20,
+        project["model_path"], project["index"],
+        str(tmp_path / "crowd_movies") + "/", str(tmp_path / "syll_info.yaml"), str(tmp_path), {},
+        max_syllables=LABELED,
     )
     assert len(calls) == 1
     labeler = calls[0]
@@ -67,7 +69,7 @@ def test_the_labeler_and_the_comparison_tool_render_through_the_step(project, tm
     assert labeler["opts"].select_median_duration_instances is False
 
     comparison = CrowdMovieComparison(
-        config_data=read_yaml(project["config_file"]), index_path=project["index_file"],
+        crowd_movie_settings={}, index=project["index"],
         model_path=project["model_path"],
         syll_info={i: {"label": f"s{i}", "desc": "", "crowd_movie_path": ""} for i in range(LABELED)},
         output_dir=str(tmp_path / "comparison") + "/", get_pdfs=False,

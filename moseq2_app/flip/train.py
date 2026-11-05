@@ -1,3 +1,4 @@
+import os
 import h5py
 import pickle
 import joblib
@@ -10,14 +11,13 @@ from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
+from moseq2_common.bookkeeping import load, resolve_path
 from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
 from moseq2_common.h5 import h5_to_dict
 from moseq2_common.options import read_settings
 from moseq2_common.project import find_project
-from moseq2_common.yaml import read_yaml
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_extract.options import EXTRACT_STAGE
-from moseq2_extract.recordings import find_recordings
 from moseq2_extract.session_config import read_entries, recording_entry
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
@@ -62,27 +62,10 @@ def _show(value):
     return str(value)
 
 
-def _uuid(h5):
-    """The uuid extraction wrote into the session's ``.h5``, or None."""
-    with h5py.File(h5, "r") as f:
-        if "metadata/uuid" not in f:
-            return None
-        return _plain(f["metadata/uuid"][()])
-
-
-def _recordings_by_uuid(project):
-    """Each extracted recording in ``project``, by the uuid in its extraction's ``results_*.yaml``."""
-    found = {}
-    for recording in find_recordings(str(project.folder)).recordings:
-        folder = Path(recording).parent
-        for status in [*folder.glob("*/results_*.yaml"), *folder.glob("*/*/results_*.yaml")]:
-            try:
-                uuid = (read_yaml(str(status)) or {}).get("uuid")
-            except Exception:  # noqa: BLE001 -- a status file that cannot be read names no recording
-                continue
-            if uuid:
-                found[uuid] = recording
-    return found
+def _recordings_by_file(project):
+    """Each session's recording in ``project``, by its extraction file, as ``moseq2-project.yaml`` lists them."""
+    return {os.path.normcase(str(resolve_path(project, session.folder))): str(resolve_path(project, session.recording))
+            for session in load(project).sessions.values()}
 
 
 def _stored_cleaning(h5):
@@ -114,8 +97,8 @@ def session_cleaning(data_index_path: str, config_file: str | None) -> dict:
 
     config.yaml's ``extract`` section, with the arena-tool settings of the session's
     recording in the project's session_config.yaml over it; extraction's defaults
-    without ``config_file``. A session's recording is the one whose extraction has the
-    session's uuid. Where a session's extraction stored other cleaning settings than
+    without ``config_file``. A labeled file's recording is the one the project's
+    ``moseq2-project.yaml`` lists for it. Where a session's extraction stored other cleaning settings than
     the ones it resolves to, a message names each, with both values, and suggests
     re-extracting; the resolved settings are the ones returned.
 
@@ -130,7 +113,7 @@ def session_cleaning(data_index_path: str, config_file: str | None) -> dict:
     project = find_project(config_file) if config_file else None
     config = read_settings(config_file, CleaningOptions, stage_classes=EXTRACT_STAGE) if config_file else {}
     entries = read_entries(project) if project is not None else {}
-    recordings = _recordings_by_uuid(project) if entries else {}
+    recordings = _recordings_by_file(project) if entries else {}
     if config_file:
         sources = f"{config_file}'s extract section and its recording's session_config.yaml entry"
     else:
@@ -139,11 +122,12 @@ def session_cleaning(data_index_path: str, config_file: str | None) -> dict:
     cleaning = {}
     for name in data_index:
         h5 = session_paths[name]
-        recording = recordings.get(_uuid(h5)) if entries else None
+        recording = recordings.get(os.path.normcase(os.path.abspath(h5))) if entries else None
         if entries and recording is None:
-            print(f"{name} ({h5}): no recording under {project.folder} was extracted with this session's uuid, "
-                  f"so its frames are cleaned with {config_file}'s extract section alone, without a "
-                  "session_config.yaml entry.")
+            print(f"{name} ({h5}) is not one of the sessions {project.bookkeeping_file} lists, so its recording "
+                  f"is not known and its frames are cleaned with {config_file}'s extract section alone, without "
+                  "a session_config.yaml entry. To clean them as their recording is extracted, label the "
+                  "sessions in the project's aggregate_results folder.")
         entry = recording_entry(project, recording, entries) if recording is not None else {}
         cleaning[name] = CleaningOptions.resolve(config=config, entry=entry)
         _check_extraction(name, h5, cleaning[name], sources, recording)

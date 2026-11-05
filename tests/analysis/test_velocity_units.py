@@ -96,7 +96,7 @@ def table_rows(div):
 
 
 @pytest.fixture(scope="module")
-def comparison(analysis_paths, sorted_index, monkeypatch_module, tmp_path_factory):
+def comparison(analysis, sorted_index, monkeypatch_module, tmp_path_factory):
     """The crowd-movie comparison, built on the analysis bundle, with its movies stubbed.
 
     Its syllable tables come from the real ``get_session_mean_syllable_info_df``;
@@ -105,6 +105,7 @@ def comparison(analysis_paths, sorted_index, monkeypatch_module, tmp_path_factor
     """
     import moseq2_viz.steps as viz_steps
     from moseq2_app.viz import controller
+    from moseq2_common.bookkeeping import session_index
     from moseq2_app.viz.controller import CrowdMovieComparison
 
     movie = tmp_path_factory.mktemp("crowd_movies") / "movie.mp4"
@@ -112,8 +113,9 @@ def comparison(analysis_paths, sorted_index, monkeypatch_module, tmp_path_factor
 
     obj = CrowdMovieComparison.__new__(CrowdMovieComparison)
     obj.sorted_index = sorted_index
-    obj.model_path = analysis_paths["model_path"]
-    obj.index_path = analysis_paths["index_file"]
+    obj.model_path = str(analysis.model)
+    obj.index = session_index(analysis.project)
+    obj.crowd_movie_settings = {}
     obj.output_dir = str(movie.parent)
     obj.cm_choices = {'separate_by': 'groups'}
     obj.get_pdfs = False

@@ -2,23 +2,24 @@
 General utility functions.
 """
 import pandas as pd
-from moseq2_common.yaml import read_yaml, write_config
+from moseq2_common.yaml import write_config
 from copy import deepcopy
-import os
-from os.path import basename, join, exists, splitext
-from os import mkdir
-from glob import glob
-from shutil import copy2
-from collections import defaultdict
+from dataclasses import dataclass
+from os.path import basename, splitext
+from pathlib import Path, PurePosixPath
 from contextlib import contextmanager
 from typing import Iterator
+from moseq2_common.bookkeeping import Bookkeeping, BookkeepingError, load, relative_path, resolve_path, update
 from moseq2_common.options import SECTIONS, check_top_level, read_config
+from moseq2_common.project import Project
 from IPython.display import clear_output
-from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
 from moseq2_extract.util import check_filter_sizes
 from moseq2_extract.session_config import extract_settings
 from moseq2_viz.model.util import compute_behavioral_statistics
+
+#: The folder inside the project holding the fitted models.
+MODELS_DIRNAME = "models"
 
 
 class ClearOutputMixin:
@@ -151,61 +152,134 @@ def uuid_lookup(target_uuid, uuid_dict_source):
             for field in ('SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath'):
                 print(f'  {field}: {metadata[field]}')
 
-def setup_model_folders(progress_paths):
-    """Create model-specific folders
+@dataclass(frozen=True)
+class Analysis:
+    """The model the Analysis notebook analyses, and the folder its analysis is written in.
 
-    Args:
-    progress_paths (dict): dictionary of notebook progress paths.
-
-    Returns:
-    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info and crowd_dir
-    """
-    # find all the models in the model master path
-    models = glob(join(progress_paths['base_model_path'], '*.p'))
-    
-    # initialize model dictionary
-    model_dict = defaultdict(dict)
-
-    for model in models:
-        model_dir = splitext(model)[0]
-        # get the model file name to use as 
-        model = basename(model)
-        # Check if the model directory already exists
-        if not exists(model_dir):
-            print('Creating model folder for', model)
-            # make a model-specific folder
-            mkdir(model_dir)
-        
-        # check if the model is copied to the model-specific folder
-        if not exists(join(model_dir, model)):
-            copy2(join(progress_paths['base_model_path'], model), model_dir)
-        
-        model_dict[model]['model_session_path'] = model_dir
-        model_dict[model]['model_path'] = join(model_dir, model)
-    return dict(model_dict)  # remove defaultdict class
-
-def update_model_paths(desired_model, model_dict, progress_filepath):
-    """Update relevant model paths in progress.yaml when specific model is chosen
-
-    Args:
-    desired_model (str): file name of the desired specific model
-    model_dict (dict): dictionary for model specific paths such as model_session_path, model_path, syll_info and crowd_dir
-    progress_filepath (str): path to progress.yaml
-
-    Returns:
-    progress_paths (dict): dictionary of paths in the analysis
+    The folder is the model's own, beside it and named after it (``models/model/``
+    for ``models/model.p``), so two models analysed in one project keep their
+    outputs apart.
     """
 
-    assert desired_model in model_dict, '{} not found in model_dict. Make sure desired_model is one of the keys in model_dict. \nPossible keys: \n{}'.format(desired_model, "\n".join(map(str, model_dict)))
+    project: Project
+    #: The model file, where it was fit.
+    model: Path
+    #: The folder the analysis of this model writes into.
+    folder: Path
 
-    # update model_session_path and model_path
-    for key in ['model_session_path', 'model_path']:
-        progress_paths = update_progress(progress_filepath, key, model_dict[desired_model].get(key))
-    progress_paths = update_progress(progress_filepath, 'plot_path', join(model_dict[desired_model]['model_session_path'], 'plots/'))
-    progress_paths = update_progress(progress_filepath, 'crowd_dir', join(model_dict[desired_model]['model_session_path'], 'crowd_movies/'))
-    progress_paths = update_progress(progress_filepath, 'syll_info', join(model_dict[desired_model]['model_session_path'], 'syll_info.yaml'))
+    @property
+    def plots(self) -> Path:
+        return self.folder / "plots"
 
-    return progress_paths
+    @property
+    def crowd_movies(self) -> Path:
+        return self.folder / "crowd_movies"
+
+    @property
+    def syll_info(self) -> Path:
+        """The syllable labels the labeler writes."""
+        return self.folder / "syll_info.yaml"
+
+
+def _no_current_model(project: Project) -> BookkeepingError:
+    return BookkeepingError(
+        f"{project.bookkeeping_file} names no current model yet, so there is no model to analyse. Fit one "
+        "with the Extract-Modeling notebook's modeling cell or `moseq2-model learn-model`, or pass the file "
+        "name of a model in the project's models folder to choose_model."
+    )
+
+
+def _analysis(project: Project, bookkeeping: Bookkeeping, model: str) -> Analysis:
+    folder = (bookkeeping.models.get("analysis") or {}).get(model) or splitext(model)[0]
+    return Analysis(project=project, model=resolve_path(project, model), folder=resolve_path(project, folder))
+
+
+def current_analysis(project_folder) -> Analysis:
+    """The project's current model and its analysis folder, read from ``moseq2-project.yaml``.
+
+    Args:
+    project_folder (str): the project folder.
+
+    Returns:
+    (Analysis): the model and the folder its analysis is written in, which exists.
+    """
+    project = Project.at(project_folder)
+    bookkeeping = load(project)
+    model = bookkeeping.models.get("current")
+    if not model:
+        raise _no_current_model(project)
+    analysis = _analysis(project, bookkeeping, model)
+    if not analysis.model.is_file():
+        raise FileNotFoundError(
+            f"{project.bookkeeping_file} names {analysis.model} as the current model, and it does not exist. "
+            "Fit it again, or choose another of the project's models with choose_model."
+        )
+    analysis.folder.mkdir(parents=True, exist_ok=True)
+    return analysis
+
+
+def _model_named(project: Project, bookkeeping: Bookkeeping, model_name: str) -> str:
+    """The model ``model_name`` names, as the bookkeeping file stores it."""
+    listed = [*(bookkeeping.models.get("fitted") or []), *bookkeeping.applied_models]
+    found = [model for model in listed if model == model_name or PurePosixPath(model).name == model_name]
+    if len(found) == 1:
+        return found[0]
+    for candidate in (resolve_path(project, model_name), Path(project.folder) / MODELS_DIRNAME / model_name):
+        if candidate.is_file():
+            return relative_path(project, candidate)
+    models_folder = Path(project.folder) / MODELS_DIRNAME
+    in_folder = [relative_path(project, path) for path in sorted(models_folder.glob("*.p"))]
+    choices = sorted(set(listed) | set(in_folder))
+    if found:
+        problem = f"{len(found)} of the project's models are named {model_name!r}: {', '.join(found)}"
+    else:
+        problem = f"The project has no model {model_name!r}"
+    raise BookkeepingError(
+        f"{problem}. Its models are: {', '.join(choices) if choices else 'none yet'} "
+        f"({project.bookkeeping_file} and {models_folder}). Pass one of those to choose_model as model_name."
+    )
+
+
+def choose_model(project_folder, model_name=None) -> Analysis:
+    """
+    Choose the model the Analysis notebook analyses, and give its analysis a folder.
+
+    The model becomes the project's current model in ``moseq2-project.yaml``, which
+    every later analysis cell reads. Nothing is copied: the analysis reads the model
+    where it was fit, so a model fit again under the same name is what it analyses.
+    Its analysis folder is the model's own folder beside it, named after it.
+
+    Args:
+    project_folder (str): the project folder.
+    model_name (str): the model's file name in the project's ``models`` folder, or
+        its path in the project; None for the project's current model.
+
+    Returns:
+    (Analysis): the model and the folder its analysis is written in.
+    """
+    project = Project.at(project_folder)
+    bookkeeping = load(project)
+    if model_name is None:
+        model = bookkeeping.models.get("current")
+        if not model:
+            raise _no_current_model(project)
+    else:
+        model = _model_named(project, bookkeeping, str(model_name))
+    folder = (bookkeeping.models.get("analysis") or {}).get(model) or splitext(model)[0]
+
+    def change(bookkeeping):
+        fitted = bookkeeping.models.setdefault("fitted", [])
+        if model not in fitted and model not in bookkeeping.applied_models:
+            fitted.append(model)
+        bookkeeping.models["current"] = model
+        bookkeeping.models.setdefault("analysis", {})[model] = folder
+
+    if (bookkeeping.models.get("current") != model
+            or (bookkeeping.models.get("analysis") or {}).get(model) != folder):
+        update(project, change)
+    analysis = current_analysis(project_folder)
+    print(f"Analyzing {analysis.model}; its analysis is saved in {analysis.folder}")
+    return analysis
 
 
 @contextmanager

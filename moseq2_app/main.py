@@ -1,12 +1,14 @@
 """
 Main functions that facilitate all jupyter notebook functionality.
 """
-from os.path import exists
+from os.path import exists, join
 import ipywidgets as widgets
 from IPython.display import display
 from bokeh.io import output_notebook
-from moseq2_common.bookkeeping import project_index
+from moseq2_common.bookkeeping import project_index, session_index
+from moseq2_common.options import read_settings
 from moseq2_common.project import Project
+from moseq2_viz.options import CROWD_MOVIE_STAGE, CrowdMovieOptions
 from moseq2_extract.util import filter_warnings
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.widgets import GroupSettingWidgets
@@ -14,31 +16,12 @@ from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
 from moseq2_app.stat.view import plot_dendrogram
 from moseq2_app.roi.controller import InteractiveExtractionViewer
+from moseq2_app.util import current_analysis
 from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
     interactive_syllable_labeler_wrapper, interactive_crowd_movie_comparison_preview_wrapper, \
     interactive_plot_transition_graph_wrapper
 
 output_notebook()
-
-def validate_inputs(inputs, progress_paths):
-    """validate progress file input.
-
-    Args:
-        inputs (list): list of progress path inputs.
-        progress_paths (dict): dictionary of notebook progress paths.
-
-    Returns:
-        error (bool): boolean flag for whether there is any error.
-    """
-
-    error = False
-    for i in inputs:
-        if not exists(progress_paths[i]):
-            error = True
-            print(f'ERROR: {i} not found.')
-
-    return error
-
 
 @filter_warnings
 def view_extraction(extractions, default=0):
@@ -132,144 +115,115 @@ def interactive_scalar_summary(project_folder):
     display(viewer.ui_tools)
     return viewer
 
+def _crowd_movie_settings(project):
+    """The settings of ``project``'s config.yaml ``crowd_movies`` section, as ``CrowdMovieOptions.resolve`` takes them."""
+    return read_settings(project.config_file, CrowdMovieOptions, stage_classes=CROWD_MOVIE_STAGE)
+
+
+def _labels_needed(analysis):
+    """Stop, saying what to run, when the syllable labeler has not written the analysis's label file yet."""
+    if not exists(analysis.syll_info):
+        raise FileNotFoundError(
+            f"{analysis.syll_info} does not exist yet. The syllable labeler writes it for {analysis.model}: "
+            "run the notebook's labeling cell (label_syllables) first, then run this cell again."
+        )
+
+
+def _folder(path):
+    """``path`` as a folder name the analysis tools join file names onto."""
+    return join(str(path), '')
+
+
 @filter_warnings
-def label_syllables(progress_paths, max_syllables=None, n_explained=99, select_median_duration_instances=False, max_examples=20):
+def label_syllables(project_folder, max_syllables=None, n_explained=99):
     """
     launch Interactive syllable labeling tool.
 
+    The model is the project's current model (``moseq2_app.util.choose_model``); the crowd
+    movies are rendered into its analysis folder with the settings of config.yaml's
+    ``crowd_movies`` section, and the labels are saved there as ``syll_info.yaml``.
+
     Args:
-    progress_paths (dict): dictionary of notebook progress paths.
+    project_folder (str): the project folder.
     max_syllables (int or None): manual maximum number of syllables to label.
     n_explained (int): Percentage of explained variance to use to compute max_syllables to compute.
+
+    Returns:
+    max_sylls (int): the number of syllables offered for labeling.
     """
-
-    # Get proper input paths
-    model_path = progress_paths['model_path']
-    config_file = progress_paths['config_file']
-    index_file = progress_paths['index_file']
-    crowd_dir = progress_paths['crowd_dir']
-    syll_info_path = progress_paths['syll_info']
-    fig_dir = progress_paths['plot_path']
-
-    inputs = ['model_path', 'config_file', 'index_file']
-
-    if validate_inputs(inputs, progress_paths):
-        print('Set the correct paths to the missing variables and run the function again.')
-        return
-
-    max_sylls = interactive_syllable_labeler_wrapper(model_path, config_file,
-                                         index_file, crowd_dir, syll_info_path, fig_dir,
-                                         max_syllables=max_syllables, n_explained=n_explained, 
-                                         select_median_duration_instances=select_median_duration_instances, max_examples=max_examples)
-    return max_sylls
+    analysis = current_analysis(project_folder)
+    return interactive_syllable_labeler_wrapper(str(analysis.model), session_index(analysis.project),
+                                                _folder(analysis.crowd_movies), str(analysis.syll_info),
+                                                _folder(analysis.plots), _crowd_movie_settings(analysis.project),
+                                                max_syllables=max_syllables, n_explained=n_explained)
 
 
 @filter_warnings
-def show_dendrogram(progress_paths, max_syllable=None, color_by_cluster=False):
+def show_dendrogram(project_folder, max_syllable=None, color_by_cluster=False):
     """
-    show syllable similarity dendrogram.
+    show syllable similarity dendrogram, saved in the analysis folder's ``plots``.
 
     Args:
-        progress_paths (dict): dictionary of notebook progress paths.
-        max_syllable (_type_, optional): _description_. Defaults to None.
-        color_by_cluster (bool, optional): _description_. Defaults to False.
+        project_folder (str): the project folder.
+        max_syllable (int, optional): the number of syllables to include.
+        color_by_cluster (bool, optional): color the syllables by similarity cluster.
     """
+    analysis = current_analysis(project_folder)
+    plot_dendrogram(index=session_index(analysis.project), model_path=str(analysis.model),
+                    syll_info_path=str(analysis.syll_info), save_dir=_folder(analysis.plots),
+                    max_syllable=max_syllable, color_by_cluster=color_by_cluster)
 
-    # get input paths
-    index_file = progress_paths['index_file'] # Path to index file.
-    model_path = progress_paths['model_path'] # Path to trained model file.
-    syll_info_path = progress_paths['syll_info'] # Path to syllable information file.
-    save_dir = progress_paths['plot_path']
-
-    plot_dendrogram(index_file=index_file, model_path=model_path, syll_info_path=syll_info_path, 
-                    save_dir=save_dir, max_syllable=max_syllable, color_by_cluster=color_by_cluster)
 
 @filter_warnings
-def interactive_syllable_stats(progress_paths, max_syllable=None, load_parquet=False):
+def interactive_syllable_stats(project_folder, max_syllable=None):
     """
     launch the interactive syllable statistics viewer.
 
     Args:
-    progress_paths (dict): dictionary of notebook progress paths.
-    max_syllables (int or None): manual maximum number of syllables to label.
-    load_parquet (bool): Has no effect. Accepted so that notebooks which pass it still run.
+    project_folder (str): the project folder.
+    max_syllable (int or None): manual maximum number of syllables to plot.
     """
-
-    # Get proper input parameters
-    index_file = progress_paths['index_file'] # Path to index file.
-    model_path = progress_paths['model_path'] # Path to trained model file.
-    syll_info_path = progress_paths['syll_info'] # Path to syllable information file.
-
-    inputs = ['model_path', 'index_file', 'syll_info']
-
-    error = validate_inputs(inputs, progress_paths)
-
-    if error:
-        print('Set the correct paths to the missing variables and run the function again.')
-        return
+    analysis = current_analysis(project_folder)
+    _labels_needed(analysis)
 
     # Initialize the statistical grapher context
-    istat = InteractiveSyllableStats(index_path=index_file, model_path=model_path,
-                                     info_path=syll_info_path, max_sylls=max_syllable)
+    istat = InteractiveSyllableStats(index=session_index(analysis.project), model_path=str(analysis.model),
+                                     info_path=str(analysis.syll_info), max_sylls=max_syllable)
 
     display(istat.clear_button, istat.stat_widget_box, istat.out)
 
+
 @filter_warnings
-def interactive_crowd_movie_comparison(progress_paths, group_movie_dir, get_pdfs=True, load_parquet=False):
+def interactive_crowd_movie_comparison(project_folder, group_movie_dir, get_pdfs=True):
     """
     launch interactive crowd movie/position heatmap comparison function
 
     Args:
-    progress_paths (dict): dictionary of notebook progress paths.
+    project_folder (str): the project folder.
     group_movie_dir (str): path to generate new grouped crowd movies in.
     get_pdfs (bool): indicates whether to also generate position heatmaps.
-    load_parquet (bool): Has no effect. Accepted so that notebooks which pass it still run.
     """
+    analysis = current_analysis(project_folder)
+    _labels_needed(analysis)
 
-    # Get proper input paths
-    model_path = progress_paths['model_path']
-    config_file = progress_paths['config_file']
-    index_file = progress_paths['index_file']
-    syll_info_path = progress_paths['syll_info']
+    interactive_crowd_movie_comparison_preview_wrapper(_crowd_movie_settings(analysis.project),
+                                                       session_index(analysis.project), str(analysis.model),
+                                                       str(analysis.syll_info), group_movie_dir, get_pdfs=get_pdfs)
 
-    inputs = ['model_path', 'config_file', 'index_file', 'syll_info']
-
-    error = validate_inputs(inputs, progress_paths)
-
-    if error:
-        print('Set the correct paths to the missing variables and run the function again.')
-        return
-
-    interactive_crowd_movie_comparison_preview_wrapper(config_file, index_file, model_path,
-                                               syll_info_path, group_movie_dir,
-                                               get_pdfs=get_pdfs)
 
 @filter_warnings
-def interactive_transition_graph(progress_paths, max_syllables=None, plot_vertically=False, load_parquet=False):
+def interactive_transition_graph(project_folder, max_syllables=None, plot_vertically=False):
     """
     Display group transition graphs with a configurable number of syllables.
 
     Args:
-    progress_paths (dict): dictionary of notebook progress paths.
-    max_syllables (int or None): manual maximum number of syllables to label.
-    load_parquet (bool): Has no effect. Accepted so that notebooks which pass it still run.
+    project_folder (str): the project folder.
+    max_syllables (int or None): manual maximum number of syllables to plot.
+    plot_vertically (bool): stack the groups' graphs vertically.
     """
+    analysis = current_analysis(project_folder)
+    _labels_needed(analysis)
 
-    # Get proper input paths
-    model_path = progress_paths['model_path']
-    index_file = progress_paths['index_file']
-    syll_info_path = progress_paths['syll_info']
-
-    inputs = ['model_path', 'index_file', 'syll_info']
-
-    error = validate_inputs(inputs, progress_paths)
-    
-    if error:
-        print('Set the correct paths to the missing variables and run the function again.')
-        return
-
-    interactive_plot_transition_graph_wrapper(model_path,
-                                              index_file,
-                                              syll_info_path,
-                                              max_syllables=max_syllables,
+    interactive_plot_transition_graph_wrapper(str(analysis.model), session_index(analysis.project),
+                                              str(analysis.syll_info), max_syllables=max_syllables,
                                               plot_vertically=plot_vertically)
