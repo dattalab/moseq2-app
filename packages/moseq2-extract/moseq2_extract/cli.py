@@ -14,7 +14,7 @@ import click
 from click.core import ParameterSource
 
 from moseq2_common.options import ConfigFileError, click_options, command_settings, explicit_values
-from moseq2_common.project import find_project
+from moseq2_common.project import find_project, is_job_file
 from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
@@ -31,7 +31,7 @@ from moseq2_extract.options import (
     ExtractOptions,
     RoiOptions,
 )
-from moseq2_extract.session_config import recording_entry_settings, session_config_file
+from moseq2_extract.session_config import recording_entry
 
 
 @click.group(context_settings={"show_default": True})
@@ -120,12 +120,13 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 def extract(ctx, input_file, output_dir, config_file, output_file, **_):
     config = command_settings(config_file, ExtractOptions, stage_classes=EXTRACT_STAGE)
     source = _project_config(config_file)
+    # a job settings file already holds the recording's entry
+    project = find_project(source) if source and not is_job_file(source) else None
     try:
-        session_config = session_config_file(source) if source else ""
+        # the arena tool's settings from the recording's session_config.yaml entry, over config.yaml
+        entry = recording_entry(project, input_file)
     except ConfigFileError as error:
         raise click.ClickException(str(error)) from None
-    # the arena tool's settings from the recording's session_config.yaml entry, over config.yaml
-    entry = recording_entry_settings(config, input_file, session_config)
     opts = ExtractOptions.resolve(config=config, entry=entry, explicit=explicit_values(ctx, ExtractOptions))
     steps.extract(input_file, output_dir, opts)
 

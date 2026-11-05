@@ -12,7 +12,7 @@ from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.io.video import load_movie_data
 from moseq2_common.video import write_frames_preview
 from moseq2_extract.helpers.data import check_completion_status
-from moseq2_extract.session_config import recording_configs
+from moseq2_extract.session_config import recordings_options
 
 
 def write_extracted_chunk_to_h5(
@@ -231,29 +231,6 @@ def process_extract_batches(
         video_pipe.communicate()
 
 
-def _already_extracted(recording, config_data, output_dir=None):
-    """
-    Whether ``extract_wrapper`` would skip this recording as already extracted.
-
-    Args:
-    recording (str): path to the recording.
-    config_data (dict): the settings it is extracted with.
-    output_dir (str): the output folder passed to the extraction, or None for the config's.
-
-    Returns:
-    (bool): True when its results yaml says the extraction finished.
-    """
-    from moseq2_extract.helpers.wrappers import session_output_dir
-
-    if output_dir is None:
-        output_dir = config_data.get("output_dir", "proc")
-    index = config_data.get("bg_roi_index", 0)
-    if isinstance(index, (list, tuple)):
-        index = index[0]
-    folder = session_output_dir(recording, output_dir)
-    return check_completion_status(join(folder, f"results_{index:02d}.yaml"))
-
-
 def run_local_extract(
     to_extract,
     config_file,
@@ -278,18 +255,6 @@ def run_local_extract(
     """
     from moseq2_extract.gui import extract_command
 
-    # which session config values are not used, said once for every recording rather than per recording
-    resolved = recording_configs(config_file, to_extract, cli_options)
-    message = resolved.message(
-        [
-            ext
-            for ext in to_extract
-            if not (skip_extracted and _already_extracted(ext, resolved.configs[ext], output_dir))
-        ]
-    )
-    if message:
-        print(message)
-
     failures = []
     n_skipped = 0
     for ext in tqdm(to_extract, desc="Extracting Sessions"):
@@ -301,7 +266,6 @@ def run_local_extract(
                 num_frames=num_frames,
                 skip=skip_extracted,
                 cli_options=cli_options,
-                explain_settings=False,
             )
         except Exception as e:
             print("Unexpected error:", e)
@@ -360,16 +324,16 @@ def run_slurm_extract(
     """
     Write one sbatch command per session to extract it on a SLURM cluster, and submit them if run_cmd is set.
 
-    Each session is extracted with the settings ``recording_configs`` resolves: the arena tool's settings from its
-    entry in the session config, every other setting from the config file, and the options typed on the command
-    line over both. Each session gets a config.yaml of its own in its output directory whenever there is a session
-    config or a typed option: those settings, resolved, in config.yaml's ``extract`` section, with a ``job:``
-    block naming ``project`` (``moseq2_common.project.write_job_settings``).
+    Each session is extracted with the settings ``recordings_options`` resolves: the arena tool's settings from its
+    entry in the project's session_config.yaml, every other setting from the config file, and the options typed on
+    the command line over both. Each session gets a config.yaml of its own in its output directory whenever the
+    project has a session_config.yaml or an option is typed: those settings, resolved, in config.yaml's ``extract``
+    section, with a ``job:`` block naming ``project`` (``moseq2_common.project.write_job_settings``).
 
     Args:
     input_dir (str): directory the sessions were found in; extract_out_script is written there.
     to_extract (list): list of paths to files to extract
-    config_data (dict): batch-extract parameters, including config_file, session_config_path, output_dir and the SLURM settings.
+    config_data (dict): batch-extract parameters, including config_file, output_dir and the SLURM settings.
     skip_extracted (bool): Whether to skip already extracted session.
     num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
     cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
@@ -382,25 +346,10 @@ def run_slurm_extract(
     # expand input_dir absolute path
     input_dir = abspath(input_dir)
 
-    resolved = recording_configs(config_data["config_file"], to_extract, cli_options)
+    resolved = recordings_options(config_data["config_file"], to_extract, cli_options)
     # each session reads a config.yaml written to its output directory when its
     # parameters can differ from the config file's
-    session_config_files = exists(resolved.session_config_path) or bool(cli_options)
-
-    message = resolved.message(
-        [
-            depth_file
-            for depth_file in to_extract
-            if not (
-                skip_extracted
-                and check_completion_status(
-                    join(dirname(depth_file), config_data["output_dir"], "results_00.yaml")
-                )
-            )
-        ]
-    )
-    if message:
-        print(message)
+    session_config_files = (project is not None and project.session_config_file.exists()) or bool(cli_options)
 
     if session_config_files:
         for depth_file in to_extract:
@@ -412,9 +361,9 @@ def run_slurm_extract(
 
             # the recording's settings: the arena tool's from its session config entry,
             # the rest from the config file, typed options over both. It holds the entry
-            # already, so it names no session_config.yaml for the job's extract to apply again.
+            # already, so the job's extract does not lay the entry over it again.
             write_job_settings(join(output_dir, "config.yaml"), "extract",
-                               resolved.options[depth_file].settings(), project=project)
+                               resolved[depth_file].settings(), project=project)
 
     # Construct sbatch command for slurm
     commands = ""

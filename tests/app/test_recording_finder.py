@@ -187,7 +187,7 @@ def test_an_empty_project_says_where_it_looked_and_what_counts(tmp_path, capsys)
 
     from moseq2_app.roi.widget import ArenaMaskWidget
 
-    widget = ArenaMaskWidget(str(root), str(config), str(root / "session_config.yaml"))
+    widget = ArenaMaskWidget(str(root))
     assert widget.view is None
     arena_out = capsys.readouterr().out
 

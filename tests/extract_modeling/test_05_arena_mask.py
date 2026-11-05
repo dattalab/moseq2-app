@@ -1,23 +1,18 @@
 """Cell 5: find each recording's arena floor and save its extraction parameters.
 
-    session_config_path = join(progress_paths['base_dir'], 'session_config.yaml')
-    progress_paths = update_progress(progress_filepath, 'session_config', session_config_path)
-
-    ArenaMaskWidget(progress_paths['base_dir'], progress_paths['config_file'],
-                    progress_paths['session_config'],
-                    skip_extracted=skip_extracted)
+    ArenaMaskWidget(progress_paths['base_dir'], skip_extracted=skip_extracted)
 
 The first interactive cell. Everything up to here produced one configuration
 for the whole project; this cell produces one per recording, because the arena
 sits at a different depth in every rig and often moves between recordings.
 
-Opening the widget already writes the file: it runs
-``detect_and_set_camera_parameters`` over each recording that has no saved
-parameters and saves a copy of the configuration under the recording's folder
-name, or under the folder's path below the project when session folders share
-a name. A recording that has saved parameters keeps them, so running the cell
-again shows what was saved. The widget then lets a user look at the floor it
-found, adjust the parameters, and save.
+Opening the widget writes nothing: it shows each recording's saved parameters
+over the configuration, or, for a recording with none saved, the configuration
+with ``detect_and_set_camera_parameters`` run over it. The widget lets a user
+look at the floor it found, adjust the parameters, and save; saving writes the
+arena tool's settings for that recording, and only that recording, into
+``session_config.yaml`` in the project folder, keyed by the recording's path
+below the project. Running the cell again shows what was saved.
 
 The widget is a Panel object, so the tests drive it the way the browser does:
 they set a parameter, or assign a button's ``value``, and the callbacks run in
@@ -38,11 +33,11 @@ because there was nothing in it that needed tuning.
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_app.roi.widget import ArenaMaskWidget
 from moseq2_app.util import update_config
 from moseq2_common.yaml import read_yaml
@@ -50,13 +45,16 @@ from moseq2_common.yaml import read_yaml
 from test_03_config import plain
 from widgets import buttons_of, click
 
-#: The four recordings, in the order the selector offers them.
+#: The four recordings' folders.
 RECORDINGS = [
     "amphetamine_example_0",
     "amphetamine_example_1",
     "saline_example_0",
     "saline_example_1",
 ]
+
+#: The four sessions, keyed by recording, in the order the selector offers them.
+SESSIONS = [f"{name}/depth.avi" for name in RECORDINGS]
 
 #: What the widget offers to do, by the label on the button.
 ACTIONS = [
@@ -91,16 +89,14 @@ SAVED_BY = {
 }
 
 
-def parameters(session_config, recording="saline_example_0"):
+def parameters(session_config, recording="saline_example_0/depth.avi"):
     """One recording's saved parameters, as plain yaml types."""
     return plain(read_yaml(str(session_config)))[recording]
 
 
 def open_widget(root):
     """Open the widget on a project, as the cell does, and index its buttons."""
-    widget = ArenaMaskWidget(
-        str(root), str(root / "config.yaml"), str(root / "session_config.yaml")
-    )
+    widget = ArenaMaskWidget(str(root))
     return widget, widget.session_data, buttons_of(widget.view)
 
 
@@ -121,24 +117,24 @@ def scratch(tmp_path, project, arena):
 
 
 def test_every_recording_gets_a_parameter_file(arena, project):
-    """1. The cell's output: one entry per recording, keyed by folder name.
+    """1. The cell's output: one entry per recording saved, keyed by session.
 
     A recording is a folder holding a depth video. Later cells add folders of
     their own to the project (``aggregate_results/``, ``_pca/``, ``models/``),
     and the shared chain may have reached them before this test runs.
     """
     saved = read_yaml(str(arena))
-    assert sorted(saved) == RECORDINGS
-    assert sorted(p.parent.name for p in project.glob("*/depth.avi")) == RECORDINGS
+    assert sorted(saved) == SESSIONS
+    assert sorted(p.relative_to(project).as_posix() for p in project.glob("*/depth.avi")) == SESSIONS
 
 
 def test_detected_parameters_are_unchanged(arena, data_regression):
-    """2. Every parameter a recording is extracted with, pinned.
+    """2. Every arena-tool setting a recording's entry holds, pinned.
 
-    These are the values the rest of the pipeline runs on, and they come from
-    a dependency's detection routine rather than from anything written down,
-    so a change in moseq2-extract shows up here as a change to every user's
-    extraction.
+    These are the values extraction takes from the entry over config.yaml, and
+    they come from a dependency's detection routine rather than from anything
+    written down, so a change in moseq2-extract shows up here as a change to
+    every user's extraction.
     """
     saved = parameters(arena)
     data_regression.check({k: v for k, v in sorted(saved.items()) if k not in PATH_KEYS})
@@ -147,8 +143,8 @@ def test_detected_parameters_are_unchanged(arena, data_regression):
 def test_every_recording_gets_the_same_parameters(arena):
     """3. Detection is per recording, and these four recordings agree."""
     saved = plain(read_yaml(str(arena)))
-    reference = {k: v for k, v in saved[RECORDINGS[0]].items() if k not in PATH_KEYS}
-    for name in RECORDINGS[1:]:
+    reference = {k: v for k, v in saved[SESSIONS[0]].items() if k not in PATH_KEYS}
+    for name in SESSIONS[1:]:
         assert {
             k: v for k, v in saved[name].items() if k not in PATH_KEYS
         } == reference, f"{name} was detected differently"
@@ -176,11 +172,11 @@ def test_saved_parameters_differ_from_the_configuration_in_one_place(arena, conf
     assert differing == {"manual_set_depth_range"}
 
 
-def test_the_configuration_points_at_the_parameter_file(arena, configured, progress_file):
-    """5. How extraction finds the per-recording parameters in cell 6."""
-    assert plain(read_yaml(str(configured)))["session_config_path"] == str(arena)
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
-    assert recorded["session_config"] == str(arena)
+def test_extraction_finds_the_parameter_file_by_its_name(arena, configured, project):
+    """5. How extraction finds the per-recording parameters in cell 6: at a fixed
+    name in the project folder, with no pointer to it in config.yaml."""
+    assert arena == project / "session_config.yaml"
+    assert "session_config_path" not in plain(read_yaml(str(configured)))
 
 
 def test_the_widget_offers_four_actions(scratch):
@@ -196,9 +192,9 @@ def test_the_selector_lists_every_recording(scratch):
     widget, data, _ = open_widget(scratch)
     selector = widget.view.__panel__().select(pn.widgets.Select)[0]
 
-    assert list(selector.options) == RECORDINGS
-    assert data.path == RECORDINGS[0]
-    assert data.param.path.objects == RECORDINGS
+    assert list(selector.options) == SESSIONS
+    assert data.path == SESSIONS[0]
+    assert data.param.path.objects == SESSIONS
 
 
 def test_nothing_is_computed_until_a_button_is_pressed(scratch):
@@ -268,15 +264,15 @@ def assert_extraction_cuts_the_arena_shown(widget, data, buttons, root):
     with the settings extraction resolves (the saved entry's arena tool settings,
     config.yaml's others), and compare it with the one the tool showed."""
     from moseq2_extract.helpers.wrappers import get_roi_wrapper
-    from moseq2_extract.session_config import recording_configs
+    from moseq2_extract.session_config import recordings_options
 
     click(buttons["Compute arena mask"])
     shown = data.images["Arena mask"][data.mask_index]
     click(buttons["Save session parameters"])
 
     recording = widget.sessions[data.path]
-    resolved = recording_configs(str(root / "config.yaml"), [recording]).configs[recording]
-    roi, _, _ = get_roi_wrapper(recording, resolved, output_dir=str(root / data.path / "proc"))
+    resolved = recordings_options(str(root / "config.yaml"), [recording])[recording].as_dict()
+    roi, _, _ = get_roi_wrapper(recording, resolved, output_dir=str(Path(recording).parent / "proc"))
     np.testing.assert_array_equal(roi.astype(bool), shown)
 
 
@@ -311,7 +307,7 @@ def test_saving_leaves_the_other_recordings_alone(scratch):
 
     after = plain(read_yaml(str(session_config)))
     assert after[data.path]["bg_roi_depth_range"] == [600, 700]
-    for name in RECORDINGS:
+    for name in SESSIONS:
         if name != data.path:
             assert after[name] == before[name]
 
@@ -327,7 +323,7 @@ def test_saving_always_marks_the_depth_range_as_manual(scratch):
     """
     session_config = scratch / "session_config.yaml"
     fresh = plain(read_yaml(str(session_config)))
-    for name in RECORDINGS:
+    for name in SESSIONS:
         fresh[name]["manual_set_depth_range"] = False
     import yaml
 
@@ -350,7 +346,7 @@ def test_advancing_moves_to_the_next_recording_and_recomputes(scratch):
     data.depth_range = (600, 700)
     click(buttons["Save session parameters and move to next"])
 
-    assert data.path == RECORDINGS[1]
+    assert data.path == SESSIONS[1]
     assert data.depth_range == (650, 750), "the new recording's own parameters"
     assert data.images["Arena mask"] is not None
     assert data.images["Extracted mouse"].shape == (100, 80, 80)
@@ -361,11 +357,11 @@ def test_advancing_past_the_last_recording_wraps(scratch):
     """14. There is no end of the list; it returns to the first recording."""
     _, data, buttons = open_widget(scratch)
     visited = []
-    for _ in range(len(RECORDINGS) + 1):
+    for _ in range(len(SESSIONS) + 1):
         visited.append(data.path)
         click(buttons["Save session parameters and move to next"])
 
-    assert visited == RECORDINGS + [RECORDINGS[0]]
+    assert visited == SESSIONS + [SESSIONS[0]]
 
 
 @pytest.mark.parametrize(
@@ -509,58 +505,26 @@ def test_rerunning_the_cell_keeps_saved_parameters(unextracted):
     ) == (0, 1, 0)
 
 
-def test_a_new_recording_is_detected_and_the_others_keep_theirs(unextracted):
-    """A recording added to the project after the first run gets parameters
-    detected for it; every recording already in the file keeps what it has."""
+def test_a_new_recording_is_detected_and_nothing_is_written(unextracted):
+    """A recording added to the project after the first run is shown with
+    parameters detected for it; opening the tool writes no entry for it, and
+    every recording already in the file keeps what it has."""
     from moseq2_extract.util import detect_and_set_camera_parameters
     from moseq2_app.util import read_and_clean_config
 
     session_config = unextracted / "session_config.yaml"
     tune_first_recording(run_arena_cell(unextracted))
-    before = plain(read_yaml(str(session_config)))
+    before = session_config.read_bytes()
 
     shutil.copytree(unextracted / "saline_example_1", unextracted / "saline_example_2")
     widget = run_arena_cell(unextracted)
 
-    after = plain(read_yaml(str(session_config)))
-    assert sorted(after) == sorted(RECORDINGS + ["saline_example_2"])
-    for name in RECORDINGS:
-        assert after[name] == before[name], f"{name} was rewritten"
+    assert session_config.read_bytes() == before
     detected = detect_and_set_camera_parameters(
         read_and_clean_config(str(unextracted / "config.yaml")),
         str(unextracted / "saline_example_2" / "depth.avi"),
     )
-    assert after["saline_example_2"] == plain(detected)
-    assert "saline_example_2" in widget.sessions
-
-
-@pytest.mark.parametrize("value", [True, False])
-def test_the_old_argument_is_accepted_ignored_and_explained(unextracted, capsys, value):
-    """A notebook from an earlier release still passes overwrite_session_configs.
-    It opens, keeps the saved parameters whatever the value, and says once that
-    the argument can go."""
-    session_config = unextracted / "session_config.yaml"
-    tune_first_recording(run_arena_cell(unextracted))
-    saved = plain(read_yaml(str(session_config)))
-    capsys.readouterr()
-
-    widget = ArenaMaskWidget(
-        str(unextracted),
-        str(unextracted / "config.yaml"),
-        str(session_config),
-        skip_extracted=True,
-        overwrite_session_configs=value,
-    )
-
-    assert widget.view is not None
-    assert plain(read_yaml(str(session_config))) == saved
-    printed = [line for line in capsys.readouterr().out.splitlines() if "overwrite_session_configs" in line]
-    assert printed == [
-        "overwrite_session_configs is no longer used and is ignored: the arena tool "
-        f"always keeps the parameters saved in {session_config} and detects parameters "
-        "only for recordings that have none there yet. Remove overwrite_session_configs "
-        "from the cell that opens ArenaMaskWidget."
-    ]
+    assert plain(widget.session_config["saline_example_2/depth.avi"]) == plain(detected)
 
 
 # ------------------------------------------------- a plane-fit background
@@ -597,6 +561,7 @@ def plane_run(tmp_path_factory, raw_sessions):
     """
     from moseq2_extract.gui import extract_found_sessions, generate_config_command
     from moseq2_extract.io.image import read_image
+    from moseq2_extract.session_config import recordings_options
 
     root = tmp_path_factory.mktemp("plane") / "project"
     shutil.copytree(raw_sessions / STILL_RECORDING, root / STILL_RECORDING)
@@ -607,7 +572,7 @@ def plane_run(tmp_path_factory, raw_sessions):
         config_data["cluster_type"] = "local"
 
     widget, data, buttons = open_widget(root)
-    proc = root / data.path / "proc"
+    proc = root / STILL_RECORDING / "proc"
     run = {"root": root, "proc": proc, "widget": widget}
 
     click(buttons["Compute arena mask"])
@@ -631,7 +596,9 @@ def plane_run(tmp_path_factory, raw_sessions):
     run["compute extraction"] = found[-1][1][data.mask_index]
 
     click(buttons["Save session parameters"])
-    run["saved"] = read_yaml(str(root / "session_config.yaml"))[data.path]
+    # the settings extraction resolves from the saved entry and config.yaml
+    recording = widget.sessions[data.path]
+    run["saved"] = recordings_options(str(config), [recording])[recording].as_dict()
 
     results = proc / "results_00.h5"
     extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
@@ -651,7 +618,7 @@ def median_background(tmp_path_factory, plane_run):
     from moseq2_extract.io.image import read_image
 
     clean = tmp_path_factory.mktemp("median")
-    recording = plane_run["widget"].sessions[STILL_RECORDING]
+    recording = plane_run["widget"].sessions[f"{STILL_RECORDING}/depth.avi"]
     get_bground_im_file(recording, frame_stride=1000, output_dir=str(clean))
     return read_image(str(clean / "bground.tiff"), scale=True)
 
@@ -737,7 +704,7 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
     import h5py
     from moseq2_extract.gui import generate_config_command
     from moseq2_extract.helpers.wrappers import extract_wrapper
-    from moseq2_extract.session_config import recording_configs
+    from moseq2_extract.session_config import recordings_options
 
     root = tmp_path / "project"
     shutil.copytree(raw_sessions / "saline_example_0", root / "saline_example_0")
@@ -755,7 +722,7 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
 
     recording = widget.sessions[data.path]
     # the dict extraction hands its work function: the recording's resolved options
-    settings = recording_configs(str(config), [recording]).options[recording].as_dict()
+    settings = recordings_options(str(config), [recording])[recording].as_dict()
     assert settings["graduate_walls"] and settings["dilate_iterations"] > 1, (
         "the saved settings do not graduate the walls, so this compares nothing"
     )
@@ -783,8 +750,8 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
 def test_the_tool_opens_and_previews_a_config_that_turns_a_filter_off(tmp_path, raw_sessions, key, off):
     """``none`` and ``0 0`` turn the tail, cable and arena-mask filters off.
 
-    The command line takes these settings, so the arena tool, whose entries
-    start as copies of ``config.yaml``, has to take them too: open on a
+    The command line takes these settings, so the arena tool, which shows
+    ``config.yaml``'s values for a recording with no entry, has to take them too: open on a
     ``config.yaml`` holding one, preview an extraction, and save it unchanged.
     """
     from moseq2_extract.gui import generate_config_command

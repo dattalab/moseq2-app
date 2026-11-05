@@ -17,6 +17,7 @@ import pytest
 
 from moseq2_app.flip import train
 from moseq2_common.frames import CleaningOptions
+from moseq2_common.yaml import write_yaml
 
 
 @pytest.mark.parametrize("dtype", [np.uint8, np.uint16])
@@ -104,3 +105,100 @@ def test_the_cleaned_third_follows_the_cleaning_parameters(tmp_path):
 
     np.testing.assert_array_equal(cleaned_third(eroded), expected)
     assert not np.array_equal(cleaned_third(eroded), cleaned_third(CleaningOptions()))
+
+
+# ------------------------------------------------------------------ each session's own cleaning settings
+
+
+def _extracted_session(root, name, uuid, frames, stored):
+    """A recording in ``root/name`` and its extraction in ``proc``: ``results_00.h5`` holding
+    ``frames``, the uuid and the cleaning settings ``stored`` as extraction stores its settings,
+    and ``results_00.yaml`` beside it."""
+    folder = root / name
+    (folder / "proc").mkdir(parents=True)
+    (folder / "depth.dat").touch()
+    h5 = folder / "proc" / "results_00.h5"
+    with h5py.File(h5, "w") as f:
+        f["frames"] = frames
+        f["metadata/uuid"] = uuid
+        for key, value in stored.items():
+            f[f"metadata/extraction/parameters/{key}"] = value
+    write_yaml({"complete": True, "skip": False, "uuid": uuid}, str(folder / "proc" / "results_00.yaml"))
+    return h5
+
+
+#: Cleaning settings as extraction stores them for an extraction run with the defaults.
+DEFAULT_STORED = {"spatial_filter_size": [3], "temporal_filter_size": [0], "tail_filter_shape": "ellipse",
+                  "tail_filter_size": [9, 9], "tail_filter_iters": 1, "cable_filter_size": [5, 5],
+                  "cable_filter_shape": "rectangle", "cable_filter_iters": 0, "min_height": 10}
+
+
+@pytest.fixture
+def flip_project(tmp_path):
+    """Two extracted sessions, each with five labeled frames, and a config.yaml; session_b's
+    arena-tool entry in session_config.yaml sets a spatial filter of 5."""
+    from moseq2_extract.gui import generate_config_command
+
+    root = tmp_path / "project"
+    root.mkdir()
+    generate_config_command(str(root / "config.yaml"), camera_type="k2")
+    rng = np.random.default_rng(0)
+    h5s = {}
+    for i, name in enumerate(("session_a", "session_b")):
+        frames = rng.integers(0, 80, size=(10, 20, 20)).astype(np.uint8)
+        h5s[name] = _extracted_session(root, name, f"uuid-{i}", frames, DEFAULT_STORED)
+    write_yaml({"session_b/depth.dat": {"spatial_filter_size": [5]}}, str(root / "session_config.yaml"))
+    index = root / "flip-training-frame-ranges.p"
+    with index.open("wb") as f:
+        pickle.dump(({n: str(p) for n, p in h5s.items()}, {n: [(False, range(0, 5))] for n in h5s}), f)
+    return root, index
+
+
+def _cleaning_calls(monkeypatch):
+    """The spatial filter each call to ``clean_frames`` cleans with, and how many frames it cleans."""
+    calls = []
+
+    def record(frames, prefilter_space, *args, **kwargs):
+        calls.append((tuple(prefilter_space), len(frames)))
+        return frames
+
+    monkeypatch.setattr(train, "clean_frames", record)
+    return calls
+
+
+def test_training_cleans_each_session_with_its_own_settings(flip_project, monkeypatch, tmp_path):
+    """session_a takes config.yaml's spatial filter, 3; session_b its entry's, 5: each session's
+    frames, both ways round, cleaned as that recording is extracted."""
+    from moseq2_app.steps import train_flip_classifier
+
+    root, index = flip_project
+    calls = _cleaning_calls(monkeypatch)
+    monkeypatch.setattr(train, "train_classifier", lambda *a, **kw: None)
+    monkeypatch.setattr(train, "save_classifier", lambda *a, **kw: None)
+
+    train_flip_classifier(str(index), str(tmp_path / "flip.p"), str(root / "config.yaml"))
+
+    assert sorted(calls) == [((3,), 10), ((5,), 10)]
+
+
+def test_training_warns_when_a_session_was_extracted_with_other_cleaning_settings(flip_project, monkeypatch,
+                                                                                    tmp_path, capsys):
+    """session_b's extraction ran with a spatial filter of 3, and its settings now resolve to 5:
+    training says so, naming the session, the setting and both values, suggests re-extracting,
+    and cleans with 5. session_a, extracted with what it resolves to, is not named."""
+    from moseq2_app.steps import train_flip_classifier
+
+    root, index = flip_project
+    calls = _cleaning_calls(monkeypatch)
+    monkeypatch.setattr(train, "train_classifier", lambda *a, **kw: None)
+    monkeypatch.setattr(train, "save_classifier", lambda *a, **kw: None)
+
+    train_flip_classifier(str(index), str(tmp_path / "flip.p"), str(root / "config.yaml"))
+
+    out = capsys.readouterr().out
+    assert "session_b" in out
+    assert "spatial_filter_size" in out
+    assert "[3]" in out and "[5]" in out
+    assert "re-extract" in out
+    assert "session_a" not in out
+    assert ((5,), 10) in calls

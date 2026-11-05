@@ -4,8 +4,8 @@
 those from a recording's ``session_config.yaml`` entry and every other setting
 from ``config.yaml``. The list and the tool's ``set_session_config_vars`` must
 agree: a key the tool writes but the list lacks would be tuned in the tool and
-then ignored, and a key the list holds but the tool never writes would be frozen
-at the value copied when the tool first listed the recording.
+then ignored, and a key the list holds but the tool never writes would never
+be saved.
 
 The second test follows the notebook: the
 arena cell runs, a recording is tuned and saved, then ``config.yaml`` gains a
@@ -59,7 +59,7 @@ def open_arena_tool(root):
     from moseq2_app.roi.widget import ArenaMaskWidget
 
     pn.extension()
-    return ArenaMaskWidget(str(root), str(root / "config.yaml"), str(root / "session_config.yaml"))
+    return ArenaMaskWidget(str(root))
 
 
 @pytest.fixture
@@ -71,10 +71,10 @@ def project(tmp_path, raw_sessions):
     return root
 
 
-def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatch, capsys, raw_sessions):
+def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatch, raw_sessions):
     widget = open_arena_tool(project)
     data = widget.session_data
-    assert data.path == "saline_example_0"
+    assert data.path == "saline_example_0/depth.avi"
     data.crop_size = 100
     data.depth_range = (600, 700)
     click(buttons_of(widget.view)["Save session parameters"])
@@ -86,7 +86,6 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
         config["crop_size"] = [120, 120]
         config["bg_roi_depth_range"] = [650, 750]
     open_arena_tool(project)
-    capsys.readouterr()
 
     received = {}
     monkeypatch.setattr(
@@ -103,12 +102,10 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
     assert tuple(received["bg_roi_depth_range"]) == (600, 700)
     assert received["manual_set_depth_range"] is True
 
-    out = capsys.readouterr().out
-    assert f'flip_classifier: config.yaml\'s "{classifier}" is used.' in out
-    assert "frame_trim: config.yaml's [100, 0] is used." in out
-    assert "for saline_example_0." in out
-    # the entry on disk is not rewritten by extraction
-    assert read_yaml(str(project / "session_config.yaml"))["saline_example_0"]["flip_classifier"] is None
+    # the entry holds the tool's settings only, and extraction does not rewrite it
+    saved = read_yaml(str(project / "session_config.yaml"))["saline_example_0/depth.avi"]
+    assert "flip_classifier" not in saved
+    assert saved["crop_size"] == [100, 100]
 
 
 def _recorded(monkeypatch, name, calls):
@@ -130,7 +127,7 @@ def _save_then_change_config(project, raw_sessions, settings):
     section, and reopen it."""
     widget = open_arena_tool(project)
     click(buttons_of(widget.view)["Save session parameters"])
-    saved = read_yaml(str(project / "session_config.yaml"))["saline_example_0"]
+    saved = read_yaml(str(project / "session_config.yaml"))["saline_example_0/depth.avi"]
     with update_config(str(project / "config.yaml"), section="extract") as config:
         config.update(settings)
     return saved, open_arena_tool(project)
@@ -143,9 +140,9 @@ def test_config_yaml_changes_after_the_tool_reach_the_preview_extraction(project
     saved, widget = _save_then_change_config(
         project, raw_sessions, {"flip_classifier": classifier, "frame_trim": [100, 0]}
     )
-    assert saved["flip_classifier"] is None
+    assert "flip_classifier" not in saved
     data = widget.session_data
-    assert data.path == "saline_example_0"
+    assert data.path == "saline_example_0/depth.avi"
     low, high = data.depth_range
     data.depth_range = (low - 5, high + 5)
     data.tail_filters = 2
@@ -185,7 +182,7 @@ def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monke
     saved, widget = _save_then_change_config(
         project, raw_sessions, {"bg_roi_erode": [3, 3], "bg_roi_fill_holes": False}
     )
-    assert saved["bg_roi_fill_holes"] is True
+    assert "bg_roi_fill_holes" not in saved
     data = widget.session_data
     data.mask_dilations = 2
 

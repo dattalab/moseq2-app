@@ -8,11 +8,12 @@ here follow what those cells do with what it finds:
   type the pipeline reads, ``.mkv`` included;
 - the validation and preview cells find each recording's extraction in the
   ``proc`` folder beside the recording, however deep it is;
-- a session is named, in ``session_config.yaml`` and in the notebook's lists,
-  by its folder's name, or by its folder's path below the project when two
-  session folders share a name (``GroupA/mouse1`` and ``GroupB/mouse1``), so
-  each keeps its own parameters through the arena tool, a local extraction
-  and the SLURM jobs.
+- a session is named in the notebook's lists by its folder's name, or by its
+  folder's path below the project when two session folders share a name
+  (``GroupA/mouse1`` and ``GroupB/mouse1``);
+- ``session_config.yaml`` is keyed by the recording's path below the project
+  (``GroupA/mouse1/depth.avi``), so each keeps its own parameters through the
+  arena tool, a local extraction and the SLURM jobs.
 """
 
 from __future__ import annotations
@@ -86,7 +87,7 @@ def grouped(tmp_path, raw_sessions):
 def open_arena_tool(root):
     from moseq2_app.roi.widget import ArenaMaskWidget
 
-    return ArenaMaskWidget(str(root), str(root / "config.yaml"), str(root / "session_config.yaml"))
+    return ArenaMaskWidget(str(root))
 
 
 def give_each_session_its_own_noise_tolerance(root):
@@ -95,11 +96,9 @@ def give_each_session_its_own_noise_tolerance(root):
     with a different ``noise_tolerance`` (a setting the arena tool saves) for
     each session, the way a user tuning each recording leaves them different;
     return the noise tolerance by session."""
-    base = read_yaml(str(root / "config.yaml"))["extract"]
     tolerance = {key: 11 + number for number, key in enumerate(sorted(GROUPED))}
-    write_yaml({key: {**base, "noise_tolerance": value} for key, value in tolerance.items()}, str(root / "session_config.yaml"))
-    with update_config(str(root / "config.yaml")) as config:
-        config["session_config_path"] = str(root / "session_config.yaml")
+    write_yaml({f"{key}/depth.avi": {"noise_tolerance": value} for key, value in tolerance.items()},
+               str(root / "session_config.yaml"))
     return tolerance
 
 
@@ -259,46 +258,23 @@ def test_the_progress_cell_names_shared_folder_names_by_their_path(tmp_path):
 
 
 def test_the_arena_tool_keeps_parameters_for_each_same_named_folder(grouped):
-    """The arena tool saves each ``mouse1`` under its path and the folder whose
-    name is its own under that name, and saving one leaves the other alone."""
+    """The arena tool keys each recording by its path below the project, ``mouse1``
+    folders included, and saving one leaves the others unsaved."""
     from widgets import buttons_of, click
 
     widget = open_arena_tool(grouped)
-    saved = read_yaml(str(grouped / "session_config.yaml"))
 
-    assert sorted(saved) == ["GroupA/mouse1", "GroupB/mouse1", "saline_example_0"]
-    assert widget.sessions == {key: str(grouped / key / "depth.avi") for key in saved}
+    assert widget.sessions == {f"{key}/depth.avi": str(grouped / key / "depth.avi") for key in GROUPED}
 
     data = widget.session_data
-    data.path = "GroupA/mouse1"
+    data.path = "GroupA/mouse1/depth.avi"
+    data.set_config_data(data.path)
     data.depth_range = (600, 700)
     click(buttons_of(widget.view)["Save session parameters"])
 
     saved = read_yaml(str(grouped / "session_config.yaml"))
-    assert list(saved["GroupA/mouse1"]["bg_roi_depth_range"]) == [600, 700]
-    assert list(saved["GroupB/mouse1"]["bg_roi_depth_range"]) != [600, 700]
-
-
-def test_an_older_file_keyed_by_a_shared_folder_name_is_explained(grouped, capsys):
-    """A ``session_config.yaml`` written before shared names were told apart
-    holds one ``mouse1`` entry, saved for one of the two folders. The arena tool
-    cannot tell which, so it detects parameters for each under its path and
-    says so; the unshared name keeps its entry."""
-    old = {**read_yaml(str(grouped / "config.yaml"))["extract"], "fps": 7}
-    write_yaml({"mouse1": old, "saline_example_0": old}, str(grouped / "session_config.yaml"))
-    capsys.readouterr()
-
-    open_arena_tool(grouped)
-
-    saved = read_yaml(str(grouped / "session_config.yaml"))
-    assert sorted(saved) == ["GroupA/mouse1", "GroupB/mouse1", "mouse1", "saline_example_0"]
-    assert saved["saline_example_0"]["fps"] == 7
-    assert saved["GroupA/mouse1"]["fps"] != 7
-    out = capsys.readouterr().out
-    assert (
-        f'{grouped / "session_config.yaml"} holds parameters under "mouse1", a folder name '
-        f'that {grouped / "GroupA/mouse1"} and {grouped / "GroupB/mouse1"} share' in out
-    )
+    assert list(saved) == ["GroupA/mouse1/depth.avi"]
+    assert list(saved["GroupA/mouse1/depth.avi"]["bg_roi_depth_range"]) == [600, 700]
 
 
 def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, monkeypatch):
@@ -349,29 +325,3 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
         result = CliRunner().invoke(extract_cli.cli, ["extract", *split_command(command)], catch_exceptions=False)
         assert result.exit_code == 0, result.output
     assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}
-
-
-def test_extraction_reads_a_file_keyed_by_folder_name(tmp_path, monkeypatch):
-    """Where every session folder's name is its own, ``session_config.yaml``
-    is keyed by folder name, as it always was, and extraction reads it."""
-    received = {}
-    monkeypatch.setattr(
-        "moseq2_extract.steps.extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
-            {input_file: config["noise_tolerance"]}
-        ),
-    )
-    root = tmp_path / "project"
-    a = empty_session(root, "GroupA/mouse1")
-    b = empty_session(root, "GroupB/mouse2")
-    config = root / "config.yaml"
-    generate_config_command(str(config), camera_type="k2")
-    base = read_yaml(str(config))["extract"]
-    write_yaml({"mouse1": {**base, "noise_tolerance": 11}, "mouse2": {**base, "noise_tolerance": 12}}, str(root / "session_config.yaml"))
-    with update_config(str(config)) as data:
-        data["extract"]["cluster_type"] = "local"
-        data["session_config_path"] = str(root / "session_config.yaml")
-
-    extract_found_sessions(str(root), str(config), [".dat"])
-
-    assert received == {str(a): 11, str(b): 12}

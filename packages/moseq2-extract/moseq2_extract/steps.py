@@ -104,7 +104,7 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
     Each recording is extracted with ``config.yaml``'s ``extract`` settings, the
     arena tool's settings from its entry in ``session_config.yaml``, and
     ``explicit`` (options typed on the command line) over both
-    (``session_config.recording_configs``).
+    (``session_config.recordings_options``).
 
     Args:
     input_dir: the folder to search.

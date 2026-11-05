@@ -16,7 +16,7 @@ from moseq2_common.project import find_project
 from moseq2_extract import setup, steps
 from moseq2_extract.options import EXTRACT_STAGE, AggregateOptions, BatchExtractOptions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
-from moseq2_extract.session_config import recording_configs
+from moseq2_extract.session_config import recordings_options
 from moseq2_extract.util import filter_warnings
 
 
@@ -244,14 +244,13 @@ def extract_command(
     num_frames=None,
     skip=False,
     cli_options=None,
-    explain_settings=True,
 ):
     """
     Extract depth file
 
-    The recording is extracted with the settings ``recording_configs`` resolves: the arena
-    tool's settings from its entry in session_config.yaml, every other setting from the config
-    file, and the typed options over both.
+    The recording is extracted with the settings ``recordings_options`` resolves: the arena
+    tool's settings from its entry in the project's session_config.yaml, every other setting
+    from the config file, and the typed options over both.
 
     Args:
     input_file (str): path to depth file to extract.
@@ -260,20 +259,13 @@ def extract_command(
     num_frames (int): number of frames to extract. If None, all frames are extracted.
     skip (bool): skip already extracted file.
     cli_options (dict): parameters typed on the command line; they take precedence over the config file and the session config.
-    explain_settings (bool): print which settings in the recording's session config entry differ from the config file
-        and are not used. ``run_local_extract`` prints this once for all its recordings instead.
 
     Returns:
     (str or None): path to the output directory, or None if the file was skipped as already extracted.
     """
 
-    resolved = recording_configs(config_file, [input_file], cli_options)
-    if explain_settings:
-        message = resolved.message()
-        if message:
-            print(message)
-
-    opts = replace(resolved.options[input_file], num_frames=num_frames, skip_completed=skip)
+    resolved = recordings_options(config_file, [input_file], cli_options)
+    opts = replace(resolved[input_file], num_frames=num_frames, skip_completed=skip)
     result = steps.extract(input_file, output_dir, opts)
 
     return None if result.h5_file is None else str(result.h5_file.parent)

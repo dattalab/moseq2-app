@@ -5,9 +5,9 @@ The Flip-Classifier-Training notebook opens a labeling widget on the
 session, moves to a frame, clicks Start Range, steps Forward, and clicks
 Facing Left or Facing Right. The widget holds each finished range until the
 user clicks Save Labels or runs the save cell, which writes them to
-``flip-training-frame-ranges.p`` beside that folder. The next cells read the
-cleaning parameters from the extraction config and train a classifier on the
-frames the file names, cleaned with those parameters.
+``flip-training-frame-ranges.p`` beside that folder. The training cell trains a
+classifier on the frames the file names, each session's cleaned with the
+settings its recording is extracted with, from the extraction config.
 
 These tests run the notebook's own cells, with only the three paths a user
 types replaced, against the extraction chain's output copied into the test's
@@ -30,7 +30,7 @@ from cells import code_cell
 NOTEBOOK = "Flip-Classifier-Training-Notebook.ipynb"
 
 #: The notebook's code cells, numbered from 1 as ``code_cell`` counts them.
-SETUP, SHOW, SAVE, CLEAN, TRAIN = 1, 2, 3, 4, 5
+SETUP, SHOW, SAVE, TRAIN = 1, 2, 3, 4
 
 
 def press(button):
@@ -118,7 +118,6 @@ def test_labeled_ranges_reach_the_trained_classifier(notebook, tmp_path):
     assert widget.curr_total_selected_frames == 50
 
     run_cell(SAVE, notebook)
-    run_cell(CLEAN, notebook)
     run_cell(TRAIN, notebook)
 
     with np.load(notebook["trained"].training_data) as data:
@@ -139,10 +138,10 @@ def test_a_right_facing_range_is_trained_as_it_was_shown(notebook):
     session = list(widget.sessions)[0]
     label(widget, session, 5, 15, left=False)
     run_cell(SAVE, notebook)
-    run_cell(CLEAN, notebook)
     from moseq2_app.flip.train import create_training_dataset
+    from moseq2_common.frames import CleaningOptions
 
-    with np.load(create_training_dataset(widget.training_data_path, notebook["cleaning"])) as data:
+    with np.load(create_training_dataset(widget.training_data_path, CleaningOptions())) as data:
         trained = data["frames"][:10]
     with h5py.File(widget.sessions[session], "r") as f:
         np.testing.assert_array_equal(trained, f["frames"][5:15])
@@ -217,7 +216,6 @@ def test_flip_training_cleans_frames_as_extraction_does(notebook, tmp_path, conf
         config.update(CLEANING)
         notebook["config_path"] = str(tmp_path / "config.yaml")
         write_yaml({**whole, "extract": config}, notebook["config_path"])
-        run_cell(CLEAN, notebook)
         run_cell(TRAIN, notebook)
     elif front_end == "script_config_file":
         config.update(CLEANING)
@@ -244,7 +242,6 @@ def test_training_with_no_labeled_frames_says_what_to_do(notebook):
     a range first.
     """
     run_cell(SAVE, notebook)
-    run_cell(CLEAN, notebook)
     path = notebook["FF"].training_data_path
     with pytest.raises(ValueError) as raised:
         run_cell(TRAIN, notebook)
@@ -413,7 +410,6 @@ def test_training_cleans_with_the_config_parameters(notebook, tmp_path, configur
     session = list(widget.sessions)[0]
     label(widget, session, 5, 15, left=False)
     run_cell(SAVE, notebook)
-    run_cell(CLEAN, notebook)
     run_cell(TRAIN, notebook)
 
     with h5py.File(widget.sessions[session], "r") as f:
@@ -445,7 +441,6 @@ def test_training_labels_never_saved_says_to_save(notebook):
     """
     widget = notebook["FF"]
     label(widget, list(widget.sessions)[0], 10, 40, left=False)
-    run_cell(CLEAN, notebook)
     with pytest.raises(FileNotFoundError) as raised:
         run_cell(TRAIN, notebook)
     message = str(raised.value)
@@ -463,7 +458,6 @@ def test_training_on_an_empty_save_says_to_save(notebook):
     widget = notebook["FF"]
     run_cell(SAVE, notebook)
     label(widget, list(widget.sessions)[0], 10, 40, left=False)
-    run_cell(CLEAN, notebook)
     with pytest.raises(ValueError) as raised:
         run_cell(TRAIN, notebook)
     message = str(raised.value)
@@ -484,7 +478,6 @@ def test_training_on_older_saved_labels_warns(notebook, recwarn):
     label(widget, session, 10, 40, left=False)
     run_cell(SAVE, notebook)
     label(widget, session, 50, 60, left=True)
-    run_cell(CLEAN, notebook)
 
     with pytest.warns(UserWarning) as warned:
         run_cell(TRAIN, notebook)

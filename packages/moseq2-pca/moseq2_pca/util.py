@@ -325,8 +325,8 @@ def _frame_size_rows(shapes):
 
 #: Where an extraction's crop_size comes from, as the frame-size messages say it.
 CROP_SIZE_SOURCES = (
-    'crop_size in config.yaml, or --crop-size on the command line; a recording the arena '
-    'tool has listed in session_config.yaml takes crop_size from its entry there'
+    'crop_size in config.yaml, or --crop-size on the command line; a recording whose settings '
+    'were saved in the arena tool takes crop_size from its entry in session_config.yaml'
 )
 
 

@@ -3,14 +3,22 @@ import pickle
 import joblib
 import numpy as np
 from pathlib import Path
-from dataclasses import replace
+from collections.abc import Mapping
+from dataclasses import fields, replace
 from functools import partial
 from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
 from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
+from moseq2_common.h5 import h5_to_dict
+from moseq2_common.options import read_settings
+from moseq2_common.project import find_project
+from moseq2_common.yaml import read_yaml
 from moseq2_extract.extract.proc import clean_frames
+from moseq2_extract.options import EXTRACT_STAGE
+from moseq2_extract.recordings import find_recordings
+from moseq2_extract.session_config import read_entries, recording_entry
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 
@@ -22,16 +30,137 @@ SAVE_AND_RETRAIN = (
 )
 
 
-def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> Path:
+def _load_frame_ranges(data_index_path: Path):
+    """The saved frame ranges: ({session: .h5 path}, {session: [(left, frames), ...]})."""
+    if not data_index_path.exists():
+        raise FileNotFoundError(
+            f"No saved flip labels at {data_index_path}: the file does not exist. "
+            "Labels reach training only once they are saved: in the labeling widget, "
+            f"{SAVE_AND_RETRAIN}."
+        )
+    with open(data_index_path, "rb") as f:
+        return pickle.load(f)
+
+
+def _plain(value):
+    """``value`` as YAML would hold it, so a stored array and a resolved tuple compare equal."""
+    if isinstance(value, np.ndarray):
+        return _plain(value.tolist())
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def _show(value):
+    """A value written as it appears in config.yaml."""
+    if isinstance(value, list):
+        return "[" + ", ".join(_show(v) for v in value) + "]"
+    return str(value)
+
+
+def _uuid(h5):
+    """The uuid extraction wrote into the session's ``.h5``, or None."""
+    with h5py.File(h5, "r") as f:
+        if "metadata/uuid" not in f:
+            return None
+        return _plain(f["metadata/uuid"][()])
+
+
+def _recordings_by_uuid(project):
+    """Each extracted recording in ``project``, by the uuid in its extraction's ``results_*.yaml``."""
+    found = {}
+    for recording in find_recordings(str(project.folder)).recordings:
+        folder = Path(recording).parent
+        for status in [*folder.glob("*/results_*.yaml"), *folder.glob("*/*/results_*.yaml")]:
+            try:
+                uuid = (read_yaml(str(status)) or {}).get("uuid")
+            except Exception:  # noqa: BLE001 -- a status file that cannot be read names no recording
+                continue
+            if uuid:
+                found[uuid] = recording
+    return found
+
+
+def _stored_cleaning(h5):
+    """The cleaning settings extraction stored in the session's ``.h5``, or None when it stored none."""
+    with h5py.File(h5, "r") as f:
+        if "metadata/extraction/parameters" not in f:
+            return None
+        stored = h5_to_dict(f, "metadata/extraction/parameters")
+    return {f.name: stored[f.name] for f in fields(CleaningOptions) if f.name in stored}
+
+
+def _check_extraction(name, h5, cleaning, sources, recording):
+    """Say so when ``name``'s extraction ran with cleaning settings other than ``cleaning``."""
+    stored = _stored_cleaning(h5)
+    if not stored:
+        return
+    differ = [(setting, _plain(value), _plain(getattr(cleaning, setting))) for setting, value in stored.items()
+              if _plain(value) != _plain(getattr(cleaning, setting))]
+    if not differ:
+        return
+    listed = "; ".join(f"{setting} {_show(then)} at extraction, {_show(now)} now" for setting, then, now in differ)
+    print(f"{name} ({h5}) was extracted with cleaning settings other than the ones it has now, from {sources}: "
+          f"{listed}. Training cleans its frames with the settings it has now. If those are the settings you "
+          f"extract with, re-extract {recording or name} so its frames are cleaned as the classifier will see them.")
+
+
+def session_cleaning(data_index_path: str, config_file: str | None) -> dict:
+    """Each labeled session's cleaning settings, resolved as extraction resolves them.
+
+    config.yaml's ``extract`` section, with the arena-tool settings of the session's
+    recording in the project's session_config.yaml over it; extraction's defaults
+    without ``config_file``. A session's recording is the one whose extraction has the
+    session's uuid. Where a session's extraction stored other cleaning settings than
+    the ones it resolves to, a message names each, with both values, and suggests
+    re-extracting; the resolved settings are the ones returned.
+
+    Args:
+    data_index_path (str): the saved frame ranges (``flip-training-frame-ranges.p``).
+    config_file (str): the project's config.yaml, or None.
+
+    Returns:
+    (dict): {session: CleaningOptions}, for each session with labeled frames.
+    """
+    session_paths, data_index = _load_frame_ranges(Path(data_index_path))
+    project = find_project(config_file) if config_file else None
+    config = read_settings(config_file, CleaningOptions, stage_classes=EXTRACT_STAGE) if config_file else {}
+    entries = read_entries(project) if project is not None else {}
+    recordings = _recordings_by_uuid(project) if entries else {}
+    if config_file:
+        sources = f"{config_file}'s extract section and its recording's session_config.yaml entry"
+    else:
+        sources = "extraction's defaults"
+
+    cleaning = {}
+    for name in data_index:
+        h5 = session_paths[name]
+        recording = recordings.get(_uuid(h5)) if entries else None
+        if entries and recording is None:
+            print(f"{name} ({h5}): no recording under {project.folder} was extracted with this session's uuid, "
+                  f"so its frames are cleaned with {config_file}'s extract section alone, without a "
+                  "session_config.yaml entry.")
+        entry = recording_entry(project, recording, entries) if recording is not None else {}
+        cleaning[name] = CleaningOptions.resolve(config=config, entry=entry)
+        _check_extraction(name, h5, cleaning[name], sources, recording)
+    return cleaning
+
+
+def create_training_dataset(data_index_path: str, cleaning) -> Path:
     """Assemble the labeled frames into a training set and save it beside ``data_index_path``.
 
     The set holds each labeled frame and its 180 degree rotation, a randomly
     shifted copy of both, and a copy of both cleaned as extraction cleans its
-    frames with the settings ``cleaning``.
+    frames, each session's with its own settings in ``cleaning``.
 
     Args:
     data_index_path (str): the saved frame ranges (``flip-training-frame-ranges.p``).
-    cleaning (CleaningOptions): extraction's cleaning settings.
+    cleaning (Mapping or CleaningOptions): {session: CleaningOptions} (``session_cleaning``),
+        or one CleaningOptions for every session.
 
     Returns:
     out_path (Path): the training set, ``training_data.npz``.
@@ -41,17 +170,13 @@ def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> 
     out_path = data_index_path.with_name("training_data.npz")
 
     # load trainingdata index
-    if not data_index_path.exists():
-        raise FileNotFoundError(
-            f"No saved flip labels at {data_index_path}: the file does not exist. "
-            "Labels reach training only once they are saved: in the labeling widget, "
-            f"{SAVE_AND_RETRAIN}."
-        )
-    with open(data_index_path, "rb") as f:
-        session_paths, data_index = pickle.load(f)
+    session_paths, data_index = _load_frame_ranges(data_index_path)
+    if not isinstance(cleaning, Mapping):
+        cleaning = {k: cleaning for k in data_index}
 
-    # load frames
+    # load frames, and the session each came from
     frames = []
+    sessions = []
     for k, v in data_index.items():
         with h5py.File(session_paths[k], "r") as h5f:
             for left, _slice in v:
@@ -59,6 +184,7 @@ def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> 
                 if left:
                     frames_subset = np.rot90(frames_subset, 2, axes=(1, 2))
                 frames.append(frames_subset)
+                sessions += [k] * len(frames_subset)
     if sum(len(f) for f in frames) == 0:
         raise ValueError(
             f"No labeled frames in {data_index_path}. Labels reach training only once "
@@ -70,6 +196,7 @@ def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> 
     frames = np.concatenate(frames, axis=0)
     # rotate frames
     frames = np.concatenate((frames, np.rot90(frames, 2, axes=(1, 2))), axis=0)
+    sessions = sessions + sessions
 
     flipped = np.zeros((len(frames),), dtype=np.uint8)
     flipped[len(frames) // 2 :] = 1
@@ -79,17 +206,21 @@ def create_training_dataset(data_index_path: str, cleaning: CleaningOptions) -> 
     shifted_frames = np.array([np.roll(f, tuple(s), axis=(0, 1)) for f, s in zip(frames, shifts)]).astype(np.uint8)
 
     # remove noise from frames as extraction does: heights below min_height to zero, then clean_frames,
-    # with an even median kernel rounded up to the next odd size
-    cleaning = replace(
-        cleaning,
-        spatial_filter_size=tuple(odd_kernel(k) for k in cleaning.spatial_filter_size),
-        temporal_filter_size=tuple(odd_kernel(k) for k in cleaning.temporal_filter_size),
-    )
-    cleaned_frames = clean_frames(
-        np.where(frames < cleaning.min_height, 0, frames),
-        **cleaning_arguments(cleaning),
-        frame_dtype=frames.dtype,
-    )
+    # with an even median kernel rounded up to the next odd size. Sessions with the same settings
+    # are cleaned together, in the order their frames are in.
+    cleaned_frames = np.empty_like(frames)
+    for options in dict.fromkeys(cleaning[k] for k in data_index):
+        group = np.array([cleaning[k] == options for k in sessions])
+        options = replace(
+            options,
+            spatial_filter_size=tuple(odd_kernel(k) for k in options.spatial_filter_size),
+            temporal_filter_size=tuple(odd_kernel(k) for k in options.temporal_filter_size),
+        )
+        cleaned_frames[group] = clean_frames(
+            np.where(frames[group] < options.min_height, 0, frames[group]),
+            **cleaning_arguments(options),
+            frame_dtype=frames.dtype,
+        )
     frames = np.concatenate((frames, shifted_frames, cleaned_frames), axis=0)
     print(
         f"Training data shape: {frames.shape}; memory usage: {frames.nbytes / 1e9:0.2f} GB"

@@ -77,7 +77,7 @@ def project(tmp_path):
     session_config = tmp_path / "session_config.yaml"
     write_yaml(
         {
-            SESSION: {
+            f"{SESSION}/depth.avi": {
                 "crop_size": [120, 120],
                 "frame_trim": [5, 5],
                 "fps": 15,
@@ -96,7 +96,6 @@ def project(tmp_path):
                 "frame_trim": [0, 0],
                 "fps": 20,
             },
-            "session_config_path": str(session_config),
         },
         str(config),
     )
@@ -267,6 +266,7 @@ def test_slurm_batch_extract_typed_options_without_a_session_config(
     """With no session config, each recording is extracted from the config file,
     and the typed options still apply over it."""
     root, config = project
+    (root / "session_config.yaml").unlink()
     write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "fps": 20}}, str(config))
 
     call = slurm_extracted(
@@ -283,6 +283,7 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
     project, slurm_extracted
 ):
     root, config = project
+    (root / "session_config.yaml").unlink()
     write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "fps": 20}}, str(config))
 
     call = slurm_extracted(root, config)[0]
@@ -294,7 +295,7 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
 
 def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, slurm_extracted):
     """Each job's config.yaml already holds the recording's entry, so the job's
-    ``extract`` has no session_config.yaml to lay over the typed options again."""
+    ``extract`` does not lay the project's session_config.yaml over the typed options again."""
     root, config = project
     slurm_extracted(root, config, "--crop-size", "80", "80")
     job_file = read_yaml(str(root / SESSION / "proc" / "config.yaml"))

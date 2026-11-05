@@ -12,9 +12,8 @@ from tqdm.auto import tqdm
 from functools import reduce
 from panel.viewable import Viewer
 from bokeh.models import HoverTool
-from os.path import exists, basename, dirname
 from moseq2_app.gui.progress import get_sessions
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, find_recordings, session_config_key, session_keys
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
 from moseq2_extract.io.video import load_movie_data
 from moseq2_extract.util import check_filter_sizes
 from moseq2_extract.extract.extract import extract_chunk
@@ -25,9 +24,15 @@ from moseq2_extract.helpers.wrappers import (
     session_output_dir,
     validate_flip_classifier,
 )
-from moseq2_extract.session_config import extract_settings, recording_settings
-from moseq2_app.util import read_and_clean_config, update_config
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.project import Project, session_key
+from moseq2_extract.session_config import (
+    arena_settings,
+    extract_settings,
+    read_entries,
+    recording_settings,
+    save_entry,
+)
+from moseq2_app.util import read_and_clean_config
 from moseq2_extract.extract.proc import get_bground_im_file
 
 
@@ -42,71 +47,51 @@ _hover_dict = {
 
 
 class ArenaMaskWidget:
-    
-    def __init__(self, data_dir, config_file, session_config_path, skip_extracted=False, overwrite_session_configs=None,
-                 max_depth=DEFAULT_MAX_DEPTH) -> None:
+
+    def __init__(self, project_folder, skip_extracted=True, max_depth=DEFAULT_MAX_DEPTH) -> None:
         """initialize arena mask widget
 
-        Parameters saved in session_config.yaml are kept and shown; parameters
-        are detected (``detect_and_set_camera_parameters``) only for recordings
-        that have none saved yet.
+        Opening the tool writes nothing. A recording with an entry in the project's
+        session_config.yaml shows the settings saved there over config.yaml's
+        ``extract`` section; a recording without one shows config.yaml's, with the
+        camera's formats detected from the file (``detect_and_set_camera_parameters``).
+        Saving a recording writes its entry, and only its entry (``save_session_parameters``).
 
         Args:
-            data_dir (str): project base directory.
-            config_file (str): path to config.yaml
-            session_config_path (str): path to session_config.yaml.
-            skip_extracted (bool, optional): boolean flag that indicates whether to skip extracted sessions. Defaults to False.
-            overwrite_session_configs: ignored. Notebooks from earlier releases
-                pass it; passing it prints a note that it can be removed.
-            max_depth (int, optional): how many folders below data_dir to search for
+            project_folder (str): the project folder, holding config.yaml.
+            skip_extracted (bool, optional): leave out recordings already extracted. Defaults to True.
+            max_depth (int, optional): how many folders below project_folder to search for
                 recordings. Defaults to 5.
         """
-        if overwrite_session_configs is not None:
-            print('overwrite_session_configs is no longer used and is ignored: the arena tool '
-                  f'always keeps the parameters saved in {session_config_path} and detects parameters '
-                  'only for recordings that have none there yet. Remove overwrite_session_configs '
-                  'from the cell that opens ArenaMaskWidget.')
-
         self.backgrounds = {}
         self.extracts = {}
-        self.data_dir = data_dir
-        self.session_config_path = session_config_path
-        self.config_file = config_file
+        self.project = Project.at(project_folder)
+        self.data_dir = project_folder
+        self.config_file = str(self.project.config_file)
+        self.session_config_path = str(self.project.session_config_file)
 
-        self.config_data = read_and_clean_config(config_file)
+        self.config_data = read_and_clean_config(self.config_file)
 
         # prints where it looked and what it passed over when it finds nothing to show
-        sessions = get_sessions(data_dir, skip_extracted=skip_extracted, max_depth=max_depth)
+        sessions = get_sessions(project_folder, skip_extracted=skip_extracted, max_depth=max_depth)
         if len(sessions) == 0:
             self.view = None
             return
 
-        # Each session is keyed by its folder's name, or by its folder's path below data_dir when
-        # session folders share a name. Names are told apart across every recording in the
-        # project, extracted or not, so a recording's key does not depend on skip_extracted.
-        everything = sessions if not skip_extracted else find_recordings(data_dir, max_depth=max_depth).recordings
-        keys = session_keys(everything, data_dir)
-        session_parameters = read_yaml(session_config_path) if exists(session_config_path) else {}
-        session_parameters = session_parameters or {}
-        # an entry saved under a path stays where it is; otherwise the key session_keys gives
-        named = {session_config_key(session_parameters, f, by_folder_name=False) or keys[f]: f for f in sessions}
-        self._explain_shared_folder_names(session_parameters, named, everything, data_dir)
+        # each recording is keyed by its session: its path relative to the project folder
+        named = {session_key(self.project, f): f for f in sessions}
+        entries = read_entries(self.project)
 
-        # recordings with saved parameters keep them; only new ones are detected
-        new_sessions = [key for key in named if key not in session_parameters]
-        if len(new_sessions) > 0 or not exists(session_config_path):
-            for key in tqdm(new_sessions, desc="Setting camera parameters", leave=False):
-                session_parameters[key] = detect_and_set_camera_parameters(
-                    deepcopy(self.config_data), named[key])
-            # write session config with default parameters for new sessions
-            write_yaml(session_parameters, self.session_config_path)
-
-        # add session_config path to config.yaml
-
-        with update_config(config_file) as temp_config_data:
-            temp_config_data['session_config_path'] = session_config_path
-
-        self.session_config = session_parameters
+        # what the tool shows: a saved entry over config.yaml, or config.yaml with the
+        # camera's formats detected for a recording without one; nothing is written
+        self.session_config = {}
+        for key in tqdm(named, desc="Setting camera parameters", leave=False):
+            if key in entries:
+                shown = deepcopy(self.config_data)
+                shown.update(arena_settings(entries[key], key, self.session_config_path))
+            else:
+                shown = detect_and_set_camera_parameters(deepcopy(self.config_data), named[key])
+            self.session_config[key] = shown
         self.sessions = {key: named[key] for key in sorted(named, key=lambda k: named[k])}
 
         # instantiate ArenaMaskData with the first session in this list
@@ -115,26 +100,6 @@ class ArenaMaskWidget:
         self.session_data.set_config_data(list(self.sessions)[0])
 
         self.view = ArenaMaskView(self.session_data)
-
-    def _explain_shared_folder_names(self, session_parameters, named, everything, data_dir):
-        """
-        Say so when session_config.yaml holds parameters under a folder name that session
-        folders share. Those were saved for one of the folders, and which one is not recorded,
-        so each folder shown gets parameters of its own under its path instead.
-        """
-        for name in sorted({basename(dirname(f)) for k, f in named.items()
-                            if k != basename(dirname(f)) and k not in session_parameters}):
-            if name not in session_parameters:
-                continue
-            folders = sorted({dirname(f) for f in everything if basename(dirname(f)) == name})
-            keys = ', '.join(f'"{k}"' for k, f in named.items() if basename(dirname(f)) == name)
-            print(f'{self.session_config_path} holds parameters under "{name}", a folder name that '
-                  f'{" and ".join(folders)} share, so which of them they were saved for is not known. '
-                  f'Each of these folders now has parameters of its own, saved under its path below '
-                  f'{data_dir} ({keys}) and starting from detected values. Check the arena for each '
-                  'of them in the tool below and save. Extraction reads the entries named by path, so '
-                  f'the "{name}" entry is no longer used for these folders and can be deleted from '
-                  f'{self.session_config_path}.')
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         if self.view is not None:
@@ -204,11 +169,10 @@ class ArenaMaskWidget:
 
 
     def save_session_parameters(self):
-        """save session parameter to session config file.
-        """
+        """Save the current recording's settings as its entry in session_config.yaml, and only its entry."""
         self.set_session_config_vars()
-
-        write_yaml(self.session_config, self.session_config_path)
+        folder = self.session_data.path
+        save_entry(self.project, folder, self.session_config[folder])
 
     def recording_config(self, folder):
         """
@@ -220,7 +184,7 @@ class ArenaMaskWidget:
         The settings are the dict extraction hands its work function (``recording_settings``).
 
         Args:
-            folder (str): the recording's key in session_config.yaml.
+            folder (str): the recording's session key.
 
         Returns:
             (dict): the recording's settings.

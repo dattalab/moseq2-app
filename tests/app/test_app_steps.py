@@ -113,7 +113,7 @@ def test_the_arena_tool_builds_extract_options(arena_project):
     write_yaml(config, str(config_file))
 
     pn.extension()
-    widget = ArenaMaskWidget(str(arena_project), str(config_file), str(arena_project / "session_config.yaml"))
+    widget = ArenaMaskWidget(str(arena_project))
     widget.session_data.crop_size = 100
     widget.set_session_config_vars()
     folder = widget.session_data.path
