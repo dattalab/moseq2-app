@@ -25,7 +25,7 @@ import click
 from moseq2_common.frames import CleaningOptions
 from moseq2_common.options import Options, option
 from moseq2_common.slurm import SlurmOptions
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -158,8 +158,7 @@ This is only a debugging parameter, for cases where dilate_iterations > 1, other
 class BatchExtractOptions(ExtractOptions, SlurmOptions):
     """``batch-extract``: ``extract``'s settings, the folder search and the SLURM jobs."""
 
-    # .dat only, where the notebook searches every recording type (L8, removed by PR 3.2)
-    extensions: tuple = option((".dat",), "--extensions", type=str, multiple=True,
+    extensions: tuple = option(RECORDING_EXTENSIONS, "--extensions", type=str, multiple=True,
                                help="File extension of raw data")
     skip_checks: bool = option(False, "--skip-checks", is_flag=True,
                                help="Flag: include recordings whose extraction already finished")
