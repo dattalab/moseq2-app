@@ -24,11 +24,11 @@ SESSIONS = {"s0": 120, "s1": 140, "s2": 160}
 #: Each command passes its fit's settings file to --config-file.
 SCAN_SCRIPT = (
     'set -e\n'
-    'sbatch -c 8 --mem=5GB -p short -t 3:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
+    'sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
     'models/model-000-1.p --config-file models/model-000-1-settings.yaml"\n'
-    'sbatch -c 8 --mem=5GB -p short -t 3:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
+    'sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
     'models/model-001-100.p --config-file models/model-001-100-settings.yaml"\n'
-    'sbatch -c 8 --mem=5GB -p short -t 3:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
+    'sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
     'models/model-002-10000.p --config-file models/model-002-10000-settings.yaml"'
 )
 

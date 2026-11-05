@@ -9,7 +9,8 @@ help text live together. From that class:
   ``session_config.yaml``, then the values passed explicitly (options the user
   typed, arguments a script passes).
 - ``read_settings`` reads a stage's section of ``config.yaml`` for ``resolve``,
-  stopping on a key no step of that stage declares.
+  printing one message naming the keys no step of that stage reads, which it
+  ignores.
 - ``click_options`` writes the command's ``click.option`` decorators, in the
   order the command's help lists them.
 - ``explicit_values`` returns the options the user typed on the command line,
@@ -46,7 +47,6 @@ __all__ = [
     "TOP_LEVEL_KEYS",
     "ConfigFileError",
     "Options",
-    "UnknownSettingError",
     "arena_fields",
     "click_options",
     "command_settings",
@@ -67,16 +67,6 @@ SECTIONS = ("extract", "pca", "model", "crowd_movies")
 #: (``moseq2_pca.cli.shim_write_back_paths``); ``job`` is a job settings file's.
 TOP_LEVEL_KEYS = ("camera_type", "groups", "exclude", "job",
                   "session_config_path", "pca_file", "pca_file_scores", "changepoint_file")
-
-#: Where each section's settings are listed, for the unknown-setting message.
-_SECTION_HELP = {
-    "extract": "`moseq2-extract extract --help` and `moseq2-extract batch-extract --help`",
-    "pca": "`moseq2-pca train-pca --help`, `moseq2-pca apply-pca --help` and "
-           "`moseq2-pca compute-changepoints --help`",
-    "model": "`moseq2-model learn-model --help`, `moseq2-model kappa-scan --help` and "
-             "`moseq2-model apply-model --help`",
-    "crowd_movies": "`moseq2-viz make-crowd-movies --help`",
-}
 
 O = TypeVar("O", bound="Options")
 F = TypeVar("F", bound=Callable[..., Any])
@@ -167,10 +157,6 @@ class ConfigFileError(ValueError):
     """A config file named by the user is missing, empty or unreadable."""
 
 
-class UnknownSettingError(ValueError):
-    """A section of config.yaml sets a key no step of its stage declares, or a one-run switch."""
-
-
 def read_config(path: str | os.PathLike) -> dict:
     """Return the settings in the config file at ``path``.
 
@@ -207,33 +193,19 @@ def read_config(path: str | os.PathLike) -> dict:
     return dict(data)
 
 
-def _closest(key: str, names) -> list[str]:
-    return difflib.get_close_matches(key, sorted(names), n=3, cutoff=0.6)
-
-
-def _did_you_mean(names: list[str]) -> str:
-    if not names:
-        return ""
-    return "Did you mean " + " or ".join(f"`{name}`" for name in names) + "? "
+def _closest(key: str, names) -> str | None:
+    """The name in ``names`` closest to ``key``, or None when none is close."""
+    matches = difflib.get_close_matches(key, sorted(names), n=1, cutoff=0.6)
+    return matches[0] if matches else None
 
 
 def check_top_level(config_file, data: Mapping) -> None:
-    """Stop on a config.yaml without sections (1.5.0's) or with a setting outside them."""
+    """Stop on a config.yaml without sections (1.5.0's) or with a section that does not hold settings."""
     from moseq2_common.project import OldProjectError, old_project_message
 
     present = [name for name in SECTIONS if name in data]
-    stray = [key for key in data if key not in SECTIONS and key not in TOP_LEVEL_KEYS]
-    if not present and stray:
+    if not present and _stray_keys(data):
         raise OldProjectError(old_project_message(Path(config_file), "its settings have no sections"))
-    for key in stray:
-        sections = [name for name in SECTIONS if isinstance(data.get(name), Mapping) and key in data[name]]
-        where = f"`{sections[0]}: {key}`" if sections else "the section of its stage"
-        raise UnknownSettingError(
-            f"{config_file} sets `{key}` at its top level, outside the sections. The top level holds "
-            f"only camera_type, groups and exclude; every other setting goes in the section of its "
-            f"stage (extract, pca, model or crowd_movies), as {where}. Move or delete that line and "
-            "run again."
-        )
     for name in present:
         if data[name] is not None and not isinstance(data[name], Mapping):
             holds = "a list" if isinstance(data[name], list) else "a single value"
@@ -244,36 +216,66 @@ def check_top_level(config_file, data: Mapping) -> None:
             )
 
 
-def _switch_message(config_file, key: str, field: dataclasses.Field) -> str:
+def _stray_keys(data: Mapping) -> list[str]:
+    """The keys at config.yaml's top level that are neither a section nor a top-level key."""
+    return [key for key in data if key not in SECTIONS and key not in TOP_LEVEL_KEYS]
+
+
+def _ticked(keys) -> str:
+    return ", ".join(f"`{key}`" for key in keys)
+
+
+def _switch_message(config_file, section: str, key: str, field: dataclasses.Field) -> str:
     flags = [flag for flag in _spec(field)["flags"] for flag in flag.split("/") if flag.startswith("--")]
     flag = flags[0] if flags else f"--{key.replace('_', '-')}"
-    return (f"`{key}` is not read from {config_file}: it applies to one run. Delete the line and pass "
-            f"`{flag}` on the command line, or `{key}=` to the notebook function.")
+    return (f"`{key}` in the `{section}` section of {config_file} is ignored: it applies to one run and is "
+            f"never read from config.yaml. Pass `{flag}` on the command line, or `{key}=` to the notebook "
+            "function, and delete the line to silence this message.")
 
 
-def check_section(config_file, section: str, settings: Mapping, stage_classes: Sequence[type[Options]]) -> None:
-    """Stop on a key in ``section`` that no class of ``stage_classes`` declares, or a one-run switch."""
+def _ignored_settings(config_file, section: str, settings: Mapping,
+                     stage_classes: Sequence[type[Options]]) -> tuple[list[str], list[str]]:
+    """The keys of ``section`` no step reads, and the messages that name them.
+
+    The keys no class of ``stage_classes`` declares share one message, each
+    with the declared setting closest to it; a one-run switch
+    (``setting=False``) and ``camera_type``, which is read from the top level
+    only, each get a message of their own.
+    """
     fields = {}
     for cls in stage_classes:
         for field in dataclasses.fields(cls):
             fields.setdefault(field.name, field)
     settings_names = {name for name, field in fields.items() if _spec(field)["setting"]}
+    ignored, unknown, messages = [], [], []
     for key in settings:
-        if key == "camera_type":
-            raise UnknownSettingError(
-                f"{config_file} sets `camera_type` in its `{section}` section. camera_type is the one "
-                "setting at the top level of config.yaml, read by every stage: move the line to the top "
-                "level (no indent) and run again."
-            )
-        if key in settings_names:
+        if key in settings_names and key != "camera_type":
             continue
-        if key in fields:
-            raise UnknownSettingError(_switch_message(config_file, key, fields[key]))
-        raise UnknownSettingError(
-            f"{config_file} sets `{key}` in its `{section}` section, and no {section} step has that "
-            f"setting. {_did_you_mean(_closest(key, settings_names))}Correct or delete that line and run "
-            f"again; the {section} settings are listed by {_SECTION_HELP.get(section, 'the commands')}."
-        )
+        ignored.append(key)
+        if key == "camera_type":
+            messages.append(
+                f"`camera_type` in the `{section}` section of {config_file} is ignored: camera_type is read "
+                "only from the top level of config.yaml, by every stage. Move the line to the top level "
+                "(no indent), or delete it, to silence this message."
+            )
+        elif key in fields:
+            messages.append(_switch_message(config_file, section, key, fields[key]))
+        else:
+            closest = _closest(key, settings_names - {"camera_type"})
+            unknown.append(f"`{key}`" + (f" (did you mean `{closest}`?)" if closest else ""))
+    if unknown:
+        messages.insert(0, (
+            f"{config_file} has settings in its `{section}` section that no {section} step reads, so they "
+            f"are ignored: {', '.join(unknown)}. Correct or delete those lines to silence this message."
+        ))
+    return ignored, messages
+
+
+def _stray_message(config_file, stray: list[str]) -> str:
+    return (f"{config_file} has settings at its top level, outside the sections, that no step reads, so "
+            f"they are ignored: {_ticked(stray)}. The top level holds only camera_type, groups and exclude; "
+            "move each of those lines into the section of its stage (extract, pca, model or crowd_movies), "
+            "or delete it, to silence this message.")
 
 
 def read_settings(config_file: str | os.PathLike | None, cls: type[Options], *,
@@ -282,19 +284,28 @@ def read_settings(config_file: str | os.PathLike | None, cls: type[Options], *,
 
     The section named by ``cls.SECTION`` is checked against every field of
     ``stage_classes`` (the classes of every step of that stage), and the
-    top-level ``camera_type`` is added when ``cls`` declares it. A class with no
-    section, or no ``config_file``, reads nothing.
+    top-level ``camera_type`` is added when ``cls`` declares it. A key no step
+    of the stage reads (``_ignored_settings``) and a setting at the top level
+    outside the sections are left out, and a message naming them is printed.
+    A class with no section, or no ``config_file``, reads nothing.
 
-    Raises ``ConfigFileError`` for a file that cannot be read,
-    ``moseq2_common.project.OldProjectError`` for a file without sections, and
-    ``UnknownSettingError`` for a key no step of the stage declares.
+    Raises ``ConfigFileError`` for a file that cannot be read or a section that
+    does not hold settings, and ``moseq2_common.project.OldProjectError`` for a
+    file without sections.
     """
     if cls.SECTION is None or not config_file:
         return {}
     data = read_config(config_file)
     check_top_level(config_file, data)
+    stray = _stray_keys(data)
+    if stray:
+        click.echo(_stray_message(config_file, stray))
     settings = dict(data.get(cls.SECTION) or {})
-    check_section(config_file, cls.SECTION, settings, stage_classes)
+    ignored, messages = _ignored_settings(config_file, cls.SECTION, settings, stage_classes)
+    for message in messages:
+        click.echo(message)
+    for key in ignored:
+        del settings[key]
     names = {f.name for f in dataclasses.fields(cls)}
     if "camera_type" in names and data.get("camera_type") is not None:
         settings["camera_type"] = data["camera_type"]
@@ -319,7 +330,7 @@ def command_settings(config_file, cls: type[Options], *, stage_classes: Sequence
     source = config_file or (project.config_file if project is not None else None)
     try:
         return read_settings(source, cls, stage_classes=stage_classes or (cls,))
-    except (ConfigFileError, UnknownSettingError, OldProjectError) as error:
+    except (ConfigFileError, OldProjectError) as error:
         raise click.ClickException(str(error)) from None
 
 

@@ -95,6 +95,9 @@ class KappaScanOptions(ModelOptions, SlurmOptions):
     min_kappa: float | None = option(None, '--min-kappa', type=float,
                                      help="Minimum kappa value to begin scan from.")
     max_kappa: float | None = option(None, '--max-kappa', type=float, help="Maximum kappa value to end scan on.")
+    # what the notebook's kappa-scan jobs requested in 1.5.0; batch-extract keeps SlurmOptions' 5GB, 3:00:00
+    memory: str = option("15GB", "--memory", type=str, help="RAM (slurm only)")
+    wall_time: str = option("06:00:00", "--wall-time", type=str, help="Wall time (slurm only)")
 
 
 @dataclass(frozen=True, kw_only=True)

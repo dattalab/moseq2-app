@@ -2,7 +2,7 @@ import click
 from pathlib import Path
 from moseq2_app.steps import train_flip_classifier
 from moseq2_common.frames import CleaningOptions
-from moseq2_common.options import ConfigFileError, UnknownSettingError, read_settings
+from moseq2_common.options import ConfigFileError, read_settings
 from moseq2_common.project import OldProjectError
 from moseq2_extract.options import EXTRACT_STAGE
 
@@ -30,7 +30,7 @@ def main(data_index_path, prefix, classifier_type, config_file):
     try:
         # the extract section of config.yaml, where extraction reads its cleaning settings
         cleaning = read_settings(config_file, CleaningOptions, stage_classes=EXTRACT_STAGE)
-    except (ConfigFileError, UnknownSettingError, OldProjectError) as error:
+    except (ConfigFileError, OldProjectError) as error:
         raise click.ClickException(str(error)) from None
 
     print(f"Training {classifier_type} classifier")

@@ -141,7 +141,7 @@ model:
   load_groups: true
   max_kappa: null
   max_states: 100
-  memory: 5GB
+  memory: 15GB
   min_kappa: null
   n_models: 10
   ncpus: 0
@@ -161,7 +161,7 @@ model:
   separate_trans: false
   use_checkpoint: false
   var_name: scores
-  wall_time: '3:00:00'
+  wall_time: 06:00:00
   whiten: all
 pca:
   chunk_size: 4000

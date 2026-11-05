@@ -8,10 +8,12 @@ value per stage, so setting it for extraction leaves PCA alone. Both front ends
 of a step resolve the same section the same way, with no difference in value or
 type between the command line and the notebook.
 
-A key in a section that no step of that stage declares stops the step, naming
-the key, the section, the file and the declared names closest to it; a one-run
-switch (``run_cmd``, ``get_cmd``, ``verbose``, ``progress_bar``) in a section
-stops it naming its flag. A ``config.yaml`` without sections was written by
+A key in a section that no step of that stage declares is ignored, and the step
+prints one message naming every such key with the declared name closest to it,
+then runs. A one-run switch (``run_cmd``, ``get_cmd``, ``verbose``,
+``progress_bar``) in a section, ``camera_type`` inside a section and a setting at
+the top level outside the sections are ignored the same way, each with a message
+saying where the line belongs. A ``config.yaml`` without sections was written by
 1.5.0 or earlier and stops with the message that says how to finish that project.
 
 ``generate-config`` writes the sections and, for an Azure Kinect or Orbbec Femto
@@ -101,36 +103,78 @@ def test_choosing_slurm_for_extraction_leaves_pca_local(tmp_path, pca_steps):
     assert pca_steps["train_pca"][0].cluster_type == "local"
 
 
-def test_a_misspelled_setting_stops_with_the_closest_names(tmp_path, pca_steps):
-    """A key no PCA step declares stops train-pca before it runs, and nothing is written."""
-    config = sectioned(tmp_path / "config.yaml", pca={"gausfilter_space": [2, 2]})
-    before = config.read_bytes()
+def test_unrecognized_settings_are_listed_and_ignored(tmp_path, pca_steps):
+    """Keys no PCA step declares are named in one message, each with its closest name, and train-pca runs."""
+    config = sectioned(tmp_path / "config.yaml",
+                       pca={"chunk_size": 250, "gausfilter_space": [2, 2], "zzz_unheard_of": 1})
 
     result = run_pca("train-pca", tmp_path, config)
 
-    assert result.exit_code != 0
-    for named in ("gausfilter_space", "`pca`", str(config), "gaussfilter_space"):
-        assert named in result.output, (named, result.output)
-    assert pca_steps["train_pca"] == []
-    assert config.read_bytes() == before
-    assert not (tmp_path / "_pca").exists()
+    assert result.exit_code == 0, result.output
+    (opts,) = pca_steps["train_pca"]
+    assert opts.chunk_size == 250
+    assert opts.gaussfilter_space == (1.5, 1)
+    message = (f"{config} has settings in its `pca` section that no pca step reads, so they are ignored: "
+               "`gausfilter_space` (did you mean `gaussfilter_space`?), `zzz_unheard_of`. "
+               "Correct or delete those lines to silence this message.")
+    assert message in result.output, result.output
+    assert result.output.count("no pca step reads") == 1, result.output
 
 
-def test_a_one_run_switch_in_config_is_refused(tmp_path):
-    """``run_cmd`` applies to one run; in config.yaml it stops the step, naming its flag."""
+def test_a_one_run_switch_in_config_is_ignored_naming_its_flag(tmp_path, monkeypatch):
+    """``verbose`` applies to one run; in config.yaml it is ignored, and the message names its flag."""
+    import moseq2_model.steps as model_steps
     from moseq2_model.cli import cli
 
-    config = sectioned(tmp_path / "config.yaml", model={"run_cmd": True})
+    fits = []
+    monkeypatch.setattr(model_steps, "learn_model", lambda input_file, dest_file, opts, **kwargs: fits.append(opts))
+    config = sectioned(tmp_path / "config.yaml", model={"verbose": True, "nlags": 2})
     scores = tmp_path / "pca_scores.h5"
     scores.write_bytes(b"")
 
     result = CliRunner().invoke(cli, ["learn-model", str(scores), str(tmp_path / "model.p"),
                                       "--config-file", str(config)])
 
-    assert result.exit_code != 0
-    assert "--run-cmd" in result.output, result.output
-    assert "run_cmd=" in result.output, result.output
-    assert not (tmp_path / "model.p").exists()
+    assert result.exit_code == 0, result.output
+    (opts,) = fits
+    assert opts.verbose is False
+    assert opts.nlags == 2
+    for named in ("`verbose`", "`model`", str(config), "--verbose", "verbose=", "ignored"):
+        assert named in result.output, (named, result.output)
+
+
+def test_camera_type_inside_a_section_is_ignored(tmp_path, capsys):
+    """camera_type is read from the top level only; a copy inside a section is named and ignored."""
+    from moseq2_common.options import read_settings
+    from moseq2_extract.options import EXTRACT_STAGE, ExtractOptions
+
+    config = sectioned(tmp_path / "config.yaml", extract={"camera_type": "azure", "chunk_size": 250})
+    settings = read_settings(config, ExtractOptions, stage_classes=EXTRACT_STAGE)
+    assert settings["camera_type"] == "auto"
+    assert settings["chunk_size"] == 250
+
+    write_yaml({"extract": {"camera_type": "azure"}, "pca": {}}, str(config))
+    assert "camera_type" not in read_settings(config, ExtractOptions, stage_classes=EXTRACT_STAGE)
+
+    printed = capsys.readouterr().out
+    assert printed.count("`camera_type` in the `extract` section") == 2, printed
+    for named in (str(config), "ignored", "top level"):
+        assert named in printed, (named, printed)
+
+
+def test_a_setting_outside_the_sections_is_ignored(tmp_path, pca_steps):
+    """A setting at the top level beside the sections is named and ignored, and the step runs."""
+    config = tmp_path / "config.yaml"
+    write_yaml({"camera_type": "auto", "pca": {"min_height": 5}, "chunk_size": 250}, str(config))
+
+    result = run_pca("train-pca", tmp_path, config)
+
+    assert result.exit_code == 0, result.output
+    (opts,) = pca_steps["train_pca"]
+    assert opts.chunk_size == 4000
+    assert opts.min_height == 5
+    for named in (str(config), "`chunk_size`", "top level", "ignored"):
+        assert named in result.output, (named, result.output)
 
 
 def test_command_line_pca_on_an_mkv_project_uses_the_azure_filters(tmp_path, pca_steps):
