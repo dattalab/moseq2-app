@@ -21,7 +21,7 @@ project folder (``moseq2_common.project.session_key``).
 
 import os
 from dataclasses import dataclass, field
-from os.path import abspath, exists, isdir, join, realpath
+from os.path import abspath, dirname, exists, isdir, join, realpath
 
 #: The recording types the pipeline reads, in the order one is preferred over
 #: another when a session folder holds several.
@@ -310,3 +310,20 @@ def find_recordings(
 
     search.recordings = sorted(found)
     return search
+
+
+def recording_of_extraction(h5):
+    """The recording an extraction's ``.h5`` (``<recording folder>/<output folder>/results_XX.h5``) was made from.
+
+    The recording found in the folder above the output folder; for an archive, which is
+    extracted into a folder named after it, the archive beside that folder. When neither is
+    there (the recording was moved), the folder above the output folder stands for it.
+    """
+    folder = dirname(dirname(abspath(h5)))
+    search = find_recordings(folder, max_depth=0)
+    if search.recordings:
+        return search.recordings[0]
+    for extension in _ARCHIVE_EXTENSIONS:
+        if exists(folder + extension):
+            return folder + extension
+    return folder

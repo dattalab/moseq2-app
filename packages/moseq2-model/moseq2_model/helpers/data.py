@@ -22,7 +22,8 @@ def process_indexfile(index, data_metadata, default_group="n/a", select_groups=F
     Read index file (if applicable) and return dictionaries containing metadata in the index file.
 
     Args:
-    index (str or None): path to index file.
+    index (dict, str or None): the sessions as an index in memory (``moseq2_common.bookkeeping.session_index``),
+        or a path to an index file.
     data_metadata (dict): loaded metadata containing uuid and group information.
     default_group (str): default group name to supply to data without assigned group labels
     select_groups (bool): when True, print metadata describing group selection
@@ -32,12 +33,15 @@ def process_indexfile(index, data_metadata, default_group="n/a", select_groups=F
     data_metadata (dict): updated metadata dictionary.
     """
 
-    # if we have an index file, strip out the groups, match to the scores uuids
-    if index is not None and exists(index):
-        with open(index, "r") as f:
-            # reading in array of files
-            index_data = read_yaml(f)
-            yml_metadata = index_data["files"]
+    # if we have an index (in memory, or an index file), strip out the groups, match to the scores uuids
+    if isinstance(index, dict) or (index is not None and exists(index)):
+        if isinstance(index, dict):
+            index_data = index
+        else:
+            with open(index, "r") as f:
+                # reading in array of files
+                index_data = read_yaml(f)
+        yml_metadata = index_data["files"]
 
         # reading corresponding groups and uuids
         uuid_map = dict(pluck(["uuid", "group"], yml_metadata))

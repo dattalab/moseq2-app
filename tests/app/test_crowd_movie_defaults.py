@@ -69,7 +69,8 @@ def _cpus():
     return os.cpu_count()
 
 
-def test_three_crowd_movie_front_ends_share_one_set_of_defaults(project, rendered, tmp_path, monkeypatch, displayed):
+def test_three_crowd_movie_front_ends_share_one_set_of_defaults(project, analysis_project_1_6, rendered, tmp_path,
+                                                                monkeypatch, displayed):
     from moseq2_app.gui.wrappers import interactive_syllable_labeler_wrapper
     from moseq2_app.viz import controller
     from moseq2_app.viz.controller import CrowdMovieComparison
@@ -84,7 +85,8 @@ def test_three_crowd_movie_front_ends_share_one_set_of_defaults(project, rendere
     assert reference["processes"] == _cpus()
 
     # make-crowd-movies, with nothing typed but the files
-    result = CliRunner().invoke(cli, ["make-crowd-movies", project["index_file"], project["model_path"],
+    result = CliRunner().invoke(cli, ["make-crowd-movies", str(analysis_project_1_6 / "models" / "model.p"),
+                                      "--project-file", str(analysis_project_1_6 / "moseq2-project.yaml"),
                                       "-o", str(tmp_path / "cli")], catch_exceptions=False)
     assert result.exit_code == 0, result.output
 
@@ -129,16 +131,19 @@ def test_crowd_movie_workers_follow_the_cpus_available_to_the_process(affinity, 
 
     assert CrowdMovieOptions().processes == expected
 
-    for name in ("index.yaml", "model.p"):
-        (tmp_path / name).write_text("")
-    result = CliRunner().invoke(cli, ["make-crowd-movies", str(tmp_path / "index.yaml"), str(tmp_path / "model.p"),
+    from configs import write_bookkeeping
+
+    (tmp_path / "model.p").write_text("")
+    write_bookkeeping(tmp_path)
+    project_file = str(tmp_path / "moseq2-project.yaml")
+    result = CliRunner().invoke(cli, ["make-crowd-movies", str(tmp_path / "model.p"), "--project-file", project_file,
                                       "--specific-syllable", "0", "-o", str(tmp_path / "out")],
                                 catch_exceptions=False)
     assert result.exit_code == 0, result.output
     assert calls[-1]["processes"] == expected
 
     # a number typed on the command line is used as given
-    result = CliRunner().invoke(cli, ["make-crowd-movies", str(tmp_path / "index.yaml"), str(tmp_path / "model.p"),
+    result = CliRunner().invoke(cli, ["make-crowd-movies", str(tmp_path / "model.p"), "--project-file", project_file,
                                       "--specific-syllable", "0", "--processes", "2", "-o", str(tmp_path / "out")],
                                 catch_exceptions=False)
     assert result.exit_code == 0, result.output

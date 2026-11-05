@@ -2,13 +2,12 @@
 
     changepoints_filename = 'changepoints'
 
-    with update_config(progress_paths['config_file']) as config_data:
-        config_data['dims'] = 300
+    # with update_config(project.config_file, section='pca') as config_data:
+    #     config_data['dims'] = 300
 
-    progress_paths = update_progress(progress_filepath, 'changepoints_path', changepoints_filename)
-    compute_changepoints_command(progress_paths['train_data_dir'], progress_paths, changepoints_filename)
+    compute_changepoints_command(str(project.folder), changepoints_filename)
 
-    display(Image(join(progress_paths['pca_dirname'], changepoints_filename + '_dist.png')))
+    display(Image(str(project.folder / '_pca' / (changepoints_filename + '_dist.png'))))
 
 Not an output of the pipeline so much as a yardstick for it. The cell looks
 for moments where the PC scores change sharply and calls those the boundaries
@@ -124,10 +123,9 @@ def test_the_distribution_figure_is_drawn(changepoints, pca):
     assert (pixels < 250).mean() > 0.01, "the distribution plot is blank"
 
 
-def test_the_changepoints_are_recorded_in_progress(changepoints, progress_file, pca):
+def test_the_changepoints_are_recorded_in_the_bookkeeping_file(changepoints, project, pca):
     """6. Where cell 19 finds the yardstick."""
-    from moseq2_app.gui.progress import restore_progress_vars
+    from moseq2_common.yaml import read_yaml
 
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
-    assert recorded["changepoints_path"] == "changepoints"
+    assert read_yaml(str(project / "moseq2-project.yaml"))["pca"]["changepoints"] == "_pca/changepoints.h5"
     assert changepoints == pca / "changepoints.h5"

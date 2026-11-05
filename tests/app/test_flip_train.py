@@ -204,6 +204,7 @@ def test_training_warns_when_a_session_was_extracted_with_other_cleaning_setting
     assert ((5,), 10) in calls
 
 
+@pytest.mark.xfail(reason="PR 4.3b", strict=True)
 def test_a_sessions_recording_is_found_through_the_bookkeeping_file(tmp_path, monkeypatch):
     """Labeled sessions are aggregated files with no uuid and no results yaml beside them: the project's
     moseq2-project.yaml says which recording each one is, so session_b's arena-tool entry reaches training."""

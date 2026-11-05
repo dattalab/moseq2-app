@@ -101,18 +101,16 @@ def test_every_model_command_calls_its_step(tmp_path, scores, called, options):
 def test_the_notebook_functions_call_the_steps(tmp_path, scores, called, options):
     from moseq2_model.gui import apply_model_command, learn_model_command
 
+    from configs import write_bookkeeping
+
     config = tmp_path / "config.yaml"
-    index = tmp_path / "moseq2-index.yaml"
-    write_yaml({"files": []}, str(index))
-    paths = {"scores_path": str(scores), "model_path": str(tmp_path / "models" / "model.p"),
-             "config_file": str(config), "index_file": str(index),
-             "base_model_path": str(tmp_path / "models")}
+    write_bookkeeping(tmp_path, scores=scores.name)
 
     write_yaml({"model": {"kappa": 1000, "num_iter": 7}}, str(config))
-    learn_model_command(paths)
+    learn_model_command(str(tmp_path))
     write_yaml({"model": {"kappa": "scan", "scan_scale": "log", "n_models": 4}}, str(config))
-    learn_model_command(paths)
-    apply_model_command(paths, str(tmp_path / "models" / "model.p"))
+    learn_model_command(str(tmp_path))
+    apply_model_command(str(tmp_path), str(tmp_path / "models" / "model.p"))
 
     assert [type(o) for o in called["learn_model"]] == [options.LearnModelOptions]
     assert (called["learn_model"][0].kappa, called["learn_model"][0].num_iter) == (1000, 7)

@@ -91,3 +91,60 @@ def fetch_analysis_bundle():
 def fetch_azure_mkv():
     """The synthetic Azure Kinect recording, holding ``depth.mkv``."""
     return _fetch_bundle(AZURE_MKV)
+
+
+#: What the analysis bundle's progress file carries where the project root belongs.
+ROOT_SENTINEL = "__PROJECT_ROOT__"
+
+
+def project_1_6_from_bundle(bundle, dest):
+    """A copy of the analysis bundle at ``dest``, laid out as a 1.6 project.
+
+    The bundle is a project made by 1.5.0: a flat ``config.yaml``, a
+    ``moseq2-index.yaml`` naming each session's aggregated extraction and group,
+    and a ``progress.yaml``. The copy's ``config.yaml`` holds the same settings in
+    their stages' sections, with the index's groups as its ``groups``, and its
+    ``moseq2-project.yaml`` lists the index's sessions (keyed by ``SessionName``,
+    since the bundle holds no recordings), the PCA files and the model. The index
+    and progress file stay beside them, with the copy's folder in place of the
+    root the progress file was cut with, for the analysis cells that read them.
+    """
+    import shutil
+
+    from moseq2_common.options import setting_fields
+    from moseq2_common.yaml import read_yaml, write_config, write_yaml
+    from moseq2_extract.options import EXTRACT_STAGE
+    from moseq2_model.options import MODEL_STAGE
+    from moseq2_pca.options import PCA_STAGE
+    from moseq2_viz.options import CROWD_MOVIE_STAGE
+
+    dest = Path(dest)
+    shutil.copytree(bundle, dest, dirs_exist_ok=True)
+    progress = dest / "progress.yaml"
+    if progress.is_file():
+        progress.write_text(progress.read_text().replace(ROOT_SENTINEL, str(dest)))
+
+    flat = read_yaml(str(dest / "config.yaml")) or {}
+    config = {"camera_type": flat.get("camera_type", "auto")}
+    for section, stage in (("extract", EXTRACT_STAGE), ("pca", PCA_STAGE), ("model", MODEL_STAGE),
+                           ("crowd_movies", CROWD_MOVIE_STAGE)):
+        names = {name for cls in stage for name in setting_fields(cls)} - {"camera_type"}
+        config[section] = {key: value for key, value in flat.items() if key in names}
+
+    index = read_yaml(str(dest / "moseq2-index.yaml"))
+    sessions, groups = {}, {}
+    for entry in index["files"]:
+        key = str(entry["metadata"]["SessionName"])
+        sessions[key] = {"recording": key, "folder": Path(entry["path"][0]).as_posix(), "uuid": str(entry["uuid"])}
+        groups[key] = str(entry["group"])
+    config["groups"] = groups
+    write_config(config, str(dest / "config.yaml"))
+
+    outputs = {"components": "_pca/pca.h5", "scores": "_pca/pca_scores.h5", "changepoints": "_pca/changepoints.h5"}
+    write_yaml({
+        "sessions": sessions,
+        "pca": {name: path for name, path in outputs.items() if (dest / path).is_file()},
+        "models": {"fitted": ["models/model.p"], "current": "models/model.p", "analysis": {}},
+        "applied_models": [],
+    }, str(dest / "moseq2-project.yaml"))
+    return dest

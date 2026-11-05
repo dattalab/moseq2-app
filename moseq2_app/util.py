@@ -84,19 +84,17 @@ def merge_labels_with_scalars(sorted_index, model_path):
 
     return df, scalar_df
 
-def index_to_dataframe(index_path):
+def index_to_dataframe(index_data):
     """
-    Read the index file into a dictionary and converts it into an editable DataFrame.
+    Turn the project's sessions into an editable DataFrame.
 
     Args:
-    index_path (str): Path to index file
+    index_data (dict): the sessions (``moseq2_common.bookkeeping.session_index``)
 
     Returns:
-    index_data (dict): Dict object containing all parsed index file contents
+    index_data (dict): the sessions, as given
     df (pd.DataFrame): Formatted dict in DataFrame form including each session's metadata
     """
-
-    index_data = read_yaml(index_path)
 
     files = index_data['files']
     meta = [f['metadata'] for f in files]

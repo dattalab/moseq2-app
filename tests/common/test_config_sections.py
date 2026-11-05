@@ -210,7 +210,8 @@ def _same(cli_opts, notebook_opts):
 
 @pytest.fixture
 def project(tmp_path):
-    """A project folder with a generated config.yaml and the files the notebook functions check for."""
+    """A project folder with a generated config.yaml, and a moseq2-project.yaml naming a session, scores and
+    changepoints, as the notebook functions read them."""
     from moseq2_extract.cli import cli as extract_cli
 
     result = CliRunner().invoke(extract_cli, ["generate-config", "-o", str(tmp_path / "config.yaml")])
@@ -218,20 +219,13 @@ def project(tmp_path):
     (tmp_path / "aggregate_results").mkdir()
     (tmp_path / "_pca").mkdir()
     (tmp_path / "models").mkdir()
-    write_yaml({"files": []}, str(tmp_path / "moseq2-index.yaml"))
+    write_yaml({"sessions": {"s0/depth.avi": {"recording": "s0/depth.avi", "folder": "aggregate_results/s0.h5",
+                                              "uuid": "s0"}},
+                "pca": {"scores": "_pca/pca_scores.h5", "changepoints": "_pca/changepoints.h5"}},
+               str(tmp_path / "moseq2-project.yaml"))
     (tmp_path / "_pca" / "pca_scores.h5").write_bytes(b"")
     (tmp_path / "_pca" / "changepoints.h5").write_bytes(b"")
     return tmp_path
-
-
-def progress_paths(project: Path) -> dict:
-    return {
-        "base_dir": str(project), "config_file": str(project / "config.yaml"),
-        "train_data_dir": str(project / "aggregate_results"), "pca_dirname": str(project / "_pca"),
-        "index_file": str(project / "moseq2-index.yaml"), "scores_path": str(project / "_pca" / "pca_scores.h5"),
-        "model_path": str(project / "models" / "model.p"), "base_model_path": str(project / "models"),
-        "changepoints_path": str(project / "_pca" / "changepoints.h5"), "plot_path": str(project),
-    }
 
 
 def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch):
@@ -247,15 +241,14 @@ def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch
     from moseq2_viz.cli import cli as viz_cli
     from moseq2_viz.gui import get_best_fit_model
 
-    paths = progress_paths(project)
     config = project / "config.yaml"
 
     # PCA
-    train_pca_command(paths, paths["pca_dirname"], "pca")
+    train_pca_command(str(project), "pca")
     assert run_pca("train-pca", project, config).exit_code == 0
-    apply_pca_command(paths, "pca_scores")
+    apply_pca_command(str(project), "pca_scores")
     assert run_pca("apply-pca", project, config).exit_code == 0
-    compute_changepoints_command(paths["train_data_dir"], paths, "changepoints")
+    compute_changepoints_command(str(project), "changepoints")
     assert run_pca("compute-changepoints", project, config).exit_code == 0
     for name, (notebook, cli) in pca_steps.items():
         assert notebook.timeout == 5 and type(notebook.timeout) is int, name
@@ -274,9 +267,9 @@ def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch
     # modeling
     fits = []
     monkeypatch.setattr(model_steps, "learn_model", lambda input_file, dest_file, opts, **kwargs: fits.append(opts))
-    learn_model_command(paths)
-    result = CliRunner().invoke(model_cli, ["learn-model", paths["scores_path"], paths["model_path"],
-                                            "--config-file", str(config)])
+    learn_model_command(str(project))
+    result = CliRunner().invoke(model_cli, ["learn-model", str(project / "_pca" / "pca_scores.h5"),
+                                            str(project / "models" / "model.p"), "--config-file", str(config)])
     assert result.exit_code == 0, result.output
     _same(fits[1], fits[0])
 
@@ -287,11 +280,12 @@ def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch
         def show(self, **_):
             pass
 
-    monkeypatch.setattr(viz_steps, "get_best_model", lambda model_dir, cp_path, output_file, opts: best.append(opts)
+    monkeypatch.setattr(viz_steps, "get_best_model",
+                        lambda model_dir, cp_path, output_file, opts, **_: best.append(opts)
                         or viz_steps.BestModelResult(best_model_info={}, figure=_Figure(), figure_files=[]))
-    get_best_fit_model(paths, str(project / "best"))
-    result = CliRunner().invoke(viz_cli, ["get-best-model", paths["base_model_path"], paths["changepoints_path"],
-                                          str(project / "best")])
+    get_best_fit_model(str(project), str(project / "best"))
+    result = CliRunner().invoke(viz_cli, ["get-best-model", str(project / "models"),
+                                          str(project / "_pca" / "changepoints.h5"), str(project / "best")])
     assert result.exit_code == 0, result.output
     _same(best[1], best[0])
 
@@ -326,7 +320,7 @@ def test_a_job_file_names_its_project(project):
     config["model"].update({"kappa": "scan", "n_models": 2})
     write_yaml(config, str(project / "config.yaml"))
 
-    learn_model_command(progress_paths(project))
+    learn_model_command(str(project))
 
     job_files = sorted((project / "models").glob("model-*-settings.yaml"))
     assert len(job_files) == 2
@@ -350,4 +344,4 @@ def test_a_flat_config_stops_with_the_old_project_message(tmp_path, pca_steps):
     assert str(config) in result.output
     assert pca_steps["train_pca"] == []
     with pytest.raises(OldProjectError, match="1.5.0"):
-        train_pca_command(progress_paths(tmp_path), str(tmp_path / "_pca"), "pca")
+        train_pca_command(str(tmp_path), "pca")

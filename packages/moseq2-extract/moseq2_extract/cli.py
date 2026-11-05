@@ -267,7 +267,8 @@ def generate_index(input_dir, output_file):
 def aggregate_extract_results(ctx, input_dir, output_dir, **_):
     config = command_settings(None, AggregateOptions, stage_classes=EXTRACT_STAGE)
     steps.aggregate_results(input_dir, output_dir,
-                            AggregateOptions.resolve(config=config, explicit=explicit_values(ctx, AggregateOptions)))
+                            AggregateOptions.resolve(config=config, explicit=explicit_values(ctx, AggregateOptions)),
+                            project=find_project())
 
 
 @cli.command(

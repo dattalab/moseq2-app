@@ -5,6 +5,11 @@ Each pipeline command's settings are generated from its options class in
 ``moseq2_viz.options``; the command resolves the settings and calls its step in
 ``moseq2_viz.steps``. ``make-crowd-movies`` reads the ``crowd_movies`` section
 of the ``config.yaml`` in the folder it runs in.
+
+The commands work on a project's sessions: those its ``moseq2-project.yaml``
+lists, each with its group from the project's ``config.yaml``
+(``--project-file``, by default the one in the folder the command runs in).
+Without one they stop, saying where they looked.
 """
 
 import os
@@ -12,8 +17,15 @@ from pathlib import Path
 
 import click
 
-from moseq2_common.options import click_options, command_settings, explicit_values
-from moseq2_common.project import find_project, standalone_note
+from moseq2_common.bookkeeping import session_index
+from moseq2_common.options import (
+    click_options,
+    command_project,
+    command_settings,
+    explicit_values,
+    project_file_option,
+)
+from moseq2_common.project import find_project
 from moseq2_viz import steps
 from moseq2_viz.helpers.wrappers import copy_h5_metadata_to_yaml_wrapper
 from moseq2_viz.options import (
@@ -40,6 +52,19 @@ def _resolve(ctx, cls):
     return cls.resolve(config=config, explicit=explicit_values(ctx, cls))
 
 
+_PROJECT_FILE_HELP = ("The project's moseq2-project.yaml, whose sessions and groups (in its config.yaml) the "
+                      "command uses; by default the one in the folder the command runs in")
+
+
+def _project_file():
+    return project_file_option(_PROJECT_FILE_HELP)
+
+
+def _sessions(ctx, project_file):
+    """The sessions of the project the command runs on, as an index in memory."""
+    return session_index(command_project(project_file, f"moseq2-viz {ctx.info_name}", required=True))
+
+
 def _argument(name):
     return click.argument(name, type=click.Path(exists=True, resolve_path=True))
 
@@ -50,14 +75,15 @@ def _output_file(default, help=None):
 
 @cli.command(
     name="add-group",
-    help="Change group name for the sessions in index file (moseq2-index.yaml)",
+    help="Set the group of the project's sessions whose metadata matches, in the project's config.yaml (groups)",
 )
 @click_options(AddGroupOptions,
-               order=("index_file", "key", "value", "group", "exact", "lowercase", "negative"),
-               others={"index_file": _argument("index-file")})
+               order=("key", "value", "group", "exact", "lowercase", "negative", "project_file"),
+               others={"project_file": _project_file()})
 @click.pass_context
-def add_group(ctx, index_file, **_):
-    steps.add_group(index_file, AddGroupOptions.resolve(explicit=explicit_values(ctx, AddGroupOptions)))
+def add_group(ctx, project_file, **_):
+    project = command_project(project_file, "moseq2-viz add-group", required=True)
+    steps.add_group(project, AddGroupOptions.resolve(explicit=explicit_values(ctx, AddGroupOptions)))
 
 
 @cli.command(
@@ -71,7 +97,7 @@ def add_group(ctx, index_file, **_):
                                                      type=click.Path(exists=False, resolve_path=True))})
 @click.pass_context
 def get_best_fit_model(ctx, model_dir, cp_path, output_file, **_):
-    steps.get_best_model(model_dir, cp_path, output_file, _resolve(ctx, BestModelOptions))
+    steps.get_best_model(model_dir, cp_path, output_file, _resolve(ctx, BestModelOptions), project=find_project())
 
 
 # recurse through directories, find h5 files with completed extractions, make a manifest
@@ -93,16 +119,15 @@ def copy_h5_metadata_to_yaml(input_dir):
 
 @cli.command(
     name="make-df",
-    help="Make a dataframe containing syllable and scalar information from an index and model fit file",
+    help="Make a dataframe containing syllable and scalar information from the project's sessions and a model fit file",
 )
 # no settings: the output file's extension picks the format
 @_argument("model-fit")
-@_argument("index-file")
 @_output_file(Path.cwd() / "moseq_df.csv", "Filename to store dataframe")
-def make_df(model_fit, index_file, output_file):
-    if find_project() is None:
-        click.echo(standalone_note(os.getcwd()))
-    steps.make_df(model_fit, index_file, output_file)
+@_project_file()
+@click.pass_context
+def make_df(ctx, model_fit, output_file, project_file):
+    steps.make_df(model_fit, _sessions(ctx, project_file), output_file)
     print(f"Dataframe successfully generated at:\n    {Path(output_file)}")
 
 
@@ -111,19 +136,19 @@ def make_df(model_fit, index_file, output_file):
     help="write movies of overlaid examples of the rodent perform a given syllable",
 )
 @click_options(CrowdMovieOptions, order=(
-    "index_file", "model_path", "max_syllable", "n_explained", "max_examples", "processes", "separate_by",
+    "model_path", "max_syllable", "n_explained", "max_examples", "processes", "separate_by",
     "specific_syllable", "session_names", "sort", "count", "output_dir", "gaussfilter_space", "medfilter_space",
     "min_height", "max_height", "raw_size", "scale", "cmap", "max_dur", "min_dur", "legacy_jitter_fix",
-    "frame_path", "progress_bar", "pad", "seed", "select_median_duration_instances",
+    "frame_path", "progress_bar", "pad", "seed", "select_median_duration_instances", "project_file",
 ), others={
-    "index_file": _argument("index-file"),
+    "project_file": _project_file(),
     "model_path": _argument("model-path"),
     "output_dir": click.option("--output-dir", "-o", type=click.Path(),
                                default=os.path.join(os.getcwd(), "crowd_movies"), help="Path to store files"),
 })
 @click.pass_context
-def make_crowd_movies(ctx, index_file, model_path, output_dir, **_):
-    steps.make_crowd_movies(index_file, model_path, output_dir, _resolve(ctx, CrowdMovieOptions))
+def make_crowd_movies(ctx, project_file, model_path, output_dir, **_):
+    steps.make_crowd_movies(_sessions(ctx, project_file), model_path, output_dir, _resolve(ctx, CrowdMovieOptions))
     print(f"Crowd movies successfully generated in {output_dir}.")
 
 
@@ -131,40 +156,40 @@ def make_crowd_movies(ctx, index_file, model_path, output_dir, **_):
     name="plot-scalar-summary",
     help="Plot a scalar summary scatter plot for each group.",
 )
-@click_options(ScalarSummaryOptions, order=("index_file", "output_file", "colors"), others={
-    "index_file": _argument("index-file"),
+@click_options(ScalarSummaryOptions, order=("output_file", "colors", "project_file"), others={
+    "project_file": _project_file(),
     "output_file": _output_file(os.path.join(os.getcwd(), "scalars")),
 })
 @click.pass_context
-def plot_scalar_summary(ctx, index_file, output_file, **_):
-    steps.plot_scalar_summary(index_file, output_file, _resolve(ctx, ScalarSummaryOptions))
+def plot_scalar_summary(ctx, project_file, output_file, **_):
+    steps.plot_scalar_summary(_sessions(ctx, project_file), output_file, _resolve(ctx, ScalarSummaryOptions))
     print("Sucessfully plotted scalar summary")
 
 
 @cli.command(
     name="plot-group-position-heatmaps", help="Plots position heatmaps for each group"
 )
-@click_options(HeatmapOptions, order=("index_file", "output_file", "normalize"), others={
-    "index_file": _argument("index-file"),
+@click_options(HeatmapOptions, order=("output_file", "normalize", "project_file"), others={
+    "project_file": _project_file(),
     "output_file": _output_file(os.path.join(os.getcwd(), "group_heat_map")),
 })
 @click.pass_context
-def plot_group_position_heatmaps(ctx, index_file, output_file, **_):
-    steps.plot_group_position_heatmaps(index_file, output_file, _resolve(ctx, HeatmapOptions))
+def plot_group_position_heatmaps(ctx, project_file, output_file, **_):
+    steps.plot_group_position_heatmaps(_sessions(ctx, project_file), output_file, _resolve(ctx, HeatmapOptions))
     print("Sucessfully plotted mean group heatmaps")
 
 
 @cli.command(
     name="plot-verbose-position-heatmaps",
-    help="Plots a position heatmap for each session in the index file.",
+    help="Plots a position heatmap for each session in the project.",
 )
-@click_options(HeatmapOptions, order=("index_file", "output_file", "normalize"), others={
-    "index_file": _argument("index-file"),
+@click_options(HeatmapOptions, order=("output_file", "normalize", "project_file"), others={
+    "project_file": _project_file(),
     "output_file": _output_file(os.path.join(os.getcwd(), "session_heat_map")),
 })
 @click.pass_context
-def plot_verbose_position_heatmaps(ctx, index_file, output_file, **_):
-    steps.plot_verbose_position_heatmaps(index_file, output_file, _resolve(ctx, HeatmapOptions))
+def plot_verbose_position_heatmaps(ctx, project_file, output_file, **_):
+    steps.plot_verbose_position_heatmaps(_sessions(ctx, project_file), output_file, _resolve(ctx, HeatmapOptions))
     print("Sucessfully plotted mean group heatmaps")
 
 
@@ -173,17 +198,17 @@ def plot_verbose_position_heatmaps(ctx, index_file, output_file, **_):
     help="Plot the transition graph depicting the transition probabilities between syllables.",
 )
 @click_options(TransitionGraphOptions, order=(
-    "index_file", "model_fit", "max_syllable", "n_explained", "group", "output_file", "normalize",
+    "model_fit", "max_syllable", "n_explained", "group", "output_file", "normalize",
     "edge_threshold", "usage_threshold", "layout", "keep_orphans", "orphan_weight", "arrows", "sort", "count",
-    "scale_node_by_usage", "width_per_group",
+    "scale_node_by_usage", "width_per_group", "project_file",
 ), others={
-    "index_file": _argument("index-file"),
+    "project_file": _project_file(),
     "model_fit": _argument("model-fit"),
     "output_file": _output_file(os.path.join(os.getcwd(), "transitions"), "Filename to store plot"),
 })
 @click.pass_context
-def plot_transition_graph(ctx, index_file, model_fit, output_file, **_):
-    steps.plot_transition_graph(index_file, model_fit, output_file,
+def plot_transition_graph(ctx, project_file, model_fit, output_file, **_):
+    steps.plot_transition_graph(_sessions(ctx, project_file), model_fit, output_file,
                                 _resolve(ctx, TransitionGraphOptions))
 
 
@@ -192,15 +217,15 @@ def plot_transition_graph(ctx, index_file, model_fit, output_file, **_):
     help="Plot syllable usages with different sorting,coloring and grouping capabilities",
 )
 @click_options(StatsPlotOptions, order=(
-    "index_file", "model_fit", "stat", "output_file", "sort", "figsize", "count", "max_syllable", "n_explained",
-    "group", "ordering", "ctrl_group", "exp_group", "colors",
+    "model_fit", "stat", "output_file", "sort", "figsize", "count", "max_syllable", "n_explained",
+    "group", "ordering", "ctrl_group", "exp_group", "colors", "project_file",
 ), others={
-    "index_file": _argument("index-file"),
+    "project_file": _project_file(),
     "model_fit": _argument("model-fit"),
     "output_file": _output_file(os.path.join(os.getcwd(), "syll_stat"), "Filename to store plot"),
 })
 @click.pass_context
-def plot_stats(ctx, index_file, model_fit, output_file, **_):
+def plot_stats(ctx, project_file, model_fit, output_file, **_):
     opts = _resolve(ctx, StatsPlotOptions)
-    steps.plot_stats(index_file, model_fit, output_file, opts)
+    steps.plot_stats(_sessions(ctx, project_file), model_fit, output_file, opts)
     click.echo(f'Syllable {opts.stat} graph created successfully')

@@ -11,6 +11,11 @@ Each step hands its work function (the ``*_wrapper`` in
 ``components_file`` (the trained components; ``<output_dir>/pca.h5`` when None)
 and, for changepoints, ``scores_file`` (the PC scores, read for missing-data
 PCA).
+
+Inside a project (``project``), each step records the file it wrote in the
+project's bookkeeping file (``moseq2_common.bookkeeping``), where the next step
+finds it: the components, the scores, the changepoints. No step writes
+``config.yaml``.
 """
 
 from __future__ import annotations
@@ -19,6 +24,8 @@ from dataclasses import dataclass
 from os.path import abspath, join
 from pathlib import Path
 
+from moseq2_common.bookkeeping import relative_path, update
+from moseq2_common.project import Project
 from moseq2_pca.helpers.wrappers import apply_pca_wrapper, compute_changepoints_wrapper, train_pca_wrapper
 from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
 
@@ -45,27 +52,45 @@ def _written(output_dir, output_file):
     return Path(join(abspath(output_dir), f'{output_file}.h5'))
 
 
-def train_pca(input_dir: str, output_dir: str, output_file: str, opts: TrainPCAOptions) -> TrainPCAResult:
+def _record(project, output, written):
+    """Record ``written`` as the project's PCA ``output`` (``components``, ``scores``, ``changepoints``)."""
+    if project is None or written is None:
+        return
+
+    def change(bookkeeping):
+        bookkeeping.pca[output] = relative_path(project, written)
+
+    update(project, change)
+
+
+def train_pca(input_dir: str, output_dir: str, output_file: str, opts: TrainPCAOptions, *,
+              project: Project | None = None) -> TrainPCAResult:
     """Train PCA on the extractions under ``input_dir``; write ``<output_dir>/<output_file>.h5``."""
     config_data = train_pca_wrapper(input_dir, opts.as_dict(), output_dir, output_file)
     pca_file = config_data.get('pca_file')
-    return TrainPCAResult(components_file=Path(pca_file) if pca_file else None)
+    result = TrainPCAResult(components_file=Path(pca_file) if pca_file else None)
+    _record(project, "components", result.components_file)
+    return result
 
 
 def apply_pca(input_dir: str, output_dir: str, output_file: str, opts: ApplyPCAOptions, *,
-              components_file: str | None = None) -> ApplyPCAResult:
+              components_file: str | None = None, project: Project | None = None) -> ApplyPCAResult:
     """Compute each extraction's PC scores with the components in ``components_file``; write
     ``<output_dir>/<output_file>.h5``."""
     _, success = apply_pca_wrapper(input_dir, {**opts.as_dict(), 'pca_file': components_file},
                                    output_dir, output_file)
-    return ApplyPCAResult(scores_file=_written(output_dir, output_file) if success else None)
+    result = ApplyPCAResult(scores_file=_written(output_dir, output_file) if success else None)
+    _record(project, "scores", result.scores_file)
+    return result
 
 
 def compute_changepoints(input_dir: str, output_dir: str, output_file: str, opts: ChangepointsOptions, *,
                          components_file: str | None = None,
-                         scores_file: str | None = None) -> ChangepointsResult:
+                         scores_file: str | None = None, project: Project | None = None) -> ChangepointsResult:
     """Compute the model-free changepoints; write ``<output_dir>/<output_file>.h5``."""
     compute_changepoints_wrapper(
         input_dir, {**opts.as_dict(), 'pca_file': components_file, 'pca_file_scores': scores_file},
         output_dir, output_file)
-    return ChangepointsResult(changepoints_file=_written(output_dir, output_file))
+    result = ChangepointsResult(changepoints_file=_written(output_dir, output_file))
+    _record(project, "changepoints", result.changepoints_file)
+    return result

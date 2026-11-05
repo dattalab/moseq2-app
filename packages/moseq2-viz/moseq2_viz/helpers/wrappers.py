@@ -85,20 +85,19 @@ def init_wrapper_function(index_file=None, output_dir=None, output_file=None):
     return index, sorted_index
 
 
-def add_group_wrapper(index_file, config_data):
+def add_group_wrapper(index, config_data):
     """
-    Update group name in index file (moseq2-index.yaml) with specified group name.
+    Find the sessions whose metadata matches, to put them in a group.
 
     Args:
-    index_file (str): path to index file
+    index (dict): the project's sessions (``moseq2_common.bookkeeping.session_index``).
     config_data (dict): dictionary for configuration parameters
-    """
-    new_index_path = f'{index_file.replace(".yaml", "")}_update.yaml'
 
-    # Read index file contents
-    index, _ = parse_index(index_file)
-    h5_uuids = [f["uuid"] for f in index["files"]]
-    metadata = [f["metadata"] for f in index["files"]]
+    Returns:
+    changed (dict): the group of each matching session, by session key.
+    """
+    files = index["files"]
+    metadata = [f["metadata"] for f in files]
 
     value = config_data["value"]
     key = config_data["key"]
@@ -106,7 +105,8 @@ def add_group_wrapper(index_file, config_data):
     if isinstance(value, str):
         value = [value]
 
-    # Search for inputted key-value pair and relabel all found instances in index
+    changed = {}
+    # Search for inputted key-value pair and relabel all found instances
     for v in value:
         if config_data["exact"]:
             v = r"\b{}\b".format(v)
@@ -114,17 +114,12 @@ def add_group_wrapper(index_file, config_data):
         # Get matched keys
         hits = get_index_hits(config_data, metadata, key, v)
 
-        # Update index dict with inputted group values
-        for uuid, hit in zip(h5_uuids, hits):
-            position = h5_uuids.index(uuid)
+        for entry, hit in zip(files, hits):
             if hit:
-                index["files"][position]["group"] = config_data["group"]
-
-    # Atomically write updated index file
-    write_yaml(index, new_index_path)
-    shutil.move(new_index_path, index_file)
+                changed[entry["key"]] = config_data["group"]
 
     print("Group(s) added successfully.")
+    return changed
 
 
 def get_best_fit_model_wrapper(

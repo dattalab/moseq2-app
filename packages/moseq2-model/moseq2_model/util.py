@@ -18,7 +18,7 @@ from moseq2_common.slurm import sbatch_command
 from moseq2_common.project import write_job_settings
 from moseq2_model.options import LearnModelOptions
 from moseq2_model.train.models import ARHMM
-from os.path import basename, getctime, join, exists
+from os.path import basename, getctime, join
 
 
 def load_pcs(filename, var_name="features", load_groups=False, npcs=10):
@@ -530,8 +530,6 @@ def create_command_strings(
     Returns:
     command_string (str): CLI learn-model command strings separated by newline characters
     """
-    index = config_data.get("index")
-    index_flag = f" -i {index}" if isinstance(index, str) and exists(index) else ""
     os.makedirs(output_dir, exist_ok=True)
 
     commands = []
@@ -543,7 +541,7 @@ def create_command_strings(
         write_job_settings(settings_file, "model", settings.settings(), project=project)
         cmd = (
             f"moseq2-model learn-model {input_file} {join(output_dir, model_name_format.format(i, k))}"
-            f" --config-file {settings_file}{index_flag}"
+            f" --config-file {settings_file}"
         )
 
         # On SLURM, each fit is its own job

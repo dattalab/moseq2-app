@@ -1,21 +1,12 @@
 """Cell 13: learn the pose basis the rest of the pipeline works in.
 
     pca_filename = 'pca'
-    pca_dirname = join(progress_paths['base_dir'], '_pca/')
-    progress_paths = update_progress(progress_filepath, 'pca_dirname', pca_dirname)
 
-    with update_config(progress_paths['config_file']) as config_data:
-        config_data['overwrite_pca'] = False
-        config_data['gaussfilter_space'] = (1.5, 1)
-        config_data['medfilter_space'] = [0]
-        config_data['medfilter_time'] = [0]
-        if camera_for_pca(config_data.get('camera_type'), progress_paths['train_data_dir'],
-                          progress_paths['base_dir']) == 'azure':
-            config_data['gaussfilter_space'] = (2.25, 1.5)
-            config_data['tailfilter_size'] = (13, 13)
-        config_data['nworkers'] = 1
+    # with update_config(project.config_file, section='pca') as config_data:
+    #     config_data['gaussfilter_space'] = (1.5, 1)
+    #     ...
 
-    train_pca_command(progress_paths, pca_dirname, pca_filename)
+    train_pca_command(str(project.folder), pca_filename)
 
 Eighty by eighty pixels of mouse is six thousand four hundred numbers a frame,
 far too many to model directly. This cell learns a basis in which a pose is a
@@ -173,10 +164,9 @@ def test_the_parameters_it_trained_with_are_recorded_beside_it(pca, configured):
     assert recorded["nworkers"] == 1
 
 
-def test_the_decomposition_is_recorded_in_progress(pca, progress_file, project):
+def test_the_decomposition_is_recorded_in_the_bookkeeping_file(pca, project):
     """8. Where cells 15 and 16 find it."""
-    from moseq2_app.gui.progress import restore_progress_vars
+    from moseq2_common.yaml import read_yaml
 
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
-    assert recorded["pca_dirname"] == str(project / "_pca") + "/"
+    assert read_yaml(str(project / "moseq2-project.yaml"))["pca"]["components"] == "_pca/pca.h5"
     assert pca == project / "_pca"

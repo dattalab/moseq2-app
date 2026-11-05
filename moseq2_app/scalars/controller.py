@@ -10,20 +10,18 @@ from moseq2_app.scalars.widgets import InteractiveScalarWidgets
 
 class InteractiveScalarViewer(InteractiveScalarWidgets):
 
-    def __init__(self, index_filepath):
+    def __init__(self, index):
         """
         Initialize function that will compute the scalar dataframe, the mean and standard deviation for interactive scalar summary.
 
         Args:
-        index_filepath (str): Path to index file
+        index (dict or str): the sessions (``moseq2_common.bookkeeping.session_index``), or a path to an index file
         """
 
         super().__init__()
 
-        self.index_filepath = index_filepath
-
         # get scalar dataframe
-        _, self.sorted_index = parse_index(index_filepath)
+        _, self.sorted_index = parse_index(index)
         self.scalar_df = scalars_to_dataframe(self.sorted_index)
 
         self.mean_df = self.scalar_df.groupby(['uuid', 'SessionName', 'SubjectName', 'group'], as_index=False).mean(numeric_only=True)

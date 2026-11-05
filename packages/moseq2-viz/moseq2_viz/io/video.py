@@ -4,6 +4,7 @@ Helper functions for handling crowd movie file writing and video metadata mainte
 
 import warnings
 import numpy as np
+import os
 from os.path import join
 from tqdm.auto import tqdm
 import multiprocessing as mp
@@ -82,7 +83,8 @@ def write_crowd_movie_info_file(model_path, model_fit, index_file, output_dir):
     Args:
     model_path (str): path to model used to generate movies
     model_fit (dict): loaded ARHMM mdoel results
-    index_file (str): path to index file used with model
+    index_file (str or dict): path to the index file used with the model, or the sessions in memory
+        (``moseq2_common.bookkeeping.session_index``)
     output_dir (str): path to crowd movies directory to store file in.
     """
 
@@ -95,7 +97,9 @@ def write_crowd_movie_info_file(model_path, model_fit, index_file, output_dir):
 
     # Adding model and index file paths
     info_dict["model_path"] = model_path
-    info_dict["index_path"] = index_file
+    # sessions held in memory name the bookkeeping file they were read from
+    info_dict["index_path"] = (str(index_file) if isinstance(index_file, (str, os.PathLike))
+                               else index_file.get("bookkeeping_file"))
 
     # Convert numpy dtypes to their corresponding primitives
     info_dict = valmap(

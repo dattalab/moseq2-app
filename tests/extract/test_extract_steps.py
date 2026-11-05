@@ -63,9 +63,9 @@ def called(monkeypatch, steps, setup):
         calls["batch_extract"].append(opts)
         return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
 
-    def aggregate_results(input_dir, output_dir, opts):
+    def aggregate_results(input_dir, output_dir, opts, **kwargs):
         calls["aggregate_results"].append(opts)
-        return steps.AggregateResult(index_file=None)
+        return steps.AggregateResult(sessions=[])
 
     def generate_config(output_file, camera_type, *, overwrite):
         calls["generate_config"].append((output_file, camera_type))
