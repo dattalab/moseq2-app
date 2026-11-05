@@ -174,7 +174,7 @@ def session_index(project: Project) -> dict:
     ``{"files": [{"uuid", "group", "metadata", "path": (h5, yaml), "key"}], "pca_path": scores or "",
     "bookkeeping_file": the file it was read from}``,
     each session's group from ``config.yaml``'s ``groups`` (``default`` when it names none). Sessions are
-    listed in the order the bookkeeping file lists them.
+    listed in the order they were recorded (``StartTime``), then by name.
     """
     bookkeeping = load(project)
     groups = read_groups(project)
@@ -188,6 +188,9 @@ def session_index(project: Project) -> dict:
             "path": (str(h5), str(h5.with_suffix(".yaml"))),
             "key": key,
         })
+    # recording order: the start time to the second, as 1.5.0's aggregated file names began with it
+    entries.sort(key=lambda f: (str(f["metadata"].get("StartTime") or "")[:19],
+                                str(f["metadata"].get("SessionName")), f["key"]))
     scores = bookkeeping.pca.get("scores")
     return {"files": entries, "pca_path": str(resolve_path(project, scores)) if scores else "",
             "bookkeeping_file": str(project.bookkeeping_file)}

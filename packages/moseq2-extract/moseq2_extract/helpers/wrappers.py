@@ -42,7 +42,6 @@ from moseq2_extract.util import (
 )
 
 
-@filter_warnings
 def aggregate_extract_results_wrapper(input_dir, output_dir, mouse_threshold=0.0, project=None):
     """
     The finished extractions of the recordings under ``input_dir``, each in its session's folder.
