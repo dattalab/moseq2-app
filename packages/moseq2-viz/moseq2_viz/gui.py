@@ -16,6 +16,23 @@ from moseq2_viz.options import BestModelOptions
 MODELS_DIRNAME = "models"
 
 
+def shim_progress_paths(progress_paths, output_file):
+    """The Analysis notebook's first cell's 1.5 paths (removed by PR 4.3b, which moves that notebook).
+
+    Its command-line branch hands ``get_best_fit_model`` the progress dictionary:
+    the models in ``base_model_path``, the changepoints at ``changepoints_path``
+    (or that name in ``pca_dirname``), and no project to record the choice in.
+    """
+    from os.path import exists
+
+    if output_file is None:
+        output_file = join(progress_paths["plot_path"], "model_vs_pc_changepoints")
+    changepoints = progress_paths["changepoints_path"]
+    if not exists(changepoints):
+        changepoints = join(progress_paths["pca_dirname"], changepoints + ".h5")
+    return None, progress_paths["base_model_path"], changepoints, output_file
+
+
 def get_best_fit_model(
     project_folder,
     output_file=None,
@@ -41,19 +58,22 @@ def get_best_fit_model(
     Returns:
     best_fit_model (str): Path tp best fit model
     """
-    project = Project.at(project_folder)
-    if output_file is None:
-        output_file = join(project_folder, "plots", "model_vs_pc_changepoints")
-
-    changepoints = load(project).pca.get("changepoints")
-    if not changepoints:
-        raise BookkeepingError(
-            f"{project.bookkeeping_file} names no changepoints yet. Compute them first, with the notebook's "
-            "changepoints cell or `moseq2-pca compute-changepoints` in the project folder."
-        )
+    if isinstance(project_folder, dict):
+        project, model_dir, changepoints, output_file = shim_progress_paths(project_folder, output_file)
+    else:
+        project = Project.at(project_folder)
+        if output_file is None:
+            output_file = join(project_folder, "plots", "model_vs_pc_changepoints")
+        stored = load(project).pca.get("changepoints")
+        if not stored:
+            raise BookkeepingError(
+                f"{project.bookkeeping_file} names no changepoints yet. Compute them first, with the notebook's "
+                "changepoints cell or `moseq2-pca compute-changepoints` in the project folder."
+            )
+        model_dir, changepoints = join(project_folder, MODELS_DIRNAME), str(resolve_path(project, stored))
     result = steps.get_best_model(
-        join(project_folder, MODELS_DIRNAME),
-        str(resolve_path(project, changepoints)),
+        model_dir,
+        changepoints,
         output_file,
         BestModelOptions.resolve(explicit={
             name: value
