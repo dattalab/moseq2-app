@@ -29,6 +29,7 @@ from moseq2_extract.options import (
     ExtractOptions,
     RoiOptions,
 )
+from moseq2_extract.session_config import recording_entry_settings
 
 
 @click.group(context_settings={"show_default": True})
@@ -109,8 +110,11 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 
 @cli.command(
     name="extract",
-    help="Processes raw input depth recordings to output a cropped and oriented"
-    "video of the mouse and saves the output+metadata to h5 files in the given output directory.",
+    help="Processes raw input depth recordings to output a cropped and oriented "
+    "video of the mouse and saves the output+metadata to h5 files in the given output directory. "
+    "With --config-file, the settings the arena tool saved for this recording in the project's "
+    "session_config.yaml are used over config.yaml's; options typed on the command line take "
+    "precedence over both.",
 )
 @click_options(ExtractOptions, order=EXTRACT_ORDER, others={
     **_roi_others({"input_file": click.argument("input-file", type=click.Path(exists=True, resolve_path=False))}),
@@ -119,8 +123,9 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 @click.pass_context
 def extract(ctx, input_file, output_dir, config_file, output_file, **_):
     config = read_config_option(config_file)
-    opts = replace(shim_click_defaults(ctx, ExtractOptions, config), **shim_typed_depth_range_is_manual(ctx))
-    # extract FILE reads config.yaml only, never the recording's session_config.yaml entry (L11, removed by PR 3.3).
+    # the arena tool's settings from the recording's session_config.yaml entry, over config.yaml
+    settings = {**(config or {}), **recording_entry_settings(config, input_file)}
+    opts = replace(shim_click_defaults(ctx, ExtractOptions, settings), **shim_typed_depth_range_is_manual(ctx))
     # The two paths 1.5.0 recorded among the extraction's parameters (R2, removed by PR 4.1):
     steps.extract(input_file, output_dir, opts,
                   shim_flat_config={"config_file": config_file, "output_file": output_file})

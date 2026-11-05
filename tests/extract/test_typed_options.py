@@ -6,11 +6,11 @@ happens to equal the option's default (moseq2-extract#24): ``--crop-size 80 80``
 over a config holding ``[120, 120]`` extracts at 80. An option not typed takes
 the config file's value where it has one.
 
-``batch-extract`` run locally extracts each recording with the settings the
-arena tool sets from that recording's entry in the session config, and every
-other setting from the config file. The options typed on its command line are
-applied over both, and ``--num-frames`` reaches the extraction
-(moseq2-extract#158).
+``extract`` and ``batch-extract`` run locally extract each recording with the
+settings the arena tool sets from that recording's entry in the session config,
+and every other setting from the config file. The options typed on the command
+line are applied over both, and ``batch-extract``'s ``--num-frames`` reaches the
+extraction (moseq2-extract#158).
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from click.testing import CliRunner
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from commands import split_command
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 
 def run(*args):
@@ -288,6 +288,59 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
     assert call["num_frames"] is None
     assert tuple(call["config"]["crop_size"]) == (90, 90)
     assert call["config"]["fps"] == 20
+
+
+def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, slurm_extracted):
+    """Each job's config.yaml already holds the recording's entry, so the job's
+    ``extract`` has no session_config.yaml to lay over the typed options again."""
+    root, config = project
+    slurm_extracted(root, config, "--crop-size", "80", "80")
+    job_config = read_yaml(str(root / SESSION / "proc" / "config.yaml"))
+
+    assert "session_config_path" not in job_config
+    assert tuple(job_config["crop_size"]) == (80, 80)
+    assert job_config["manual_set_depth_range"] is False
+
+
+# ``extract FILE`` resolves the recording's entry in session_config.yaml by the
+# same rule as batch-extract and the notebook: the arena tool's settings from
+# the entry, every other setting from the config file, typed options over both.
+
+
+def test_extract_file_uses_the_recordings_session_settings(project, received):
+    root, config = project
+    run("extract", str(root / SESSION / "depth.avi"), "--config-file", str(config))
+
+    settings = received[0]
+    assert tuple(settings["crop_size"]) == (120, 120)
+    assert tuple(settings["bg_roi_depth_range"]) == (550, 650)
+    assert settings["manual_set_depth_range"] is False
+    # not settings the arena tool sets: the config file's values
+    assert tuple(settings["frame_trim"]) == (0, 0)
+    assert settings["fps"] == 20
+
+
+def test_extract_file_typed_options_win_over_the_session_settings(project, received):
+    root, config = project
+    run("extract", str(root / SESSION / "depth.avi"), "--config-file", str(config),
+        "--crop-size", "80", "80", "--bg-roi-depth-range", "600", "800")
+
+    settings = received[0]
+    assert tuple(settings["crop_size"]) == (80, 80)
+    assert tuple(settings["bg_roi_depth_range"]) == (600, 800)
+    assert settings["manual_set_depth_range"] is True
+
+
+def test_extract_file_without_a_session_entry_uses_the_config_file(project, received):
+    root, config = project
+    other = root / "session_2"
+    other.mkdir()
+    (other / "depth.avi").touch()
+    run("extract", str(other / "depth.avi"), "--config-file", str(config))
+
+    settings = received[0]
+    assert tuple(settings["crop_size"]) == (90, 90)
+    assert settings["fps"] == 20
 
 
 @pytest.mark.parametrize("command", ["extract", "batch-extract"])
