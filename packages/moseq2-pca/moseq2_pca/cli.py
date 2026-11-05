@@ -3,7 +3,11 @@ CLI for PCA and model-free changepoint analysis.
 
 Each command's settings are generated from its options class in
 ``moseq2_pca.options``; the command reads ``--config-file``, resolves the
-settings and calls its step in ``moseq2_pca.steps``.
+settings and calls its step in ``moseq2_pca.steps``. Inside a project (the
+folder of ``--config-file``, or the working folder when it holds a
+``config.yaml``), each command records what it wrote in the project's
+``moseq2-project.yaml``, and ``apply-pca`` and ``compute-changepoints`` read the
+components and scores from there unless a path is given.
 """
 
 import os
@@ -11,8 +15,9 @@ from os.path import join
 
 import click
 
-from moseq2_common.options import click_options, command_settings, explicit_values, read_config
-from moseq2_common.yaml import write_config
+from moseq2_common.bookkeeping import load, resolve_path
+from moseq2_common.options import click_options, command_settings, explicit_values
+from moseq2_common.project import find_project
 from moseq2_pca import steps
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
 from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
@@ -65,41 +70,14 @@ CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_scores', 'pca_p
                       'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'fps', 'verbose')
 
 
-#: The output path each PCA step records at config.yaml's top level, by step.
-_WRITTEN_BACK = {'train_pca': 'pca_file', 'apply_pca': 'pca_file_scores', 'compute_changepoints': 'changepoint_file'}
-
-
-def shim_write_back_paths(config_file, step, written):
-    """Record the file a PCA step wrote at ``config_file``'s top level (L12, removed by PR 4.3).
-
-    The next PCA step's front end reads it there (``recorded_paths``), as 1.5.0
-    found the components and scores through config.yaml. No resolver reads the
-    top level, and PR 4.3's bookkeeping file replaces it. Nothing is written
-    without a config file, or when the step wrote nothing.
-    """
-    if not config_file or written is None:
-        return
-    data = read_config(config_file)
-    data[_WRITTEN_BACK[step]] = str(written)
-    write_config(data, config_file)
-
-
-def recorded_paths(config_file) -> dict:
-    """The components, scores and changepoints files earlier PCA steps recorded in ``config_file``."""
-    if not config_file:
+def recorded_paths(project) -> dict:
+    """The components, scores and changepoints files the project's bookkeeping file names (``pca_file``,
+    ``pca_file_scores``, ``changepoint_file``); empty outside a project."""
+    if project is None:
         return {}
-    data = read_config(config_file)
-    return {key: data[key] for key in _WRITTEN_BACK.values() if data.get(key)}
-
-
-def _config_file(config_file):
-    """``--config-file``, or the config.yaml of the project the command runs in."""
-    from moseq2_common.project import find_project
-
-    if config_file:
-        return config_file
-    project = find_project()
-    return str(project.config_file) if project is not None else None
+    stored = load(project).pca
+    names = {'components': 'pca_file', 'scores': 'pca_file_scores', 'changepoints': 'changepoint_file'}
+    return {names[output]: str(resolve_path(project, path)) for output, path in stored.items() if output in names}
 
 
 @cli.command(name='train-pca', help='Train PCA on all extracted results (h5 files) in input directory')
@@ -108,8 +86,7 @@ def _config_file(config_file):
 def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
     config = command_settings(config_file, TrainPCAOptions, stage_classes=PCA_STAGE)
     opts = TrainPCAOptions.resolve(config=config, explicit=explicit_values(ctx, TrainPCAOptions))
-    result = steps.train_pca(input_dir, output_dir, output_file, opts)
-    shim_write_back_paths(_config_file(config_file), 'train_pca', result.components_file)
+    steps.train_pca(input_dir, output_dir, output_file, opts, project=find_project(config_file))
 
 
 @cli.command(name='apply-pca', help='Compute PCA Scores of extraction data given a pre-trained PCA')
@@ -123,10 +100,9 @@ def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
 def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **_):
     config = command_settings(config_file, ApplyPCAOptions, stage_classes=PCA_STAGE)
     opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
-    recorded = recorded_paths(_config_file(config_file))
-    result = steps.apply_pca(input_dir, output_dir, output_file, opts,
-                             components_file=pca_file or recorded.get('pca_file'))
-    shim_write_back_paths(_config_file(config_file), 'apply_pca', result.scores_file)
+    project = find_project(config_file)
+    steps.apply_pca(input_dir, output_dir, output_file, opts,
+                    components_file=pca_file or recorded_paths(project).get('pca_file'), project=project)
 
 
 @cli.command('compute-changepoints',
@@ -140,11 +116,11 @@ def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **
 def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, pca_file_scores, **_):
     config = command_settings(config_file, ChangepointsOptions, stage_classes=PCA_STAGE)
     opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
-    recorded = recorded_paths(_config_file(config_file))
-    result = steps.compute_changepoints(input_dir, output_dir, output_file, opts,
-                                        components_file=recorded.get('pca_file'),
-                                        scores_file=pca_file_scores or recorded.get('pca_file_scores'))
-    shim_write_back_paths(_config_file(config_file), 'compute_changepoints', result.changepoints_file)
+    project = find_project(config_file)
+    recorded = recorded_paths(project)
+    steps.compute_changepoints(input_dir, output_dir, output_file, opts,
+                               components_file=recorded.get('pca_file'),
+                               scores_file=pca_file_scores or recorded.get('pca_file_scores'), project=project)
 
 
 @cli.command('clip-scores', help='Clip specified number of frames from PCA scores at the beginning or end')

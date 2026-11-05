@@ -2,7 +2,7 @@
 
     from moseq2_model.gui import learn_model_command
 
-    learn_model_command(progress_paths)
+    learn_model_command(str(project.folder), model_name, run_cmd=True)
 
 Two lines, and everything the notebook has done so far feeds them. The model
 reads the PC scores, fits an autoregressive hidden Markov model over them,

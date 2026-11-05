@@ -21,11 +21,12 @@ from dataclasses import dataclass
 from os.path import abspath, join
 from pathlib import Path
 
-from moseq2_common.project import Project
+from moseq2_common.bookkeeping import Session, load, relative_path, update
+from moseq2_common.project import Project, session_key
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
-from moseq2_extract.recordings import find_recordings
+from moseq2_extract.recordings import find_recordings, recording_of_extraction
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
 _WRAPPER_ARGUMENTS = ("num_frames", "skip_completed")
@@ -57,8 +58,8 @@ class BatchExtractResult:
 
 @dataclass(frozen=True)
 class AggregateResult:
-    #: The index file written for the aggregated sessions.
-    index_file: Path | None
+    #: The session keys this run copied into the output folder (recorded in the bookkeeping file in a project).
+    sessions: list
 
 
 def _settings(opts, leave_out=()):
@@ -143,7 +144,29 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
                               script=Path(job["extract_out_script"]))
 
 
-def aggregate_results(input_dir: str, output_dir: str, opts: AggregateOptions) -> AggregateResult:
-    """Copy every finished extraction under ``input_dir`` into ``output_dir`` and write the index."""
-    index = aggregate_extract_results_wrapper(input_dir, opts.format, output_dir, opts.mouse_threshold)
-    return AggregateResult(index_file=Path(index) if index else None)
+def aggregate_results(input_dir: str, output_dir: str, opts: AggregateOptions, *,
+                      project: Project | None = None) -> AggregateResult:
+    """Copy every finished extraction under ``input_dir`` into ``output_dir``.
+
+    In a project, each copied extraction becomes a session in the bookkeeping file
+    (``moseq2_common.bookkeeping``), keyed by its recording; sessions aggregated
+    before are kept, and nothing else in the file changes. Outside a project, nothing
+    is recorded.
+    """
+    copied = aggregate_extract_results_wrapper(input_dir, opts.format, output_dir, opts.mouse_threshold)
+    if project is None:
+        return AggregateResult(sessions=[])
+
+    sessions = [Session(key=session_key(project, recording), recording=session_key(project, recording),
+                        folder=relative_path(project, copy), uuid=uuid)
+                for recording, copy, uuid in ((recording_of_extraction(source), copy, uuid)
+                                              for source, copy, uuid in copied)]
+
+    def add(bookkeeping):
+        for session in sessions:
+            bookkeeping.sessions[session.key] = session
+
+    update(project, add)
+    print(f"{len(sessions)} session(s) added to {project.bookkeeping_file}; it lists "
+          f"{len(load(project).sessions)} in all.")
+    return AggregateResult(sessions=[session.key for session in sessions])

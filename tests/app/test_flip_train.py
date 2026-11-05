@@ -202,3 +202,39 @@ def test_training_warns_when_a_session_was_extracted_with_other_cleaning_setting
     assert "re-extract" in out
     assert "session_a" not in out
     assert ((5,), 10) in calls
+
+
+@pytest.mark.xfail(reason="PR 4.3b", strict=True)
+def test_a_sessions_recording_is_found_through_the_bookkeeping_file(tmp_path, monkeypatch):
+    """Labeled sessions are aggregated files with no uuid and no results yaml beside them: the project's
+    moseq2-project.yaml says which recording each one is, so session_b's arena-tool entry reaches training."""
+    from moseq2_app.steps import train_flip_classifier
+    from moseq2_extract.gui import generate_config_command
+
+    root = tmp_path / "project"
+    (root / "aggregate_results").mkdir(parents=True)
+    generate_config_command(str(root / "config.yaml"), camera_type="k2")
+    rng = np.random.default_rng(0)
+    h5s, sessions = {}, {}
+    for i, name in enumerate(("session_a", "session_b")):
+        (root / name).mkdir()
+        (root / name / "depth.dat").touch()
+        h5 = root / "aggregate_results" / f"2019-03-20_{name}_results_00.h5"
+        with h5py.File(h5, "w") as f:
+            f["frames"] = rng.integers(0, 80, size=(10, 20, 20)).astype(np.uint8)
+        h5s[name] = h5
+        key = f"{name}/depth.dat"
+        sessions[key] = {"recording": key, "folder": f"aggregate_results/{h5.name}", "uuid": f"uuid-{i}"}
+    write_yaml({"sessions": sessions}, str(root / "moseq2-project.yaml"))
+    write_yaml({"session_b/depth.dat": {"spatial_filter_size": [5]}}, str(root / "session_config.yaml"))
+    index = root / "flip-training-frame-ranges.p"
+    with index.open("wb") as f:
+        pickle.dump(({n: str(p) for n, p in h5s.items()}, {n: [(False, range(0, 5))] for n in h5s}), f)
+
+    calls = _cleaning_calls(monkeypatch)
+    monkeypatch.setattr(train, "train_classifier", lambda *a, **kw: None)
+    monkeypatch.setattr(train, "save_classifier", lambda *a, **kw: None)
+
+    train_flip_classifier(str(index), str(tmp_path / "flip.p"), str(root / "config.yaml"))
+
+    assert sorted(calls) == [((3,), 10), ((5,), 10)]

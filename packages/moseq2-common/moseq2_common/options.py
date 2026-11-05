@@ -15,6 +15,9 @@ help text live together. From that class:
   order the command's help lists them.
 - ``explicit_values`` returns the options the user typed on the command line,
   including one typed at its default value.
+- ``project_file_option`` and ``command_project`` give the viz and model
+  commands their ``--project-file``: the project's ``moseq2-project.yaml``, by
+  default the working folder's.
 
 ``config.yaml`` has one section per stage, named by each class's ``SECTION``
 (``extract``, ``pca``, ``model``, ``crowd_movies``), and ``camera_type`` at its
@@ -51,7 +54,9 @@ __all__ = [
     "click_options",
     "command_settings",
     "explicit_values",
+    "command_project",
     "option",
+    "project_file_option",
     "read_config",
     "read_settings",
     "setting_fields",
@@ -62,11 +67,8 @@ _KEY = "moseq2_option"
 #: The sections of config.yaml, one per stage.
 SECTIONS = ("extract", "pca", "model", "crowd_movies")
 
-#: The keys config.yaml holds at its top level, outside the sections.
-#: The three output paths leave with PR 4.3 (``moseq2_pca.cli.shim_write_back_paths``);
-#: ``job`` is a job settings file's.
-TOP_LEVEL_KEYS = ("camera_type", "groups", "exclude", "job",
-                  "pca_file", "pca_file_scores", "changepoint_file")
+#: The keys config.yaml holds at its top level, outside the sections; ``job`` is a job settings file's.
+TOP_LEVEL_KEYS = ("camera_type", "groups", "exclude", "job")
 
 O = TypeVar("O", bound="Options")
 F = TypeVar("F", bound=Callable[..., Any])
@@ -396,3 +398,38 @@ def explicit_values(ctx: click.Context, cls: type[Options]) -> dict:
         for f in dataclasses.fields(cls)
         if ctx.get_parameter_source(f.name) is ParameterSource.COMMANDLINE
     }
+
+
+def project_file_option(help: str):
+    """``--project-file``: a project's ``moseq2-project.yaml``, by default the one in the working folder."""
+    return click.option("--project-file", type=click.Path(dir_okay=False), default=None, help=help)
+
+
+def command_project(project_file, command: str, *, required: bool):
+    """The project a viz or model command runs on: ``--project-file``'s folder, else the working folder's.
+
+    With ``required``, a command without a ``moseq2-project.yaml`` to read stops with a message
+    naming where it looked and ``--project-file``. Without, it runs outside a project (None)
+    when the working folder holds no ``config.yaml``. A ``--project-file`` that does not exist
+    always stops.
+    """
+    from moseq2_common.bookkeeping import BOOKKEEPING_NAME
+    from moseq2_common.project import Project, find_project
+
+    if project_file:
+        if not Path(project_file).is_file():
+            raise click.ClickException(
+                f"`{command}` needs a project's {BOOKKEEPING_NAME}, and {project_file}, given with "
+                "--project-file, does not exist. Check the path, or run the command from the project folder "
+                "without --project-file."
+            )
+        return Project.at(Path(project_file).absolute().parent)
+    cwd = Path.cwd()
+    if required:
+        if not (cwd / BOOKKEEPING_NAME).is_file():
+            raise click.ClickException(
+                f"`{command}` needs a project's {BOOKKEEPING_NAME}, and there is none in {cwd}. Run it from the "
+                f"project folder, or pass `--project-file /path/to/project/{BOOKKEEPING_NAME}`."
+            )
+        return Project.at(cwd)
+    return find_project()

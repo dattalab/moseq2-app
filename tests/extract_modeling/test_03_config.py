@@ -1,9 +1,8 @@
 """Cell 3: generate the configuration every later step reads.
 
-    config_filepath = join(progress_paths['base_dir'], 'config.yaml')
+    config_filepath = project.config_file
     camera_type = 'k2'
     generate_config_command(config_filepath, camera_type=camera_type)
-    progress_paths = update_progress(progress_filepath, 'config_file', config_filepath)
 
 ``generate_config_command`` does not write a template. It writes every
 setting each stage's options classes declare, at its declared default, into
@@ -29,7 +28,6 @@ import re
 
 import pytest
 
-from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_extract.gui import generate_config_command
 from moseq2_common.yaml import read_yaml
 
@@ -141,14 +139,13 @@ def test_every_value_is_a_plain_yaml_type(tmp_path):
     assert not bad, f"config values that are not plain yaml types: {bad}"
 
 
-def test_config_lands_where_the_notebook_puts_it(project, progress_file, configured):
-    """4. The file is written beside the recordings and recorded in progress.yaml."""
+def test_config_lands_where_the_notebook_puts_it(project, started, configured):
+    """4. The file is written in the project folder, where every later cell finds it."""
     assert configured.exists()
     assert configured.parent == project
     assert configured.name == "config.yaml"
 
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
-    assert recorded["config_file"] == str(configured)
+    assert started.config_file == configured
 
 
 def test_regenerating_over_an_existing_config_asks_first(tmp_path, monkeypatch):

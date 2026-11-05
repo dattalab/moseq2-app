@@ -7,9 +7,15 @@ settings into one options object and call these. A step needs no
 ``learn_model("_pca/pca_scores.h5", "models/model.p", LearnModelOptions(kappa=1e5))``.
 
 Each step hands its work function (the ``*_wrapper`` in
-``moseq2_model.helpers.wrappers``) the options as a dict, with ``index``.
-``apply_model`` leaves ``index`` out when it is None, as the notebook's
-apply-model always has (L3).
+``moseq2_model.helpers.wrappers``) the options as a dict, with ``index``: the
+project's sessions and groups as an index in memory
+(``moseq2_common.bookkeeping.session_index``), or None. ``apply_model`` leaves
+``index`` out when it is None, as the notebook's apply-model always has (L3).
+
+Inside a project (``project``), ``learn_model`` records the model in the
+project's bookkeeping file as fitted and current, and ``apply_model`` records
+the applied model. A fit run from a kappa scan's job settings file is given no
+``project`` and records nothing; its model enters the bookkeeping file later.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from os.path import realpath
 from pathlib import Path
 
 from moseq2_model.helpers.wrappers import apply_model_wrapper, kappa_scan_fit_models_wrapper, learn_model_wrapper
+from moseq2_common.bookkeeping import relative_path, update
 from moseq2_common.project import Project
 from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
 
@@ -54,13 +61,24 @@ def _settings(opts, paths):
 
 
 def learn_model(input_file: str, dest_file: str, opts: LearnModelOptions, *,
-                index: str | None = None) -> LearnModelResult:
+                index: dict | None = None, project: Project | None = None) -> LearnModelResult:
     """Fit an AR-HMM to the PC scores in ``input_file``; write the model to ``dest_file``."""
     figure = learn_model_wrapper(input_file, dest_file, _settings(opts, {'index': index}))
-    return LearnModelResult(model_file=Path(realpath(dest_file)), figure_file=Path(figure) if figure else None)
+    result = LearnModelResult(model_file=Path(realpath(dest_file)), figure_file=Path(figure) if figure else None)
+    if project is not None:
+        model = relative_path(project, result.model_file)
+
+        def change(bookkeeping):
+            fitted = bookkeeping.models.setdefault("fitted", [])
+            if model not in fitted:
+                fitted.append(model)
+            bookkeeping.models["current"] = model
+
+        update(project, change)
+    return result
 
 
-def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, index: str | None = None,
+def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, index: dict | None = None,
                learn: LearnModelOptions | None = None, project: Project | None = None) -> KappaScanResult:
     """Write ``opts.out_script``, one ``learn-model`` command per kappa, each saving its model in ``output_dir``.
 
@@ -75,8 +93,17 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
 
 
 def apply_model(model_file: str, pc_file: str, dest_file: str, opts: ApplyModelOptions, *,
-                index: str | None = None) -> ApplyModelResult:
+                index: dict | None = None, project: Project | None = None) -> ApplyModelResult:
     """Label the PC scores in ``pc_file`` with the model in ``model_file``; write them to ``dest_file``."""
     paths = {} if index is None else {'index': index}
     apply_model_wrapper(model_file, pc_file, dest_file, _settings(opts, paths))
-    return ApplyModelResult(applied_file=Path(dest_file))
+    result = ApplyModelResult(applied_file=Path(dest_file))
+    if project is not None:
+        applied = relative_path(project, result.applied_file)
+
+        def change(bookkeeping):
+            if applied not in bookkeeping.applied_models:
+                bookkeeping.applied_models.append(applied)
+
+        update(project, change)
+    return result

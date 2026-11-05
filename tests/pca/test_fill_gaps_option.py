@@ -4,8 +4,9 @@ Every later step treats a row of PC scores as one frame step, so scores
 without the empty rows would make the model and the changepoints assume
 nothing was dropped. There is no option to turn it off; typing the former
 ``--fill-gaps`` stops with that explanation. A config file that still holds
-``fill_gaps`` (``apply-pca`` used to write every option it ran with back into
-it) is accepted, since it says nothing the command does not already do.
+``fill_gaps`` in its ``pca`` section (``apply-pca`` used to write every option it
+ran with back into it) gets the message every setting no step reads gets, naming
+it, and the scores are computed.
 """
 
 from __future__ import annotations
@@ -53,11 +54,12 @@ def test_typing_fill_gaps_stops_with_why(tmp_path, received, value):
     assert received == []
 
 
-def test_a_config_file_holding_fill_gaps_stops_naming_it(tmp_path, received):
-    """No PCA step has a fill_gaps setting, so the pca section's key stops the step, as any unknown key does."""
+def test_a_config_file_holding_fill_gaps_is_named_and_the_scores_computed(tmp_path, received):
+    """No PCA step has a fill_gaps setting: the message names the key and its section, and apply-pca runs."""
     config = tmp_path / "config.yaml"
     write_yaml({"pca": {"fill_gaps": True}}, str(config))
     result = apply_pca(tmp_path, "--config-file", str(config))
-    assert result.exit_code != 0
+    assert result.exit_code == 0, result.output
     assert "`fill_gaps`" in result.output and "`pca`" in result.output
-    assert received == []
+    assert len(received) == 1
+    assert "fill_gaps" not in received[0]

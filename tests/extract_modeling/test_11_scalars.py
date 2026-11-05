@@ -2,10 +2,10 @@
 
     from moseq2_app.main import interactive_scalar_summary
 
-    viewer = interactive_scalar_summary(progress_paths['index_file'])
+    viewer = interactive_scalar_summary(str(project.folder))
 
-The last check before PCA. It reads every recording's scalars through the
-index, reduces each to a mean and a standard deviation, and draws them as
+The last check before PCA. It reads the scalars of every session the project's
+``moseq2-project.yaml`` lists, reduces each to a mean and a standard deviation, and draws them as
 violins split by the groups cell 10 assigned, so a recording that sits apart
 from its condition is visible before it is modelled.
 
@@ -56,10 +56,12 @@ def test_the_cell_displays_its_controls_and_hands_back_the_viewer(grouped, displ
     assert viewer.ui_tools in displayed.objects
 
 
-def test_a_missing_index_is_reported_rather_than_raised(tmp_path, capsys):
-    """2. The cell is reached with a path a user typed, so it can be wrong."""
-    assert interactive_scalar_summary(str(tmp_path / "nope.yaml")) is None
-    assert "Index file does not exist" in capsys.readouterr().out
+def test_a_project_with_no_sessions_is_reported_rather_than_raised(tmp_path, capsys):
+    """2. Run before the aggregation cell, the cell says to run that first."""
+    assert interactive_scalar_summary(str(tmp_path)) is None
+    out = capsys.readouterr().out
+    assert str(tmp_path / "moseq2-project.yaml") in out
+    assert "aggregation cell" in out
 
 
 def test_the_measurements_on_offer(scalar_viewer):
@@ -96,7 +98,7 @@ def test_each_recording_becomes_one_point_per_measurement(scalar_viewer):
         assert sorted(frame["group"]) == ["amph", "amph", "saline", "saline"]
 
 
-def test_the_groups_come_from_the_index(scalar_viewer, grouped):
+def test_the_groups_come_from_config_yaml(scalar_viewer, grouped):
     """6. What cell 10 did is what this cell splits on."""
     from_index = {
         entry["metadata"]["SessionName"]: entry["group"]

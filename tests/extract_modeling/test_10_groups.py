@@ -2,19 +2,20 @@
 
     from moseq2_app.main import interactive_group_setting
 
-    interactive_group_setting(progress_paths['index_file'])
+    interactive_group_setting(str(project.folder))
 
 Cell 9 left every recording in group ``default``. Until that changes, every
 group comparison in the analysis notebook compares the experiment against
 itself, so this cell is the one that makes the rest of the project mean
 something.
 
-It shows an editable table of the index: session, subject, group, uuid and
-filename, with only the group column editable. A user selects the rows for
-one condition, types its name, presses "Set Group Name" to write it into the
-selected rows, and presses "Update Index File" to save the table back. The
-first button changes the table and nothing else; only the second touches
-disk, so a user can reorganise freely and commit once.
+It shows an editable table of the project's sessions: session, subject, group,
+uuid and filename, with only the group column editable. A user selects the rows
+for one condition, types its name, presses "Set Group Name" to write it into the
+selected rows, and presses "Save Groups" to save each session's group in
+``config.yaml``'s ``groups``, keyed by its recording. The first button changes
+the table and nothing else; only the second touches disk, so a user can
+reorganise freely and commit once.
 
 Everything here runs in process. The table is a qgridnext grid, which keeps
 its data as a DataFrame and exposes the selection, so the tests select rows,
@@ -39,9 +40,9 @@ from test_09_aggregate import entries
 CONDITIONS = {"saline": "saline", "amphetamine": "amph"}
 
 
-def open_table(index):
-    """Open the cell's widget on an index file."""
-    return interactive_group_setting(str(index))
+def open_table(project):
+    """Open the cell's widget on a project folder."""
+    return interactive_group_setting(str(project))
 
 
 def select(widget, prefix):
@@ -60,16 +61,23 @@ def assign(widget, prefix, group):
 
 
 @pytest.fixture
-def scratch_index(tmp_path, index_as_aggregated):
-    """A copy of the index cell 9 wrote, for tests that save changes to it."""
-    index = tmp_path / "moseq2-index.yaml"
-    shutil.copy2(index_as_aggregated, index)
-    return index
+def scratch_project(tmp_path, project, aggregated, bookkeeping_as_aggregated):
+    """The project as cell 9 left it, for tests that save changes: its sessions, and a config.yaml without groups."""
+    from moseq2_common.options import read_config
+    from moseq2_common.yaml import write_config
+
+    root = tmp_path / "project"
+    shutil.copytree(project / "aggregate_results", root / "aggregate_results")
+    shutil.copy2(bookkeeping_as_aggregated, root / "moseq2-project.yaml")
+    config = read_config(project / "config.yaml")
+    config.pop("groups", None)
+    write_config(config, str(root / "config.yaml"))
+    return root
 
 
-def test_the_cell_displays_the_controls_and_the_table(index_as_aggregated, displayed):
+def test_the_cell_displays_the_controls_and_the_table(scratch_project, displayed):
     """1. What a user is given."""
-    widget = open_table(index_as_aggregated)
+    widget = open_table(scratch_project)
 
     controls = displayed.one(widgets.HBox)
     assert [type(child).__name__ for child in controls.children] == [
@@ -78,13 +86,13 @@ def test_the_cell_displays_the_controls_and_the_table(index_as_aggregated, displ
         "Button",
     ]
     assert controls.children[1].description == "Set Group Name"
-    assert controls.children[2].description == "Update Index File"
+    assert controls.children[2].description == "Save Groups"
     assert widget.qgrid_widget in displayed.objects
 
 
-def test_the_table_shows_every_recording(index_as_aggregated):
+def test_the_table_shows_every_recording(scratch_project):
     """2. One row per recording, with what a user needs to tell them apart."""
-    widget = open_table(index_as_aggregated)
+    widget = open_table(scratch_project)
     table = widget.qgrid_widget.get_changed_df()
 
     assert list(table.columns) == [
@@ -98,21 +106,17 @@ def test_the_table_shows_every_recording(index_as_aggregated):
     assert set(table["group"]) == {"default"}
 
 
-def test_only_the_group_can_be_edited(index_as_aggregated):
-    """3. The table is for labelling, not for correcting the metadata.
-
-    A user who could edit a uuid here would break the link between the index
-    and the extraction it describes.
-    """
-    widget = open_table(index_as_aggregated)
+def test_only_the_group_can_be_edited(scratch_project):
+    """3. The table is for labelling, not for correcting the metadata."""
+    widget = open_table(scratch_project)
 
     assert widget.col_opts["editable"] is False
     assert widget.col_defs == {"group": {"editable": True, "toolTip": "editable"}}
 
 
-def test_setting_a_name_changes_only_the_selected_rows(scratch_index):
+def test_setting_a_name_changes_only_the_selected_rows(scratch_project):
     """4. The point of selecting first."""
-    widget = open_table(scratch_index)
+    widget = open_table(scratch_project)
     assign(widget, "saline", "saline")
 
     table = widget.qgrid_widget.get_changed_df()
@@ -126,27 +130,33 @@ def test_setting_a_name_changes_only_the_selected_rows(scratch_index):
     )
 
 
-def test_setting_a_name_does_not_touch_the_index(scratch_index):
+def test_setting_a_name_does_not_touch_config_yaml(scratch_project):
     """5. A user can reorganise the table freely and commit once.
 
-    Only "Update Index File" writes, so an accidental selection costs
-    nothing until it is saved.
+    Only "Save Groups" writes, so an accidental selection costs nothing until
+    it is saved.
     """
-    before = scratch_index.read_text()
-    widget = open_table(scratch_index)
+    before = (scratch_project / "config.yaml").read_bytes()
+    widget = open_table(scratch_project)
     assign(widget, "saline", "saline")
 
-    assert scratch_index.read_text() == before
+    assert (scratch_project / "config.yaml").read_bytes() == before
 
 
-def test_saving_writes_every_group_to_the_index(scratch_index):
+def test_saving_writes_every_group_to_config_yaml(scratch_project):
     """6. The cell's output, and what the rest of the project reads."""
-    widget = open_table(scratch_index)
+    widget = open_table(scratch_project)
     for prefix, group in CONDITIONS.items():
         assign(widget, prefix, group)
-    widget.update_index_button.click()
+    widget.save_groups_button.click()
 
-    saved = entries(scratch_index)
+    assert read_yaml(str(scratch_project / "config.yaml"))["groups"] == {
+        "saline_example_0/depth.avi": "saline",
+        "saline_example_1/depth.avi": "saline",
+        "amphetamine_example_0/depth.avi": "amph",
+        "amphetamine_example_1/depth.avi": "amph",
+    }
+    saved = entries(scratch_project / "moseq2-project.yaml")
     assert {name: entry["group"] for name, entry in saved.items()} == {
         "saline_example_0": "saline",
         "saline_example_1": "saline",
@@ -155,67 +165,42 @@ def test_saving_writes_every_group_to_the_index(scratch_index):
     }
 
 
-def test_saving_keeps_the_rest_of_the_index_intact(scratch_index):
-    """7. Only the groups move.
-
-    The index is rebuilt from a DataFrame rather than edited in place, so
-    everything the later cells read has to survive the round trip.
-    """
-    before = plain(read_yaml(str(scratch_index)))
-    widget = open_table(scratch_index)
+def test_saving_changes_nothing_but_the_groups(scratch_project):
+    """7. Only the groups move: config.yaml's settings and the bookkeeping file stay as they were."""
+    before_config = plain(read_yaml(str(scratch_project / "config.yaml")))
+    before_bookkeeping = (scratch_project / "moseq2-project.yaml").read_bytes()
+    widget = open_table(scratch_project)
     assign(widget, "saline", "saline")
-    widget.update_index_button.click()
-    after = plain(read_yaml(str(scratch_index)))
+    widget.save_groups_button.click()
+    after_config = plain(read_yaml(str(scratch_project / "config.yaml")))
 
-    assert sorted(after) == sorted(before)
-    assert after["pca_path"] == before["pca_path"]
-    before_by_uuid = {entry["uuid"]: entry for entry in before["files"]}
-    for entry in after["files"]:
-        original = before_by_uuid[entry["uuid"]]
-        assert entry["path"] == original["path"]
-        assert entry["metadata"] == original["metadata"]
+    assert {k: v for k, v in after_config.items() if k != "groups"} == before_config
+    assert (scratch_project / "moseq2-project.yaml").read_bytes() == before_bookkeeping
 
 
-def test_the_save_button_tracks_unsaved_changes(scratch_index):
-    """8. The only feedback a user gets about whether the file is current.
+def test_the_save_button_tracks_unsaved_changes(scratch_project):
+    """8. The only feedback a user gets about whether the groups are saved.
 
     The button passes through three states: plain while nothing has changed,
     highlighted once the table holds edits that are not on disk, and ticked
-    once they are. It is the only thing distinguishing a saved table from an
-    edited one, since the table itself looks the same either way.
+    once they are.
     """
-    widget = open_table(scratch_index)
-    assert (widget.update_index_button.button_style, widget.update_index_button.icon) == ("", "")
+    widget = open_table(scratch_project)
+    assert (widget.save_groups_button.button_style, widget.save_groups_button.icon) == ("", "")
 
     assign(widget, "saline", "saline")
-    assert (widget.update_index_button.button_style, widget.update_index_button.icon) == (
+    assert (widget.save_groups_button.button_style, widget.save_groups_button.icon) == (
         "info",
         "none",
     )
 
-    widget.update_index_button.click()
-    assert (widget.update_index_button.button_style, widget.update_index_button.icon) == (
+    widget.save_groups_button.click()
+    assert (widget.save_groups_button.button_style, widget.save_groups_button.icon) == (
         "success",
         "check",
     )
 
 
-def test_saving_does_not_add_a_key_to_the_index(scratch_index):
-    """9. The index should hold what it held, with the groups changed.
-
-    Saving adds a ``filename`` key to every entry, which cell 9 did not write
-    and nothing reads. It is harmless and idempotent, but it means the file on
-    disk is no longer the shape the aggregation produced.
-    """
-    before = {key for entry in plain(read_yaml(str(scratch_index)))["files"] for key in entry}
-    widget = open_table(scratch_index)
-    assign(widget, "saline", "saline")
-    widget.update_index_button.click()
-    after = {key for entry in plain(read_yaml(str(scratch_index)))["files"] for key in entry}
-
-    assert after == before
-
-
 def test_the_chain_labels_both_conditions(grouped):
-    """10. The state the rest of the notebook runs on."""
-    assert {entry["group"] for entry in entries(grouped).values()} == {"saline", "amph"}
+    """9. The state the rest of the notebook runs on."""
+    assert {entry["group"] for entry in entries(grouped / "moseq2-project.yaml").values()} == {"saline", "amph"}

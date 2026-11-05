@@ -26,6 +26,7 @@ import pytest
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from cells import code_cell
+from moseq2_common.project import Project
 from commands import split_command
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.roi.controller import InteractiveExtractionViewer
@@ -151,7 +152,7 @@ def test_the_notebooks_extraction_cell_extracts_an_mkv(tmp_path, chosen):
     generate_config_command(str(config), camera_type="azure")
 
     namespace = {
-        "progress_paths": {"base_dir": str(root), "config_file": str(config)},
+        "project": Project.at(root),
         "skip_extracted": True,
     }
     exec(compile(code_cell(EXTRACT_NOTEBOOK, EXTRACTION_CELL), "<extraction cell>", "exec"), namespace)

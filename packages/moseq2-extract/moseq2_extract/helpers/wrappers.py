@@ -130,7 +130,7 @@ def aggregate_extract_results_wrapper(
     input_dir, format, output_dir, mouse_threshold=0.0
 ):
     """
-    Aggregate results to one folder and generate index file (moseq2-index.yaml).
+    Copy every finished extraction under input_dir into one folder, named from its metadata.
 
     Args:
     input_dir (str): path to base directory containing all session folders
@@ -139,7 +139,7 @@ def aggregate_extract_results_wrapper(
     mouse_threshold (float): threshold value of mean frame depth to include session frames
 
     Returns:
-    indexpath (str): path to generated index file including all aggregated session information.
+    copied (list): (extraction h5, its copy in output_dir, its uuid) for each extraction copied.
     """
 
     h5s, dicts, _ = recursive_find_h5s(input_dir)
@@ -172,10 +172,8 @@ def aggregate_extract_results_wrapper(
 
     print("Results successfully aggregated in", output_dir)
 
-    indexpath = generate_index_wrapper(output_dir, join(input_dir, "moseq2-index.yaml"))
-
-    print(f"Index file path: {indexpath}")
-    return indexpath
+    return [(source, join(output_dir, f'{entry["copy_path"]}.h5'), entry["yaml_dict"].get("uuid"))
+            for source, entry in manifest.items()]
 
 
 def generate_index_from_agg_res_wrapper(input_dir):

@@ -1,9 +1,9 @@
-"""Writing and reading ``config.yaml`` in its sectioned shape, for tests that set a few settings by hand.
+"""Writing a project's files by hand, for tests that set up a few settings or sessions.
 
-A 1.6 ``config.yaml`` holds ``camera_type`` (and, until a later pull request,
-the PCA output paths) at its top level, and every
-other setting in the section of its stage. These helpers take the settings of
-one section as a flat dict, the way the tests list them.
+A 1.6 ``config.yaml`` holds ``camera_type`` at its top level, and every other
+setting in the section of its stage. These helpers take the settings of one
+section as a flat dict, the way the tests list them. ``write_bookkeeping``
+writes a ``moseq2-project.yaml`` listing given session files and outputs.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from moseq2_common.yaml import read_yaml, write_yaml
 
 #: The keys config.yaml keeps at its top level (``moseq2_common.options.TOP_LEVEL_KEYS``).
-TOP_LEVEL = ("camera_type", "groups", "exclude", "job", "pca_file", "pca_file_scores", "changepoint_file")
+TOP_LEVEL = ("camera_type", "groups", "exclude", "job")
 
 
 def sectioned(flat: dict, section: str = "extract") -> dict:
@@ -43,3 +43,22 @@ def update_settings(path, section: str = "extract", **changes) -> None:
         else:
             data.setdefault(section, {})[key] = value
     write_yaml(data, str(path))
+
+
+def write_bookkeeping(project, session_files=(), **pca) -> None:
+    """Write ``project``'s ``moseq2-project.yaml``: a session per file in ``session_files`` and the PCA outputs
+    given as ``components=``, ``scores=``, ``changepoints=`` (paths relative to the project, or absolute)."""
+    from pathlib import Path
+
+    from moseq2_common.bookkeeping import relative_path
+    from moseq2_common.project import Project
+
+    project = Project.at(project)
+    sessions = {}
+    for i, path in enumerate(session_files):
+        folder = relative_path(project, Path(project.folder) / path)
+        sessions[f"session_{i}/depth.avi"] = {"recording": f"session_{i}/depth.avi", "folder": folder,
+                                              "uuid": f"uuid-{i}"}
+    write_yaml({"sessions": sessions,
+                "pca": {name: relative_path(project, Path(project.folder) / path) for name, path in pca.items()}},
+               str(project.bookkeeping_file))

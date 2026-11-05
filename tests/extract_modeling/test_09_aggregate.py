@@ -1,27 +1,23 @@
-"""Cell 9: gather the extractions into one directory and index them.
+"""Cell 9: gather the extractions into one directory and list the sessions.
 
     recording_format = '{start_time}_{session_name}_{subject_name}'
     aggregate_results_dirname = 'aggregate_results/'
 
-    train_data_dir = join(progress_paths['base_dir'], aggregate_results_dirname)
-    update_progress(progress_filepath, 'train_data_dir', train_data_dir)
-
-    index_filepath = aggregate_extract_results_command(
-        progress_paths['base_dir'], recording_format, aggregate_results_dirname)
-    progress_paths = update_progress(progress_filepath, 'index_file', index_filepath)
+    aggregate_extract_results_command(str(project.folder), recording_format, aggregate_results_dirname)
 
 The hinge of the notebook. Up to here every output has lived beside the
 recording that produced it, named ``results_00`` in a ``proc`` directory and
 told apart only by which folder it sits in. Modeling reads one directory, so
 the cell copies everything into ``aggregate_results/`` under a name built from
-the acquisition metadata, and writes ``moseq2-index.yaml`` describing what it
-gathered.
+the acquisition metadata, and lists each recording as one of the project's
+sessions in ``moseq2-project.yaml``.
 
-The index is the project's table of contents from here on: one entry per
-recording, carrying a uuid, the acquisition metadata, a group label and the
-paths to that recording's files. Every later cell takes the index rather than
-the project. The group starts as ``default`` for everything and is what cell
-10 exists to change.
+That file is the project's table of contents from here on: one session per
+recording, keyed by the recording's path in the project, with its uuid and its
+file in ``aggregate_results/``. The later steps read the sessions as an index
+in memory (``moseq2_common.bookkeeping.session_index``), each with the
+acquisition metadata and its group from ``config.yaml``, ``default`` until
+cell 10 sets them.
 
 The copies are byte-identical, so the originals beside each recording stay
 usable and nothing is rewritten in the move.
@@ -34,7 +30,8 @@ from pathlib import Path
 
 import h5py
 
-from moseq2_app.gui.progress import restore_progress_vars
+from moseq2_common.bookkeeping import session_index
+from moseq2_common.project import Project
 from moseq2_common.yaml import read_yaml
 
 from test_03_config import plain
@@ -52,9 +49,13 @@ NAME = re.compile(
 )
 
 
-def entries(index):
-    """The index's recordings, keyed by session name."""
-    listed = plain(read_yaml(str(index)))["files"]
+def entries(where):
+    """The project's sessions, as the later steps read them, keyed by session name.
+
+    ``where`` is the project folder or its ``moseq2-project.yaml``.
+    """
+    root = Path(where) if Path(where).is_dir() else Path(where).parent
+    listed = plain(session_index(Project.at(root)))["files"]
     return {entry["metadata"]["SessionName"]: entry for entry in listed}
 
 
@@ -98,12 +99,11 @@ def test_the_copies_are_identical_to_what_was_extracted(aggregated, project):
         assert copied.read_bytes() == (proc(project, name) / "results_00.h5").read_bytes()
 
 
-def test_the_index_lists_every_recording_by_uuid(aggregated, project):
-    """4. What identifies a recording from here on.
+def test_the_sessions_carry_each_extractions_uuid(aggregated, project):
+    """4. What a model's results are matched back to.
 
-    The uuid is written by the extraction and travels into the index, which is
-    how a model's results are later matched back to the recording they came
-    from. Names and paths change; this does not.
+    The uuid is written by the extraction and travels into the bookkeeping
+    file, and the PC scores and the model key each session by it.
     """
     listed = entries(aggregated)
     assert sorted(listed) == RECORDINGS
@@ -115,7 +115,7 @@ def test_the_index_lists_every_recording_by_uuid(aggregated, project):
 
 
 def test_each_entry_points_at_the_copies_not_the_originals(aggregated, project):
-    """5. The index is a view of the aggregate directory."""
+    """5. The sessions are the aggregate directory's files."""
     for entry in entries(aggregated).values():
         paths = [Path(p) for p in entry["path"]]
         assert [p.suffix for p in paths] == [".h5", ".yaml"]
@@ -127,9 +127,9 @@ def test_each_entry_points_at_the_copies_not_the_originals(aggregated, project):
 def test_the_movies_are_gathered_but_not_indexed(aggregated, project):
     """6. Current behaviour, captured.
 
-    Each recording's preview movie is copied with the rest, but the index
-    entry names only the h5 and the yaml. Anything that wants the movie finds
-    it by rebuilding the name rather than by reading the index.
+    Each recording's preview movie is copied with the rest, but a session's
+    paths name only the h5 and the yaml. Anything that wants the movie finds
+    it by rebuilding the name.
     """
     movies = sorted((project / "aggregate_results").glob("*.mp4"))
     assert len(movies) == len(RECORDINGS)
@@ -138,24 +138,35 @@ def test_the_movies_are_gathered_but_not_indexed(aggregated, project):
     assert not any(str(movie) in indexed for movie in movies)
 
 
-def test_every_recording_starts_in_the_default_group(index_as_aggregated):
-    """7. The state cell 10 exists to change.
+def test_aggregation_lists_the_sessions_and_nothing_else(bookkeeping_as_aggregated, project):
+    """7. What the cell writes: each recording as a session, keyed by its path in the project.
 
-    Nothing has told the project which recordings are which condition yet, so
-    every entry carries the same label and a group comparison here would
-    compare the experiment against itself. Cell 10 labels the groups in the
-    index itself, so this reads the index as this cell wrote it.
+    No group is stored here (groups are config.yaml's), and no later step has
+    recorded an output yet.
     """
-    assert {entry["group"] for entry in entries(index_as_aggregated).values()} == {"default"}
+    stored = read_yaml(str(bookkeeping_as_aggregated))
+
+    assert set(stored["sessions"]) == {f"{name}/depth.avi" for name in RECORDINGS}
+    for key, session in stored["sessions"].items():
+        assert session["recording"] == key
+        assert session["folder"].startswith("aggregate_results/") and session["folder"].endswith(".h5")
+    assert stored["pca"] == {}
+    assert stored["models"]["fitted"] == []
+    assert "group" not in str(stored)
 
 
-def test_the_index_is_written_beside_the_project_and_recorded(
-    aggregated, project, progress_file
-):
-    """8. Where the rest of the notebook finds it."""
-    assert aggregated == project / "moseq2-index.yaml"
+def test_a_session_no_group_names_is_in_the_default_group(bookkeeping_as_aggregated, tmp_path):
+    """8. The state cell 10 exists to change: with no groups in config.yaml, every session is ``default``."""
+    import shutil
 
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
-    assert recorded["index_file"] == str(aggregated)
-    assert recorded["train_data_dir"] == str(project / "aggregate_results") + "/"
+    copy = tmp_path / "project"
+    copy.mkdir()
+    shutil.copy2(bookkeeping_as_aggregated, copy / "moseq2-project.yaml")
+    (copy / "config.yaml").write_text("camera_type: auto\n")
 
+    assert {entry["group"] for entry in session_index(Project.at(copy))["files"]} == {"default"}
+
+
+def test_the_bookkeeping_file_is_written_in_the_project(aggregated, project):
+    """9. Where the rest of the notebook finds it."""
+    assert aggregated == project / "moseq2-project.yaml"

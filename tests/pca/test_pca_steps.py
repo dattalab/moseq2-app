@@ -97,15 +97,15 @@ def test_every_pca_command_calls_its_step(tmp_path, called, options):
 def test_the_notebook_functions_call_the_steps(tmp_path, called, options):
     from moseq2_pca.gui import apply_pca_command, compute_changepoints_command, train_pca_command
 
+    from configs import write_bookkeeping
+
     config = tmp_path / "config.yaml"
     write_yaml({"pca": {"rank": 30}}, str(config))
-    paths = {"config_file": str(config), "train_data_dir": str(tmp_path / "aggregate_results"),
-             "pca_dirname": str(tmp_path / "_pca"), "index_file": str(tmp_path / "moseq2-index.yaml"),
-             "scores_path": str(tmp_path / "_pca" / "pca_scores.h5")}
+    write_bookkeeping(tmp_path, ["aggregate_results/s0.h5"], scores="_pca/pca_scores.h5")
 
-    train_pca_command(paths, paths["pca_dirname"], "pca")
-    apply_pca_command(paths, "pca_scores")
-    compute_changepoints_command(paths["train_data_dir"], paths, "changepoints")
+    train_pca_command(str(tmp_path), "pca")
+    apply_pca_command(str(tmp_path), "pca_scores")
+    compute_changepoints_command(str(tmp_path), "changepoints")
 
     for name, cls in step_classes(options).items():
         assert len(called[name]) == 1, name
@@ -142,8 +142,11 @@ def test_both_front_ends_hand_the_wrapper_the_same_settings(tmp_path, monkeypatc
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
-    train_pca_command({"config_file": str(configs[1]), "train_data_dir": str(tmp_path)},
-                      str(tmp_path / "notebook" / "_pca"), "pca")
+    from configs import write_bookkeeping
+
+    # the notebook's project lists sessions in tmp_path, where the command line's -i points
+    write_bookkeeping(tmp_path / "notebook", ["../s0.h5"])
+    train_pca_command(str(tmp_path / "notebook"), "pca")
 
     cli, notebook = received
     fields = list(options.TrainPCAOptions().as_dict())

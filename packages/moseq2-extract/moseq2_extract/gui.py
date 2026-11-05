@@ -182,43 +182,39 @@ def extract_found_sessions(
 
 @filter_warnings
 def aggregate_extract_results_command(
-    input_dir, format, output_dir, mouse_threshold=None, config_file=None
+    project_folder, format="{start_time}_{session_name}_{subject_name}", output_dir="aggregate_results/",
+    mouse_threshold=None,
 ):
     """
-    Find all extracted h5, yaml and mp4 files and copies them all to a
-    new directory relabeled with their respective session names.
-    Also generates the index file (moseq2-index.yaml).
+    Copy every finished extraction in the project into ``output_dir``, named from its metadata, and list
+    each as one of the project's sessions in its bookkeeping file (moseq2-project.yaml).
 
     Args:
-    input_dir (str): path to base directory to recursively search for extracted files
+    project_folder (str): the project folder, holding config.yaml and the recordings.
     format (str): filename format for info to include in filenames
-    output_dir (str): path to directory to save all aggregated results
+    output_dir (str): the folder to copy the extractions into, relative to the project folder.
     mouse_threshold (float): min threshold of extracted mouse height to include a session
     in the aggregated sesssions to ensure sessions with no extracted mouse is not included in the aggregated sessions.
     None takes config.yaml's ``extract`` section, else ``AggregateOptions``' default.
-    config_file (str): path to config.yaml; None for the project in ``input_dir``.
-
 
     Returns:
-    indexpath (str): path to generated index file (moseq2-index.yaml).
+    sessions (list): the sessions this run added, by key.
     """
 
     # the project's folder, where the command line's is the working directory's (PR 4.5)
-    output_dir = join(input_dir, output_dir)
+    output_dir = join(project_folder, output_dir)
 
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    project = find_project(config_file, cwd=input_dir)
-    config = read_settings(config_file or (project.config_file if project is not None else None),
+    project = find_project(cwd=project_folder)
+    config = read_settings(project.config_file if project is not None else None,
                            AggregateOptions, stage_classes=EXTRACT_STAGE)
     explicit = {"format": format}
     if mouse_threshold is not None:
         explicit["mouse_threshold"] = mouse_threshold
     opts = AggregateOptions.resolve(config=config, explicit=explicit)
-    result = steps.aggregate_results(input_dir, output_dir, opts)
-
-    return None if result.index_file is None else str(result.index_file)
+    return steps.aggregate_results(project_folder, output_dir, opts, project=project).sessions
 
 
 def download_flip_command(output_dir, config_file="", selection=1):

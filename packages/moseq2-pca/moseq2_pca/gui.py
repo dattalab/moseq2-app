@@ -1,112 +1,93 @@
 """
 GUI front-end operations for PCA.
 
-Each function reads the ``pca`` section of the project's ``config.yaml``,
-resolves the step's settings and calls the step in ``moseq2_pca.steps``.
+Each function takes the project folder, reads the ``pca`` section of its
+``config.yaml``, resolves the step's settings and calls the step in
+``moseq2_pca.steps``. The steps read the sessions from the project's
+``aggregate_results/`` and write into its ``_pca/``; each records what it wrote
+in the project's ``moseq2-project.yaml``, which the next function reads (on
+every call, so a step run on the command line in between is what it finds).
 """
 
 import warnings
+from os.path import join
 
+from moseq2_common.bookkeeping import sessions_folder
 from moseq2_common.options import read_settings
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.project import Project
 from moseq2_pca import steps
-from moseq2_pca.cli import recorded_paths, shim_write_back_paths
+from moseq2_pca.cli import recorded_paths
 from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
 
+#: The folder inside the project the notebook's PCA steps write to.
+PCA_DIRNAME = '_pca'
 
-def shim_index_pca_path(index_file, scores_path):
-    """Write the scores' path into the index as ``pca_path`` (L1, removed by PR 4.3).
 
-    As 1.5.0: a missing or unreadable index is reported and left alone.
+def _options(cls, project):
+    return cls.resolve(config=read_settings(project.config_file, cls, stage_classes=PCA_STAGE))
+
+
+def train_pca_command(project_folder, output_file='pca'):
     """
-    try:
-        index_params = read_yaml(index_file)
-    except OSError:
-        index_params = None
-    if index_params:
-        print(f'Updating index file pca_path: {scores_path}')
-        index_params['pca_path'] = scores_path
-        write_yaml(index_params, index_file)
-    else:
-        print('moseq2-index not found, did not update paths')
-
-
-def _options(cls, config_file):
-    return cls.resolve(config=read_settings(config_file, cls, stage_classes=PCA_STAGE))
-
-
-def train_pca_command(progress_paths, output_dir, output_file):
-    """
-    Train PCA through Jupyter notebook, and updates config file.
+    Train PCA on the project's sessions from within a Jupyter notebook.
 
     Args:
-    progress_paths (dict): dictionary containing notebook progress paths
-    output_dir (str): path to output pca directory
-    output_file (str): name of output pca file.
-
-    Returns:
+    project_folder (str): the project folder.
+    output_file (str): name of the components file written into the project's ``_pca/`` (``pca`` writes ``pca.h5``).
     """
-    config_file = progress_paths['config_file']
-    opts = _options(TrainPCAOptions, config_file)
+    project = Project.at(project_folder)
+    opts = _options(TrainPCAOptions, project)
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         warnings.filterwarnings("ignore", category=UserWarning)
 
-        result = steps.train_pca(progress_paths['train_data_dir'], output_dir, output_file, opts)
+        steps.train_pca(str(sessions_folder(project)), join(project_folder, PCA_DIRNAME), output_file, opts,
+                        project=project)
 
-    shim_write_back_paths(config_file, 'train_pca', result.components_file)
 
-
-def apply_pca_command(progress_paths, output_file):
+def apply_pca_command(project_folder, output_file='pca_scores', components_file=None):
     """
-    Compute PCA Scores given trained PCA using Jupyter Notebook.
+    Compute the PC scores of the project's sessions from within a Jupyter notebook.
 
     Args:
-    progress_paths (dict): dictionary containing notebook progress paths
-    output_file (str): name of output pca file.
+    project_folder (str): the project folder.
+    output_file (str): name of the scores file written into the project's ``_pca/``.
+    components_file (str): the PCA components to use; None for the ones the project last trained.
 
     Returns:
     (str): success string.
     """
-    config_file = progress_paths['config_file']
-    opts = _options(ApplyPCAOptions, config_file)
+    project = Project.at(project_folder)
+    opts = _options(ApplyPCAOptions, project)
 
-    result = steps.apply_pca(progress_paths['train_data_dir'], progress_paths['pca_dirname'], output_file, opts,
-                             components_file=recorded_paths(config_file).get('pca_file'))
-    success = result.scores_file is not None
+    result = steps.apply_pca(str(sessions_folder(project)), join(project_folder, PCA_DIRNAME), output_file, opts,
+                             components_file=components_file or recorded_paths(project).get('pca_file'),
+                             project=project)
 
-    shim_write_back_paths(config_file, 'apply_pca', result.scores_file)
-
-    # if the scores were not recomputed, the path in progress.yaml is still written to the index
-    shim_index_pca_path(progress_paths['index_file'], progress_paths.get('scores_path'))
-
-    if success:
+    if result.scores_file is not None:
         return 'PCA Scores have been successfully computed.'
     else:
         return 'PCA Scores have not been computed'
 
 
-def compute_changepoints_command(input_dir, progress_paths, output_file):
+def compute_changepoints_command(project_folder, output_file='changepoints'):
     """
-    Compute Changepoint distribution using Jupyter Notebook.
+    Compute the model-free changepoints of the project's sessions from within a Jupyter notebook.
 
     Args:
-    input_dir (str): path to directory containing training data
-    progress_paths (dict): dictionary containing notebook progress paths
-    output_file (str): name of output pca file.
+    project_folder (str): the project folder.
+    output_file (str): name of the changepoints file written into the project's ``_pca/``.
 
     Returns:
     (str): success string.
     """
-    config_file = progress_paths['config_file']
-    opts = _options(ChangepointsOptions, config_file)
-    recorded = recorded_paths(config_file)
+    project = Project.at(project_folder)
+    opts = _options(ChangepointsOptions, project)
+    recorded = recorded_paths(project)
 
-    result = steps.compute_changepoints(input_dir, progress_paths['pca_dirname'], output_file, opts,
-                                        components_file=recorded.get('pca_file'),
-                                        scores_file=recorded.get('pca_file_scores'))
-
-    shim_write_back_paths(config_file, 'compute_changepoints', result.changepoints_file)
+    steps.compute_changepoints(str(sessions_folder(project)), join(project_folder, PCA_DIRNAME), output_file, opts,
+                               components_file=recorded.get('pca_file'),
+                               scores_file=recorded.get('pca_file_scores'), project=project)
 
     return 'Model-free syllable changepoints have been successfully computed.'

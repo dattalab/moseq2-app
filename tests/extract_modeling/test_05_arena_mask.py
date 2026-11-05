@@ -1,6 +1,6 @@
 """Cell 5: find each recording's arena floor and save its extraction parameters.
 
-    ArenaMaskWidget(progress_paths['base_dir'], skip_extracted=skip_extracted)
+    ArenaMaskWidget(str(project.folder), skip_extracted=skip_extracted)
 
 The first interactive cell. Everything up to here produced one configuration
 for the whole project; this cell produces one per recording, because the arena
@@ -436,20 +436,14 @@ def unextracted(tmp_path, project, arena):
     The cell skips extracted recordings (``skip_extracted = True``), so a copy
     made after the chain's extraction would show it none.
     """
-    from moseq2_app.gui.progress import update_progress
-
     root = tmp_path / "project"
     shutil.copytree(
         project,
         root,
         ignore=shutil.ignore_patterns(
-            "proc", "aggregate_results", "_pca", "models", "progress.yaml", "*.tar.gz"
+            "proc", "aggregate_results", "_pca", "models", "moseq2-project.yaml", "*.tar.gz"
         ),
     )
-    progress = root / "progress.yaml"
-    progress.write_text("{}\n")
-    update_progress(str(progress), "base_dir", str(root))
-    update_progress(str(progress), "config_file", str(root / "config.yaml"))
     return root
 
 
@@ -463,11 +457,9 @@ def run_arena_cell(root):
 
     from cells import code_cell
 
-    progress = root / "progress.yaml"
-    namespace = {
-        "progress_filepath": str(progress),
-        "progress_paths": read_yaml(str(progress)),
-    }
+    from moseq2_common.project import Project
+
+    namespace = {"project": Project.at(root)}
     tree = ast.parse(code_cell("MoSeq2-Extract-Modeling-Notebook.ipynb", 5))
     last = tree.body.pop()
     exec(compile(tree, "<arena cell>", "exec"), namespace)

@@ -1,20 +1,15 @@
 """Cell 17: choose how the model is fit, and where it goes.
 
-    base_model_path = 'models/'
     model_name = 'model.p'
-    session_path = join(progress_paths['base_dir'], base_model_path)
-    model_path = join(session_path, model_name)
 
-    progress_paths = update_progress(progress_filepath, 'model_path', model_path)
-    progress_paths = update_progress(progress_filepath, 'base_model_path', session_path)
-
-    with update_config(progress_paths['config_file'], section='model') as config_data:
+    with update_config(project.config_file, section='model') as config_data:
         config_data['robust'] = True
         config_data['nfolds'] = 2
         ...
 
-Nothing is computed here. The cell records where the model will go and
-writes the modelling parameters into the configuration cell 18 reads, which
+Nothing is computed here. The cell names the model's file (cell 18 writes it
+into the project's ``models/`` folder) and writes the modelling parameters into
+the configuration cell 18 reads, which
 makes it the longest cell in the notebook and the one a user actually edits.
 
 Most of it is annotated defaults. Three choices matter: ``npcs`` decides how
@@ -33,7 +28,6 @@ from __future__ import annotations
 
 import pytest
 
-from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_common.yaml import read_yaml
 
 from conftest import MODEL_SETTINGS
@@ -72,17 +66,17 @@ def test_the_modelling_parameters_reach_the_configuration(model_settings, config
         assert config[key] == value, key
 
 
-def test_the_model_paths_are_recorded(model_settings, project, progress_file):
-    """2. Where the model goes, and where cell 19 looks for it.
+def test_the_fit_is_recorded_in_the_bookkeeping_file(model, project):
+    """2. Where the model goes, and where cell 19 and the analysis find it.
 
-    Both are recorded: the file for this model, and the folder, which is
-    what cell 19 searches when it compares models against each other.
+    Cell 18 writes the model into the project's ``models/`` folder, which cell
+    19 searches, and records it as fitted and current.
     """
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
+    from moseq2_common.yaml import read_yaml
 
-    assert recorded["model_path"] == str(project / "models" / "model.p")
-    assert recorded["base_model_path"] == str(project / "models") + "/"
-    assert model_settings["model_path"] == recorded["model_path"]
+    assert model == project / "models" / "model.p"
+    models = read_yaml(str(project / "moseq2-project.yaml"))["models"]
+    assert "models/model.p" in models["fitted"]
 
 
 def test_a_scan_writes_one_fitting_command_per_kappa(

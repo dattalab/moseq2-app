@@ -5,6 +5,8 @@ from os.path import exists
 import ipywidgets as widgets
 from IPython.display import display
 from bokeh.io import output_notebook
+from moseq2_common.bookkeeping import project_index
+from moseq2_common.project import Project
 from moseq2_extract.util import filter_warnings
 from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.widgets import GroupSettingWidgets
@@ -94,15 +96,15 @@ def validate_extractions(input_dir):
     validate_extractions_wrapper(input_dir)
 
 @filter_warnings
-def interactive_group_setting(index_file):
+def interactive_group_setting(project_folder):
     """
-    display a excel-like table to update the current group selection
+    display a excel-like table to set each session's group, saved in the project's config.yaml
 
     Args:
-    index_file (str): Path to index file to update.
+    project_folder (str): the project folder.
     """
 
-    index_grid = GroupSettingWidgets(index_file)
+    index_grid = GroupSettingWidgets(project_folder)
 
     # Display output
     display(index_grid.clear_button, index_grid.group_set)
@@ -111,19 +113,22 @@ def interactive_group_setting(index_file):
     return index_grid
 
 @filter_warnings
-def interactive_scalar_summary(index_file):
+def interactive_scalar_summary(project_folder):
     """
     launch Interactive Scalar summary visualization tool.
 
     Args:
-    index_file (str): Path to index file containing session paths to plot scalars for.
+    project_folder (str): the project folder, whose sessions it plots the scalars of.
     """
 
-    if not exists(index_file):
-        print('Index file does not exist. Input path to an existing file and run the function again.')
+    project = Project.at(project_folder)
+    index = project_index(project)
+    if index is None:
+        print(f'{project.bookkeeping_file} lists no sessions yet. Run the aggregation cell above first, '
+              'then run this cell again.')
         return
 
-    viewer = InteractiveScalarViewer(index_file)
+    viewer = InteractiveScalarViewer(index)
     display(viewer.ui_tools)
     return viewer
 

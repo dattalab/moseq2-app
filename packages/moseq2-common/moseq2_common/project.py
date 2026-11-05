@@ -17,6 +17,13 @@ are keyed by session: the recording's path relative to the project folder, with
 ``/`` between folders on every system (``session_key``), so a project moved or
 copied elsewhere still finds them.
 
+Groups are a setting: ``config.yaml``'s top-level ``groups`` maps each session
+key to its group. ``write_groups`` is its one writer, used by ``add-group`` and the
+notebook's group widget.
+
+What the project holds and where each step's outputs are is in its bookkeeping
+file, ``moseq2-project.yaml`` (``moseq2_common.bookkeeping``).
+
 A ``config.yaml`` without sections was written by MoSeq2 1.5.0 or earlier.
 1.6.0 does not read or convert it, and stops with ``OldProjectError``.
 """
@@ -31,7 +38,8 @@ from pathlib import Path, PurePath
 from moseq2_common.yaml import read_yaml, write_config
 
 __all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "Project", "find_project", "is_job_file",
-           "old_project_message", "session_key", "standalone_note", "write_job_settings"]
+           "old_project_message", "read_groups", "session_key", "standalone_note", "write_groups",
+           "write_job_settings"]
 
 CONFIG_NAME = "config.yaml"
 #: The file holding each recording's arena-tool settings, in the project folder.
@@ -153,3 +161,28 @@ def write_job_settings(path: str | os.PathLike, section: str, settings: Mapping,
     data["job"] = {"project": str(Path(project.folder).absolute()) if project is not None else None}
     write_config(data, str(path))
     return Path(path)
+
+
+def read_groups(project: Project) -> dict[str, str]:
+    """``config.yaml``'s ``groups``: each session key's group. Empty without a config.yaml or groups."""
+    from moseq2_common.options import read_config
+
+    if not Path(project.config_file).is_file():
+        return {}
+    groups = read_config(project.config_file).get("groups") or {}
+    if not isinstance(groups, Mapping):
+        raise ValueError(
+            f"{project.config_file}'s `groups` holds {type(groups).__name__}, not one `session: group` line per "
+            "session. Correct it, or delete it and set the groups again with the notebook's group widget or "
+            "`moseq2-viz add-group`."
+        )
+    return {str(key): str(value) for key, value in groups.items()}
+
+
+def write_groups(project: Project, groups: Mapping[str, str]) -> None:
+    """Set ``config.yaml``'s ``groups`` to ``groups``, the rest of the file as it was."""
+    from moseq2_common.options import read_config
+
+    data = read_config(project.config_file)
+    data["groups"] = {str(key): str(value) for key, value in groups.items()}
+    write_config(data, str(project.config_file))

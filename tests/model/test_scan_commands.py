@@ -48,9 +48,10 @@ def scan_inputs(tmp_path):
         for key, n in {"s0": 120, "s1": 140, "s2": 160}.items():
             f[f"scores/{key}"] = rng.normal(size=(n, 10)).astype("float32")
             f[f"scores_idx/{key}"] = np.arange(n, dtype="float32")
-    index = tmp_path / "moseq2-index.yaml"
-    write_yaml({"files": []}, str(index))
-    return scores, index
+    from configs import write_bookkeeping
+
+    write_bookkeeping(tmp_path, [f"aggregate_results/s{i}.h5" for i in range(3)], scores=scores.name)
+    return scores, tmp_path / "moseq2-project.yaml"
 
 
 def _fits(script, monkeypatch):
@@ -74,7 +75,7 @@ def test_kappa_scan_jobs_carry_every_learn_model_option(front_end, tmp_path, sca
     The command line's kappa-scan takes the fitting options; the notebook's scan
     reads them, and the options only learn-model has, from config.yaml.
     """
-    scores, index = scan_inputs
+    scores, project_file = scan_inputs
     models = tmp_path / "models"
     given = _declared(SCAN_FITTING) if front_end == "cli" else _declared({**SCAN_FITTING, **LEARN_ONLY})
     defaults = LearnModelOptions()
@@ -86,17 +87,15 @@ def test_kappa_scan_jobs_carry_every_learn_model_option(front_end, tmp_path, sca
         for name, value in given.items():
             param = next(p for p in kappa_scan.params if p.name == name)
             typed += [param.opts[-1]] if param.is_flag else [param.opts[-1], str(value)]
-        result = CliRunner().invoke(cli, ["kappa-scan", str(scores), str(models), "-i", str(index), "--n-models", "3",
-                                          *typed], catch_exceptions=False)
+        result = CliRunner().invoke(cli, ["kappa-scan", str(scores), str(models), "--n-models", "3",
+                                          "--project-file", str(project_file), *typed], catch_exceptions=False)
         assert result.exit_code == 0, result.output
     else:
         from moseq2_model.gui import learn_model_command
 
         config = tmp_path / "config.yaml"
         write_yaml({"model": {**given, "kappa": "scan", "scan_scale": "log", "n_models": 3}}, str(config))
-        learn_model_command({"scores_path": str(scores), "model_path": str(models / "model.p"),
-                             "config_file": str(config), "index_file": str(index),
-                             "base_model_path": str(models)}, get_cmd=False)
+        learn_model_command(str(tmp_path), get_cmd=False)
 
     fits = _fits((models / "train_out.sh").read_text(), monkeypatch)
 
@@ -106,4 +105,5 @@ def test_kappa_scan_jobs_carry_every_learn_model_option(front_end, tmp_path, sca
         expected = dataclasses.replace(defaults, **given, kappa=opts.kappa)
         got, want = opts.as_dict(), expected.as_dict()
         assert {k: (got[k], want[k]) for k in want if got[k] != want[k]} == {}, "(fit's value, scan's value)"
-        assert fit_index == str(index)
+        # the fit's settings file names the project, whose sessions it takes
+        assert sorted(f["uuid"] for f in fit_index["files"]) == ["uuid-0", "uuid-1", "uuid-2"]

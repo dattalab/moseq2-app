@@ -78,6 +78,21 @@ def analysis_project(tmp_path_factory, analysis_bundle):
 
 
 @pytest.fixture(scope="session")
+def analysis_project_1_6(tmp_path_factory, analysis_bundle):
+    """A writable copy of the finished project, laid out as a 1.6 project.
+
+    The bundle is a project 1.5.0 made; ``project_1_6_from_bundle`` gives its
+    copy a sectioned ``config.yaml`` holding the groups and a
+    ``moseq2-project.yaml`` listing its sessions, PCA files and model, which is
+    what the ``moseq2-viz`` commands read. Shared and read-only: a test that
+    writes into it takes its own copy.
+    """
+    from fixtures import project_1_6_from_bundle
+
+    return project_1_6_from_bundle(analysis_bundle, tmp_path_factory.mktemp("analysis_1_6"))
+
+
+@pytest.fixture(scope="session")
 def analysis_progress(analysis_project):
     """Cell 1: read the finished project's paths back out of its progress file.
 
@@ -264,7 +279,7 @@ def transitions(analysis_paths, labeled):
 
 
 @pytest.fixture(scope="session")
-def arena(project, progress_file, configured, flipped):
+def arena(project, started, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
 
     The cell opens the arena mask widget on the project folder. Opening it
@@ -292,45 +307,38 @@ def arena(project, progress_file, configured, flipped):
 
 
 @pytest.fixture(scope="session")
-def aggregation(tmp_path_factory, project, progress_file, extracted):
-    """Cell 9: gather every extraction into one directory and index it.
+def aggregation(tmp_path_factory, project, started, extracted):
+    """Cell 9: gather every extraction into one directory and list the sessions.
 
     Until now each recording's output has sat beside the recording. Modeling
     reads one directory, so the cell copies every extraction into
     ``aggregate_results/`` under a name built from the acquisition metadata,
-    and writes ``moseq2-index.yaml`` listing what it found. That index is
-    what every cell from here on is pointed at.
+    and lists each as one of the project's sessions in ``moseq2-project.yaml``.
+    That file is what every cell from here on reads its sessions from.
 
-    Returns the index and a copy of it as this cell wrote it. Cell 10 labels
-    the groups in the index itself, and a test that describes the index cell
-    10 is given reads the copy, since the chain may already have gone past
-    cell 10 when it runs.
+    Returns the bookkeeping file and a copy of it as this cell wrote it, since
+    later cells add their outputs to it and the chain may already have gone
+    past them when a test describing this cell runs.
     """
-    from moseq2_app.gui.progress import update_progress
     from moseq2_extract.gui import aggregate_extract_results_command
 
-    update_progress(
-        str(progress_file), "train_data_dir", str(project / "aggregate_results") + "/"
-    )
-    index = aggregate_extract_results_command(
-        str(project), "{start_time}_{session_name}_{subject_name}", "aggregate_results/"
-    )
-    update_progress(str(progress_file), "index_file", index)
+    aggregate_extract_results_command(str(project))
+    bookkeeping = project / "moseq2-project.yaml"
 
-    as_written = tmp_path_factory.mktemp("aggregated") / "moseq2-index.yaml"
-    shutil.copy2(index, as_written)
-    return Path(index), as_written
+    as_written = tmp_path_factory.mktemp("aggregated") / "moseq2-project.yaml"
+    shutil.copy2(bookkeeping, as_written)
+    return bookkeeping, as_written
 
 
 @pytest.fixture(scope="session")
 def aggregated(aggregation):
-    """Cell 9's index, ``moseq2-index.yaml`` in the project, as later cells change it."""
+    """Cell 9's ``moseq2-project.yaml`` in the project, as later cells change it."""
     return aggregation[0]
 
 
 @pytest.fixture(scope="session")
-def index_as_aggregated(aggregation):
-    """A copy of the index as cell 9 wrote it: every recording still in group ``default``."""
+def bookkeeping_as_aggregated(aggregation):
+    """A copy of ``moseq2-project.yaml`` as cell 9 wrote it: the sessions and nothing else."""
     return aggregation[1]
 
 
@@ -375,18 +383,20 @@ def flipped(project, configured, raw_sessions):
 
 
 @pytest.fixture(scope="session")
-def grouped(aggregated):
+def grouped(project, aggregated):
     """Cell 10: label each recording with the condition it belongs to.
 
     Until this runs every recording is in group ``default`` and a group
     comparison compares the experiment against itself. The cell shows an
     editable table; a user selects rows, types a name, sets it, and saves the
-    table back to the index. The chain does the same for the two conditions
+    groups into config.yaml. The chain does the same for the two conditions
     the fixture recordings come from.
+
+    Returns the project folder.
     """
     from moseq2_app.main import interactive_group_setting
 
-    widget = interactive_group_setting(str(aggregated))
+    widget = interactive_group_setting(str(project))
     for prefix, group in (("saline", "saline"), ("amphetamine", "amph")):
         table = widget.qgrid_widget.get_changed_df()
         widget.qgrid_widget.change_selection(
@@ -394,8 +404,8 @@ def grouped(aggregated):
         )
         widget.group_input.value = group
         widget.save_button.click()
-    widget.update_index_button.click()
-    return aggregated
+    widget.save_groups_button.click()
+    return project
 
 
 @pytest.fixture(scope="session")
@@ -411,7 +421,7 @@ def scalar_viewer(grouped):
 
 
 @pytest.fixture(scope="session")
-def pca(project, progress_file, configured, grouped):
+def pca(project, started, configured, grouped):
     """Cell 13: learn the pose basis every later step works in.
 
     Eighty by eighty pixels of mouse is too much to model directly, so the
@@ -422,47 +432,38 @@ def pca(project, progress_file, configured, grouped):
     Runs under dask on the ``pca`` section's settings, which the cell leaves
     at the defaults config.yaml holds.
     """
-    from moseq2_app.gui.progress import update_progress
     from moseq2_pca.gui import train_pca_command
 
-    pca_dirname = str(project / "_pca") + "/"
-    paths = update_progress(str(progress_file), "pca_dirname", pca_dirname)
-
-    train_pca_command(paths, pca_dirname, "pca")
-    return Path(pca_dirname)
+    train_pca_command(str(project), "pca")
+    return project / "_pca"
 
 
 @pytest.fixture(scope="session")
-def scores(project, progress_file, pca):
+def scores(project, pca):
     """Cell 15: express every frame in the basis cell 13 learned.
 
     The decomposition describes how a mouse's shape varies; this projects
     each recording's frames onto it, turning 6400 pixels per frame into a
     couple of dozen coordinates. The model is fit on these.
     """
-    from moseq2_app.gui.progress import update_progress
     from moseq2_pca.gui import apply_pca_command
 
-    scores_file = str(pca / "pca_scores.h5")
-    paths = update_progress(str(progress_file), "scores_path", scores_file)
-    apply_pca_command(paths, "pca_scores")
-    return Path(scores_file)
+    apply_pca_command(str(project), "pca_scores")
+    return pca / "pca_scores.h5"
 
 
 @pytest.fixture(scope="session")
-def changepoints(project, progress_file, configured, scores):
+def changepoints(project, configured, scores):
     """Cell 16: find where the mouse's pose changes, without a model.
 
     A model-free estimate of how long a behavioural unit lasts, computed from
     the PC scores alone. Cell 19 scores a fitted model against it, which is
     how a kappa is chosen, so this is the yardstick rather than an output.
     """
-    from moseq2_app.gui.progress import update_progress
     from moseq2_pca.gui import compute_changepoints_command
 
-    paths = update_progress(str(progress_file), "changepoints_path", "changepoints")
-    compute_changepoints_command(paths["train_data_dir"], paths, "changepoints")
-    return Path(paths["pca_dirname"]) / "changepoints.h5"
+    compute_changepoints_command(str(project), "changepoints")
+    return scores.parent / "changepoints.h5"
 
 
 #: The model section's values cell 17 shows (it sets ``robust`` and ``nfolds``; the rest are the defaults
@@ -485,33 +486,29 @@ MODEL_SETTINGS = {
 
 
 @pytest.fixture(scope="session")
-def model_settings(project, progress_file, configured, changepoints):
-    """Cell 17: choose how the model is fit, and where it goes.
+def model_settings(project, configured, changepoints):
+    """Cell 17: choose how the model is fit.
 
-    Nothing is computed here. The cell records the model's paths and writes
-    the modelling parameters into the configuration cell 18 reads.
+    Nothing is computed here. The cell writes the modelling parameters into
+    the configuration cell 18 reads. Returns the project folder.
     """
-    from moseq2_app.gui.progress import update_progress
     from moseq2_app.util import update_config
 
-    models = project / "models"
-    update_progress(str(progress_file), "model_path", str(models / "model.p"))
-    paths = update_progress(str(progress_file), "base_model_path", str(models) + "/")
     with update_config(str(configured), section="model") as config:
         config.update(MODEL_SETTINGS)
-    return paths
+    return project
 
 
 @pytest.fixture(scope="session")
 def model(model_settings):
-    """Cell 18: fit the AR-HMM.
+    """Cell 18: fit the AR-HMM, into the project's ``models/model.p``.
 
     The heaviest cell in the notebook. One fit, shared by the whole suite.
     """
     from moseq2_model.gui import learn_model_command
 
-    learn_model_command(model_settings)
-    return Path(model_settings["model_path"])
+    learn_model_command(str(model_settings))
+    return model_settings / "models" / "model.p"
 
 
 #: The kappa the second model is fit at, so cell 19 has a real choice to
@@ -520,7 +517,7 @@ SECOND_KAPPA = 100
 
 
 @pytest.fixture(scope="session")
-def two_models(project, progress_file, configured, model):
+def two_models(project, configured, model):
     """A second model beside the first, fit at a different kappa.
 
     Cell 19 picks the model whose syllable durations best match the
@@ -528,47 +525,41 @@ def two_models(project, progress_file, configured, model):
     between, so the chain fits a second at a kappa far from the first, which
     is what a user comparing kappas would have.
     """
-    from moseq2_app.gui.progress import update_progress
     from moseq2_app.util import update_config
     from moseq2_model.gui import learn_model_command
 
     second = model.parent / f"model_kappa_{SECOND_KAPPA}.p"
-    paths = update_progress(str(progress_file), "model_path", str(second))
     with update_config(str(configured), section="model") as config:
         config["kappa"] = SECOND_KAPPA
     try:
-        learn_model_command(paths)
+        learn_model_command(str(project), second.name)
     finally:
         with update_config(str(configured), section="model") as config:
             config["kappa"] = MODEL_SETTINGS["kappa"]
-        update_progress(str(progress_file), "model_path", str(model))
     return {"model.p": model, second.name: second}
 
 
 @pytest.fixture(scope="session")
-def configured(project, progress_file):
+def configured(project, started):
     """Cell 3: the config file every later step reads its parameters from."""
-    from moseq2_app.gui.progress import update_progress
     from moseq2_extract.gui import generate_config_command
 
     config = project / "config.yaml"
     generate_config_command(str(config), camera_type="auto")
-    update_progress(str(progress_file), "config_file", str(config))
     return config
 
 
 @pytest.fixture(scope="session")
-def progress_file(project):
-    """Cell 2: the state file every later cell writes its output paths into.
+def started(project):
+    """Cell 2: name the project folder and show what it holds.
 
-    Created in a project that holds nothing but recordings, which is where a
-    user starts.
+    Run in a project that holds nothing but recordings, which is where a user
+    starts. Every later cell takes the project folder and reads what earlier
+    cells recorded from its ``moseq2-project.yaml``.
     """
-    from moseq2_app.gui.progress import restore_progress_vars
+    from moseq2_app.project import start
 
-    path = project / "progress.yaml"
-    restore_progress_vars(str(path), init=True, overwrite=False)
-    return path
+    return start(str(project))
 
 
 @pytest.fixture(scope="session")

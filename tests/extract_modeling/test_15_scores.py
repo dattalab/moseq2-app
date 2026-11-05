@@ -1,10 +1,8 @@
 """Cell 15: express every frame in the basis the decomposition learned.
 
     scores_filename = 'pca_scores'
-    scores_file = join(progress_paths['pca_dirname'], scores_filename + '.h5')
-    progress_paths = update_progress(progress_filepath, 'scores_path', scores_file)
 
-    apply_pca_command(progress_paths, scores_filename)
+    apply_pca_command(str(project.folder), scores_filename)
 
 Cell 13 learned what mouse poses look like. This projects each recording's
 frames onto that basis, so a frame stops being 6400 pixels and becomes a
@@ -131,10 +129,9 @@ def test_the_leading_components_carry_the_most_movement(scores, grouped):
     assert spread[:10].sum() > 0.85 * spread.sum()
 
 
-def test_the_index_records_where_the_scores_went(scores, progress_file, pca):
+def test_the_bookkeeping_file_records_where_the_scores_went(scores, project, pca):
     """7. Where cells 16 and 18 find them."""
-    from moseq2_app.gui.progress import restore_progress_vars
+    from moseq2_common.yaml import read_yaml
 
-    recorded = restore_progress_vars(str(progress_file), init=False, overwrite=False)
-    assert recorded["scores_path"] == str(scores)
+    assert read_yaml(str(project / "moseq2-project.yaml"))["pca"]["scores"] == "_pca/pca_scores.h5"
     assert scores == pca / "pca_scores.h5"

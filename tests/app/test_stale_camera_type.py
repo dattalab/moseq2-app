@@ -27,7 +27,7 @@ from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.helpers.wrappers as extract_wrappers
-from moseq2_app.gui.progress import update_progress
+from moseq2_common.project import Project
 import moseq2_app.util as app_util
 from moseq2_app.util import update_config
 from moseq2_extract.gui import generate_config_command
@@ -73,18 +73,12 @@ def project_as_145_left_it(root, camera_type, recording="azure-mkv"):
     generate_config_command(str(config), camera_type="azure" if recording.suffix == ".mkv" else "k2")
     with update_config(str(config)) as c:
         c["camera_type"] = camera_type
-    progress = root / "progress.yaml"
-    progress.write_text("{}\n")
-    update_progress(str(progress), "base_dir", str(root))
-    update_progress(str(progress), "config_file", str(config))
     return recording
 
 
 def run_arena_cell(root):
     """The notebook's arena cell, as a kernel runs it."""
-    progress = root / "progress.yaml"
-    namespace = {"progress_filepath": str(progress), "progress_paths": read_yaml(str(progress)),
-                 "skip_extracted": True}
+    namespace = {"project": Project.at(root), "skip_extracted": True}
     tree = ast.parse(code_cell(NOTEBOOK, ARENA_CELL))
     last = tree.body.pop()
     exec(compile(tree, "<arena cell>", "exec"), namespace)
@@ -185,12 +179,10 @@ def run_pca_cell(monkeypatch):
 
     trained = []
     monkeypatch.setattr(moseq2_pca.gui, "train_pca_command",
-                        lambda paths, *args: trained.append(read_yaml(paths["config_file"])["pca"]))
+                        lambda folder, *args: trained.append(read_yaml(str(Path(folder) / "config.yaml"))["pca"]))
 
     def run(root):
-        progress = root / "progress.yaml"
-        update_progress(str(progress), "train_data_dir", str(root / "aggregate_results") + "/")
-        namespace = {"progress_filepath": str(progress), "progress_paths": read_yaml(str(progress))}
+        namespace = {"project": Project.at(root)}
         exec(compile(code_cell(NOTEBOOK, PCA_CELL), "<PCA cell>", "exec"), namespace)
         (section,) = trained
         return {key: list(section.get(key) or []) for key in AZURE_FILTERS}

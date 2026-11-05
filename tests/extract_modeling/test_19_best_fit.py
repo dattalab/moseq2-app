@@ -1,12 +1,9 @@
 """Cell 19: choose between the models that were fit.
 
-    output_file = join(progress_paths['base_dir'], 'model_vs_pc_changepoints')
+    output_file = join(project.folder, 'model_vs_pc_changepoints')
     objective = 'duration (mean match)'
 
-    best_model_fit = get_best_fit_model(progress_paths, output_file, plot_all=True, objective=objective)
-
-    progress_paths = update_progress(progress_filepath, 'model_path',
-                                     best_model_fit[f'best model - {objective}'])
+    best_model_fit = get_best_fit_model(str(project.folder), output_file, plot_all=True, objective=objective)
 
 The last cell, and the reason cell 16 exists. Kappa decides how long the
 model expects a syllable to last, and there is no way to know the right value
@@ -14,8 +11,8 @@ in advance, so a user fits several and compares. This cell does the
 comparing: it reads every model in the folder, measures the syllable
 durations each produced, and scores them against the model-free changepoints.
 
-The chosen model's path is written back into the progress file, which is what
-the analysis notebook opens. That makes this cell the handover between the
+The chosen model is recorded as the project's current model in
+``moseq2-project.yaml``, which is what the analysis notebook opens. That makes this cell the handover between the
 two notebooks, and the only one whose output is a decision rather than a file.
 
 With a single model in the folder the comparison is vacuous, so the chain
@@ -26,12 +23,12 @@ kappas would have in front of them.
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from moseq2_app.gui.progress import restore_progress_vars
 from moseq2_viz.gui import get_best_fit_model
 
 from conftest import SECOND_KAPPA
@@ -157,27 +154,23 @@ def test_the_comparison_figure_is_drawn(comparison, project):
     assert (pixels < 250).mean() > 0.01, "the comparison plot is blank"
 
 
-def test_the_choice_is_handed_to_the_analysis_notebook(comparison, progress_file, tmp_path):
+def test_the_choice_is_handed_to_the_analysis_notebook(two_models, model_settings, project, tmp_path):
     """7. The handover between the two notebooks.
 
-    The cell writes the chosen model back into the progress file, which is
-    the only thing the analysis notebook is given. A choice that was made and
-    not recorded would leave that notebook opening whichever model happened
-    to be named last.
-
-    The write goes to a copy of the chain's progress file. Cell 17's test
-    reads the model path that cell recorded there, and may run after this.
+    The cell records the chosen model as the project's current model in
+    ``moseq2-project.yaml``, which is what the analysis notebook is given. A
+    choice that was made and not recorded would leave that notebook opening
+    whichever model happened to be fit last. Run here again, since other
+    tests here choose by other objectives.
     """
-    chosen, _ = comparison
+    from moseq2_common.yaml import read_yaml
+
+    chosen = get_best_fit_model(str(project), str(tmp_path / "comparison"), plot_all=True,
+                                objective=DEFAULT_OBJECTIVE)
     best = chosen[f"best model - {DEFAULT_OBJECTIVE}"]
 
-    from moseq2_app.gui.progress import update_progress
-
-    progress = tmp_path / "progress.yaml"
-    shutil.copy2(progress_file, progress)
-    update_progress(str(progress), "model_path", best)
-    recorded = restore_progress_vars(str(progress), init=False, overwrite=False)
-    assert recorded["model_path"] == best
+    current = read_yaml(str(project / "moseq2-project.yaml"))["models"]["current"]
+    assert project / current == Path(best)
 
 
 def test_the_summary_reports_each_distance_under_its_own_name(comparison, project):

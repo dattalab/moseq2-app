@@ -198,9 +198,11 @@ def test_the_notebook_cell_gets_the_same_check(tmp_path, sessions, workers_have)
     config_file = tmp_path / "config.yaml"
     write_yaml({"pca": {"cluster_type": "local", "nworkers": 1, "overwrite_pca_train": True,
                         "dask_cache_path": str(tmp_path / "cache")}}, str(config_file))
-    progress = {"train_data_dir": str(sessions), "config_file": str(config_file)}
+    from configs import write_bookkeeping
+
+    write_bookkeeping(tmp_path, sorted(path.relative_to(tmp_path) for path in sessions.rglob("*.h5")))
     with pytest.warns(Warning) as record, pytest.raises(ReachedDask):
-        train_pca_command(progress, str(tmp_path / "_pca"), "pca")
+        train_pca_command(str(tmp_path), "pca")
     message = "\n".join(str(w.message) for w in record if "the dask workers have" in str(w.message))
     assert "15.36 MB" in message
     assert suggested_subset(message) < 1

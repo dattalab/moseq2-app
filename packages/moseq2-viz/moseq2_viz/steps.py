@@ -2,13 +2,19 @@
 
 The ``moseq2-viz`` commands (``cli.py``) and the notebook's model selection
 (``gui.py``) resolve their settings into one options object and call these. A
-step needs no ``config.yaml``: from a script, pass the paths and an options
-object, such as ``plot_stats("moseq2-index.yaml", "model.p", "plots/usage",
-StatsPlotOptions(stat="duration"))``.
+step needs no ``config.yaml``: from a script, pass the sessions, the paths and
+an options object, such as ``plot_stats(session_index(Project.at("my_project")),
+"model.p", "plots/usage", StatsPlotOptions(stat="duration"))``.
 
-Each step hands its work function (the ``*_wrapper`` in
-``moseq2_viz.helpers.wrappers``) the options, as keywords or as the dict the
-wrapper takes.
+``index`` is the project's sessions with their groups as an index in memory
+(``moseq2_common.bookkeeping.session_index``); a path to a 1.5.0
+``moseq2-index.yaml`` is read the same way. Each step hands its work function
+(the ``*_wrapper`` in ``moseq2_viz.helpers.wrappers``) the options, as keywords
+or as the dict the wrapper takes.
+
+``add_group`` writes ``config.yaml``'s ``groups``, and ``get_best_model``
+records the model it picks as the project's current model in its
+``moseq2-project.yaml``.
 """
 
 from __future__ import annotations
@@ -17,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from moseq2_common.bookkeeping import relative_path, session_index, update
+from moseq2_common.project import Project, read_groups, write_groups
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
     get_best_fit_model_wrapper,
@@ -41,8 +49,8 @@ from moseq2_viz.options import (
 
 @dataclass(frozen=True)
 class AddGroupResult:
-    #: The index file, rewritten with the new group names.
-    index_file: Path
+    #: The sessions whose group was set, by key, with the group.
+    changed: dict
 
 
 @dataclass(frozen=True)
@@ -79,64 +87,79 @@ def _figures(output_file, suffix=""):
     return [Path(f"{output_file}{suffix}.png"), Path(f"{output_file}{suffix}.pdf")]
 
 
-def add_group(index_file: str, opts: AddGroupOptions) -> AddGroupResult:
-    """Set the group of the index's sessions whose metadata matches; rewrite ``index_file``."""
-    add_group_wrapper(index_file, opts.as_dict())
-    return AddGroupResult(index_file=Path(index_file))
+def add_group(project: Project, opts: AddGroupOptions) -> AddGroupResult:
+    """Set the group of the project's sessions whose metadata matches; write ``config.yaml``'s ``groups``."""
+    changed = add_group_wrapper(session_index(project), opts.as_dict())
+    write_groups(project, {**read_groups(project), **changed})
+    return AddGroupResult(changed=changed)
 
 
 def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
-                   opts: BestModelOptions) -> BestModelResult:
-    """Pick the model in ``model_dir`` closest to the changepoints in ``cp_path``; plot the comparison."""
+                   opts: BestModelOptions, *, project: Project | None = None) -> BestModelResult:
+    """Pick the model in ``model_dir`` closest to the changepoints in ``cp_path``; plot the comparison.
+
+    In a project, the model picked becomes the project's current model.
+    """
     best_model_info, figure = get_best_fit_model_wrapper(
         model_dir, cp_path, output_file, opts.plot_all, opts.ext, opts.fps, opts.objective
     )
+    best = best_model_info.get(f"best model - {opts.objective}")
+    if project is not None and best:
+        model = relative_path(project, best)
+
+        def change(bookkeeping):
+            fitted = bookkeeping.models.setdefault("fitted", [])
+            if model not in fitted:
+                fitted.append(model)
+            bookkeeping.models["current"] = model
+
+        update(project, change)
     return BestModelResult(best_model_info=best_model_info, figure=figure,
                            figure_files=_figures(output_file) if output_file is not None else [])
 
 
-def make_df(model_fit: str, index_file: str, output_file: str | Path) -> MakeDfResult:
+def make_df(model_fit: str, index: dict | str, output_file: str | Path) -> MakeDfResult:
     """Write the syllable and scalar dataframe, and its statistics, as ``.csv`` or ``.parquet``."""
     output_file = Path(output_file)
     extension = output_file.suffix[1:]
     if extension not in ["csv", "parquet"]:
         raise ValueError(f"Extension {extension} is not supported. Please use .csv or .parquet.")
-    make_df_wrapper(model_fit, index_file, output_file, extension)
+    make_df_wrapper(model_fit, index, output_file, extension)
     return MakeDfResult(dataframe_file=output_file,
                         stats_file=output_file.with_name(f"{output_file.stem}_stats.{extension}"))
 
 
-def make_crowd_movies(index_file: str, model_path: str, output_dir: str, opts: CrowdMovieOptions) -> CrowdMoviesResult:
+def make_crowd_movies(index: dict | str, model_path: str, output_dir: str, opts: CrowdMovieOptions) -> CrowdMoviesResult:
     """Write a crowd movie for each syllable into ``output_dir``."""
-    return CrowdMoviesResult(movies=make_crowd_movies_wrapper(index_file, model_path, output_dir, opts.as_dict()))
+    return CrowdMoviesResult(movies=make_crowd_movies_wrapper(index, model_path, output_dir, opts.as_dict()))
 
 
-def plot_scalar_summary(index_file: str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:
+def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:
     """Plot each group's scalar summary to ``<output_file>_summary``."""
-    plot_scalar_summary_wrapper(index_file, output_file, colors=opts.colors)
+    plot_scalar_summary_wrapper(index, output_file, colors=opts.colors)
     return FiguresResult(figure_files=_figures(output_file, "_summary"))
 
 
-def plot_group_position_heatmaps(index_file: str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
+def plot_group_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
     """Plot each group's mean position heatmap to ``output_file``."""
-    plot_mean_group_position_pdf_wrapper(index_file, output_file, normalize=opts.normalize)
+    plot_mean_group_position_pdf_wrapper(index, output_file, normalize=opts.normalize)
     return FiguresResult(figure_files=_figures(output_file))
 
 
-def plot_verbose_position_heatmaps(index_file: str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
+def plot_verbose_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
     """Plot each session's position heatmap to ``output_file``."""
-    plot_verbose_pdfs_wrapper(index_file, output_file, normalize=opts.normalize)
+    plot_verbose_pdfs_wrapper(index, output_file, normalize=opts.normalize)
     return FiguresResult(figure_files=_figures(output_file))
 
 
-def plot_transition_graph(index_file: str, model_fit: str, output_file: str,
+def plot_transition_graph(index: dict | str, model_fit: str, output_file: str,
                           opts: TransitionGraphOptions) -> FiguresResult:
     """Plot each group's transition graph to ``output_file``."""
-    plot_transition_graph_wrapper(index_file, model_fit, output_file, opts.as_dict())
+    plot_transition_graph_wrapper(index, model_fit, output_file, opts.as_dict())
     return FiguresResult(figure_files=_figures(output_file))
 
 
-def plot_stats(index_file: str, model_fit: str, output_file: str, opts: StatsPlotOptions) -> FiguresResult:
+def plot_stats(index: dict | str, model_fit: str, output_file: str, opts: StatsPlotOptions) -> FiguresResult:
     """Plot a syllable statistic for each group to ``output_file``."""
-    plot_syllable_stat_wrapper(model_fit, index_file, output_file, **opts.as_dict())
+    plot_syllable_stat_wrapper(model_fit, index, output_file, **opts.as_dict())
     return FiguresResult(figure_files=_figures(output_file))

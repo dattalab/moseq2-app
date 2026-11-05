@@ -40,8 +40,10 @@ class Refused(Exception):
     """Raised in place of starting the pool, once its start method is seen."""
 
 
-def test_crowd_movie_workers_are_not_forked(analysis_paths, tmp_path, monkeypatch):
+def test_crowd_movie_workers_are_not_forked(analysis_project_1_6, tmp_path, monkeypatch):
     """The pool is asked for with a start method that does not copy the caller."""
+    from moseq2_common.bookkeeping import session_index
+    from moseq2_common.project import Project
     from moseq2_viz.cli import make_crowd_movies
 
     seen = []
@@ -54,18 +56,21 @@ def test_crowd_movie_workers_are_not_forked(analysis_paths, tmp_path, monkeypatc
 
     monkeypatch.setattr(multiprocessing.pool.Pool, "__init__", record)
     # click fills in every option's default, which is what the wrapper expects
+    project = analysis_project_1_6
     config = make_crowd_movies.make_context(
         "make-crowd-movies",
-        [analysis_paths["index_file"], analysis_paths["model_path"], *ONE_SYLLABLE],
+        [str(project / "models" / "model.p"), "--project-file", str(project / "moseq2-project.yaml"),
+         *ONE_SYLLABLE],
     ).params
+    config.pop("project_file")
     with pytest.raises(Refused):
         make_crowd_movies_wrapper(
-            config.pop("index_file"), config.pop("model_path"), str(tmp_path), config
+            session_index(Project.at(project)), config.pop("model_path"), str(tmp_path), config
         )
     assert seen and "fork" not in seen, f"crowd movie workers were started with {seen}"
 
 
-def test_linear_algebra_still_answers_after_crowd_movies(analysis_paths, tmp_path):
+def test_linear_algebra_still_answers_after_crowd_movies(analysis_project_1_6, tmp_path):
     """After the movies are written, a LAPACK call large enough to use threads returns.
 
     Run in its own interpreter: a hang here would otherwise take the whole
@@ -83,7 +88,8 @@ def test_linear_algebra_still_answers_after_crowd_movies(analysis_paths, tmp_pat
 
             if __name__ == "__main__":
                 make_crowd_movies.main(
-                    {[analysis_paths["index_file"], analysis_paths["model_path"],
+                    {[str(analysis_project_1_6 / "models" / "model.p"),
+                      "--project-file", str(analysis_project_1_6 / "moseq2-project.yaml"),
                       "-o", str(tmp_path / "crowd_movies"), *ONE_SYLLABLE]!r},
                     standalone_mode=False,
                 )
