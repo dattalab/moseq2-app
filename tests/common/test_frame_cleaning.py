@@ -6,9 +6,9 @@ builds the tail filter's structuring element. Both live in
 ``moseq2_common.frames`` now. PCA adds its temporal filters after the shared
 spatial ones.
 
-A median filter takes only odd kernel sizes. PCA, crowd movies and flip
-training round an even size up to the next odd one, through
-``moseq2_common.frames.odd_kernel``, as extraction does.
+A median filter takes only odd kernel sizes. Extraction, PCA, crowd movies
+and flip training round an even size up to the next odd one, through
+``moseq2_common.frames.odd_kernel``.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import h5py
 import numpy as np
 import pytest
 
-from fixtures import fetch_analysis_bundle
+from fixtures import fetch_analysis_bundle, fetch_raw_sessions
 from moseq2_common.frames import clean_frames, select_strel
 
 
@@ -158,22 +158,57 @@ def clean_for_flip_training(tmp_path):
     )
 
 
+def clean_for_extract_file(tmp_path):
+    """``extract FILE --config-file`` on a copy of one fixture recording, whose
+    settings reach extraction as tuples."""
+    import shutil
+
+    from click.testing import CliRunner
+
+    import moseq2_extract.cli as extract_cli
+    from moseq2_common.yaml import write_yaml
+
+    session = tmp_path / "saline_example_0"
+    shutil.copytree(Path(fetch_raw_sessions()) / "saline_example_0", session)
+    config = tmp_path / "config.yaml"
+    write_yaml({"spatial_filter_size": [4], "temporal_filter_size": [4]}, str(config))
+    result = CliRunner().invoke(
+        extract_cli.cli,
+        ["extract", str(session / "depth.avi"), "--config-file", str(config), "--num-frames", "20"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+
 @pytest.mark.parametrize(
     "clean",
-    [clean_for_pca, clean_for_a_crowd_movie, clean_for_flip_training],
-    ids=["pca", "crowd_movies", "flip_training"],
+    [clean_for_extract_file, clean_for_pca, clean_for_a_crowd_movie, clean_for_flip_training],
+    ids=["extract_file", "pca", "crowd_movies", "flip_training"],
 )
 def test_an_even_median_kernel_rounds_up_everywhere(clean, tmp_path, monkeypatch):
-    """Asked for a median kernel of 4, each step filters with 5, as extraction does, and says so.
+    """Asked for a median kernel of 4, each step filters with 5, and says so.
 
-    PCA's spatial and temporal median filters, crowd movies' spatial one and
-    flip training's spatial and temporal ones, which are extraction's
-    settings. Every size reaching OpenCV or scipy is 5.
+    Extraction's spatial and temporal median filters, PCA's, crowd movies'
+    spatial one and flip training's spatial and temporal ones, which are
+    extraction's settings. Every size reaching OpenCV or scipy is 5.
     """
     kernels = recorded_median_kernels(monkeypatch)
     with pytest.warns(UserWarning, match="rounds up to 5"):
         clean(tmp_path)
     assert kernels and set(kernels) == {5}
+
+
+def test_extraction_rounds_every_kernel_and_leaves_its_settings_alone():
+    """``check_filter_sizes`` rounds each kernel of both lists, takes tuples, and
+    returns new lists rather than editing the settings it was given."""
+    from moseq2_extract.util import check_filter_sizes
+
+    given = {"spatial_filter_size": (5, 4), "temporal_filter_size": (0, 6)}
+    with pytest.warns(UserWarning, match="rounds up"):
+        checked = check_filter_sizes(given)
+    assert checked["spatial_filter_size"] == [5, 5]
+    assert checked["temporal_filter_size"] == [0, 7]
+    assert given == {"spatial_filter_size": (5, 4), "temporal_filter_size": (0, 6)}
 
 
 def test_odd_kernel_keeps_odd_sizes_and_sizes_that_turn_the_filter_off():

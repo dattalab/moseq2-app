@@ -14,7 +14,7 @@ import numpy as np
 from glob import glob
 from copy import deepcopy
 import moseq2_common.yaml
-from moseq2_common.frames import select_strel
+from moseq2_common.frames import odd_kernel
 from typing import Pattern
 from cytoolz import valmap
 from moseq2_extract.io.image import write_image
@@ -319,25 +319,20 @@ def _same_setting(a, b):
 
 def check_filter_sizes(config_data):
     """
-    Ensure spatial and temporal filter kernel sizes are odd numbers.
+    Round each even spatial and temporal median kernel size up to the next odd one.
 
     Args:
     config_data (dict): a dictionary holding all extraction parameters
 
     Returns:
-    config_data (dict): Updated configuration dict
-
+    config_data (dict): a copy of ``config_data`` whose ``spatial_filter_size`` and
+        ``temporal_filter_size`` are new lists, each size through ``moseq2_common.frames.odd_kernel``
     """
-
-    # Ensure filter kernel sizes are odd
-    if config_data['spatial_filter_size'][0] % 2 == 0 and config_data['spatial_filter_size'][0] > 0:
-        warnings.warn("Spatial Filter Size must be an odd number. Incrementing value by 1.")
-        config_data['spatial_filter_size'][0] += 1
-    if config_data['temporal_filter_size'][0] % 2 == 0 and config_data['temporal_filter_size'][0] > 0:
-        config_data['temporal_filter_size'][0] += 1
-        warnings.warn("Spatial Filter Size must be an odd number. Incrementing value by 1.")
-
-    return config_data
+    return {
+        **config_data,
+        "spatial_filter_size": [odd_kernel(size) for size in config_data["spatial_filter_size"]],
+        "temporal_filter_size": [odd_kernel(size) for size in config_data["temporal_filter_size"]],
+    }
 
 def generate_missing_metadata(sess_dir, sess_name):
     """

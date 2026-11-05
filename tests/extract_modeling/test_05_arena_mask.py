@@ -769,3 +769,40 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
 
     assert shown.shape == extracted.shape
     np.testing.assert_array_equal(shown, extracted)
+
+
+# ------------------------------------------ filters turned off in config.yaml
+
+@pytest.mark.parametrize(
+    "key, off",
+    [
+        ("tail_filter_shape", "none"),
+        ("cable_filter_shape", "none"),
+        ("tail_filter_size", [0, 0]),
+        ("cable_filter_size", [0, 0]),
+        ("bg_roi_shape", "none"),
+    ],
+)
+def test_the_tool_opens_and_previews_a_config_that_turns_a_filter_off(tmp_path, raw_sessions, key, off):
+    """``none`` and ``0 0`` turn the tail, cable and arena-mask filters off.
+
+    The command line takes these settings, so the arena tool, whose entries
+    start as copies of ``config.yaml``, has to take them too: open on a
+    ``config.yaml`` holding one, preview an extraction, and save it unchanged.
+    """
+    from moseq2_extract.gui import generate_config_command
+
+    root = tmp_path / "project"
+    shutil.copytree(raw_sessions / "saline_example_0", root / "saline_example_0")
+    config = root / "config.yaml"
+    generate_config_command(str(config), camera_type="k2")
+    with update_config(str(config)) as config_data:
+        config_data["output_dir"] = "proc"
+        config_data[key] = off
+
+    _, data, buttons = open_widget(root)
+    data.frames_to_extract = 10
+    click(buttons["Compute extraction"])
+    assert data.images["Extracted mouse"] is not None
+    click(buttons["Save session parameters"])
+    assert parameters(root / "session_config.yaml", data.path)[key] == off

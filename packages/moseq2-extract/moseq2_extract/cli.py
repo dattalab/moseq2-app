@@ -154,6 +154,9 @@ def _typed_extract_options(ctx):
 @click_options(BatchExtractOptions, order=BATCH_EXTRACT_ORDER, others={
     **_roi_others({"input_folder": click.argument("input-folder",
                                                   type=click.Path(exists=True, resolve_path=False))}),
+    "output_dir": click.option("--output-dir", default="proc", show_default=False,
+                               help="Output directory to save the results h5 file "
+                                    "(default: config.yaml's output_dir, else proc)"),
     "output_file": _OUTPUT_FILE,
 })
 @click.pass_context
@@ -169,7 +172,7 @@ def batch_extract(ctx, input_folder, config_file, **_):
     typed = _typed_extract_options(ctx)
     result = steps.batch_extract(
         input_folder, opts, config_file=config_file,
-        # an --output-dir not typed is config.yaml's for a local extraction, proc for the search and SLURM jobs
+        # an --output-dir not typed is config.yaml's output_dir, else proc
         output_dir=typed.pop("output_dir", None),
         explicit=typed,
     )
