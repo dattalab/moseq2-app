@@ -2,8 +2,8 @@
 
 With ``skip_extracted = True`` (its default), the notebook's extraction cell
 leaves out the recordings whose ``results_00.yaml`` says the extraction
-completed, as ``moseq2-extract batch-extract`` does without ``--skip-checks``,
-and names them in one message. The checks that guard an extraction (the
+completed, as ``moseq2-extract batch-extract`` does without ``--skip-checks``;
+when that is every recording, one line says there is nothing to extract. The checks that guard an extraction (the
 flip-classifier warning, the frame timestamps, the frame count) are about a
 recording that is about to be extracted, and a finished one is not. A project
 extracted before frame timestamps were required can hold a finished session
@@ -63,8 +63,11 @@ def rerun(project, capsys):
 def test_a_rerun_skips_finished_sessions_with_or_without_timestamps(extracted_project, capsys):
     out, err, caught = rerun(extracted_project, capsys)
 
-    assert f"{len(SESSIONS)} recording(s) already extracted were left out" in out, out
-    assert "To include them, set skip_extracted to False (in the notebook)" in out, out
+    assert out == (
+        f"All {len(SESSIONS)} recordings under {extracted_project} are already extracted, so there is "
+        "nothing to extract. To extract them again, set skip_extracted to False (in the notebook) "
+        "or add --skip-checks (moseq2-extract batch-extract).\n"
+    ), out
     assert "failed" not in out and "No frame timestamps" not in out, out
 
 

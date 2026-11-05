@@ -11,6 +11,8 @@ True, as its cell sets it.
 
 Each test builds a project of empty recording files and stops the step before
 it extracts anything: the list it would have extracted is what it found.
+
+When every recording is already extracted, both say so in one line.
 """
 
 from __future__ import annotations
@@ -98,3 +100,29 @@ def test_both_front_ends_list_the_same_recordings(project, extracted, skip_extra
 
     assert by_cli == expected
     assert by_notebook == expected
+
+
+def test_a_rerun_with_every_recording_extracted_says_so_in_one_line(project, extracted, capsys):
+    for folder in RECORDINGS:
+        mark_extracted(project / folder)
+    line = (f"All {len(RECORDINGS)} recordings under {project} are already extracted, so there is nothing "
+            "to extract. To extract them again, set skip_extracted to False (in the notebook) or add "
+            "--skip-checks (moseq2-extract batch-extract).\n")
+
+    by_cli = run_cli(project).output
+    capsys.readouterr()
+    extract_found_sessions(str(project), str(project / "config.yaml"), extract_all=True, skip_extracted=True)
+    by_notebook = capsys.readouterr().out
+
+    assert extracted == []
+    assert by_cli == line
+    assert by_notebook == line
+
+
+def test_a_rerun_with_some_recordings_extracted_extracts_the_rest(project, extracted):
+    mark_extracted(project / "avi_session")
+
+    output = run_cli(project).output
+
+    assert sorted(extracted) == [r for r in every_recording(project) if not r.endswith("depth.avi")]
+    assert "nothing to extract" not in output, output

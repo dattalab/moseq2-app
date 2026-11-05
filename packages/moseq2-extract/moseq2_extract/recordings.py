@@ -126,6 +126,8 @@ class RecordingSearch:
         Says where the search looked, how deep, what counts as a recording and
         which folders it passed over and why, whenever it found nothing or left
         anything out; and warns for each recording without a metadata.json.
+        When every recording found is already extracted, one line says so, and
+        the rest follows only when a folder was passed over.
         """
         lines = self.warnings()
         if not self.root_exists:
@@ -139,7 +141,20 @@ class RecordingSearch:
         if self.recordings and not left_out:
             return "\n".join(lines)
 
-        if self.recordings:
+        all_extracted = not self.recordings and bool(self.extracted)
+        if all_extracted:
+            lines.append(
+                f"All {len(self.extracted)} recordings under {self.root} are already extracted, so there is "
+                "nothing to extract. To extract them again, set skip_extracted to False (in the notebook) "
+                "or add --skip-checks (moseq2-extract batch-extract)."
+            )
+            if not left_out:
+                return "\n".join(lines)
+            lines.append(
+                f"Searched {self.root} and its folders down to {self.max_depth} levels below it, "
+                "following symlinked folders."
+            )
+        elif self.recordings:
             lines.append(
                 f"Found {len(self.recordings)} recording(s) under {self.root}, searching its folders "
                 f"down to {self.max_depth} levels below it and following symlinked folders."
@@ -167,7 +182,7 @@ class RecordingSearch:
         if passed_over:
             lines.append("Folders passed over:")
             lines += [f"  {folder}: {reason}" for folder, reason in passed_over]
-        if self.extracted:
+        if self.extracted and not all_extracted:
             lines.append(
                 f"{len(self.extracted)} recording(s) already extracted were left out, each with a "
                 f"finished extraction recorded beside it (such as {self.extracted[0][1]}). To include "
