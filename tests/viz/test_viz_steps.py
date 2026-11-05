@@ -112,7 +112,7 @@ def test_get_best_fit_model_calls_the_step(tmp_path, monkeypatch, steps, options
     best = get_best_fit_model(str(tmp_path), plot_all=True, objective="duration (median match)")
 
     assert best == {"best": "m.p"}
-    assert calls == [(str(tmp_path / "models"), str(changepoints),
+    assert calls == [(str(tmp_path / "models") + "/", str(changepoints),
                       str(tmp_path / "plots" / "model_vs_pc_changepoints"),
                       options.BestModelOptions(plot_all=True, objective="duration (median match)"))]
 
