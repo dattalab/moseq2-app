@@ -89,7 +89,7 @@ def test_a_frame_with_no_mouse_becomes_the_mean_pose(scores, grouped, project):
     """
     with h5py.File(scores) as f:
         for name, uuid in uuids(grouped).items():
-            with h5py.File(proc(project, name) / "results_00.h5") as extraction:
+            with h5py.File(proc(project, name) / "results.h5") as extraction:
                 empty = (extraction["frames"][:] > 0).sum(axis=(1, 2)) == 0
             projected = f[f"scores/{uuid}"][:]
             blank = (projected == 0).all(axis=1)

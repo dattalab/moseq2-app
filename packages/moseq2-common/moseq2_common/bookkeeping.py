@@ -3,8 +3,9 @@
 It sits in the project folder beside ``config.yaml`` and lists:
 
 - the sessions, each keyed by its recording's path relative to the project
-  (``moseq2_common.project.session_key``), with the recording, its extraction
-  file in ``aggregate_results/`` (``folder``) and its uuid;
+  (``moseq2_common.project.session_key``), with the recording, its folder in
+  ``aggregate_results/`` (``folder``, holding the extraction ``results.h5``,
+  ``SESSION_FILE``) and its uuid;
 - each step's current outputs: the PCA components, scores and changepoints, the
   fitted models and which one is current, each model's analysis folder, and the
   applied models.
@@ -26,17 +27,19 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from glob import escape, glob
-from os.path import abspath, dirname, join
+from os.path import abspath, dirname
 from pathlib import Path, PurePosixPath
 
 from moseq2_common.project import Project, read_groups, session_key
 from moseq2_common.yaml import read_yaml, write_yaml
 
-__all__ = ["BOOKKEEPING_NAME", "Bookkeeping", "BookkeepingError", "Session", "load", "project_index",
-           "relative_path", "resolve_path", "session_index", "sessions_folder", "update"]
+__all__ = ["BOOKKEEPING_NAME", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session", "load",
+           "project_index", "relative_path", "resolve_path", "session_h5", "session_index", "sessions_folder",
+           "update"]
 
 BOOKKEEPING_NAME = "moseq2-project.yaml"
+#: A session's extraction file, in its folder; its preview movie and results yaml share the name.
+SESSION_FILE = "results.h5"
 
 #: The group of a session ``config.yaml``'s ``groups`` does not name.
 DEFAULT_GROUP = "default"
@@ -52,7 +55,7 @@ class Session:
     key: str
     #: The recording, relative to the project folder.
     recording: str
-    #: The session's extraction file in ``aggregate_results/``, relative to the project folder.
+    #: The session's folder in ``aggregate_results/``, relative to the project folder.
     folder: str
     uuid: str
 
@@ -134,6 +137,11 @@ def update(project: Project, change: Callable[[Bookkeeping], None]) -> Bookkeepi
     return bookkeeping
 
 
+def session_h5(project: Project, session: Session) -> Path:
+    """The extraction file of ``session``: ``results.h5`` in its folder."""
+    return resolve_path(project, session.folder) / SESSION_FILE
+
+
 def sessions_folder(project: Project, bookkeeping: Bookkeeping | None = None) -> Path:
     """The folder holding the project's session files (``aggregate_results/``)."""
     bookkeeping = bookkeeping if bookkeeping is not None else load(project)
@@ -166,13 +174,13 @@ def session_index(project: Project) -> dict:
     ``{"files": [{"uuid", "group", "metadata", "path": (h5, yaml), "key"}], "pca_path": scores or "",
     "bookkeeping_file": the file it was read from}``,
     each session's group from ``config.yaml``'s ``groups`` (``default`` when it names none). Sessions are
-    listed in the order their files sit in their folder, the order 1.5.0's index listed them in.
+    listed in the order the bookkeeping file lists them.
     """
     bookkeeping = load(project)
     groups = read_groups(project)
     entries = []
     for key, session in bookkeeping.sessions.items():
-        h5 = resolve_path(project, session.folder)
+        h5 = session_h5(project, session)
         entries.append({
             "uuid": session.uuid,
             "group": groups.get(key, DEFAULT_GROUP),
@@ -180,11 +188,6 @@ def session_index(project: Project) -> dict:
             "path": (str(h5), str(h5.with_suffix(".yaml"))),
             "key": key,
         })
-    order = {}
-    for folder in sorted({dirname(f["path"][0]) for f in entries}):
-        for position, found in enumerate(glob(join(escape(folder), "**", "*.h5"), recursive=True)):
-            order.setdefault(abspath(found), (folder, position))
-    entries.sort(key=lambda f: order.get(abspath(f["path"][0]), (dirname(f["path"][0]), float("inf"))))
     scores = bookkeeping.pca.get("scores")
     return {"files": entries, "pca_path": str(resolve_path(project, scores)) if scores else "",
             "bookkeeping_file": str(project.bookkeeping_file)}

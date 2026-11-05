@@ -18,20 +18,21 @@ def test_a_project_under_a_flipped_directory_lists_its_sessions(tmp_path):
     """
     project = tmp_path / "flipped_mice" / "project"
     for session in ("s0", "s1"):
-        proc = project / session / "proc"
+        proc = project / "aggregate_results" / session
         proc.mkdir(parents=True)
+        (project / session).mkdir()
         (project / session / "depth.dat").write_bytes(b"")
         (project / session / "metadata.json").write_text("{}")
-        (proc / "results_00.mp4").write_bytes(b"")
-        (proc / "results_00_flipped.mp4").write_bytes(b"")
+        (proc / "results.mp4").write_bytes(b"")
+        (proc / "results_flipped.mp4").write_bytes(b"")
 
     raw = get_session_paths(str(project))
     extracted = get_session_paths(str(project), extracted=True)
     flipped = get_session_paths(str(project), extracted=True, flipped=True)
 
     assert raw == {s: str(project / s / "depth.dat") for s in ("s0", "s1")}
-    assert extracted == {s: str(project / s / "proc" / "results_00.mp4") for s in ("s0", "s1")}
-    assert flipped == {s: str(project / s / "proc" / "results_00_flipped.mp4") for s in ("s0", "s1")}
+    assert extracted == {s: str(project / "aggregate_results" / s / "results.mp4") for s in ("s0", "s1")}
+    assert flipped == {s: str(project / "aggregate_results" / s / "results_flipped.mp4") for s in ("s0", "s1")}
 
 
 def test_a_project_under_a_depth_directory_lists_only_its_depth_recordings(tmp_path):

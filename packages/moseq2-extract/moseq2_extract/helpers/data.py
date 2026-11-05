@@ -2,264 +2,56 @@
 Contains helper functions for handling/storing data during extraction.
 """
 
-import os
-import h5py
-import shutil
 import tarfile
 import warnings
 import numpy as np
-from moseq2_common.h5 import h5_to_dict
-from moseq2_common.yaml import read_yaml, write_yaml
-from tqdm.auto import tqdm
-from cytoolz import keymap
 from importlib.metadata import version
 from moseq2_extract.io.video import load_timestamps_from_movie
-from os.path import exists, join, dirname, basename, splitext
+from os.path import exists, join, basename
 from moseq2_extract.util import (
     load_timestamps,
     load_metadata,
-    camel_to_snake,
     load_textdata,
-    build_path,
     dict_to_h5,
     click_param_annot,
 )
 
 
-def check_completion_status(status_filename):
+#: Files an acquisition can leave beside a recording, which extraction copies into the session's ``.h5``
+#: under ``/metadata/misc/<name>``: (file, name, data type).
+MISC_FILES = (
+    # behavior reinforcement experiments
+    ("feedback_ts.txt", "realtime_feedback", bool),
+    # a pre-trained model's real-time syllable classification
+    ("predictions.txt", "realtime_predictions", int),
+    # real-time PC scores
+    ("pc_scores.txt", "realtime_pc_scores", np.float32),
+)
+
+
+def write_misc_metadata(h5_file, recording_folder):
     """
-    Read a results_00.yaml (status file) and checks whether the session has been
-    fully extracted.
+    Copy the real-time files beside a recording (``MISC_FILES``) into its extraction.
 
     Args:
-    status_filename (str): path to results_00.yaml
-
-    Returns:
-    complete (bool): If True, data has been extracted to completion.
+    h5_file (h5py.File): the extraction, open for writing.
+    recording_folder (str): the folder holding the recording.
     """
-
-    if exists(status_filename):
-        return read_yaml(status_filename)["complete"]
-    return False
-
-
-def build_index_dict(files_to_use):
-    """
-    Create a dictionary for the index file from a list of files and respective metadatas.
-
-    Args:
-    files_to_use (list): list of paths to extracted h5 files.
-
-    Returns:
-    output_dict (dict): index-file dictionary containing all aggregated extractions.
-    """
-
-    output_dict = {"files": [], "pca_path": ""}
-
-    index_uuids = []
-    for i, file_tup in enumerate(files_to_use):
-        if file_tup[2]["uuid"] not in index_uuids:
-            tmp = {
-                "path": (file_tup[0], file_tup[1]),
-                "uuid": file_tup[2]["uuid"],
-                "group": "default",
-                "metadata": {
-                    "SessionName": f"default_{i}",
-                    "SubjectName": f"default_{i}",
-                },  # fallback metadata
-            }
-
-            # handling metadata sub-dictionary values
-            if "metadata" in file_tup[2]:
-                tmp["metadata"].update(file_tup[2]["metadata"])
-            else:
-                warnings.warn(
-                    f"Could not locate metadata for {file_tup[0]}! File will be listed with minimal default metadata."
-                )
-
-            index_uuids.append(file_tup[2]["uuid"])
-            # appending file with default information
-            output_dict["files"].append(tmp)
-
-    return output_dict
-
-
-def load_extraction_meta_from_h5s(to_load, snake_case=True):
-    """
-    Load extraction metadata from h5 files.
-
-    Args:
-    to_load (list): list of paths to h5 files.
-    snake_case (bool): whether to save the files using snake_case
-
-    Returns:
-    loaded (list): list of loaded h5 dicts.
-    """
-
-    loaded = []
-    for _dict, _h5f in tqdm(to_load, desc="Scanning data"):
-        try:
-            # v0.1.3 introduced a change - acq. metadata now here
-            tmp = h5_to_dict(_h5f, "/metadata/acquisition")
-        except KeyError:
-            # if it doesn't exist it's likely from an older moseq version. Try loading it here
-            try:
-                tmp = h5_to_dict(_h5f, "/metadata/extraction")
-            except KeyError:
-                # if all else fails, abandon all hope
-                tmp = {}
-
-        # note that everything going into here must be a string (no bytes!)
-        tmp = {k: str(v) for k, v in tmp.items()}
-        if snake_case:
-            tmp = keymap(camel_to_snake, tmp)
-
-        # Specific use case block: Behavior reinforcement experiments
-        feedback_file = join(dirname(_h5f), "..", "feedback_ts.txt")
-        if exists(feedback_file):
-            timestamps = map(int, load_timestamps(feedback_file, 0))
-            feedback_status = map(int, load_timestamps(feedback_file, 1))
-            _dict["feedback_timestamps"] = list(zip(timestamps, feedback_status))
-
-        _dict["extraction_metadata"] = tmp
-        loaded += [(_dict, _h5f)]
-
-    return loaded
-
-
-def build_manifest(loaded, format, snake_case=True):
-    """
-    Build a manifest file used to contain extraction result metadata from h5 and yaml files.
-
-    Args:
-    loaded (list of dicts): list of dicts containing loaded h5 data.
-    format (str): filename format indicating the new name for the metadata files in the aggregate_results dir.
-    snake_case (bool): whether to save the files using snake_case
-
-    Returns:
-    manifest (dict): dictionary of extraction metadata.
-    """
-
-    manifest = {}
-    fallback = "session_{:03d}"
-    fallback_count = 0
-
-    # Additional metadata for certain use cases
-    additional_meta = []
-
-    # Behavior reinforcement metadata
-    additional_meta.append(
-        {
-            "filename": "feedback_ts.txt",
-            "var_name": "realtime_feedback",
-            "dtype": bool,
-        }
-    )
-
-    # Pre-trained model real-time syllable classification results
-    additional_meta.append(
-        {
-            "filename": "predictions.txt",
-            "var_name": "realtime_predictions",
-            "dtype": int,
-        }
-    )
-
-    # Real-Time Recorded/Computed PC Scores
-    additional_meta.append(
-        {
-            "filename": "pc_scores.txt",
-            "var_name": "realtime_pc_scores",
-            "dtype": np.float32,
-        }
-    )
-
-    for _dict, _h5f in loaded:
-        print_format = f"{format}_{splitext(basename(_h5f))[0]}"
-        if not _dict["extraction_metadata"]:
-            copy_path = fallback.format(fallback_count)
-            fallback_count += 1
-        else:
-            try:
-                copy_path = build_path(
-                    _dict["extraction_metadata"], print_format, snake_case=snake_case
-                )
-            except:
-                copy_path = fallback.format(fallback_count)
-                fallback_count += 1
-                pass
-
-        # add a bonus dictionary here to be copied to h5 file itself
-        manifest[_h5f] = {
-            "copy_path": copy_path,
-            "yaml_dict": _dict,
-            "additional_metadata": {},
-        }
-        for meta in additional_meta:
-            filename = join(dirname(_h5f), "..", meta["filename"])
-            if exists(filename):
-                try:
-                    data, timestamps = load_textdata(filename, dtype=meta["dtype"])
-                    manifest[_h5f]["additional_metadata"][meta["var_name"]] = {
-                        "data": data,
-                        "timestamps": timestamps,
-                    }
-                except:
-                    warnings.warn(
-                        "WARNING: Did not load timestamps! This may cause issues if total dropped frames > 2% of the session."
-                    )
-
-    return manifest
-
-
-def copy_manifest_results(manifest, output_dir):
-    """
-    Copy all consolidated manifest results to their respective output files.
-
-    Args:
-    manifest (dict): manifest dictionary containing all extraction h5 metadata to save
-    output_dir (str): path to directory where extraction results will be aggregated.
-
-    """
-
-    if not exists(output_dir):
-        os.makedirs(output_dir)
-
-    # now the key is the source h5 file and the value is the path to copy to
-    for k, v in tqdm(manifest.items(), desc="Copying files"):
-
-        if exists(join(output_dir, f'{v["copy_path"]}.h5')):
+    for filename, name, dtype in MISC_FILES:
+        path = join(recording_folder, filename)
+        if not exists(path):
             continue
-
-        in_basename = splitext(basename(k))[0]
-        in_dirname = dirname(k)
-
-        h5_path = k
-        mp4_path = join(in_dirname, f"{in_basename}.mp4")
-
-        if exists(h5_path):
-            new_h5_path = join(output_dir, f'{v["copy_path"]}.h5')
-            shutil.copyfile(h5_path, new_h5_path)
-
-        # if we have additional_meta then crack open the h5py and write to a safe place
-        if len(v["additional_metadata"]) > 0:
-            for k2, v2 in v["additional_metadata"].items():
-                new_key = f"/metadata/misc/{k2}"
-                with h5py.File(new_h5_path, "a") as f:
-                    f.create_dataset(f"{new_key}/data", data=v2["data"])
-                    f.create_dataset(f"{new_key}/timestamps", data=v2["timestamps"])
-
-        if exists(mp4_path):
-            shutil.copyfile(mp4_path, join(output_dir, f'{v["copy_path"]}.mp4'))
-
-        v["yaml_dict"].pop("extraction_metadata", None)
-        write_yaml(v["yaml_dict"], f'{join(output_dir, v["copy_path"])}.yaml')
+        try:
+            data, timestamps = load_textdata(path, dtype=dtype)
+        except Exception as error:  # noqa: BLE001 -- a file that cannot be read is named and left out
+            warnings.warn(f"{path} could not be read ({error}), so it is not copied into the extraction. "
+                          "Check that each line holds a timestamp, a space and comma-separated values, then "
+                          "extract the recording again to include it.")
+            continue
+        h5_file.create_dataset(f"/metadata/misc/{name}/data", data=data)
+        h5_file.create_dataset(f"/metadata/misc/{name}/timestamps", data=timestamps)
 
 
-#: The unit of every extraction's ``/timestamps``, also written as the dataset's
-#: ``unit`` attribute. A Kinect v2 ``depth_ts.txt`` is in milliseconds already;
-#: ``timestamps.csv`` and an ``.mkv`` container's own frame times are seconds and
-#: are converted when read.
 TIMESTAMP_UNIT = "milliseconds"
 
 
@@ -333,7 +125,9 @@ def handle_extract_metadata(input_file, dirname, with_source=False):
             )
             source = looked_in[1]
             alternate_correct = True
-        metadata_path = tar.extractfile(tar_members[tar_names.index("metadata.json")])
+        # an archive without a metadata.json is named after itself (load_metadata)
+        metadata_path = (tar.extractfile(tar_members[tar_names.index("metadata.json")])
+                         if "metadata.json" in tar_names else join(dirname, "metadata.json"))
     else:
         # Handling non-compressed session paths
         metadata_path = join(dirname, "metadata.json")

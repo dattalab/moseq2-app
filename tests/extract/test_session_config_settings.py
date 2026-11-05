@@ -9,7 +9,7 @@ Extraction takes those from the entry and every other setting from
 Options typed on ``batch-extract``'s command line win over both.
 
 Every path is covered: the notebook's local extraction and ``batch-extract``
-(both through ``extract_command``), and the per-recording ``proc/config.yaml``
+(both through ``extract_command``), and the per-recording ``config.yaml`` in its session folder
 that ``batch-extract --cluster-type slurm`` and the notebook's SLURM path write.
 Nothing is submitted; each SLURM command is run through ``extract`` with
 ``extract_wrapper`` recorded, so what is checked is what the job would extract with.
@@ -84,7 +84,7 @@ def local(monkeypatch):
     """What each local extraction hands ``extract_wrapper``, instead of running it."""
     calls = {}
 
-    def record(input_file, output_dir, config_data, num_frames=None, skip=False):
+    def record(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None):
         calls[input_file] = {"config": config_data, "num_frames": num_frames}
         return output_dir
 
@@ -96,7 +96,7 @@ def local(monkeypatch):
 def slurm(monkeypatch):
     """Write the SLURM commands without submitting, run each through ``extract``
     and return what each received, keyed by recording, plus each written
-    ``proc/config.yaml``."""
+    job ``config.yaml`` in its session folder."""
     monkeypatch.setattr(
         "moseq2_extract.helpers.extract.system",
         lambda *_: pytest.fail("a job was submitted"),
@@ -109,7 +109,7 @@ def slurm(monkeypatch):
         monkeypatch.setattr(
             extract_steps,
             "extract_wrapper",
-            lambda f, out, config, num_frames=None, skip=False: calls.update(
+            lambda f, out, config, num_frames=None, skip=False, uuid=None: calls.update(
                 {f: {"config": config, "num_frames": num_frames}}
             ),
         )
@@ -117,7 +117,7 @@ def slurm(monkeypatch):
         for line in filter(str.strip, script.splitlines()):
             command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
             run("extract", *split_command(command))
-        written = {name: read_settings(root / name / "proc" / "config.yaml") for name in SESSIONS}
+        written = {name: read_settings(root / "aggregate_results" / name / "config.yaml") for name in SESSIONS}
         return calls, written
 
     return go
@@ -184,7 +184,7 @@ def test_local_batch_extract_takes_frame_trim_and_num_frames_from_config_yaml(pr
 
 
 def test_slurm_batch_extract_writes_config_yaml_settings_into_each_job(project, slurm):
-    """B1 on SLURM: each job's proc/config.yaml holds config.yaml's frame_trim and
+    """B1 on SLURM: each job's config.yaml holds config.yaml's frame_trim and
     num_frames over the recording's tuned arena settings."""
     root, config, session_config = project
 

@@ -59,7 +59,7 @@ def extract(recording, output_dir, chunk_size, overlap=0, classifier=False):
         warnings.simplefilter("always")
         result = CliRunner().invoke(extract_cli.cli, args, catch_exceptions=False)
     assert result.exit_code == 0, result.output
-    with h5py.File(recording / output_dir / "results_00.h5", "r") as f:
+    with h5py.File(recording / output_dir / "results.h5", "r") as f:
         return {
             "frames": f["frames"][()],
             "angle": f["scalars/angle"][()],

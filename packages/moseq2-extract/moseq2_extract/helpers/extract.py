@@ -5,13 +5,12 @@ Extraction-helper utility functions.
 import numpy as np
 from moseq2_common.project import write_job_settings
 from moseq2_common.slurm import sbatch_command
-from os.path import exists, basename, dirname, join, abspath
+from os.path import exists, join, abspath
 from os import makedirs, system
 from tqdm.auto import tqdm
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.io.video import load_movie_data
 from moseq2_common.video import write_frames_preview
-from moseq2_extract.helpers.data import check_completion_status
 from moseq2_extract.session_config import recordings_options
 
 
@@ -236,7 +235,7 @@ def run_local_extract(
     config_file,
     skip_extracted=False,
     num_frames=None,
-    output_dir=None,
+    output_dirs=None,
     cli_options=None,
 ):
     """
@@ -247,7 +246,7 @@ def run_local_extract(
     config_file (str): path to configuration file containing pre-configured extract and ROI
     skip_extracted (bool): Whether to skip already extracted session.
     num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
-    output_dir (str): output directory for each session. If None, the config file's output_dir, else "proc".
+    output_dirs (dict): each recording's output folder; a recording it does not name goes to its session's folder.
     cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
 
     Returns:
@@ -261,7 +260,7 @@ def run_local_extract(
         try:
             result = extract_command(
                 ext,
-                output_dir,
+                (output_dirs or {}).get(ext),
                 config_file=config_file,
                 num_frames=num_frames,
                 skip=skip_extracted,
@@ -320,24 +319,27 @@ def run_slurm_extract(
     num_frames=None,
     cli_options=None,
     project=None,
+    output_dirs=None,
 ):
     """
     Write one sbatch command per session to extract it on a SLURM cluster, and submit them if run_cmd is set.
 
     Each session is extracted with the settings ``recordings_options`` resolves: the arena tool's settings from its
     entry in the project's session_config.yaml, every other setting from the config file, and the options typed on
-    the command line over both. Each session gets a config.yaml of its own in its output directory whenever the
+    the command line over both. Each session gets a config.yaml of its own in its session folder whenever the
     project has a session_config.yaml or an option is typed: those settings, resolved, in config.yaml's ``extract``
     section, with a ``job:`` block naming ``project`` (``moseq2_common.project.write_job_settings``).
 
     Args:
     input_dir (str): directory the sessions were found in; extract_out_script is written there.
     to_extract (list): list of paths to files to extract
-    config_data (dict): batch-extract parameters, including config_file, output_dir and the SLURM settings.
+    config_data (dict): batch-extract parameters, including config_file and the SLURM settings.
     skip_extracted (bool): Whether to skip already extracted session.
     num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
     cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
     project (moseq2_common.project.Project): the project each session's job file names; None outside a project.
+    output_dirs (dict): each recording's session folder, where its job file goes; with
+        ``config_data["output_dir"]`` set, the job is given its folder with ``--output-dir``.
     """
 
     assert (
@@ -353,7 +355,7 @@ def run_slurm_extract(
 
     if session_config_files:
         for depth_file in to_extract:
-            output_dir = join(dirname(depth_file), config_data["output_dir"])
+            output_dir = output_dirs[depth_file]
 
             # ensure output_dir exists
             if not exists(output_dir):
@@ -368,12 +370,10 @@ def run_slurm_extract(
     # Construct sbatch command for slurm
     commands = ""
     for depth_file in to_extract:
-        output_dir = join(dirname(depth_file), config_data["output_dir"])
+        output_dir = output_dirs[depth_file]
 
         # skip session if skip_extracted is true and the session is already extracted
-        if skip_extracted and check_completion_status(
-            join(output_dir, "results_00.yaml")
-        ):
+        if skip_extracted and exists(join(output_dir, "results.h5")):
             continue
 
         # set up config file
@@ -384,8 +384,9 @@ def run_slurm_extract(
 
         # construct command
         frames = f" --num-frames {num_frames}" if num_frames is not None else ""
+        folder = f" --output-dir {output_dir}" if config_data.get("output_dir") else ""
         commands += sbatch_command(
-            f"moseq2-extract extract --config-file {config_file}{frames} {depth_file}; ",
+            f"moseq2-extract extract --config-file {config_file}{frames}{folder} {depth_file}; ",
             ncpus=config_data["ncpus"] if config_data["ncpus"] > 0 else 1,
             memory=config_data["memory"],
             partition=config_data["partition"],

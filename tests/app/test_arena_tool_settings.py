@@ -91,7 +91,7 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
     monkeypatch.setattr(
         extract_steps,
         "extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(config),
+        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None: received.update(config),
     )
     extract_command(str(project / "saline_example_0" / "depth.avi"), None, str(project / "config.yaml"))
 
@@ -178,7 +178,7 @@ def test_the_preview_stops_on_a_flip_classifier_that_does_not_fit_the_crop_size(
 
 def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monkeypatch, raw_sessions):
     """ "Compute arena mask" finds the arena with config.yaml's settings outside the tool's,
-    and caches the background in the folder extraction writes to, ``proc``."""
+    and caches the background in the folder extraction writes to, the recording's session folder."""
     saved, widget = _save_then_change_config(
         project, raw_sessions, {"bg_roi_erode": [3, 3], "bg_roi_fill_holes": False}
     )
@@ -195,5 +195,5 @@ def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monke
     assert tuple(received["bg_roi_erode"]) == (3, 3)
     assert received["bg_roi_fill_holes"] is False
     assert received["dilate_iterations"] == 2
-    assert output_dir == str(project / "saline_example_0" / "proc")
-    assert (project / "saline_example_0" / "proc" / "bground.tiff").exists()
+    assert output_dir == str(project / "aggregate_results" / "saline_example_0")
+    assert (project / "aggregate_results" / "saline_example_0" / "bground.tiff").exists()

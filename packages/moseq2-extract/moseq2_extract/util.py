@@ -11,12 +11,8 @@ import click
 import tarfile
 import warnings
 import numpy as np
-from glob import glob
 from copy import deepcopy
-import moseq2_common.yaml
 from moseq2_common.frames import odd_kernel
-from typing import Pattern
-from cytoolz import valmap
 from moseq2_extract.io.image import write_image
 from moseq2_extract.io.video import get_movie_info
 from os.path import join, exists, splitext, basename, abspath, dirname
@@ -340,47 +336,28 @@ def check_filter_sizes(config_data):
         "temporal_filter_size": [odd_kernel(size) for size in config_data["temporal_filter_size"]],
     }
 
-def generate_missing_metadata(sess_dir, sess_name):
-    """
-    Generate metadata.json with default avlues for session that does not already include one.
-
-    Args:
-    sess_dir (str): Path to session directory to create metadata.json file in.
-    sess_name (str): Session Name to set the metadata SessionName.
-
-    Returns:
-    """
-
-    # generate sample metadata json for each session that is missing one
-    sample_meta = {'SubjectName': '', f'SessionName': f'{sess_name}',
-                   'NidaqChannels': 0, 'NidaqSamplingRate': 0.0, 'DepthResolution': [512, 424],
-                   'ColorDataType': "Byte[]", "StartTime": ""}
-
-    with open(join(sess_dir, 'metadata.json'), 'w') as fp:
-        json.dump(sample_meta, fp)
-
 def load_metadata(metadata_file):
     """
-    Load metadata from session metadata.json file.
+    Load a session's metadata.json, or its stand-in when the recording has none.
+
+    A recording without a metadata.json gets an empty ``SubjectName``, its folder's name as
+    ``SessionName`` and an empty ``StartTime``, in memory only: nothing is written into the
+    recording's folder. A corrected metadata.json takes effect when the recording is extracted again.
 
     Args:
-    metadata_file (str): path to metadata file
+    metadata_file (str or file object): path to metadata.json, or the file opened (inside an archive).
 
     Returns:
     metadata (dict): metadata dictionary of JSON contents
     """
 
-    try:
-        if not exists(metadata_file):
-            generate_missing_metadata(dirname(metadata_file), basename(dirname(metadata_file)))
+    if not isinstance(metadata_file, (str, os.PathLike)):
+        return json.load(metadata_file)
+    if not exists(metadata_file):
+        return {'SubjectName': '', 'SessionName': basename(dirname(abspath(metadata_file))), 'StartTime': ''}
+    with open(metadata_file, 'r') as f:
+        return json.load(f)
 
-        with open(metadata_file, 'r') as f:
-            metadata = json.load(f)
-    except TypeError:
-        # try loading directly
-        metadata = json.load(metadata_file)
-
-    return metadata
 
 def scalar_attributes():
     """
@@ -516,42 +493,6 @@ def dict_to_h5(h5, dic, root='/', annotations=None):
                 h5[dest].attrs['description'] = annotations[key]
 
 
-def recursive_find_h5s(root_dir=os.getcwd(),
-                       ext='.h5',
-                       yaml_string='{}.yaml'):
-    """
-    Recursively find h5 files, along with yaml files with the same basename
-
-    Args:
-    root_dir (str): path to base directory to begin recursive search in.
-    ext (str): extension to search for
-    yaml_string (str): string for filename formatting when saving data
-
-    Returns:
-    h5s (list): list of found h5 files
-    dicts (list): list of found metadata files
-    yamls (list): list of found yaml files
-    """
-    if not ext.startswith('.'):
-        ext = '.' + ext
-
-    def has_frames(f):
-        try:
-            with h5py.File(f, 'r') as h5f:
-                return 'frames' in h5f
-        except OSError:
-            warnings.warn(f'Error reading {f}, skipping...')
-            return False
-
-    h5s = glob(join(abspath(root_dir), '**', f'*{ext}'), recursive=True)
-    h5s = filter(lambda f: exists(yaml_string.format(f.replace(ext, ''))), h5s)
-    h5s = list(filter(has_frames, h5s))
-    yamls = list(map(lambda f: yaml_string.format(f.replace(ext, '')), h5s))
-    dicts = list(map(moseq2_common.yaml.read_yaml, yamls))
-
-    return h5s, dicts, yamls
-
-
 def escape_path(path):
     """
     Return a path to return to original base directory.
@@ -564,23 +505,6 @@ def escape_path(path):
     """
 
     return re.sub(r'\s', r'\ ', path)
-
-
-def clean_file_str(file_str: str, replace_with: str = '-') -> str:
-    """
-    Removes invalid characters for a file name from a string.
-
-    Args:
-    file_str (str): filename substring to replace
-    replace_with (str): value to replace str with
-
-    Returns:
-    out (str): cleaned file string
-    """
-
-    out = re.sub(r'[ <>:"/\\|?*\']', replace_with, file_str)
-    # find any occurrences of `replace_with`, i.e. (--)
-    return re.sub(replace_with * 2, replace_with, out)
 
 
 def load_textdata(data_file, dtype=np.float32):
@@ -611,7 +535,7 @@ def load_textdata(data_file, dtype=np.float32):
             # dtype -- `np.fromstring("0.000000", sep=",", dtype=int)` raises
             # ValueError where 2.2 returned 0 -- and these files hold decimals
             # whatever the column means, so `predictions.txt` stopped loading.
-            # build_manifest catches that and drops the entry, so the data went
+            # extraction catches that and leaves the entry out, so the data went
             # missing with nothing raised.
             clean_data = np.array(
                 [piece for piece in tmp[1].strip().split(',') if piece],
@@ -623,43 +547,6 @@ def load_textdata(data_file, dtype=np.float32):
 
     return data, timestamps
 
-
-def time_str_for_filename(time_str: str) -> str:
-    """
-    Process the timestamp to be used in the filename.
-
-    Args:
-    time_str (str): time str to format
-
-    Returns:
-    out (str): formatted timestamp str
-    """
-
-    out = time_str.split('.')[0]
-    out = out.replace(':', '-').replace('T', '_')
-    return out
-
-def build_path(keys: dict, format_string: str, snake_case=True) -> str:
-    """
-    Produce a new file name using keys collected from extraction h5 files.
-
-    Args:
-    keys (dict): dictionary specifying which keys used to produce the new file name
-    format_string (str): the string to reformat using the `keys` dictionary i.e. '{subject_name}_{session_name}'.
-    snake_case (bool): flag to save the files with snake_case
-
-    Returns:
-    out (str): a newly formatted filename useable with any operating system
-    """
-
-    if 'start_time' in keys:
-        # process the time value
-        keys['start_time'] = time_str_for_filename(keys['start_time'])
-
-    if snake_case:
-        keys = valmap(camel_to_snake, keys)
-
-    return clean_file_str(format_string.format(**keys))
 
 def mouse_threshold_filter(h5file, thresh=0):
     """
@@ -677,47 +564,6 @@ def mouse_threshold_filter(h5file, thresh=0):
         # select 1st 1000 frames
         frames = f['frames'][:min(f['frames'].shape[0], 1000)]
     return np.nanmean(frames) > thresh
-
-def clean_dict(dct):
-    """
-    Standardize types of dict value.
-
-    Args:
-    dct (dict): dict object with mixed type value objects.
-
-    Returns:
-    out (dict): dict object with list value objects.
-    """
-
-    def clean_entry(e):
-        if isinstance(e, dict):
-            out = clean_dict(e)
-        elif isinstance(e, np.ndarray):
-            out = e.tolist()
-        elif isinstance(e, np.generic):
-            out = e.item()
-        else:
-            out = e
-        return out
-
-    return valmap(clean_entry, dct)
-
-_underscorer1: Pattern[str] = re.compile(r'(.)([A-Z][a-z]+)')
-_underscorer2 = re.compile('([a-z0-9])([A-Z])')
-
-def camel_to_snake(s):
-    """
-    Convert CamelCase to snake_case
-
-    Args:
-    s (str): CamelCase string to convert to snake_case.
-
-    Returns:
-    (str): string in snake_case
-    """
-
-    subbed = _underscorer1.sub(r'\1_\2', s)
-    return _underscorer2.sub(r'\1_\2', subbed).lower()
 
 
 def click_param_annot(click_cmd):

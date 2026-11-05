@@ -54,9 +54,9 @@ def test_a_tarball_extracts_beside_the_archive(tarball):
     assert result.exception is None, result.output
 
     proc = tarball.parent / "proc"
-    for name in ("results_00.h5", "results_00.mp4", "results_00.yaml"):
+    for name in ("results.h5", "results.mp4", "results.yaml"):
         assert (proc / name).is_file(), f"{name} missing from {proc}: {sorted(p.name for p in proc.iterdir())}"
-    with h5py.File(proc / "results_00.h5", "r") as f:
+    with h5py.File(proc / "results.h5", "r") as f:
         assert f["frames"].shape[0] == N_FRAMES
         assert len(f["timestamps"]) == N_FRAMES
-    assert "complete: true" in (proc / "results_00.yaml").read_text()
+    assert "complete: true" in (proc / "results.yaml").read_text()

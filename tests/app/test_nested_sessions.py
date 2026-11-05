@@ -6,8 +6,8 @@ here follow what those cells do with what it finds:
 
 - the extraction cell, with the notebook's own text, takes every recording
   type the pipeline reads, ``.mkv`` included;
-- the validation and preview cells find each recording's extraction in the
-  ``proc`` folder beside the recording, however deep it is;
+- the validation and preview cells find each recording's extraction in its
+  session folder in ``aggregate_results/``, however deep the recording is;
 - a session is named in the notebook's lists by its folder's name, or by its
   folder's path below the project when two session folders share a name
   (``GroupA/mouse1`` and ``GroupB/mouse1``);
@@ -50,17 +50,23 @@ GROUPED = {
 }
 
 
+def session_folder(root, where):
+    """The session folder in ``aggregate_results/`` of the one recording in ``root/where``."""
+    return Path(root, "aggregate_results", where.replace("/", "_"))
+
+
 def empty_session(root, where, recording="depth.dat", extracted=False):
-    """A session folder at ``root/where`` holding an empty recording, and an
-    empty extraction movie and flipped movie in its ``proc`` when ``extracted``."""
+    """A session folder at ``root/where`` holding an empty recording, and an empty extraction movie
+    and flipped movie in its session folder in ``aggregate_results/`` when ``extracted``."""
     folder = Path(root, where)
     folder.mkdir(parents=True, exist_ok=True)
     (folder / recording).touch()
     (folder / "metadata.json").write_text("{}")
     if extracted:
-        (folder / "proc").mkdir()
-        (folder / "proc" / "results_00.mp4").touch()
-        (folder / "proc" / "results_00_flipped.mp4").touch()
+        outputs = session_folder(root, where)
+        outputs.mkdir(parents=True)
+        (outputs / "results.mp4").touch()
+        (outputs / "results_flipped.mp4").touch()
     return folder / recording
 
 
@@ -164,8 +170,8 @@ def test_the_notebooks_extraction_cell_extracts_an_mkv(tmp_path, chosen):
 
 
 def test_extractions_two_levels_down_are_listed(tmp_path):
-    """Validation and preview list the movie in the ``proc`` folder beside each
-    recording, at any depth the recordings are found at."""
+    """Validation and preview list the movie in each recording's session folder, at any depth the
+    recordings are found at."""
     root = tmp_path / "project"
     for where in ("GroupA/mouse1", "GroupB/mouse2", "solo"):
         empty_session(root, where, extracted=True)
@@ -175,26 +181,28 @@ def test_extractions_two_levels_down_are_listed(tmp_path):
     flipped = get_session_paths(str(root), extracted=True, flipped=True)
 
     assert extracted == {
-        name: str(root / where / "proc" / "results_00.mp4")
+        name: str(session_folder(root, where) / "results.mp4")
         for name, where in (("mouse1", "GroupA/mouse1"), ("mouse2", "GroupB/mouse2"), ("solo", "solo"))
     }
     assert flipped == {
-        name: str(root / where / "proc" / "results_00_flipped.mp4")
+        name: str(session_folder(root, where) / "results_flipped.mp4")
         for name, where in (("mouse1", "GroupA/mouse1"), ("mouse2", "GroupB/mouse2"), ("solo", "solo"))
     }
 
 
 def test_an_extraction_whose_recording_was_removed_is_still_listed(tmp_path):
-    """A session folder one level down whose recording was moved away after
-    extraction keeps its extraction listed, as it always was."""
+    """A session moseq2-project.yaml lists keeps its extraction listed after its recording was moved
+    away, named by its session key."""
     root = tmp_path / "project"
-    kept = empty_session(root, "s0", extracted=True)
+    empty_session(root, "s0", extracted=True)
     removed = empty_session(root, "s1", extracted=True)
+    write_yaml({"sessions": {"s1/depth.dat": {"recording": "s1/depth.dat", "folder": "aggregate_results/s1",
+                                              "uuid": "u1"}}}, str(root / "moseq2-project.yaml"))
     removed.unlink()
 
     assert get_session_paths(str(root), extracted=True) == {
-        "s0": str(kept.parent / "proc" / "results_00.mp4"),
-        "s1": str(removed.parent / "proc" / "results_00.mp4"),
+        "s0": str(session_folder(root, "s0") / "results.mp4"),
+        "s1/depth.dat": str(session_folder(root, "s1") / "results.mp4"),
     }
 
 
@@ -206,9 +214,7 @@ def test_the_preview_offers_extractions_two_levels_down(tmp_path):
     viewer = InteractiveExtractionViewer(str(root))
 
     assert dict(viewer.sess_select.options) == {
-        "GroupA/mouse1": str(root / "GroupA/mouse1/proc/results_00.mp4"),
-        "GroupB/mouse1": str(root / "GroupB/mouse1/proc/results_00.mp4"),
-        "solo": str(root / "solo/proc/results_00.mp4"),
+        where: str(session_folder(root, where) / "results.mp4") for where in ("GroupA/mouse1", "GroupB/mouse1", "solo")
     }
 
 
@@ -230,6 +236,7 @@ def test_validation_reports_every_extraction_in_a_grouped_project(tmp_path, extr
     }
     for where, source in layout.items():
         shutil.copytree(Path(extracted) / source, root / where)
+        shutil.copytree(Path(extracted) / "aggregate_results" / source, session_folder(root, where))
 
     printed = StringIO()
     with redirect_stdout(printed):
@@ -282,7 +289,7 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
     received = {}
     monkeypatch.setattr(
         "moseq2_extract.steps.extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
+        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None: received.update(
             {input_file: config["noise_tolerance"]}
         ),
     )
@@ -297,7 +304,7 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
 
 def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch):
     """The SLURM path writes each session's parameters into its own
-    ``proc/config.yaml``, and each job extracts with that file."""
+    ``config.yaml`` in its session folder, and each job extracts with that file."""
     monkeypatch.setattr(
         "moseq2_extract.helpers.extract.system",
         lambda *_: pytest.fail("extract_found_sessions submitted a job"),
@@ -306,7 +313,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
     monkeypatch.setattr(
         extract_steps,
         "extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False: received.update(
+        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None: received.update(
             {input_file: config["noise_tolerance"]}
         ),
     )
@@ -317,7 +324,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
     extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
 
     for key in GROUPED:
-        assert read_yaml(str(grouped / key / "proc" / "config.yaml"))["extract"]["noise_tolerance"] == tolerance[key], key
+        assert read_yaml(str(session_folder(grouped, key) / "config.yaml"))["extract"]["noise_tolerance"] == tolerance[key], key
     script = (grouped / "extract_out.sh").read_text()
     for line in filter(str.strip, script.splitlines()):
         command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]

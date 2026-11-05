@@ -1,8 +1,7 @@
 """Rerunning an extraction skips the recordings already extracted, quietly.
 
 With ``skip_extracted = True`` (its default), the notebook's extraction cell
-leaves out the recordings whose ``results_00.yaml`` says the extraction
-completed, as ``moseq2-extract batch-extract`` does without ``--skip-checks``;
+leaves out the recordings whose ``results.h5`` is in their session folder, as ``moseq2-extract batch-extract`` does without ``--skip-checks``;
 when that is every recording, one line says there is nothing to extract. The checks that guard an extraction (the
 flip-classifier warning, the frame timestamps, the frame count) are about a
 recording that is about to be extracted, and a finished one is not. A project
@@ -21,7 +20,7 @@ import warnings
 from pathlib import Path
 
 import pytest
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.yaml import read_yaml
 
 from moseq2_extract.gui import extract_found_sessions, generate_config_command
 from moseq2_extract.helpers.wrappers import NoFlipClassifierWarning, extract_wrapper
@@ -32,10 +31,12 @@ SESSIONS = ("saline_example_0", "saline_example_1")
 NO_TIMESTAMPS = "saline_example_1"
 
 
-def mark_extracted(session):
-    """What a finished extraction leaves behind, as far as skipping reads it."""
-    (session / "proc").mkdir()
-    write_yaml({"complete": True, "uuid": "x"}, str(session / "proc" / "results_00.yaml"))
+def mark_extracted(session, folder=None):
+    """What a finished extraction leaves behind, as far as skipping reads it: its ``results.h5``, in its
+    session folder in the project's ``aggregate_results/`` (or in ``folder``)."""
+    folder = folder if folder is not None else session.parent / "aggregate_results" / session.name
+    folder.mkdir(parents=True)
+    (folder / "results.h5").touch()
 
 
 @pytest.fixture
@@ -107,9 +108,9 @@ def test_an_unextracted_recording_without_timestamps_still_fails(unextracted, co
 
 
 def test_an_unfinished_extraction_still_gets_the_frame_count_check(unextracted, config):
-    """A results_00.yaml that is not complete does not count as extracted."""
+    """An extraction left unfinished (its ``.h5`` under the temporary name) does not count as extracted."""
     (unextracted / "proc").mkdir()
-    write_yaml({"complete": False, "uuid": "x"}, str(unextracted / "proc" / "results_00.yaml"))
+    (unextracted / "proc" / ".results.h5.partial").touch()
     lines = (unextracted / "depth_ts.txt").read_text().splitlines(keepends=True)
     (unextracted / "depth_ts.txt").write_text("".join(lines[:-1]))
     with pytest.warns(NoFlipClassifierWarning), pytest.raises(ValueError, match="Frame count mismatch"):
@@ -121,7 +122,7 @@ def test_a_finished_mkv_is_skipped_without_its_frame_count_line(tmp_path, config
     session.mkdir()
     shutil.copy(Path(fetch_azure_mkv()) / "depth.mkv", session / "depth.mkv")
     (session / "metadata.json").write_text("{}")
-    mark_extracted(session)
+    mark_extracted(session, session / "proc")
     capsys.readouterr()
 
     with warnings.catch_warnings(record=True) as caught:

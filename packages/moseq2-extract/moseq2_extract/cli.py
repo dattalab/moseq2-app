@@ -19,8 +19,6 @@ from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
     copy_slice_wrapper,
-    generate_index_from_agg_res_wrapper,
-    generate_index_wrapper,
 )
 from moseq2_extract.options import (
     EXTRACT_STAGE,
@@ -114,6 +112,10 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 )
 @click_options(ExtractOptions, order=EXTRACT_ORDER, others={
     **_roi_others({"input_file": click.argument("input-file", type=click.Path(exists=True, resolve_path=False))}),
+    "output_dir": click.option("--output-dir", default=None, show_default=False,
+                               help="Folder for the recording's outputs, relative to the recording's folder (default: its "
+                                    "session's folder in the project's aggregate_results, or proc beside the "
+                                    "recording outside a project)"),
     "output_file": _OUTPUT_FILE,
 })
 @click.pass_context
@@ -128,7 +130,7 @@ def extract(ctx, input_file, output_dir, config_file, output_file, **_):
     except ConfigFileError as error:
         raise click.ClickException(str(error)) from None
     opts = ExtractOptions.resolve(config=config, entry=entry, explicit=explicit_values(ctx, ExtractOptions))
-    steps.extract(input_file, output_dir, opts)
+    steps.extract(input_file, output_dir, opts, project=find_project(source) if source else None)
 
 
 #: ExtractOptions fields batch-extract hands the step in its options rather than as typed values.
@@ -153,9 +155,9 @@ def _typed_extract_options(ctx):
 @click_options(BatchExtractOptions, order=BATCH_EXTRACT_ORDER, others={
     **_roi_others({"input_folder": click.argument("input-folder",
                                                   type=click.Path(exists=True, resolve_path=False))}),
-    "output_dir": click.option("--output-dir", default="proc", show_default=False,
-                               help="Output directory to save the results h5 file "
-                                    "(default: config.yaml's output_dir, else proc)"),
+    "output_dir": click.option("--output-dir", default=None, show_default=False,
+                               help="Folder holding each recording's session folder (default: the project's "
+                                    "aggregate_results)"),
     "output_file": _OUTPUT_FILE,
 })
 @click.pass_context
@@ -174,7 +176,7 @@ def batch_extract(ctx, input_folder, config_file, **_):
     typed.pop("output_file", None)
     result = steps.batch_extract(
         input_folder, opts, config_file=config_file,
-        # an --output-dir not typed is proc
+        # an --output-dir not typed is the project's aggregate_results
         output_dir=typed.pop("output_dir", None),
         explicit=typed,
         project=find_project(config_file),
@@ -226,65 +228,31 @@ def generate_config(output_file, camera_type):
 
 
 @cli.command(
-    name="generate-index",
-    help="Generates an index file (moseq2-index.yaml) that contains all extracted session metadata.",
-)
-@click.option(
-    "--input-dir",
-    "-i",
-    type=click.Path(),
-    default=os.getcwd(),
-    help="Directory to find h5 files",
-)
-@click.option(
-    "--output-file",
-    "-o",
-    type=click.Path(),
-    default=os.path.join(os.getcwd(), "moseq2-index.yaml"),
-    help="Location for storing index",
-)
-def generate_index(input_dir, output_file):
-
-    output_file = generate_index_wrapper(input_dir, output_file)
-
-    if output_file is not None:
-        print(f"Index file: {output_file} was successfully generated.")
-
-
-@cli.command(
     name="aggregate-results",
-    help="Copies all extracted results (h5, yaml, mp4) files from all extracted sessions to a new directory for modeling and analysis",
+    help="Lists every extracted recording in the project as one of its sessions in moseq2-project.yaml, for "
+    "modeling and analysis. Each session's files are already in its folder in aggregate_results, where "
+    "extraction wrote them. Run it in the project folder.",
 )
-@click_options(AggregateOptions, order=("input_dir", "format", "output_dir", "mouse_threshold"), others={
-    "input_dir": click.option("--input-dir", "-i", type=click.Path(), default=os.getcwd(),
-                              help="Directory to find h5 files"),
-    # the working directory's aggregate_results, where the notebook's is the project's (PR 4.5)
-    "output_dir": click.option("--output-dir", "-o", type=click.Path(),
-                               default=os.path.join(os.getcwd(), "aggregate_results/"),
-                               help="Location for storing all results together"),
+@click_options(AggregateOptions, order=("input_dir", "output_dir", "mouse_threshold"), others={
+    "input_dir": click.option("--input-dir", "-i", type=click.Path(), default=None, show_default=False,
+                              help="Folder searched for the recordings (default: the project folder)"),
+    "output_dir": click.option("--output-dir", "-o", type=click.Path(), default=None, show_default=False,
+                               help="Folder holding the session folders, when extraction was given one with "
+                                    "--output-dir (default: the project's aggregate_results)"),
 })
 @click.pass_context
 def aggregate_extract_results(ctx, input_dir, output_dir, **_):
-    config = command_settings(None, AggregateOptions, stage_classes=EXTRACT_STAGE)
-    steps.aggregate_results(input_dir, output_dir,
-                            AggregateOptions.resolve(config=config, explicit=explicit_values(ctx, AggregateOptions)),
-                            project=find_project())
-
-
-@cli.command(
-    name="agg-to-index",
-    help="Generate an index file from aggregated results with default as group names",
-)
-@click.option(
-    "--input-dir",
-    "-i",
-    type=click.Path(),
-    default=os.path.join(os.getcwd(), "aggregate_results"),
-    help="Directory for aggregated results folder",
-)
-def agg_to_index(input_dir):
-
-    generate_index_from_agg_res_wrapper(input_dir)
+    project = find_project()
+    if project is None:
+        raise click.ClickException(
+            f"There is no config.yaml in {os.getcwd()}, so this is not a project folder, and aggregate-results "
+            "lists the sessions in a project's moseq2-project.yaml. Run it in the project folder, the one holding "
+            "config.yaml and the recordings."
+        )
+    config = command_settings(str(project.config_file), AggregateOptions, stage_classes=EXTRACT_STAGE)
+    steps.aggregate_results(project, AggregateOptions.resolve(config=config,
+                                                              explicit=explicit_values(ctx, AggregateOptions)),
+                            input_dir=input_dir, output_dir=output_dir)
 
 
 @cli.command(

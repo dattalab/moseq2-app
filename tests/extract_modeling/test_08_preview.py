@@ -65,13 +65,13 @@ def test_the_selector_lists_every_extracted_recording(extracted, displayed):
 
     assert sorted(options) == RECORDINGS
     for name in RECORDINGS:
-        assert options[name] == str(proc(extracted, name) / "results_00.mp4")
+        assert options[name] == str(proc(extracted, name) / "results.mp4")
 
 
 def test_choosing_a_recording_renders_a_player(extracted, shown):
     """3. The cell's product: a video and the control above it."""
     viewer = InteractiveExtractionViewer(data_path=str(extracted))
-    viewer.get_extraction(str(proc(extracted, RECORDINGS[0]) / "results_00.mp4"))
+    viewer.get_extraction(str(proc(extracted, RECORDINGS[0]) / "results.mp4"))
 
     assert [type(model).__name__ for model in shown] == ["Slider", "Div"]
 
@@ -83,7 +83,7 @@ def test_the_movie_travels_inside_the_page(extracted, shown):
     or opened from another machine, so the movie is carried in the document.
     This is also what makes the cell's output large.
     """
-    movie = proc(extracted, RECORDINGS[0]) / "results_00.mp4"
+    movie = proc(extracted, RECORDINGS[0]) / "results.mp4"
     viewer = InteractiveExtractionViewer(data_path=str(extracted))
     viewer.get_extraction(str(movie))
 
@@ -96,7 +96,7 @@ def test_the_movie_travels_inside_the_page(extracted, shown):
 
 def test_the_player_is_sized_to_the_movie(extracted, shown):
     """5. A player sized to something else crops or letterboxes the mouse."""
-    movie = proc(extracted, RECORDINGS[0]) / "results_00.mp4"
+    movie = proc(extracted, RECORDINGS[0]) / "results.mp4"
     viewer = InteractiveExtractionViewer(data_path=str(extracted))
     viewer.get_extraction(str(movie))
 
@@ -109,7 +109,7 @@ def test_the_player_is_sized_to_the_movie(extracted, shown):
 def test_the_speed_control_covers_slow_motion_and_fast(extracted, shown):
     """6. Why a user opens this cell: watching a flip or a rear at a tenth speed."""
     viewer = InteractiveExtractionViewer(data_path=str(extracted))
-    viewer.get_extraction(str(proc(extracted, RECORDINGS[0]) / "results_00.mp4"))
+    viewer.get_extraction(str(proc(extracted, RECORDINGS[0]) / "results.mp4"))
 
     slider = next(model for model in shown if isinstance(model, Slider))
     assert (slider.start, slider.end, slider.value) == (0, 4, 1)

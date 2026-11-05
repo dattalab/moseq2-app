@@ -13,7 +13,7 @@ from functools import reduce
 from panel.viewable import Viewer
 from bokeh.models import HoverTool
 from moseq2_app.gui.progress import get_sessions
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, session_outputs
 from moseq2_extract.io.video import load_movie_data
 from moseq2_extract.util import check_filter_sizes
 from moseq2_extract.extract.extract import extract_chunk
@@ -21,7 +21,6 @@ from moseq2_extract.util import detect_and_set_camera_parameters
 from moseq2_extract.helpers.wrappers import (
     find_arena_candidates,
     floor_depth_and_background,
-    session_output_dir,
     validate_flip_classifier,
 )
 from moseq2_common.project import Project, session_key
@@ -254,8 +253,11 @@ class ArenaMaskWidget:
         return self.backgrounds[folder]
 
     def _output_dir(self, folder):
-        """The folder this recording's extraction writes to."""
-        return session_output_dir(self.sessions[folder], self.recording_config(folder).get('output_dir'))
+        """The recording's session folder in the project's aggregate_results, where its extraction writes
+        and the background the tool computes is kept for it."""
+        output_dir = session_outputs(self.project, folder).folder
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return str(output_dir)
 
 
 # define data class first

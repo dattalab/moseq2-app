@@ -13,9 +13,10 @@
 The heaviest cell, and the one every later cell is built on. It does four
 things: walk the project for depth recordings of every type the pipeline reads,
 narrow that list to what the user wants, dispatch on ``cluster_type``, and
-extract. What it leaves behind is a ``proc`` directory beside each recording
-holding the cropped frames, the scalars computed from them, a preview movie
-and a record of the parameters used.
+extract. What it leaves behind is a folder for each recording in
+``aggregate_results/``, named from the recording's path in the project, holding
+the cropped frames, the scalars computed from them, a preview movie and a
+record of the parameters used. Nothing is written beside the recordings.
 
 The tests split along that seam. The ones that only need to know which
 recordings were chosen run against a directory of empty files with a stand-in
@@ -53,13 +54,13 @@ from test_05_arena_mask import RECORDINGS
 #: passed is still the list searched.
 EXTENSIONS = [".avi", ".dat", ".tar.gz"]
 
-#: What extraction writes beside every recording.
+#: What extraction writes into every recording's session folder.
 OUTPUTS = (
     "bground.tiff",
     "first_frame.tiff",
-    "results_00.h5",
-    "results_00.mp4",
-    "results_00.yaml",
+    "results.h5",
+    "results.mp4",
+    "results.yaml",
     "roi_00.tiff",
 )
 
@@ -104,8 +105,8 @@ NOT_COMPARABLE = ("config_file", "num_frames", "output_file", "detected_true_dep
 
 
 def proc(project, recording):
-    """The directory extraction writes beside one recording."""
-    return Path(project) / recording / "proc"
+    """The session folder extraction writes one recording's outputs into."""
+    return Path(project) / "aggregate_results" / recording
 
 
 def build_fake_project(root, recordings=RECORDINGS, extension=".avi"):
@@ -297,10 +298,11 @@ def test_the_slurm_branch_writes_a_script_and_submits_nothing(
 
 
 def test_every_recording_is_extracted(extracted):
-    """9. The cell's output: a full proc directory beside each recording."""
+    """9. The cell's output: a full session folder for each recording, and nothing beside it."""
     for name in RECORDINGS:
         written = sorted(p.name for p in proc(extracted, name).iterdir())
         assert written == sorted(OUTPUTS), name
+        assert not (Path(extracted) / name / "proc").exists(), name
 
 
 def test_the_extracted_frames_are_a_cropped_movie_of_the_mouse(extracted):
@@ -310,7 +312,7 @@ def test_the_extracted_frames_are_a_cropped_movie_of_the_mouse(extracted):
     paired with the mask that produced them.
     """
     for name in RECORDINGS:
-        with h5py.File(proc(extracted, name) / "results_00.h5") as f:
+        with h5py.File(proc(extracted, name) / "results.h5") as f:
             assert f["frames"].shape == (600, 80, 80)
             assert f["frames"].dtype == np.uint8
             assert f["frames_mask"].shape == f["frames"].shape
@@ -335,7 +337,7 @@ def test_a_mouse_is_found_in_all_but_the_opening_frames(extracted):
     frames, where no single pose survives the median.
     """
     for name in RECORDINGS:
-        with h5py.File(proc(extracted, name) / "results_00.h5") as f:
+        with h5py.File(proc(extracted, name) / "results.h5") as f:
             found = (f["frames"][:] > 0).sum(axis=(1, 2))
 
         empty = np.flatnonzero(found == 0)
@@ -355,7 +357,7 @@ def test_every_scalar_is_measured(extracted):
     Which frames carry a value and which do not is the next test's business.
     """
     for name in RECORDINGS:
-        with h5py.File(proc(extracted, name) / "results_00.h5") as f:
+        with h5py.File(proc(extracted, name) / "results.h5") as f:
             assert sorted(f["scalars"]) == sorted(SCALARS), name
             for scalar in SCALARS:
                 values = f[f"scalars/{scalar}"]
@@ -372,7 +374,7 @@ def test_a_frame_without_a_mouse_has_no_measurements(extracted):
     frame takes the frame after it with it.
     """
     for name in RECORDINGS:
-        with h5py.File(proc(extracted, name) / "results_00.h5") as f:
+        with h5py.File(proc(extracted, name) / "results.h5") as f:
             empty = (f["frames"][:] > 0).sum(axis=(1, 2)) == 0
             after = np.concatenate([[False], empty[:-1]])
             for scalar in SCALARS:
@@ -391,10 +393,10 @@ def test_a_frame_without_a_mouse_has_no_measurements(extracted):
 def test_each_recording_reports_itself_finished(extracted):
     """14. How the next run, and cell 2's progress report, know this is done."""
     for name in RECORDINGS:
-        results = plain(read_yaml(str(proc(extracted, name) / "results_00.yaml")))
+        results = plain(read_yaml(str(proc(extracted, name) / "results.yaml")))
         assert results["complete"] is True
         assert results["skip"] is False
-        with h5py.File(proc(extracted, name) / "results_00.h5") as f:
+        with h5py.File(proc(extracted, name) / "results.h5") as f:
             assert results["uuid"] == f["metadata/uuid"][()].decode()
 
 
@@ -409,7 +411,7 @@ def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
     """
     saved = plain(read_yaml(str(arena)))
     for name in RECORDINGS:
-        with h5py.File(proc(extracted, name) / "results_00.h5") as f:
+        with h5py.File(proc(extracted, name) / "results.h5") as f:
             used = {
                 key: plain(value[()].tolist() if value.shape else value[()])
                 for key, value in f["metadata/extraction/parameters"].items()
@@ -429,7 +431,7 @@ def test_the_preview_movie_is_h264(extracted):
     Written as H.264 with 4:2:0 chroma, which is what a browser will decode.
     """
     for name in RECORDINGS:
-        codec, pix_fmt = probe(proc(extracted, name) / "results_00.mp4")
+        codec, pix_fmt = probe(proc(extracted, name) / "results.mp4")
         assert (codec, pix_fmt) == ("h264", "yuv420p"), name
 
 
@@ -441,13 +443,13 @@ def test_the_preview_movie_starts_without_reading_all_of_it(extracted):
     preview that opens and one that appears to hang.
     """
     for name in RECORDINGS:
-        assert index_is_at_the_front(proc(extracted, name) / "results_00.mp4"), name
+        assert index_is_at_the_front(proc(extracted, name) / "results.mp4"), name
 
 
 def test_rerunning_the_cell_extracts_nothing_again(extracted, configured):
     """17. ``skip_extracted`` carries over from cell 5, so a second run is free."""
     before = {
-        name: proc(extracted, name).joinpath("results_00.h5").stat().st_mtime_ns
+        name: proc(extracted, name).joinpath("results.h5").stat().st_mtime_ns
         for name in RECORDINGS
     }
 
@@ -461,6 +463,6 @@ def test_rerunning_the_cell_extracts_nothing_again(extracted, configured):
 
     for name in RECORDINGS:
         assert (
-            proc(extracted, name).joinpath("results_00.h5").stat().st_mtime_ns
+            proc(extracted, name).joinpath("results.h5").stat().st_mtime_ns
             == before[name]
         ), f"{name} was extracted again"

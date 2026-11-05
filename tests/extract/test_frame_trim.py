@@ -59,7 +59,7 @@ def extract(recording, start, end):
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
-    with h5py.File(recording / output_dir / "results_00.h5", "r") as f:
+    with h5py.File(recording / output_dir / "results.h5", "r") as f:
         return {
             "frames": f["frames"][()],
             "frames_mask": f["frames_mask"][()],

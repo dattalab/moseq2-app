@@ -186,50 +186,6 @@ def h5_filepath_from_sorted(sorted_index_entry: dict) -> str:
     return first(sorted_index_entry["path"])
 
 
-def recursive_find_h5s(root_dir=None, ext=".h5", yaml_string="{}.yaml"):
-    """
-    Recursively find h5 files, along with yaml files with the same basename.
-
-    Args:
-    root_dir (str): path to directory containing h5, if None, searches the current working directory
-    ext (str): extension to search for.
-    yaml_string (str): yaml file format name.
-
-    Returns:
-    h5s (list): list of paths to h5 files
-    dicts (list): list of paths to metadata files
-    yamls (list): list of paths to yaml files
-    """
-
-    if root_dir is None:
-        root_dir = os.getcwd()
-
-    def has_frames(h5f):
-        """Checks if the supplied h5 file has a frames key"""
-        with h5py.File(h5f, "r") as f:
-            return "frames" in f
-
-    def h5_to_yaml(h5f):
-        return yaml_string.format(splitext(h5f)[0])
-
-    # make function to test if yaml file with same basename as h5 file exists
-    yaml_exists = compose(exists, h5_to_yaml)
-
-    # grab all files with ext = .h5
-    files = glob(os.path.join(root_dir, "**", f"*{ext}"), recursive=True)
-    # keep h5s that have a yaml file associated with them
-    to_keep = filter(yaml_exists, files)
-    # keep h5s that have a frames key
-    to_keep = filter(has_frames, to_keep)
-
-    h5s = list(to_keep)
-    yamls = list(map(h5_to_yaml, h5s))
-    dicts = list(map(moseq2_common.yaml.read_yaml, yamls))
-
-    return h5s, dicts, yamls
-
-
-# from https://stackoverflow.com/questions/40084931/taking-subarrays-from-numpy-array-with-given-stride-stepsize/40085052#40085052
 def strided_app(a, L, S):  # Window len = L, Stride len/stepsize = S
     """
     Slice a numpy.array into subarrays with a given stride

@@ -63,8 +63,7 @@ def start(folder: str | os.PathLike = "./", exts=("dat", "mkv", "avi", "tar.gz")
 
     project = Project.at(Path(folder).absolute())
     check_not_old(project.folder)
-    path_dict, num_extracted = get_extraction_progress(str(project.folder), exts=list(exts), max_depth=max_depth,
-                                                       write_missing_metadata=False)
+    path_dict, num_extracted = get_extraction_progress(str(project.folder), exts=list(exts), max_depth=max_depth)
     if path_dict:
         print(f"Extraction Progress: {num_extracted} out of {len(path_dict)} session(s) extracted")
     print(summary(project))

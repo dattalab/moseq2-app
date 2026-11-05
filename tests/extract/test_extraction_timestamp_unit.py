@@ -35,7 +35,7 @@ def extract(recording, *args):
         ["extract", str(recording), "--output-dir", str(output_dir), *args],
     )
     assert result.exit_code == 0, result.output + repr(result.exception)
-    return output_dir / "results_00.h5"
+    return output_dir / "results.h5"
 
 
 @pytest.fixture

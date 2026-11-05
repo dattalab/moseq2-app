@@ -95,8 +95,13 @@ def parameters(session_config, recording="saline_example_0/depth.avi"):
 
 
 def open_widget(root):
-    """Open the widget on a project, as the cell does, and index its buttons."""
-    widget = ArenaMaskWidget(str(root))
+    """Open the widget on a project, as the cell does, and index its buttons.
+
+    Extracted recordings are listed too: a copy of the chain's project may be taken after
+    another test file has extracted it, and the cell's own ``skip_extracted`` would then
+    show none.
+    """
+    widget = ArenaMaskWidget(str(root), skip_extracted=False)
     return widget, widget.session_data, buttons_of(widget.view)
 
 
@@ -272,7 +277,8 @@ def assert_extraction_cuts_the_arena_shown(widget, data, buttons, root):
 
     recording = widget.sessions[data.path]
     resolved = recordings_options(str(root / "config.yaml"), [recording])[recording].as_dict()
-    roi, _, _ = get_roi_wrapper(recording, resolved, output_dir=str(Path(recording).parent / "proc"))
+    # the recording's session folder, where extraction writes and the tool keeps the background
+    roi, _, _ = get_roi_wrapper(recording, resolved, output_dir=widget._output_dir(data.path))
     np.testing.assert_array_equal(roi.astype(bool), shown)
 
 
@@ -564,7 +570,7 @@ def plane_run(tmp_path_factory, raw_sessions):
         config_data["cluster_type"] = "local"
 
     widget, data, buttons = open_widget(root)
-    proc = root / STILL_RECORDING / "proc"
+    proc = root / "aggregate_results" / STILL_RECORDING
     run = {"root": root, "proc": proc, "widget": widget}
 
     click(buttons["Compute arena mask"])
@@ -592,7 +598,7 @@ def plane_run(tmp_path_factory, raw_sessions):
     recording = widget.sessions[data.path]
     run["saved"] = recordings_options(str(config), [recording])[recording].as_dict()
 
-    results = proc / "results_00.h5"
+    results = proc / "results.h5"
     extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
     run["first extraction"] = h5_arena_and_frames(results)
     run["bground.tiff after the first extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
@@ -644,7 +650,7 @@ def test_a_plane_background_gives_a_second_extraction_the_same_arena_and_frames(
 
 
 def test_a_plane_background_leaves_the_median_in_bground_tiff(plane_run, median_background):
-    """``proc/bground.tiff`` is the cache every later reader takes as the
+    """The session folder's ``bground.tiff`` is the cache every later reader takes as the
     median background, so the plane fit never replaces it."""
     np.testing.assert_array_equal(plane_run["bground.tiff after the first extraction"], median_background)
     np.testing.assert_array_equal(plane_run["bground.tiff after the second extraction"], median_background)
@@ -719,8 +725,8 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
         "the saved settings do not graduate the walls, so this compares nothing"
     )
     settings["frame_trim"] = (1, 0)
-    output_dir = extract_wrapper(recording, "proc", settings, num_frames=PREVIEW_FRAMES + 1)
-    with h5py.File(f"{output_dir}/results_00.h5", "r") as f:
+    output_dir = extract_wrapper(recording, widget._output_dir(data.path), settings, num_frames=PREVIEW_FRAMES + 1)
+    with h5py.File(f"{output_dir}/results.h5", "r") as f:
         extracted = f["frames"][()]
 
     assert shown.shape == extracted.shape

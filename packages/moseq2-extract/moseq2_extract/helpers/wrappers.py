@@ -5,18 +5,14 @@ Wrapper functions for data processing in extraction.
 import os
 import sys
 import math
-import uuid
+from uuid import uuid4
 import h5py
-import shutil
 import warnings
-from glob import glob
 import numpy as np
 import urllib.request
 from copy import deepcopy
-from moseq2_common.h5 import h5_to_dict
 from moseq2_common.yaml import read_yaml, write_config, write_yaml
 from tqdm.auto import tqdm
-from cytoolz import partial
 from moseq2_extract.io.image import write_image
 from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
@@ -27,20 +23,16 @@ from moseq2_extract.util import mouse_threshold_filter, filter_warnings
 from moseq2_extract.helpers.data import (
     handle_extract_metadata,
     create_extract_h5,
-    build_index_dict,
-    load_extraction_meta_from_h5s,
-    build_manifest,
-    copy_manifest_results,
-    check_completion_status,
+    write_misc_metadata,
 )
+from moseq2_extract.recordings import find_recordings, outputs_in, project_keys, session_outputs
+from moseq2_common.project import session_key
 from moseq2_common.frames import select_strel
 from moseq2_extract.util import (
     gen_batch_sequence,
     scalar_attributes,
     convert_raw_to_avi_function,
     set_bground_to_plane_fit,
-    recursive_find_h5s,
-    clean_dict,
     graduate_dilated_wall_area,
     get_bucket_center,
     _floor_depth,
@@ -50,191 +42,42 @@ from moseq2_extract.util import (
 )
 
 
-def copy_h5_metadata_to_yaml_wrapper(input_dir, h5_metadata_path):
-    """
-    Copy user specified metadata from h5path to a yaml file.
-
-    Args:
-    input_dir (str): path to directory containing h5 files
-    h5_metadata_path (str): path within h5 to desired metadata to copy to yaml.
-
-    """
-
-    h5s, dicts, yamls = recursive_find_h5s(input_dir)
-    to_load = [
-        (tmp, yml, file)
-        for tmp, yml, file in zip(dicts, yamls, h5s)
-        if tmp["complete"] and not tmp["skip"]
-    ]
-
-    # load in all of the h5 files, grab the extraction metadata, reformat to make nice 'n pretty
-    # then stage the copy
-
-    for tup in tqdm(to_load, desc="Copying data to yamls"):
-        with h5py.File(tup[2], "r") as f:
-            tmp = clean_dict(h5_to_dict(f, h5_metadata_path))
-            tup[0]["metadata"] = dict(tmp)
-
-        new_file = f"{basename(tup[1])}_update.yaml"
-        write_yaml(tup[0], new_file)
-
-        if new_file != tup[1]:
-            shutil.move(new_file, tup[1])
-
-
 @filter_warnings
-def generate_index_wrapper(input_dir, output_file):
+def aggregate_extract_results_wrapper(input_dir, output_dir, mouse_threshold=0.0, project=None):
     """
-    Generate index file containing a summary of all extracted sessions.
+    The finished extractions of the recordings under ``input_dir``, each in its session's folder.
+
+    Nothing is copied: extraction writes each session's files into its folder. A recording counts
+    when its ``results.h5`` exists (``moseq2_extract.recordings.session_outputs``) and its frames'
+    mean depth is above ``mouse_threshold``.
 
     Args:
-    input_dir (str): directory to search for extracted sessions.
-    output_file (str): preferred name of the index file.
+    input_dir (str): the folder searched for recordings.
+    output_dir (str): the folder holding the session folders; None for each session's folder in the
+        project (the one moseq2-project.yaml names, else in ``aggregate_results/``).
+    mouse_threshold (float): the mean frame depth a session's extraction must exceed to be included.
+    project (Project): the project.
 
     Returns:
-    output_file (str): path to index file (moseq2-index.yaml).
+    found (list): (session key, its folder, its uuid) for each session included, sorted by key.
     """
-
-    # gather the h5s and the pca scores file
-    # uuids should match keys in the scores file
-    h5s, dicts, yamls = recursive_find_h5s(input_dir)
-
-    file_with_uuids = [
-        (abspath(h5), abspath(yml), meta) for h5, yml, meta in zip(h5s, yamls, dicts)
-    ]
-
-    # Ensuring all retrieved extracted session h5s have the appropriate metadata
-    # included in their results_00.h5 file
-    for file in file_with_uuids:
-        try:
-            if "metadata" not in file[2]:
-                copy_h5_metadata_to_yaml_wrapper(input_dir, file[0])
-        except:
-            warnings.warn(
-                f"Metadata for session {file[0]} not found. \
-            File may be listed with minimal/defaulted metadata in index file."
-            )
-
-    print(f"Number of sessions included in index file: {len(file_with_uuids)}")
-
-    # Create index file in dict form
-    output_dict = build_index_dict(file_with_uuids)
-
-    # write out index yaml
-    write_yaml(output_dict, output_file)
-
-    return output_file
-
-
-def aggregate_extract_results_wrapper(
-    input_dir, format, output_dir, mouse_threshold=0.0
-):
-    """
-    Copy every finished extraction under input_dir into one folder, named from its metadata.
-
-    Args:
-    input_dir (str): path to base directory containing all session folders
-    format (str): string format for metadata to use as the new aggregated filename
-    output_dir (str): name of the directory to create and store all results in
-    mouse_threshold (float): threshold value of mean frame depth to include session frames
-
-    Returns:
-    copied (list): (extraction h5, its copy in output_dir, its uuid) for each extraction copied.
-    """
-
-    h5s, dicts, _ = recursive_find_h5s(input_dir)
-
-    not_in_output = lambda f: not exists(join(output_dir, basename(f)))
-    complete = lambda d: d["complete"] and not d["skip"]
-
-    # only include real extracted mice with this filter func
-    mtf = partial(mouse_threshold_filter, thresh=mouse_threshold)
-
-    def filter_h5(args):
-        """remove h5's that should be skipped or extraction wasn't complete"""
-        _dict, _h5 = args
-        return (
-            complete(_dict)
-            and not_in_output(_h5)
-            and mtf(_h5)
-            and ("sample" not in _dict)
-        )
-
-    # load in all of the h5 files, grab the extraction metadata, reformat to make nice 'n pretty
-    # then stage the copy
-    to_load = list(filter(filter_h5, zip(dicts, h5s)))
-
-    loaded = load_extraction_meta_from_h5s(to_load)
-
-    manifest = build_manifest(loaded, format=format)
-
-    copy_manifest_results(manifest, output_dir)
-
-    print("Results successfully aggregated in", output_dir)
-
-    return [(source, join(output_dir, f'{entry["copy_path"]}.h5'), entry["yaml_dict"].get("uuid"))
-            for source, entry in manifest.items()]
-
-
-def generate_index_from_agg_res_wrapper(input_dir):
-    """
-    Generate index file from aggregated results folder.
-
-    Args:
-    input_dir (str): path to aggregated results folder
-    """
-
-    # find the yaml files
-    yaml_paths = glob(os.path.join(input_dir, "*.yaml"))
-    # setup pca path
-    pca_path = os.path.join(os.path.dirname(input_dir), "_pca", "pca_scores.h5")
-    if os.path.exists(pca_path):
-        # point pca_path to pca scores you have
-        index_data = {
-            "files": [],
-            "pca_path": pca_path,
-        }
-    else:
-        index_data = {
-            "files": [],
-            "pca_path": "",
-        }
-
-    for p in yaml_paths:
-        temp_yaml = read_yaml(p)
-        file_dict = {
-            "group": "default",
-            "metadata": temp_yaml["metadata"],
-            "path": [p[:-4] + "h5", p],
-            "uuid": temp_yaml["uuid"],
-        }
-        index_data["files"].append(file_dict)
-
-    # find output filename
-    output_file = os.path.join(os.path.dirname(input_dir), "moseq2-index.yaml")
-
-    # write out index yaml
-    write_yaml(index_data, output_file)
-
-
-def session_output_dir(input_file, output_dir=None):
-    """
-    The folder a recording's extraction writes to, and where its background is cached.
-
-    Args:
-    input_file (str): path to the depth file.
-    output_dir (str): the configured output folder; relative to the recording's folder
-        unless it already names it.
-
-    Returns:
-    (str): path to the output folder.
-    """
-    in_dirname = dirname(input_file)
-    if output_dir is None:
-        return join(in_dirname, "proc")
-    if in_dirname not in output_dir:
-        return join(in_dirname, output_dir)
-    return output_dir
+    recordings = find_recordings(input_dir).recordings
+    keys = sorted(session_key(project, recording) for recording in recordings)
+    everything = set(keys) | set(project_keys(project))
+    found = []
+    for key in keys:
+        outputs = session_outputs(project, key, keys=everything, sessions_dir=output_dir)
+        if not outputs.h5.is_file():
+            continue
+        if not mouse_threshold_filter(str(outputs.h5), thresh=mouse_threshold):
+            print(f"Leaving out {key}: the mean depth of its first frames in {outputs.h5} is not above "
+                  f"mouse_threshold ({mouse_threshold}), so it is taken to hold no mouse. Set a lower "
+                  "mouse_threshold in config.yaml's extract section to include it.")
+            continue
+        with h5py.File(outputs.h5, "r") as f:
+            uuid_value = f["metadata/uuid"][()]
+        found.append((key, outputs.folder, uuid_value.decode() if isinstance(uuid_value, bytes) else str(uuid_value)))
+    return found
 
 
 def find_arena_candidates(bground_im, config_data, output_dir=None):
@@ -512,39 +355,44 @@ def floor_depth_and_background(bground_im, roi, config_data, output_dir):
     return bground_im
 
 
-def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False):
+def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None):
     """
     Extract depth videos.
 
+    The session's files go into ``output_dir`` under fixed names (``results.h5``, ``results.mp4``,
+    ``results.yaml`` and the images), whichever arena mask is used, so extracting again replaces them.
+    The ``.h5`` is written under a temporary name and renamed when the extraction is complete, so a
+    recording is extracted when its ``results.h5`` exists.
+
     Args:
     input_file (str): path to depth file
-    output_dir (str): path to directory to save results in.
+    output_dir (str): the folder the session's files go in, relative to the recording's folder; made when missing.
     config_data (dict): dictionary containing extraction parameters.
     num_frames (int): number of frames to extract.
     skip (bool): indicates whether to skip file if already extracted
-    extract (function): extraction function state
+    uuid (str): the session's uuid, when it has one already; None draws a new one.
 
     Returns:
     output_dir (str): path to directory containing extraction, or None if the file was skipped as already extracted
     """
     print("Processing:", input_file)
 
-    # The output folder is built from the recording's path; for a tarball,
-    # input_file becomes the opened archive further down.
+    # for a tarball, input_file becomes the opened archive further down
     recording = input_file
-    output_dir = session_output_dir(recording, output_dir)
+    outputs = outputs_in(join(dirname(abspath(recording)), output_dir))
+    output_dir = str(outputs.folder)
 
     roi_index = config_data["bg_roi_index"]
     if isinstance(roi_index, list):
         roi_index = roi_index[0]
-    output_filename = f"results_{roi_index:02d}"
-    status_filename = join(output_dir, f"{output_filename}.yaml")
-    movie_filename = join(output_dir, f"{output_filename}.mp4")
-    results_filename = join(output_dir, f"{output_filename}.h5")
+    status_filename = str(outputs.h5.with_suffix(".yaml"))
+    movie_filename = str(outputs.movie)
+    results_filename = str(outputs.h5)
+    partial_filename = join(output_dir, f".{outputs.h5.name}.partial")
 
     # A recording already extracted is skipped before anything about it is
     # checked: the checks below guard an extraction that is about to run.
-    if skip and check_completion_status(status_filename):
+    if skip and exists(results_filename):
         print("Skipping...")
         return
 
@@ -563,7 +411,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     status_dict = {
         "complete": False,
         "skip": False,
-        "uuid": str(uuid.uuid4()),
+        "uuid": str(uuid) if uuid else str(uuid4()),
         "metadata": "",
         "parameters": deepcopy(config_data),
     }
@@ -672,8 +520,8 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         "frame_batches": frame_batches,
     }
 
-    # farm out the batches and write to an hdf5 file
-    with h5py.File(results_filename, "w") as f:
+    # farm out the batches and write to an hdf5 file, renamed to its final name when complete
+    with h5py.File(partial_filename, "w") as f:
         # Write scalars, roi, acquisition metadata, etc. to h5 file
         create_extract_h5(
             **extraction_data,
@@ -693,6 +541,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
             scalars=scalars,
             output_mov_path=movie_filename,
         )
+        write_misc_metadata(f, dirname(recording))
 
     print()
 
@@ -716,6 +565,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         # config_data.get('true_depth') is numpy.float64 and yaml.safe_dump can't represent the object
         status_dict["parameters"]["true_depth"] = float(config_data.get("true_depth"))
     write_yaml(status_dict, status_filename)
+    os.replace(partial_filename, results_filename)
 
     return output_dir
 

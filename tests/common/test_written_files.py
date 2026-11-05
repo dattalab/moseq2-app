@@ -92,8 +92,8 @@ def test_session_config_is_written_as_before(arena, tmp_path):
 
 
 def test_results_yaml_is_written_as_before(extracted, tmp_path):
-    results = [p for p in Path(extracted).rglob("results_00.yaml") if p.parent.name == "proc"]
-    assert results, f"no proc/results_00.yaml under {extracted}"
+    results = sorted((Path(extracted) / "aggregate_results").glob("*/results.yaml"))
+    assert results, f"no results.yaml in a session folder under {extracted}"
     for path in results:
         assert_written_as_before(path, tmp_path)
 
@@ -102,13 +102,6 @@ def test_bookkeeping_file_is_written_as_the_other_files_are(bookkeeping_as_aggre
                                                             tmp_path):
     assert_written_as_before(bookkeeping_as_aggregated, tmp_path)
     assert_written_as_before(aggregated, tmp_path)
-
-
-def test_aggregated_results_are_written_as_before(aggregated, tmp_path):
-    results = sorted((Path(aggregated).parent / "aggregate_results").glob("*.yaml"))
-    assert results, f"no yaml in {Path(aggregated).parent / 'aggregate_results'}"
-    for path in results:
-        assert_written_as_before(path, tmp_path)
 
 
 def test_pca_parameters_are_written_as_before(pca, tmp_path):

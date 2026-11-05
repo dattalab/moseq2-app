@@ -107,7 +107,7 @@ def extracted(monkeypatch):
     """What each local extraction hands ``extract_wrapper``, instead of running it."""
     calls = []
 
-    def record(input_file, output_dir, config_data, num_frames=None, skip=False):
+    def record(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None):
         calls.append(
             {"config": config_data, "num_frames": num_frames, "output_dir": output_dir}
         )
@@ -196,7 +196,7 @@ def slurm_extracted(monkeypatch, received):
     monkeypatch.setattr(
         extract_steps,
         "extract_wrapper",
-        lambda f, out, config, num_frames=None, skip=False: (
+        lambda f, out, config, num_frames=None, skip=False, uuid=None: (
             received.append(config) or nums.append(num_frames)
         ),
     )
@@ -298,7 +298,7 @@ def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, s
     ``extract`` does not lay the project's session_config.yaml over the typed options again."""
     root, config = project
     slurm_extracted(root, config, "--crop-size", "80", "80")
-    job_file = read_yaml(str(root / SESSION / "proc" / "config.yaml"))
+    job_file = read_yaml(str(root / "aggregate_results" / SESSION / "config.yaml"))
     job_config = job_file["extract"]
 
     assert "session_config_path" not in job_file

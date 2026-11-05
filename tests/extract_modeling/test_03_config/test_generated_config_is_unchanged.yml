@@ -81,7 +81,6 @@ extract:
   extract_out_script: extract_out.sh
   flip_classifier: null
   flip_classifier_smoothing: 51
-  format: '{start_time}_{session_name}_{subject_name}'
   fps: 30
   frame_dtype: uint8
   frame_trim:

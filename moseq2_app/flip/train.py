@@ -11,7 +11,7 @@ from sklearn.svm import SVC
 from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
-from moseq2_common.bookkeeping import load, resolve_path
+from moseq2_common.bookkeeping import load, resolve_path, session_h5
 from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
 from moseq2_common.h5 import h5_to_dict
 from moseq2_common.options import read_settings
@@ -69,7 +69,7 @@ def _show(value):
 
 def _recordings_by_file(project):
     """Each session's recording in ``project``, by its extraction file, as ``moseq2-project.yaml`` lists them."""
-    return {os.path.normcase(str(resolve_path(project, session.folder))): str(resolve_path(project, session.recording))
+    return {os.path.normcase(str(session_h5(project, session))): str(resolve_path(project, session.recording))
             for session in load(project).sessions.values()}
 
 
