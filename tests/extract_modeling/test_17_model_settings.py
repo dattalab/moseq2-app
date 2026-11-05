@@ -8,12 +8,9 @@
     progress_paths = update_progress(progress_filepath, 'model_path', model_path)
     progress_paths = update_progress(progress_filepath, 'base_model_path', session_path)
 
-    with update_config(progress_paths['config_file']) as config_data:
-        config_data['npcs'] = 10
-        config_data['max_states'] = 100
+    with update_config(progress_paths['config_file'], section='model') as config_data:
         config_data['robust'] = True
-        config_data['num_iter'] = 100
-        config_data['kappa'] = None
+        config_data['nfolds'] = 2
         ...
 
 Nothing is computed here. The cell records where the model will go and
@@ -27,7 +24,7 @@ as ``None`` means the frame count, which cell 18 resolves.
 
 The cell also carries a branch the notebook leaves unentered. Setting
 ``kappa`` to ``'scan'`` turns cell 18 into a spooler that writes one fitting
-command per kappa and, with the ``run_cmd`` the branch sets, runs all of them.
+command per kappa and, with the ``run_cmd=True`` cell 18 passes, runs all of them.
 The tests exercise it as script generation, with the execution stubbed, since
 running it would fit fifteen models.
 """
@@ -57,10 +54,10 @@ def no_shell(monkeypatch):
 
 
 def scan_config(settings, configured, **overrides):
-    """Point the configuration at a kappa scan, as the notebook's branch does."""
+    """Point the configuration's model section at a kappa scan, as the notebook's branch does."""
     from moseq2_app.util import update_config
 
-    with update_config(str(configured)) as config:
+    with update_config(str(configured), section="model") as config:
         config["kappa"] = "scan"
         config.update(SCAN)
         config.update(overrides)
@@ -69,7 +66,7 @@ def scan_config(settings, configured, **overrides):
 
 def test_the_modelling_parameters_reach_the_configuration(model_settings, configured):
     """1. The cell's whole product: cell 18 reads these and nothing else."""
-    config = plain(read_yaml(str(configured)))
+    config = plain(read_yaml(str(configured)))["model"]
 
     for key, value in MODEL_SETTINGS.items():
         assert config[key] == value, key
@@ -98,9 +95,10 @@ def test_a_scan_writes_one_fitting_command_per_kappa(
     """
     from moseq2_model.gui import learn_model_command
 
-    scan_config(model_settings, configured, run_cmd=False)
+    scan_config(model_settings, configured)
+    run_cmd = False
     try:
-        commands = learn_model_command(model_settings)
+        commands = learn_model_command(model_settings, run_cmd=run_cmd)
     finally:
         restore(configured)
 
@@ -120,14 +118,15 @@ def test_a_scan_spans_a_range_of_kappas(model_settings, configured, project, no_
 
     from moseq2_model.gui import learn_model_command
 
-    scan_config(model_settings, configured, run_cmd=False)
+    scan_config(model_settings, configured)
+    run_cmd = False
     try:
-        commands = learn_model_command(model_settings)
+        commands = learn_model_command(model_settings, run_cmd=run_cmd)
     finally:
         restore(configured)
 
     # each fit's kappa is in the settings file its command passes to --config-file
-    kappas = [read_yaml(path)["kappa"] for path in re.findall(r'--config-file ([^\s"]+)', commands)]
+    kappas = [read_yaml(path)["model"]["kappa"] for path in re.findall(r'--config-file ([^\s"]+)', commands)]
     assert len(kappas) == SCAN["n_models"]
     assert kappas == sorted(kappas)
     assert kappas[-1] > kappas[0] * 10, f"the scan barely moves: {kappas[0]} to {kappas[-1]}"
@@ -138,15 +137,16 @@ def test_a_scan_set_to_run_hands_the_fits_to_the_shell(
 ):
     """5. Current behaviour, captured, because the notebook turns it on.
 
-    The commented-out branch in cell 17 sets ``run_cmd = True``, so a user who
-    uncomments it does not get a script to look over: the fifteen fits start
+    Cell 18 passes ``run_cmd=True``, so a user who uncomments cell 17's scan
+    branch does not get a script to look over: the fifteen fits start
     immediately, in one shell call, with no confirmation.
     """
     from moseq2_model.gui import learn_model_command
 
-    scan_config(model_settings, configured, run_cmd=True)
+    scan_config(model_settings, configured)
+    run_cmd = True
     try:
-        learn_model_command(model_settings)
+        learn_model_command(model_settings, run_cmd=run_cmd)
     finally:
         restore(configured)
 
@@ -158,10 +158,11 @@ def test_an_unknown_scan_scale_is_rejected(model_settings, configured, no_shell)
     """6. The one thing the cell checks before spending an afternoon."""
     from moseq2_model.gui import learn_model_command
 
-    scan_config(model_settings, configured, scan_scale="logarithmic", run_cmd=False)
+    scan_config(model_settings, configured, scan_scale="logarithmic")
+    run_cmd = False
     try:
         with pytest.raises(AssertionError, match='scan scale must be "log" or "linear"'):
-            learn_model_command(model_settings)
+            learn_model_command(model_settings, run_cmd=run_cmd)
     finally:
         restore(configured)
 
@@ -172,5 +173,5 @@ def restore(configured):
     """Put the configuration back the way cell 17 left it."""
     from moseq2_app.util import update_config
 
-    with update_config(str(configured)) as config:
+    with update_config(str(configured), section="model") as config:
         config.update(MODEL_SETTINGS)

@@ -27,7 +27,7 @@ import numpy as np
 from ruamel.yaml import YAML
 from ruamel.yaml.representer import RepresenterError
 
-__all__ = ["UnwritableValueError", "dump_yaml", "read_yaml", "write_yaml"]
+__all__ = ["UnwritableValueError", "dump_yaml", "read_yaml", "write_config", "write_yaml"]
 
 _ADVICE = (
     "If you set this value, change it to text, a number, true/false, a list or a "
@@ -150,16 +150,17 @@ def _type_name(value):
     return f"{kind.__module__}.{kind.__qualname__}"
 
 
-def _serialize(data, target, kind):
+def _serialize(data, target, kind, parser=_parser):
     """The whole YAML document for ``data``, or ``UnwritableValueError``.
 
     ``kind`` is ``"file"``, ``"stream"`` or ``"string"``; with ``target``, it
-    decides how the error names what was being written.
+    decides how the error names what was being written. ``parser`` makes the
+    parser that writes it.
     """
     plain = _plain(data)
     buffer = io.StringIO()
     try:
-        _parser().dump(plain, buffer)
+        parser().dump(plain, buffer)
     except RepresenterError as err:
         found = _find_unwritable(plain)
         if found is None:
@@ -211,3 +212,34 @@ def write_yaml(data, path_or_stream):
 def dump_yaml(data):
     """Serialize ``data`` to a YAML string."""
     return _serialize(data, None, "string")
+
+
+class _Block(dict):
+    """A mapping written in block style, one ``name: value`` line each, whatever it holds."""
+
+
+def _block(representer, data):
+    return representer.represent_mapping("tag:yaml.org,2002:map", data, flow_style=False)
+
+
+def _config_parser():
+    """``_parser``, keeping each mapping's order, with ``_Block`` mappings in block style."""
+    parser = _parser()
+    parser.representer.add_representer(_Block, _block)
+    parser.representer.sort_base_mapping_type_on_output = False
+    return parser
+
+
+def write_config(data, path):
+    """Write ``config.yaml`` (or a file in its shape): a mapping whose mappings are its sections.
+
+    As ``write_yaml``, except that the top level keeps ``data``'s order and each
+    section is written one ``name: value`` line per setting, its names sorted.
+    The safe writer puts a mapping that holds only plain values on one line
+    (``{alpha: 5.7, ...}``), which is hard to edit by hand.
+    """
+    plain = _plain(data)
+    shaped = {key: _Block(sorted(value.items())) if type(value) is dict else value for key, value in plain.items()}
+    text = _serialize(shaped, path, "file", parser=_config_parser)
+    with open(path, "w") as handle:
+        handle.write(text)

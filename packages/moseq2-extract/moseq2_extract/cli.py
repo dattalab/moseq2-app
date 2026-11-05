@@ -2,18 +2,19 @@
 CLI for extracting the depth data.
 
 Each command's settings are generated from its options class in
-``moseq2_extract.options``; the command reads ``--config-file``, resolves the
-settings and calls its step in ``moseq2_extract.steps`` (or
+``moseq2_extract.options``; the command reads the ``extract`` section of its
+project's ``config.yaml`` (``--config-file``, or the working folder's), resolves
+the settings and calls its step in ``moseq2_extract.steps`` (or
 ``moseq2_extract.setup``).
 """
 
 import os
-from dataclasses import replace
 
 import click
 from click.core import ParameterSource
 
-from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
+from moseq2_common.options import ConfigFileError, click_options, command_settings, explicit_values
+from moseq2_common.project import find_project
 from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
@@ -22,6 +23,7 @@ from moseq2_extract.helpers.wrappers import (
     generate_index_wrapper,
 )
 from moseq2_extract.options import (
+    EXTRACT_STAGE,
     AggregateOptions,
     BatchExtractOptions,
     ConvertOptions,
@@ -29,7 +31,7 @@ from moseq2_extract.options import (
     ExtractOptions,
     RoiOptions,
 )
-from moseq2_extract.session_config import recording_entry_settings
+from moseq2_extract.session_config import recording_entry_settings, session_config_file
 
 
 @click.group(context_settings={"show_default": True})
@@ -79,19 +81,12 @@ BATCH_EXTRACT_ORDER = (
 _AVI_ORDER = ("input_file", "mapping", "threads", "delete", "fps", "chunk_size", "output_file")
 
 
-def shim_typed_depth_range_is_manual(ctx) -> dict:
-    """``{"manual_set_depth_range": True}`` when ``--bg-roi-depth-range`` was typed, else ``{}``.
-
-    A range typed on the command line is used as given rather than replaced by
-    the detected range, as in 1.5.0. A range from ``config.yaml`` or in a
-    script's options still follows ``manual_set_depth_range``, so the rule lives
-    in the command bodies of ``find-roi``, ``extract`` and ``batch-extract`` and
-    not in the step. Removed by PR 4.1, which moves it into the step or the
-    options class.
-    """
-    if ctx.get_parameter_source("bg_roi_depth_range") is ParameterSource.COMMANDLINE:
-        return {"manual_set_depth_range": True}
-    return {}
+def _project_config(config_file):
+    """``--config-file``, or the config.yaml of the project the command runs in; None outside a project."""
+    if config_file:
+        return config_file
+    project = find_project()
+    return str(project.config_file) if project is not None else None
 
 
 @cli.command(
@@ -103,8 +98,9 @@ def shim_typed_depth_range_is_manual(ctx) -> dict:
 }))
 @click.pass_context
 def find_roi(ctx, input_file, output_dir, config_file, **_):
-    config = read_config_option(config_file)
-    opts = replace(shim_click_defaults(ctx, RoiOptions, config), **shim_typed_depth_range_is_manual(ctx))
+    config = command_settings(config_file, RoiOptions, stage_classes=EXTRACT_STAGE)
+    # a --bg-roi-depth-range typed sets --manual-set-depth-range (RoiOptions.resolve)
+    opts = RoiOptions.resolve(config=config, explicit=explicit_values(ctx, RoiOptions))
     steps.find_roi(input_file, output_dir, opts)
 
 
@@ -122,13 +118,16 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 })
 @click.pass_context
 def extract(ctx, input_file, output_dir, config_file, output_file, **_):
-    config = read_config_option(config_file)
+    config = command_settings(config_file, ExtractOptions, stage_classes=EXTRACT_STAGE)
+    source = _project_config(config_file)
+    try:
+        session_config = session_config_file(source) if source else ""
+    except ConfigFileError as error:
+        raise click.ClickException(str(error)) from None
     # the arena tool's settings from the recording's session_config.yaml entry, over config.yaml
-    settings = {**(config or {}), **recording_entry_settings(config, input_file)}
-    opts = replace(shim_click_defaults(ctx, ExtractOptions, settings), **shim_typed_depth_range_is_manual(ctx))
-    # The two paths 1.5.0 recorded among the extraction's parameters (R2, removed by PR 4.1):
-    steps.extract(input_file, output_dir, opts,
-                  shim_flat_config={"config_file": config_file, "output_file": output_file})
+    entry = recording_entry_settings(config, input_file, session_config)
+    opts = ExtractOptions.resolve(config=config, entry=entry, explicit=explicit_values(ctx, ExtractOptions))
+    steps.extract(input_file, output_dir, opts)
 
 
 #: ExtractOptions fields batch-extract hands the step in its options rather than as typed values.
@@ -143,8 +142,7 @@ def _typed_extract_options(ctx):
     typed = set(explicit_values(ctx, ExtractOptions)) - set(_IN_BATCH_OPTIONS)
     typed |= {name for name in ("output_dir", "output_file")
               if ctx.get_parameter_source(name) is ParameterSource.COMMANDLINE}
-    return {**{name: value for name, value in ctx.params.items() if name in typed},
-            **shim_typed_depth_range_is_manual(ctx)}
+    return {name: value for name, value in ctx.params.items() if name in typed}
 
 
 @cli.command(
@@ -161,20 +159,24 @@ def _typed_extract_options(ctx):
 })
 @click.pass_context
 def batch_extract(ctx, input_folder, config_file, **_):
+    config_file = _project_config(config_file)
     if not config_file:
         # Add message to tell the users to specify a config file
         print(
             "Command not run. Please specified a config file using --config-file flag."
         )
         return
-    config = read_config_option(config_file)
-    opts = shim_click_defaults(ctx, BatchExtractOptions, config)
+    config = command_settings(config_file, BatchExtractOptions, stage_classes=EXTRACT_STAGE)
+    opts = BatchExtractOptions.resolve(config=config, explicit=explicit_values(ctx, BatchExtractOptions))
     typed = _typed_extract_options(ctx)
+    # --output-file names no file in a batch: each recording's is named from its arena mask
+    typed.pop("output_file", None)
     result = steps.batch_extract(
         input_folder, opts, config_file=config_file,
-        # an --output-dir not typed is config.yaml's output_dir, else proc
+        # an --output-dir not typed is proc
         output_dir=typed.pop("output_dir", None),
         explicit=typed,
+        project=find_project(config_file),
     )
     # the summary the local extraction printed names each failure
     if result.failures:
@@ -208,9 +210,12 @@ def download_flip_file(config_file, output_dir):
 @click.option("--output-file", "-o", type=click.Path(), default="config.yaml")
 @click.option(
     "--camera-type",
-    default="k2",
-    type=str,
-    help="specify the camera type (k2 or azure), default is k2",
+    default="auto",
+    type=click.Choice(["auto", "kinect", "azure", "k2"]),
+    help="The camera the project's recordings were made with, whose preset settings the file gets: "
+    "kinect (a Kinect v2; k2 is the same), or azure (an Azure Kinect or Orbbec Femto). auto takes "
+    "azure when every recording in the output file's folder is an .mkv, which only those cameras "
+    "write, and kinect otherwise.",
 )
 def generate_config(output_file, camera_type):
 
@@ -259,7 +264,9 @@ def generate_index(input_dir, output_file):
 })
 @click.pass_context
 def aggregate_extract_results(ctx, input_dir, output_dir, **_):
-    steps.aggregate_results(input_dir, output_dir, shim_click_defaults(ctx, AggregateOptions, None))
+    config = command_settings(None, AggregateOptions, stage_classes=EXTRACT_STAGE)
+    steps.aggregate_results(input_dir, output_dir,
+                            AggregateOptions.resolve(config=config, explicit=explicit_values(ctx, AggregateOptions)))
 
 
 @cli.command(
@@ -288,7 +295,7 @@ def agg_to_index(input_dir):
 })
 @click.pass_context
 def convert_raw_to_avi(ctx, input_file, output_file, **_):
-    opts = shim_click_defaults(ctx, ConvertOptions, None)
+    opts = ConvertOptions.resolve(explicit=explicit_values(ctx, ConvertOptions))
     convert_raw_to_avi_wrapper(
         input_file, output_file, opts.chunk_size, opts.fps, opts.delete, opts.threads, opts.mapping
     )
@@ -304,7 +311,7 @@ def convert_raw_to_avi(ctx, input_file, output_file, **_):
 })
 @click.pass_context
 def copy_slice(ctx, input_file, output_file, **_):
-    opts = shim_click_defaults(ctx, CopySliceOptions, None)
+    opts = CopySliceOptions.resolve(explicit=explicit_values(ctx, CopySliceOptions))
     copy_slice_wrapper(
         input_file, output_file, opts.copy_slice, opts.chunk_size, opts.fps, opts.delete, opts.threads,
         opts.mapping

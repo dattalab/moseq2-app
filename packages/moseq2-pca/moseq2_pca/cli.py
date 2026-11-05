@@ -7,16 +7,15 @@ settings and calls its step in ``moseq2_pca.steps``.
 """
 
 import os
-from dataclasses import replace
 from os.path import join
 
 import click
 
-from moseq2_common.options import click_options, explicit_values, read_config_option, shim_click_defaults
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.options import click_options, command_settings, explicit_values, read_config
+from moseq2_common.yaml import write_config
 from moseq2_pca import steps
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
-from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
+from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
 
 
 @click.group(context_settings={"show_default": True})
@@ -59,91 +58,93 @@ TRAIN_PCA_ORDER = (*_INPUT_AND_DASK, 'gaussfilter_space', 'gaussfilter_time', 'm
                    'medfilter_time', 'missing_data', 'missing_data_iters', 'mask_threshold',
                    'mask_height_threshold', 'min_height', 'max_height', 'tailfilter_size', 'tailfilter_shape',
                    'use_fft', 'train_on_subset', 'recon_pcs', 'rank', 'output_file', 'local_processes',
-                   'overwrite_pca_train', 'camera_type')
+                   'overwrite_pca_train')
 APPLY_PCA_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_path', 'pca_file', 'fill_gaps', 'fps', 'verbose',
                    'overwrite_pca_apply')
 CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_scores', 'pca_path',
                       'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'fps', 'verbose')
 
 
-# 1.5.0's command_with_config left these out of what it wrote back.
-_NOT_WRITTEN_BACK = ('missing_data', 'use_fft', 'verbose', 'from_end')
+#: The output path each PCA step records at config.yaml's top level, by step.
+_WRITTEN_BACK = {'train_pca': 'pca_file', 'apply_pca': 'pca_file_scores', 'compute_changepoints': 'changepoint_file'}
 
 
-def shim_write_back_before(ctx, config_file, config, opts):
-    """Write the settings a command runs with into ``config_file`` before it runs (L12, removed by PR 4.3).
+def shim_write_back_paths(config_file, step, written):
+    """Record the file a PCA step wrote at ``config_file``'s top level (L12, removed by PR 4.3).
 
-    As 1.5.0's ``command_with_config``: the file, then every parameter of the
-    command (paths included, as resolved) except ``_NOT_WRITTEN_BACK``.
+    The next PCA step's front end reads it there (``recorded_paths``), as 1.5.0
+    found the components and scores through config.yaml. No resolver reads the
+    top level, and PR 4.3's bookkeeping file replaces it. Nothing is written
+    without a config file, or when the step wrote nothing.
     """
-    if not config_file:
+    if not config_file or written is None:
         return
-    resolved = opts.as_dict()
-    data = {**config, 'input_dir': None, 'output_dir': None, 'output_file': None}
-    data.update({name: resolved.get(name, value) for name, value in ctx.params.items()
-                 if name not in _NOT_WRITTEN_BACK})
-    write_yaml(data, config_file)
+    data = read_config(config_file)
+    data[_WRITTEN_BACK[step]] = str(written)
+    write_config(data, config_file)
 
 
-def shim_write_back_after(config_file, result):
-    """Merge what the step returned into ``config_file`` (L12, removed by PR 4.3).
-
-    As 1.5.0's ``combine_new_config``: everything but ``output_dir`` and ``output_file``.
-    """
+def recorded_paths(config_file) -> dict:
+    """The components, scores and changepoints files earlier PCA steps recorded in ``config_file``."""
     if not config_file:
-        return
-    data = {**read_yaml(config_file), **result.shim_config_data}
-    write_yaml({k: v for k, v in data.items() if k not in ('output_dir', 'output_file')}, config_file)
+        return {}
+    data = read_config(config_file)
+    return {key: data[key] for key in _WRITTEN_BACK.values() if data.get(key)}
 
 
-def shim_camera_swap(opts: TrainPCAOptions) -> TrainPCAOptions:
-    """Azure filters in place of the Kinect defaults when ``camera_type`` is azure (L6, removed by PR 4.1)."""
-    if opts.camera_type != 'azure':
-        return opts
-    print('Updating parameters for Azure Kinect camera...')
-    if opts.gaussfilter_space == (1.5, 1):
-        opts = replace(opts, gaussfilter_space=(2.25, 1.5))
-    if opts.tailfilter_size == (9, 9):
-        opts = replace(opts, tailfilter_size=(13, 13))
-    return opts
+def _config_file(config_file):
+    """``--config-file``, or the config.yaml of the project the command runs in."""
+    from moseq2_common.project import find_project
+
+    if config_file:
+        return config_file
+    project = find_project()
+    return str(project.config_file) if project is not None else None
 
 
 @cli.command(name='train-pca', help='Train PCA on all extracted results (h5 files) in input directory')
 @click_options(TrainPCAOptions, order=TRAIN_PCA_ORDER, others=_paths('pca'))
 @click.pass_context
 def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = read_config_option(config_file)
-    opts = shim_click_defaults(ctx, TrainPCAOptions, config)
-    shim_write_back_before(ctx, config_file, config, opts)
-    result = steps.train_pca(input_dir, output_dir, output_file, shim_camera_swap(opts))
-    shim_write_back_after(config_file, result)
+    config = command_settings(config_file, TrainPCAOptions, stage_classes=PCA_STAGE)
+    opts = TrainPCAOptions.resolve(config=config, explicit=explicit_values(ctx, TrainPCAOptions))
+    result = steps.train_pca(input_dir, output_dir, output_file, opts)
+    shim_write_back_paths(_config_file(config_file), 'train_pca', result.components_file)
 
 
 @cli.command(name='apply-pca', help='Compute PCA Scores of extraction data given a pre-trained PCA')
 @click_options(ApplyPCAOptions, order=APPLY_PCA_ORDER, others={
     **_paths('pca_scores'),
+    'pca_file': click.option('--pca-file', type=click.Path(), default=None, help='Path to PCA results'),
     'fill_gaps': click.option('--fill-gaps', hidden=True, expose_value=False, default=None, type=str,
                               callback=_fill_gaps_is_not_an_option),
 })
 @click.pass_context
-def apply_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = read_config_option(config_file)
-    opts = shim_click_defaults(ctx, ApplyPCAOptions, config)
-    shim_write_back_before(ctx, config_file, config, opts)
-    result = steps.apply_pca(input_dir, output_dir, output_file, opts)
-    shim_write_back_after(config_file, result)
+def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **_):
+    config = command_settings(config_file, ApplyPCAOptions, stage_classes=PCA_STAGE)
+    opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
+    recorded = recorded_paths(_config_file(config_file))
+    result = steps.apply_pca(input_dir, output_dir, output_file, opts,
+                             components_file=pca_file or recorded.get('pca_file'))
+    shim_write_back_paths(_config_file(config_file), 'apply_pca', result.scores_file)
 
 
 @cli.command('compute-changepoints',
              help='Compute the Model-Free Syllable Changepoints based on the PCA/PCA_Scores')
-@click_options(ChangepointsOptions, order=CHANGEPOINTS_ORDER, others=_paths('changepoints'))
+@click_options(ChangepointsOptions, order=CHANGEPOINTS_ORDER, others={
+    **_paths('changepoints'),
+    'pca_file_scores': click.option('--pca-file-scores', type=click.Path(), default=None,
+                                    help='Path to PCA results'),
+})
 @click.pass_context
-def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = read_config_option(config_file)
-    opts = shim_click_defaults(ctx, ChangepointsOptions, config)
-    shim_write_back_before(ctx, config_file, config, opts)
-    result = steps.compute_changepoints(input_dir, output_dir, output_file, opts)
-    shim_write_back_after(config_file, result)
+def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, pca_file_scores, **_):
+    config = command_settings(config_file, ChangepointsOptions, stage_classes=PCA_STAGE)
+    opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
+    recorded = recorded_paths(_config_file(config_file))
+    result = steps.compute_changepoints(input_dir, output_dir, output_file, opts,
+                                        components_file=recorded.get('pca_file'),
+                                        scores_file=pca_file_scores or recorded.get('pca_file_scores'))
+    shim_write_back_paths(_config_file(config_file), 'compute_changepoints', result.changepoints_file)
 
 
 @cli.command('clip-scores', help='Clip specified number of frames from PCA scores at the beginning or end')

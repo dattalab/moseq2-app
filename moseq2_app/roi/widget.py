@@ -25,7 +25,7 @@ from moseq2_extract.helpers.wrappers import (
     session_output_dir,
     validate_flip_classifier,
 )
-from moseq2_extract.session_config import recording_settings
+from moseq2_extract.session_config import extract_settings, recording_settings
 from moseq2_app.util import read_and_clean_config, update_config
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.extract.proc import get_bground_im_file
@@ -225,7 +225,7 @@ class ArenaMaskWidget:
         Returns:
             (dict): the recording's settings.
         """
-        return recording_settings(read_yaml(self.config_file) or {}, self.session_config[folder])
+        return recording_settings(extract_settings(self.config_file), self.session_config[folder])
 
     def compute_arena_mask(self):
         """compute the arena mask with the settings extraction would use (``recording_config``).

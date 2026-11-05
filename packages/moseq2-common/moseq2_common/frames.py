@@ -31,6 +31,8 @@ __all__ = ["CleaningOptions", "clean_frames", "cleaning_arguments", "odd_kernel"
 class CleaningOptions(Options):
     """Extraction's frame cleaning: the height threshold, the median filters, and the tail and cable filters."""
 
+    SECTION = "extract"
+
     temporal_filter_size: tuple = option((0,), "--temporal-filter-size", "-t", type=int, multiple=True, arena=True,
                                          help="Time prefilter kernel (median filter; an even size rounds up to the next odd one)")
     spatial_filter_size: tuple = option((3,), "--spatial-filter-size", "-s", type=int, multiple=True, arena=True,

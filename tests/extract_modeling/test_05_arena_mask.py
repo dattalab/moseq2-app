@@ -3,9 +3,6 @@
     session_config_path = join(progress_paths['base_dir'], 'session_config.yaml')
     progress_paths = update_progress(progress_filepath, 'session_config', session_config_path)
 
-    with update_config(progress_paths['config_file']) as config_data:
-        config_data['output_dir'] = 'proc'
-
     ArenaMaskWidget(progress_paths['base_dir'], progress_paths['config_file'],
                     progress_paths['session_config'],
                     skip_extracted=skip_extracted)
@@ -169,7 +166,8 @@ def test_saved_parameters_differ_from_the_configuration_in_one_place(arena, conf
     Nothing else moves, which is why the walkthrough's own session config
     holds the generated defaults: there was nothing in it that needed tuning.
     """
-    config = plain(read_yaml(str(configured)))
+    whole = plain(read_yaml(str(configured)))
+    config = {**whole["extract"], "camera_type": whole["camera_type"]}
     saved = parameters(arena)
 
     differing = {
@@ -295,7 +293,7 @@ def test_sorting_by_position_gives_extraction_the_arena_the_tool_showed(scratch)
     """``bg_sort_roi_by_position`` has no box in the tool; it comes from the config.
     Sorting this recording's five best regions top to bottom puts a fragment at
     the top edge ahead of the floor, and the tool has to show the same order."""
-    with update_config(str(scratch / "config.yaml")) as config_data:
+    with update_config(str(scratch / "config.yaml"), section="extract") as config_data:
         config_data["bg_sort_roi_by_position"] = True
         config_data["bg_sort_roi_by_position_max_rois"] = 5
     widget, data, buttons = open_widget(scratch)
@@ -604,8 +602,7 @@ def plane_run(tmp_path_factory, raw_sessions):
     shutil.copytree(raw_sessions / STILL_RECORDING, root / STILL_RECORDING)
     config = root / "config.yaml"
     generate_config_command(str(config), camera_type="k2")
-    with update_config(str(config)) as config_data:
-        config_data["output_dir"] = "proc"
+    with update_config(str(config), section="extract") as config_data:
         config_data["use_plane_bground"] = True
         config_data["cluster_type"] = "local"
 
@@ -746,8 +743,7 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
     shutil.copytree(raw_sessions / "saline_example_0", root / "saline_example_0")
     config = root / "config.yaml"
     generate_config_command(str(config), camera_type="k2")
-    with update_config(str(config)) as config_data:
-        config_data["output_dir"] = "proc"
+    with update_config(str(config), section="extract") as config_data:
         config_data["graduate_walls"] = True
 
     widget, data, buttons = open_widget(root)
@@ -758,12 +754,13 @@ def test_arena_preview_matches_extraction_for_graduated_walls(tmp_path, raw_sess
     click(buttons["Save session parameters"])
 
     recording = widget.sessions[data.path]
-    settings = recording_configs(str(config), [recording]).configs[recording]
+    # the dict extraction hands its work function: the recording's resolved options
+    settings = recording_configs(str(config), [recording]).options[recording].as_dict()
     assert settings["graduate_walls"] and settings["dilate_iterations"] > 1, (
         "the saved settings do not graduate the walls, so this compares nothing"
     )
-    settings["frame_trim"] = [1, 0]
-    output_dir = extract_wrapper(recording, settings["output_dir"], settings, num_frames=PREVIEW_FRAMES + 1)
+    settings["frame_trim"] = (1, 0)
+    output_dir = extract_wrapper(recording, "proc", settings, num_frames=PREVIEW_FRAMES + 1)
     with h5py.File(f"{output_dir}/results_00.h5", "r") as f:
         extracted = f["frames"][()]
 
@@ -796,8 +793,7 @@ def test_the_tool_opens_and_previews_a_config_that_turns_a_filter_off(tmp_path, 
     shutil.copytree(raw_sessions / "saline_example_0", root / "saline_example_0")
     config = root / "config.yaml"
     generate_config_command(str(config), camera_type="k2")
-    with update_config(str(config)) as config_data:
-        config_data["output_dir"] = "proc"
+    with update_config(str(config), section="extract") as config_data:
         config_data[key] = off
 
     _, data, buttons = open_widget(root)

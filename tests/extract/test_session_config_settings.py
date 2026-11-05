@@ -1,7 +1,7 @@
 """What a recording is extracted with when the arena tool has saved an entry for it.
 
 The arena tool writes ``session_config.yaml`` with one entry per recording, a
-copy of ``config.yaml`` taken when the tool first listed the recording plus the
+copy of ``config.yaml``'s ``extract`` section taken when the tool first listed the recording plus the
 values tuned in the tool. Extraction takes from that entry only the settings the
 tool sets (``ARENA_TOOL_SETTINGS``) and every other setting from ``config.yaml``,
 so a ``frame_trim``, ``num_frames`` or flip classifier set in ``config.yaml``
@@ -28,6 +28,8 @@ import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from commands import split_command
 from moseq2_common.yaml import read_yaml, write_yaml
+
+from configs import read_settings
 from moseq2_extract.gui import extract_command, extract_found_sessions, generate_config_command
 from moseq2_extract.util import detect_and_set_camera_parameters
 
@@ -56,11 +58,12 @@ def project(tmp_path):
     config = root / "config.yaml"
     generate_config_command(str(config), camera_type="k2")
     data = read_yaml(str(config))
-    data["output_dir"] = "proc"
+    extract = data["extract"]
 
     entries = {}
     for name in SESSIONS:
-        entry = detect_and_set_camera_parameters(deepcopy(data), str(root / name / "depth.dat"))
+        entry = detect_and_set_camera_parameters({**deepcopy(extract), "camera_type": data["camera_type"]},
+                                                 str(root / name / "depth.dat"))
         entry["crop_size"] = [100, 100]
         entry["bg_roi_depth_range"] = [600, 700]
         entry["manual_set_depth_range"] = True
@@ -69,11 +72,11 @@ def project(tmp_path):
     write_yaml(entries, str(session_config))
 
     data["session_config_path"] = str(session_config)
-    data["frame_trim"] = [100, 0]
-    data["num_frames"] = 50
-    data["flip_classifier"] = str(root / "flip_classifier.npz")
-    data["crop_size"] = [80, 80]
-    data["bg_roi_depth_range"] = [650, 750]
+    extract["frame_trim"] = [100, 0]
+    extract["num_frames"] = 50
+    extract["flip_classifier"] = str(root / "flip_classifier.npz")
+    extract["crop_size"] = [80, 80]
+    extract["bg_roi_depth_range"] = [650, 750]
     write_yaml(data, str(config))
     return root, config, session_config
 
@@ -116,7 +119,7 @@ def slurm(monkeypatch):
         for line in filter(str.strip, script.splitlines()):
             command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
             run("extract", *split_command(command))
-        written = {name: read_yaml(str(root / name / "proc" / "config.yaml")) for name in SESSIONS}
+        written = {name: read_settings(root / name / "proc" / "config.yaml") for name in SESSIONS}
         return calls, written
 
     return go
@@ -202,7 +205,7 @@ def test_no_message_when_the_entry_agrees_with_config_yaml(project, local, capsy
     entries = read_yaml(str(session_config))
     for entry in entries.values():
         for key in ("frame_trim", "num_frames", "flip_classifier"):
-            entry[key] = data[key]
+            entry[key] = data["extract"][key]
     write_yaml(entries, str(session_config))
 
     extract_command(recording(root, "session_0"), None, str(config))
@@ -276,7 +279,7 @@ def test_slurm_batch_extract_reports_each_setting_once(project, monkeypatch):
 def test_notebook_slurm_path_takes_frame_trim_from_config_yaml(project, slurm):
     root, config, session_config = project
     data = read_yaml(str(config))
-    data["cluster_type"] = "slurm"
+    data["extract"]["cluster_type"] = "slurm"
     write_yaml(data, str(config))
 
     calls, written = slurm(root, lambda: extract_found_sessions(str(root), str(config), [".dat"]))
@@ -302,7 +305,7 @@ def test_an_old_full_copy_entry_resolves_by_the_same_rule(project, local):
     run("batch-extract", str(root), "--config-file", str(config), "--extensions", ".dat")
 
     received = local[recording(root, "session_0")]["config"]
-    assert received["fps"] == read_yaml(str(config))["fps"]
+    assert received["fps"] == read_yaml(str(config))["extract"]["fps"]
     assert tuple(received["frame_trim"]) == (100, 0)
     assert received["noise_tolerance"] == 40
     assert session_config.read_text() == before

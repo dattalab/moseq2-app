@@ -2,15 +2,18 @@
 The settings each recording is extracted with, from ``config.yaml`` and ``session_config.yaml``.
 
 The arena tool (moseq2-app's ``ArenaMaskWidget``) writes ``session_config.yaml``
-with one entry per recording. An entry starts as a full copy of ``config.yaml``,
-taken when the tool first lists the recording, and holds the values tuned in the
-tool once they are saved. Extraction takes from a recording's entry only the
-settings the tool sets, ``ARENA_TOOL_SETTINGS``, and every other setting from
-``config.yaml``, so a setting changed in ``config.yaml`` later (a flip
-classifier, a ``frame_trim``) reaches every recording. Options typed on the
-command line win over both. A recording without an entry is extracted with
-``config.yaml``. Entries in files written by earlier releases, which hold every
-setting, are read by the same rule and not rewritten.
+with one entry per recording. An entry starts as a full copy of ``config.yaml``'s
+``extract`` section (with ``camera_type``), taken when the tool first lists the
+recording, and holds the values tuned in the tool once they are saved.
+Extraction takes from a recording's entry only the settings the tool sets,
+``ARENA_TOOL_SETTINGS``, and every other setting from ``config.yaml``, so a
+setting changed in ``config.yaml`` later (a flip classifier, a ``frame_trim``)
+reaches every recording. Options typed on the command line win over both. A
+recording without an entry is extracted with ``config.yaml``.
+
+Below, "config.yaml's settings" (``config_data``) are its ``extract`` section and
+``camera_type``, as ``extract_settings`` reads them; ``session_config_path`` is
+read from the file's top level.
 
 Where an entry holds a value for another setting that differs from
 ``config.yaml``'s, ``RecordingConfigs.message`` says so, one line per setting.
@@ -21,22 +24,20 @@ extractions use: ``extract_command`` (the local extraction) and
 ``recording_entry_settings``, the entry's settings by the same rule, over
 ``config.yaml`` before resolving its options. ``recording_configs`` resolves each
 recording's options with ``recording_options`` (``ExtractOptions.resolve``) and
-its whole settings dict, every key ``config.yaml`` holds included, with
-``recording_config``. Both take from the entry what ``entry_settings`` gives.
-``recording_settings`` lays the options over the settings dict, as the
-extraction steps do before calling the work function; the arena tool uses it
-for the arena it shows and its preview extraction, with the values the tool
-holds as the entry.
+its settings dict with ``recording_config``. Both take from the entry what
+``entry_settings`` gives. ``recording_settings`` is the dict the extraction
+steps hand the work function, the resolved options; the arena tool uses it for
+the arena it shows and its preview extraction, with the values the tool holds
+as the entry.
 """
 
-from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from os.path import basename, exists
 
-from moseq2_common.options import arena_fields
+from moseq2_common.options import arena_fields, read_config, read_settings
 from moseq2_common.yaml import read_yaml
-from moseq2_extract.options import ExtractOptions
+from moseq2_extract.options import EXTRACT_STAGE, ExtractOptions
 from moseq2_extract.recordings import session_config_key
 
 #: The settings the arena tool sets for a recording, which extraction takes from
@@ -52,6 +53,16 @@ ARENA_TOOL_SETTINGS = arena_fields(ExtractOptions)
 _NOT_REPORTED = frozenset(
     {"session_config_path", "config_file", "num_frames", "skip_completed", "cluster_type"}
 )
+
+
+def extract_settings(config_file):
+    """config.yaml's ``extract`` section, checked, with its ``camera_type``."""
+    return read_settings(config_file, ExtractOptions, stage_classes=EXTRACT_STAGE)
+
+
+def session_config_file(config_file):
+    """The session config ``config_file`` names (``session_config_path``), or "" when it names none."""
+    return read_config(config_file).get("session_config_path") or ""
 
 
 def _plain(value):
@@ -99,7 +110,7 @@ class RecordingConfigs:
         each setting outside ``ARENA_TOOL_SETTINGS`` whose entry value differs from config.yaml's.
     config_file (str): path to config.yaml.
     session_config_path (str): path to session_config.yaml, or "" when there is none.
-    config_data (dict): config.yaml as read.
+    config_data (dict): config.yaml's settings.
     options (dict): recording path -> the ``ExtractOptions`` it is extracted with.
     """
 
@@ -176,8 +187,8 @@ def recording_configs(config_file, recordings, cli_options=None):
     Returns:
     (RecordingConfigs): each recording's settings and options, and the differences to report.
     """
-    config_data = read_yaml(config_file) or {}
-    session_config_path = config_data.get("session_config_path") or ""
+    config_data = extract_settings(config_file)
+    session_config_path = session_config_file(config_file)
     session_configs = (read_yaml(session_config_path) or {}) if exists(session_config_path) else {}
     typed = cli_options or {}
 
@@ -198,23 +209,22 @@ def recording_configs(config_file, recordings, cli_options=None):
     return resolved
 
 
-def recording_entry_settings(config_data, recording):
+def recording_entry_settings(config_data, recording, session_config_path=""):
     """
     The settings ``recording``'s entry in session_config.yaml gives over config.yaml, by
     ``entry_settings``'s rule, a null left out so it keeps config.yaml's value.
 
-    ``extract FILE`` lays these over config.yaml. session_config.yaml is the file
-    config.yaml's ``session_config_path`` names, as for ``recording_configs``.
+    ``extract FILE`` lays these over config.yaml.
 
     Args:
-    config_data (dict): config.yaml as read, or None without one.
+    config_data (dict): config.yaml's settings, or None without one.
     recording (str): path to the recording.
+    session_config_path (str): the session config config.yaml names (``session_config_file``), or "".
 
     Returns:
     (dict): {setting: the entry's value}; empty when there is no session_config.yaml or no entry.
     """
     config_data = config_data or {}
-    session_config_path = config_data.get("session_config_path") or ""
     session_configs = (read_yaml(session_config_path) or {}) if exists(session_config_path) else {}
     key = session_config_key(session_configs, recording)
     if key is None:
@@ -232,7 +242,7 @@ def entry_settings(config_data, entry):
     ``config_data`` does not hold. config.yaml gives every other setting.
 
     Args:
-    config_data (dict): config.yaml as read.
+    config_data (dict): config.yaml's settings.
     entry (dict): the recording's entry in session_config.yaml, or None when it has none.
 
     Returns:
@@ -254,7 +264,7 @@ def recording_options(config_data, entry, cli_options=None):
     options in ``cli_options`` that ``ExtractOptions`` declares.
 
     Args:
-    config_data (dict): config.yaml as read.
+    config_data (dict): config.yaml's settings.
     entry (dict): the recording's entry in session_config.yaml, or None when it has none.
     cli_options (dict): parameters typed on the command line.
 
@@ -276,7 +286,7 @@ def recording_config(config_data, entry, cli_options=None):
     recording of an extraction with it, and the arena tool its arena and preview extraction.
 
     Args:
-    config_data (dict): config.yaml as read.
+    config_data (dict): config.yaml's settings.
     entry (dict): the recording's entry in session_config.yaml, or None when it has none.
     cli_options (dict): parameters typed on the command line.
 
@@ -304,38 +314,15 @@ def recording_config(config_data, entry, cli_options=None):
 
 def recording_settings(config_data, entry):
     """
-    The whole settings dict extraction hands its work function for one recording.
-
-    ``recording_config``'s dict with every option ``recording_options`` resolves over it,
-    a tuple-valued option the dict holds as a list kept as that list (``shim_config_lists``),
-    as the extraction steps build it. The arena tool computes its arena and preview with it.
+    The settings dict extraction hands its work function for one recording: the options
+    ``recording_options`` resolves, as the extraction steps build it. The arena tool computes
+    its arena and preview with it.
 
     Args:
-    config_data (dict): config.yaml as read.
+    config_data (dict): config.yaml's settings.
     entry (dict): the recording's entry in session_config.yaml, or None when it has none.
 
     Returns:
     (dict): the recording's settings.
     """
-    config, _ = recording_config(config_data, entry)
-    opts = recording_options(config_data, entry)
-    return {**config, **shim_config_lists(opts.as_dict(), config)}
-
-
-def shim_config_lists(resolved: Mapping, flat: Mapping) -> dict:
-    """``resolved``, with each tuple that ``flat`` holds as a list of the same items given as that list.
-
-    Removed with ``shim_flat_config`` by PR 4.1, which then has to choose one
-    behaviour. The notebook's and ``batch-extract``'s extractions hand the
-    wrapper ``config.yaml``'s lists, where ``extract FILE`` hands it tuples, and
-    ``write_image`` scales ``first_frame.tiff`` to ``bg_roi_depth_range`` only
-    when the range is a tuple: on those two paths ``first_frame.tiff`` is written
-    unscaled, and ``extract FILE`` writes it scaled.
-    """
-    def as_held(name, value):
-        held = flat.get(name)
-        if isinstance(value, tuple) and isinstance(held, list) and tuple(held) == value:
-            return held
-        return value
-
-    return {name: as_held(name, value) for name, value in resolved.items()}
+    return recording_options(config_data, entry).as_dict()

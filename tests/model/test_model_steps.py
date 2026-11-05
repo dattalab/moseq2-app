@@ -108,9 +108,9 @@ def test_the_notebook_functions_call_the_steps(tmp_path, scores, called, options
              "config_file": str(config), "index_file": str(index),
              "base_model_path": str(tmp_path / "models")}
 
-    write_yaml({"kappa": 1000, "num_iter": 7}, str(config))
+    write_yaml({"model": {"kappa": 1000, "num_iter": 7}}, str(config))
     learn_model_command(paths)
-    write_yaml({"kappa": "scan", "scan_scale": "log", "n_models": 4}, str(config))
+    write_yaml({"model": {"kappa": "scan", "scan_scale": "log", "n_models": 4}}, str(config))
     learn_model_command(paths)
     apply_model_command(paths, str(tmp_path / "models" / "model.p"))
 
@@ -141,14 +141,14 @@ def test_kappa_scan_commands_are_unchanged(tmp_path, scores, steps, options, mon
     assert result.commands == SCAN_SCRIPT
     for i, kappa in enumerate((1, 100, 10000)):
         settings = read_yaml(str(tmp_path / "models" / steps.KAPPA_SCAN_SETTINGS_NAME.format(i, kappa)))
-        assert settings == options.LearnModelOptions(kappa=float(kappa)).as_dict()
+        assert settings == {"model": options.LearnModelOptions(kappa=float(kappa)).settings(), "job": {"project": None}}
 
 
 def test_learn_model_reads_config_file(tmp_path, scores, steps, monkeypatch):
     received = []
     monkeypatch.setattr(steps, "learn_model_wrapper", lambda i, d, config: received.append(config))
     config = tmp_path / "config.yaml"
-    write_yaml({"kappa": 1000, "num_iter": 7}, str(config))
+    write_yaml({"model": {"kappa": 1000, "num_iter": 7}}, str(config))
 
     def learn(*args):
         result = CliRunner().invoke(

@@ -1,14 +1,14 @@
 """Cell 6: extract every recording in the project.
 
-    with update_config(progress_paths['config_file']) as config_data:
-        config_data['cluster_type'] = 'local'
+    run_cmd = False
 
     extract_all = True
 
     extract_found_sessions(progress_paths['base_dir'],
                            progress_paths['config_file'],
                            extract_all=extract_all,
-                           skip_extracted=skip_extracted)
+                           skip_extracted=skip_extracted,
+                           run_cmd=run_cmd)
 
 The heaviest cell, and the one every later cell is built on. It does four
 things: walk the project for depth recordings of every type the pipeline reads,
@@ -120,7 +120,7 @@ def build_fake_project(root, recordings=RECORDINGS, extension=".avi"):
         session.mkdir(parents=True)
         (session / f"depth{extension}").touch()
         (session / "metadata.json").write_text("{}")
-    (root / "config.yaml").write_text("cluster_type: local\n")
+    (root / "config.yaml").write_text("extract:\n  cluster_type: local\n")
     return root
 
 
@@ -280,7 +280,7 @@ def test_the_slurm_branch_writes_a_script_and_submits_nothing(
     does not reach the scheduler.
     """
     root = build_fake_project(tmp_path / "project")
-    (root / "config.yaml").write_text("cluster_type: slurm\n")
+    (root / "config.yaml").write_text("extract:\n  cluster_type: slurm\n")
     monkeypatch.setattr(
         "moseq2_extract.helpers.extract.system",
         lambda *_: pytest.fail("the slurm branch submitted a job"),

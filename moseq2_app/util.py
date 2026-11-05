@@ -2,21 +2,22 @@
 General utility functions.
 """
 import pandas as pd
-from moseq2_common.yaml import read_yaml, write_yaml as _write_yaml
+from moseq2_common.yaml import read_yaml, write_config
 from copy import deepcopy
 import os
-import warnings
-from os.path import abspath, basename, dirname, join, exists, splitext
+from os.path import basename, join, exists, splitext
 from os import mkdir
 from glob import glob
 from shutil import copy2
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import Iterator
+from moseq2_common.options import SECTIONS, check_top_level, read_config
 from IPython.display import clear_output
 from moseq2_app.gui.progress import update_progress
 from moseq2_viz.scalars.util import scalars_to_dataframe
-from moseq2_extract.util import check_filter_sizes, recursive_find_h5s
-from moseq2_extract.recordings import find_recordings
+from moseq2_extract.util import check_filter_sizes
+from moseq2_extract.session_config import extract_settings
 from moseq2_viz.model.util import compute_behavioral_statistics
 
 
@@ -37,7 +38,7 @@ class ClearOutputMixin:
 
 
 def read_and_clean_config(config_file):
-    """read config files and reset incorrect parameters
+    """read config.yaml's extraction settings (its ``extract`` section and ``camera_type``) and reset incorrect ones
 
     Args:
         config_file (dict): path to the config file
@@ -45,7 +46,7 @@ def read_and_clean_config(config_file):
     Returns:
         config_data (dict): dictionary of config data.
     """
-    config_data = read_yaml(config_file)
+    config_data = extract_settings(config_file)
     config_data = check_filter_sizes(config_data)
     config_data['threads'] = max(1, config_data.get('threads', 8))
 
@@ -210,111 +211,31 @@ def update_model_paths(desired_model, model_dict, progress_filepath):
 
 
 @contextmanager
-def update_config(path: str) -> dict:
-    """update config.yaml with new parameters used.
+def update_config(path: str, section: str | None = None) -> Iterator[dict]:
+    """Edit config.yaml in a notebook cell: yield one section (or, with ``section`` None, the whole file).
+
+    What the cell leaves in the yielded dict is written back when the ``with``
+    block ends, the rest of the file as it was::
+
+        with update_config(config_file, section='pca') as config_data:
+            config_data['nworkers'] = 4
 
     Args:
         path (str): path to config file.
+        section (str): ``extract``, ``pca``, ``model`` or ``crowd_movies``; None for the whole file.
     """
-    config = read_yaml(path)
+    if section is not None and section not in SECTIONS:
+        raise ValueError(f"config.yaml has no section {section!r}; its sections are {', '.join(SECTIONS)}. "
+                         "Pass one of those as update_config's section.")
+    config = read_config(path)
+    if section is None:
+        edited = config
+    else:
+        check_top_level(path, config)
+        edited = dict(config.get(section) or {})
     try:
-        yield config
+        yield edited
     finally:
-        _write_yaml(config, path)
-
-
-#: The ``camera_type`` values under which the PCA cell decides the camera from
-#: the recordings: the Kinect v2 (``k2``, ``kinect``) and ``auto``. Notebooks from
-#: 1.4.5 and earlier left ``k2`` or ``auto`` in an Azure or Femto project's config.
-_CAMERA_FROM_RECORDINGS = ('k2', 'kinect', 'auto')
-
-
-def _recording_kinds(train_data_dir, project_dir):
-    """Count the sessions in ``train_data_dir`` by the recording each was extracted from.
-
-    An aggregated session shares its uuid with the extraction it was copied from,
-    which sits in an output folder at or below its recording's folder. The
-    recording is the one ``find_recordings`` lists in the nearest folder above
-    that extraction.
-
-    Returns:
-    (dict): ``{'mkv': n, 'other': n, 'not found': n}``.
-    """
-    _, trained, _ = recursive_find_h5s(train_data_dir)
-    train_root = abspath(train_data_dir)
-    project_root = abspath(project_dir)
-
-    extractions = {}
-    for h5, results in zip(*recursive_find_h5s(project_dir)[:2]):
-        if not abspath(h5).startswith(train_root + os.sep):
-            extractions.setdefault(results.get('uuid'), abspath(h5))
-
-    recordings = {}
-    for recording in find_recordings(project_dir).recordings:
-        recordings.setdefault(dirname(abspath(recording)), []).append(recording)
-
-    kinds = {'mkv': 0, 'other': 0, 'not found': 0}
-    for results in trained:
-        folder = extractions.get(results.get('uuid'))
-        found = None
-        while folder is not None and found is None:
-            folder = dirname(folder)
-            found = recordings.get(folder)
-            if folder == project_root or dirname(folder) == folder:
-                break
-        if not found:
-            kinds['not found'] += 1
-        elif any(recording.endswith('.mkv') for recording in found):
-            kinds['mkv'] += 1
-        else:
-            kinds['other'] += 1
-    return kinds
-
-
-def camera_for_pca(camera_type, train_data_dir, project_dir):
-    """The camera whose filters the PCA cell applies: ``'azure'`` or ``camera_type``.
-
-    Only Azure Kinect and Orbbec Femto cameras write ``.mkv``. When ``camera_type``
-    is ``k2``, ``kinect`` or ``auto`` and every session in ``train_data_dir`` was
-    extracted from an ``.mkv``, the camera is ``'azure'``, and a line says so. When
-    some sessions are ``.mkv`` and others are not, or their recordings cannot be
-    found, ``camera_type`` is kept and a warning gives the counts. Any other
-    ``camera_type`` is returned as it is.
-
-    Args:
-    camera_type (str): ``camera_type`` from config.yaml.
-    train_data_dir (str): the folder PCA trains on (``aggregate_results/``).
-    project_dir (str): the project folder holding the recordings and their extractions.
-
-    Returns:
-    (str): ``'azure'`` or ``camera_type``.
-    """
-    if camera_type not in _CAMERA_FROM_RECORDINGS:
-        return camera_type
-
-    kinds = _recording_kinds(train_data_dir, project_dir)
-    n_mkv = kinds['mkv']
-    if n_mkv == 0:
-        return camera_type
-
-    if n_mkv == sum(kinds.values()):
-        sessions = (f'the 1 session in {train_data_dir} was recorded as an .mkv' if n_mkv == 1
-                    else f'all {n_mkv} sessions in {train_data_dir} were recorded as .mkv files')
-        print('PCA uses the Azure Kinect and Orbbec Femto filters set in this cell '
-              f'(gaussfilter_space, tailfilter_size): config.yaml says camera_type: {camera_type}, '
-              f'but {sessions}, which only those cameras write. Set camera_type: azure in config.yaml.')
-        return 'azure'
-
-    parts = [f"{n_mkv} {'was' if n_mkv == 1 else 'were'} recorded as .mkv (an Azure Kinect or Orbbec Femto)"]
-    if kinds['other']:
-        parts.append(f"{kinds['other']} as another file type (.dat, .avi or .tar.gz)")
-    if kinds['not found']:
-        parts.append(f"for {kinds['not found']} the recording could not be found under {project_dir}")
-    counts = parts[0] if len(parts) == 1 else ', '.join(parts[:-1]) + ' and ' + parts[-1]
-    warnings.warn(
-        f'Not every session in {train_data_dir} was recorded as an .mkv: {counts}. PCA uses the '
-        f"filters for config.yaml's camera_type: {camera_type}, which suit the Kinect v2. If every "
-        'session is from an Azure Kinect or Orbbec Femto, set camera_type: azure in config.yaml '
-        'and run this cell again.'
-    )
-    return camera_type
+        if section is not None:
+            config[section] = edited
+        write_config(config, path)

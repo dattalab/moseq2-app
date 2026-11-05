@@ -43,7 +43,14 @@ delete: false
 detected_true_depth: auto
 dilate_iterations: 1
 erode_iterations: 0
+extensions:
+- .dat
+- .mkv
+- .avi
+- .tar.gz
+extract_out_script: extract_out.sh
 flip_classifier_smoothing: 51
+format: '{start_time}_{session_name}_{subject_name}'
 fps: 30
 frame_dtype: uint8
 frame_trim:
@@ -52,18 +59,23 @@ frame_trim:
 graduate_walls: false
 manual_set_depth_range: true
 mapping: DEPTH
+max_depth: 5
 max_height: 120
+memory: 5GB
 min_height: 10
 model_smoothing_clips:
 - 0
 - 0
+mouse_threshold: 0
 movie_dtype: <u2
+ncpus: 1
 noise_tolerance: 30
 num_frames: null
-output_dir: proc
+partition: short
 pixel_format: gray16le
-progress_bar: false
+prefix: ''
 recompute_bg: false
+skip_checks: false
 skip_completed: false
 spatial_filter_size:
 - 3
@@ -81,5 +93,6 @@ tracking_model_segment: true
 use_cc: true
 use_plane_bground: false
 use_tracking_model: false
+wall_time: '3:00:00'
 widen_radius: 0
 write_movie: true

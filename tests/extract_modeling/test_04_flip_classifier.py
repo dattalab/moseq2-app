@@ -1,4 +1,4 @@
-"""Cell 4: fetch a flip classifier and record it in the config.
+"""Cell 4: fetch a flip classifier and record it in the config's extract section.
 
     from moseq2_extract.gui import download_flip_command
     selection = 1
@@ -74,7 +74,7 @@ def test_selection_maps_to_the_published_classifier(selection, tmp_path, recorde
     """Each index fetches the classifier it is documented to fetch."""
     _, filename = FLIP_FILES[selection]
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
 
     download_flip_command(str(tmp_path), str(config), selection=selection)
 
@@ -87,7 +87,7 @@ def test_selection_maps_to_the_published_classifier(selection, tmp_path, recorde
 def test_a_negative_selection_is_rejected(tmp_path, recorded_download):
     """There is no classifier at a negative index, so `-1` fetches nothing."""
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
 
     with pytest.raises(IndexError):
         download_flip_command(str(tmp_path), str(config), selection=-1)
@@ -97,7 +97,7 @@ def test_a_negative_selection_is_rejected(tmp_path, recorded_download):
 def test_a_selection_past_the_end_raises(tmp_path, recorded_download):
     """An index with no classifier behind it fails before anything is fetched."""
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
 
     with pytest.raises(IndexError):
         download_flip_command(str(tmp_path), str(config), selection=len(FLIP_FILES))
@@ -113,7 +113,7 @@ def test_the_prompt_asks_again_for_a_number_it_does_not_list(
     for again, the same as text that is not a number.
     """
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
     answers = iter(["-1", str(len(FLIP_FILES)), "1"])
     monkeypatch.setattr("builtins.input", lambda *_: next(answers))
 
@@ -126,11 +126,11 @@ def test_the_prompt_asks_again_for_a_number_it_does_not_list(
 def test_the_config_records_the_downloaded_classifier(tmp_path, recorded_download):
     """The cell's output: the config now names a classifier on disk."""
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
 
     download_flip_command(str(tmp_path), str(config), selection=1)
 
-    recorded = read_yaml(str(config))["flip_classifier"]
+    recorded = read_yaml(str(config))["extract"]["flip_classifier"]
     assert recorded == str(tmp_path / FLIP_FILES[1][1])
     assert (tmp_path / FLIP_FILES[1][1]).exists()
 
@@ -142,7 +142,7 @@ def test_running_the_cell_twice_fetches_again(tmp_path, recorded_download):
     file that results is the same one, so nothing downstream notices.
     """
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
 
     download_flip_command(str(tmp_path), str(config), selection=1)
     first = (tmp_path / FLIP_FILES[1][1]).read_bytes()
@@ -156,7 +156,7 @@ def test_running_the_cell_twice_fetches_again(tmp_path, recorded_download):
 def test_no_selection_lists_what_is_available(tmp_path, monkeypatch, recorded_download, capsys):
     """With no selection the cell prints the menu and asks for one."""
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
     monkeypatch.setattr("builtins.input", lambda *_: "1")
 
     download_flip_command(str(tmp_path), str(config), selection=None)
@@ -168,7 +168,7 @@ def test_no_selection_lists_what_is_available(tmp_path, monkeypatch, recorded_do
 
 def test_the_bundled_classifier_is_the_one_the_chain_uses(configured, flipped):
     """The chain reaches cell 4's state: the config names a classifier that loads."""
-    assert read_yaml(str(configured))["flip_classifier"] == str(flipped)
+    assert read_yaml(str(configured))["extract"]["flip_classifier"] == str(flipped)
     assert flipped.suffix == ".npz"
     load_flip_classifier(str(flipped))
 
@@ -187,7 +187,7 @@ def test_every_published_classifier_downloads_and_classifies(selection, tmp_path
     """
     _, filename = FLIP_FILES[selection]
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
 
     download_flip_command(str(tmp_path), str(config), selection=selection)
 
@@ -209,7 +209,7 @@ def test_every_published_classifier_downloads_and_classifies(selection, tmp_path
 def test_refetching_over_the_network_gives_the_same_file(tmp_path):
     """Re-running the cell for real overwrites with identical content."""
     config = tmp_path / "config.yaml"
-    config.write_text("flip_classifier: null\n")
+    config.write_text("extract:\n  flip_classifier: null\n")
     target = tmp_path / FLIP_FILES[1][1]
 
     download_flip_command(str(tmp_path), str(config), selection=1)

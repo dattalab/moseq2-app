@@ -5,22 +5,22 @@
     generate_config_command(config_filepath, camera_type=camera_type)
     progress_paths = update_progress(progress_filepath, 'config_file', config_filepath)
 
-``generate_config_command`` does not write a template. It harvests the
-defaults off moseq2-extract's own click ``extract`` command and dumps them to
-yaml, so the contents of a user's config are a function of what click reports
-a default to be. That is why a click release once broke this cell outright on
-a fresh install: the defaults themselves were fine, and what changed was how
-they presented.
+``generate_config_command`` does not write a template. It writes every
+setting each stage's options classes declare, at its declared default, into
+that stage's section (``extract``, ``pca``, ``model``, ``crowd_movies``), with
+``camera_type`` at the top, so the contents of a user's config are a function
+of those declarations.
 
 The full-config baseline below is therefore the alarm for that whole class of
-problem. A dependency that changes any default turns it red on purpose.
+problem. A change to any default turns it red on purpose.
 
 This cell is the one place the notebook asks for the camera. ``'azure'``
 (an Azure Kinect or an Orbbec Femto) writes ``camera_type: azure`` and that
-camera's depth range, filters and crop, the same as ``moseq2-extract
-generate-config --camera-type azure``; ``'k2'`` leaves ``camera_type: auto``,
-so extraction tells the camera from the file. Later cells read the key and
-never set it.
+camera's depth range, filters and crop in ``extract`` and its PCA filters in
+``pca``, the same as ``moseq2-extract generate-config --camera-type azure``;
+``'kinect'`` (or ``'k2'``) writes ``camera_type: auto``, so extraction tells the
+camera from the file, and ``'auto'`` takes ``'azure'`` when every recording is
+an ``.mkv``. Later cells read the key and never set it.
 """
 
 from __future__ import annotations
@@ -38,13 +38,15 @@ from cells import code_cell
 EXTRACT = "MoSeq2-Extract-Modeling-Notebook.ipynb"
 APPLY = "[OPTIONAL]MoSeq2-Apply-Pre-Trained-Model-Notebook.ipynb"
 
-#: The only keys `camera_type='azure'` changes.
+#: The only settings `camera_type='azure'` changes, by (section, key); None for the top level.
 AZURE_OVERRIDES = {
-    "bg_roi_depth_range": [550, 650],
-    "spatial_filter_size": [5],
-    "tail_filter_size": [15, 15],
-    "crop_size": [120, 120],
-    "camera_type": "azure",
+    ("extract", "bg_roi_depth_range"): [550, 650],
+    ("extract", "spatial_filter_size"): [5],
+    ("extract", "tail_filter_size"): [15, 15],
+    ("extract", "crop_size"): [120, 120],
+    ("pca", "gaussfilter_space"): [2.25, 1.5],
+    ("pca", "tailfilter_size"): [13, 13],
+    (None, "camera_type"): "azure",
 }
 
 #: What a config value is allowed to be once written and read back.
@@ -60,9 +62,20 @@ def plain(value):
     return value
 
 
-def generate(path, camera_type="k2"):
+def generate(path, camera_type="auto"):
     generate_config_command(str(path), camera_type=camera_type)
     return plain(read_yaml(str(path)))
+
+
+def settings(config):
+    """Every setting by (section, key), the top-level ones under section None."""
+    out = {}
+    for key, value in config.items():
+        if isinstance(value, dict):
+            out.update({(key, name): item for name, item in value.items()})
+        else:
+            out[(None, key)] = value
+    return out
 
 
 def test_generated_config_is_unchanged(tmp_path, data_regression):
@@ -72,13 +85,13 @@ def test_generated_config_is_unchanged(tmp_path, data_regression):
     introspected defaults, so a change here is a change to what every user's
     pipeline runs with, whether or not anyone meant it.
     """
-    data_regression.check(generate(tmp_path / "config.yaml", camera_type="k2"))
+    data_regression.check(generate(tmp_path / "config.yaml", camera_type="auto"))
 
 
 def test_azure_changes_exactly_its_parameters(tmp_path):
     """2. The azure branch's whole contract."""
-    k2 = generate(tmp_path / "k2.yaml", camera_type="k2")
-    azure = generate(tmp_path / "azure.yaml", camera_type="azure")
+    k2 = settings(generate(tmp_path / "k2.yaml", camera_type="k2"))
+    azure = settings(generate(tmp_path / "azure.yaml", camera_type="azure"))
 
     assert set(k2) == set(azure), "azure added or dropped a key"
     differing = {key for key in k2 if k2[key] != azure[key]}
@@ -117,7 +130,7 @@ def test_every_value_is_a_plain_yaml_type(tmp_path):
     no downstream step can use, so the failure surfaced far from its cause.
     Checking the types here names it at the source.
     """
-    config = generate(tmp_path / "config.yaml")
+    config = settings(generate(tmp_path / "config.yaml"))
     bad = {}
     for key, value in config.items():
         if isinstance(value, list):
@@ -163,7 +176,7 @@ def test_accepting_the_prompt_regenerates(tmp_path, monkeypatch):
     assert message == "Configuration file has been successfully generated."
     rewritten = plain(read_yaml(str(path)))
     assert "edited_by_hand" not in rewritten
-    assert rewritten["bg_roi_depth_range"] == [650, 750]
+    assert rewritten["extract"]["bg_roi_depth_range"] == [650, 750]
 
 
 def test_first_generation_reports_success(tmp_path):

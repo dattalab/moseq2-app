@@ -53,7 +53,7 @@ def test_extract_crop_size(typed, expected, tmp_path, received):
     recording = tmp_path / "depth.avi"
     recording.touch()
     config = tmp_path / "config.yaml"
-    write_yaml({"crop_size": [120, 120]}, str(config))
+    write_yaml({"extract": {"crop_size": [120, 120]}}, str(config))
 
     run("extract", str(recording), "--config-file", str(config), *typed)
 
@@ -90,10 +90,12 @@ def project(tmp_path):
     config = tmp_path / "config.yaml"
     write_yaml(
         {
-            "cluster_type": "local",
-            "crop_size": [90, 90],
-            "frame_trim": [0, 0],
-            "fps": 20,
+            "extract": {
+                "cluster_type": "local",
+                "crop_size": [90, 90],
+                "frame_trim": [0, 0],
+                "fps": 20,
+            },
             "session_config_path": str(session_config),
         },
         str(config),
@@ -265,7 +267,7 @@ def test_slurm_batch_extract_typed_options_without_a_session_config(
     """With no session config, each recording is extracted from the config file,
     and the typed options still apply over it."""
     root, config = project
-    write_yaml({"cluster_type": "local", "crop_size": [90, 90], "fps": 20}, str(config))
+    write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "fps": 20}}, str(config))
 
     call = slurm_extracted(
         root, config, "--num-frames", "50", "--crop-size", "80", "80"
@@ -281,7 +283,7 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
     project, slurm_extracted
 ):
     root, config = project
-    write_yaml({"cluster_type": "local", "crop_size": [90, 90], "fps": 20}, str(config))
+    write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "fps": 20}}, str(config))
 
     call = slurm_extracted(root, config)[0]
 
@@ -295,9 +297,10 @@ def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, s
     ``extract`` has no session_config.yaml to lay over the typed options again."""
     root, config = project
     slurm_extracted(root, config, "--crop-size", "80", "80")
-    job_config = read_yaml(str(root / SESSION / "proc" / "config.yaml"))
+    job_file = read_yaml(str(root / SESSION / "proc" / "config.yaml"))
+    job_config = job_file["extract"]
 
-    assert "session_config_path" not in job_config
+    assert "session_config_path" not in job_file
     assert tuple(job_config["crop_size"]) == (80, 80)
     assert job_config["manual_set_depth_range"] is False
 

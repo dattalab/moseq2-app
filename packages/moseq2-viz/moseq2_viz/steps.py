@@ -13,7 +13,6 @@ wrapper takes.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -107,15 +106,9 @@ def make_df(model_fit: str, index_file: str, output_file: str | Path) -> MakeDfR
                         stats_file=output_file.with_name(f"{output_file.stem}_stats.{extension}"))
 
 
-def make_crowd_movies(index_file: str, model_path: str, output_dir: str, opts: CrowdMovieOptions, *,
-                      shim_flat_config: Mapping | None = None) -> CrowdMoviesResult:
-    """Write a crowd movie for each syllable into ``output_dir``.
-
-    ``shim_flat_config`` (R2, removed by PR 4.1) is a notebook front end's whole
-    settings dict, passed under the options.
-    """
-    settings = {**(shim_flat_config or {}), **opts.as_dict()}
-    return CrowdMoviesResult(movies=make_crowd_movies_wrapper(index_file, model_path, output_dir, settings))
+def make_crowd_movies(index_file: str, model_path: str, output_dir: str, opts: CrowdMovieOptions) -> CrowdMoviesResult:
+    """Write a crowd movie for each syllable into ``output_dir``."""
+    return CrowdMoviesResult(movies=make_crowd_movies_wrapper(index_file, model_path, output_dir, opts.as_dict()))
 
 
 def plot_scalar_summary(index_file: str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:

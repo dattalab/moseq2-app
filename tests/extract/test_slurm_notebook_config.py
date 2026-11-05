@@ -45,8 +45,9 @@ def project(tmp_path):
     config = tmp_path / "config.yaml"
     run("generate-config", "-o", str(config))
     data = read_yaml(str(config))
-    assert data["config_file"] is None
-    data.update(cluster_type="slurm", fps=20, crop_size=[90, 90])
+    # paths are not settings: config.yaml names no config file of its own
+    assert "config_file" not in data["extract"]
+    data["extract"].update(cluster_type="slurm", fps=20, crop_size=[90, 90])
     write_yaml(data, str(config))
     return tmp_path, config
 
@@ -98,7 +99,7 @@ def test_notebook_slurm_jobs_read_the_session_config(project, jobs):
     root, config = project
     session_config = root / "session_config.yaml"
     write_yaml(
-        {SESSION: {**read_yaml(str(config)), "fps": 15, "crop_size": [110, 110]}},
+        {SESSION: {**read_yaml(str(config))["extract"], "fps": 15, "crop_size": [110, 110]}},
         str(session_config),
     )
     data = read_yaml(str(config))

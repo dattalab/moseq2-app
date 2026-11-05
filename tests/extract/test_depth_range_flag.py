@@ -53,7 +53,7 @@ def test_a_range_from_the_config_file_follows_the_flag(tmp_path, received):
     recording = tmp_path / "depth.avi"
     recording.touch()
     config = tmp_path / "config.yaml"
-    write_yaml({"bg_roi_depth_range": [550, 650]}, str(config))
+    write_yaml({"extract": {"bg_roi_depth_range": [550, 650]}}, str(config))
     run("find-roi", str(recording), "--config-file", str(config))
     assert received[0]["manual_set_depth_range"] is False
     assert tuple(received[0]["bg_roi_depth_range"]) == (550, 650)

@@ -14,10 +14,17 @@ shares) and the rest of ``extract``'s, and
 ``BatchExtractOptions`` adds the folder search and the SLURM job settings. The
 fields marked ``arena=True`` are the settings the arena tool sets for each
 recording (``session_config.ARENA_TOOL_SETTINGS``).
+
+Every class here but the utilities' reads ``config.yaml``'s ``extract``
+section (``EXTRACT_STAGE``), and ``camera_type`` from its top level. A range
+passed explicitly in ``bg_roi_depth_range`` (typed on the command line, or in a
+script's ``explicit``) is used as given: it sets ``manual_set_depth_range``
+unless that is passed too.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import click
@@ -32,7 +39,10 @@ from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
 class RoiOptions(Options):
     """``find-roi``: finding the arena and the background."""
 
-    progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, help="Show verbose progress bars.")
+    SECTION = "extract"
+
+    progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, setting=False,
+                                help="Show verbose progress bars.")
     recompute_bg: bool = option(False, "--recompute-bg", help="Overwrite previously computed background image")
     use_plane_bground: bool = option(False, "--use-plane-bground", is_flag=True,
                                      help="Use a plane fit for the background. Useful when mice don't move much")
@@ -75,6 +85,15 @@ class RoiOptions(Options):
                                help="Shape to use to detect roi (ellipse or rect)")
     bg_roi_dilate: tuple = option((10, 10), "--bg-roi-dilate", type=(int, int), arena=True,
                                   help="Size of StructuringElement to dilate roi")
+
+    @classmethod
+    def resolve(cls, config: Mapping | None = None, entry: Mapping | None = None,
+                explicit: Mapping | None = None):
+        """``Options.resolve``, with an explicit ``bg_roi_depth_range`` used as given (module docstring)."""
+        explicit = dict(explicit or {})
+        if "bg_roi_depth_range" in explicit:
+            explicit.setdefault("manual_set_depth_range", True)
+        return super().resolve(config=config, entry=entry, explicit=explicit)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -173,6 +192,8 @@ class BatchExtractOptions(ExtractOptions, SlurmOptions):
 class AggregateOptions(Options):
     """``aggregate-results``."""
 
+    SECTION = "extract"
+
     format: str = option("{start_time}_{session_name}_{subject_name}", "--format", "-f", type=str,
                          help="New file name formats from resepective metadata")
     mouse_threshold: float = option(0, "--mouse-threshold", type=float,
@@ -197,3 +218,7 @@ class CopySliceOptions(ConvertOptions):
 
     copy_slice: tuple = option((0, 1000), "-c", "--copy-slice", type=(int, int),
                                help="Slice indices used for copy")
+
+
+#: The classes of the extraction steps, whose fields config.yaml's ``extract`` section may set.
+EXTRACT_STAGE = (RoiOptions, ExtractOptions, BatchExtractOptions, AggregateOptions, CleaningOptions)

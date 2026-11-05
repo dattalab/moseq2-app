@@ -51,7 +51,7 @@ def _batch_extract(tmp_path, monkeypatch, args):
 
     monkeypatch.setattr(extract_cli.steps, "batch_extract", stand_in)
     config = tmp_path / "config.yaml"
-    config.write_text("cluster_type: slurm\n")
+    config.write_text("extract:\n  cluster_type: slurm\n")
     result = CliRunner().invoke(extract_cli.cli, ["batch-extract", str(tmp_path), "--config-file", str(config),
                                                   *args], catch_exceptions=False)
     assert result.exit_code == 0, result.output

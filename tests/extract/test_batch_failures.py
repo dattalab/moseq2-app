@@ -36,7 +36,7 @@ def project(tmp_path):
         session.mkdir()
         (session / "depth.avi").touch()
         (session / "metadata.json").write_text("{}")
-    (tmp_path / "config.yaml").write_text("cluster_type: local\n")
+    (tmp_path / "config.yaml").write_text("extract:\n  cluster_type: local\n")
     return tmp_path
 
 

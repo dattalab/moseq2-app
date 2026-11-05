@@ -28,9 +28,10 @@ class SlurmOptions(Options):
     memory: str = option("5GB", "--memory", type=str, help="RAM (slurm only)")
     wall_time: str = option("3:00:00", "--wall-time", type=str, help="Wall time (slurm only)")
     partition: str = option("short", "--partition", type=str, help="Partition name (slurm only)")
-    get_cmd: bool = option(True, "--get-cmd/--no-get-cmd", is_flag=True,
+    get_cmd: bool = option(True, "--get-cmd/--no-get-cmd", is_flag=True, setting=False,
                            help="Print the commands after writing them to the script.")
-    run_cmd: bool = option(False, "--run-cmd", is_flag=True, help="Run the commands written to the script.")
+    run_cmd: bool = option(False, "--run-cmd", is_flag=True, setting=False,
+                           help="Run the commands written to the script.")
 
 
 def sbatch_command(command: str, *, ncpus: int, memory: str, partition: str,

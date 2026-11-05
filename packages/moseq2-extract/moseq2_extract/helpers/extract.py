@@ -3,8 +3,8 @@ Extraction-helper utility functions.
 """
 
 import numpy as np
+from moseq2_common.project import write_job_settings
 from moseq2_common.slurm import sbatch_command
-from moseq2_common.yaml import write_yaml
 from os.path import exists, basename, dirname, join, abspath
 from os import makedirs, system
 from tqdm.auto import tqdm
@@ -355,6 +355,7 @@ def run_slurm_extract(
     skip_extracted=False,
     num_frames=None,
     cli_options=None,
+    project=None,
 ):
     """
     Write one sbatch command per session to extract it on a SLURM cluster, and submit them if run_cmd is set.
@@ -362,7 +363,8 @@ def run_slurm_extract(
     Each session is extracted with the settings ``recording_configs`` resolves: the arena tool's settings from its
     entry in the session config, every other setting from the config file, and the options typed on the command
     line over both. Each session gets a config.yaml of its own in its output directory whenever there is a session
-    config or a typed option; it holds those merged settings and no ``session_config_path``.
+    config or a typed option: those settings, resolved, in config.yaml's ``extract`` section, with a ``job:``
+    block naming ``project`` (``moseq2_common.project.write_job_settings``).
 
     Args:
     input_dir (str): directory the sessions were found in; extract_out_script is written there.
@@ -371,6 +373,7 @@ def run_slurm_extract(
     skip_extracted (bool): Whether to skip already extracted session.
     num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
     cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
+    project (moseq2_common.project.Project): the project each session's job file names; None outside a project.
     """
 
     assert (
@@ -410,9 +413,8 @@ def run_slurm_extract(
             # the recording's settings: the arena tool's from its session config entry,
             # the rest from the config file, typed options over both. It holds the entry
             # already, so it names no session_config.yaml for the job's extract to apply again.
-            job_config = {key: value for key, value in resolved.configs[depth_file].items()
-                          if key != "session_config_path"}
-            write_yaml(job_config, join(output_dir, "config.yaml"))
+            write_job_settings(join(output_dir, "config.yaml"), "extract",
+                               resolved.options[depth_file].settings(), project=project)
 
     # Construct sbatch command for slurm
     commands = ""

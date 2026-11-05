@@ -267,10 +267,10 @@ def transitions(analysis_paths, labeled):
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
 
-    The cell registers a session config path, names the subdirectory
-    extractions are written to, and opens the arena mask widget. Opening it is
-    what writes the file: the widget detects each recording's camera
-    parameters and saves a copy of the configuration per recording.
+    The cell registers a session config path and opens the arena mask widget.
+    Opening it is what writes the file: the widget detects each recording's
+    camera parameters and saves a copy of the configuration's extraction
+    settings per recording.
 
     Clicking "save session parameters and move to next" once per recording is
     what the walkthrough did. It keeps the detected parameters as they are and
@@ -282,7 +282,6 @@ def arena(project, progress_file, configured, flipped):
 
     from moseq2_app.gui.progress import update_progress
     from moseq2_app.roi.widget import ArenaMaskWidget
-    from moseq2_app.util import update_config
 
     from widgets import buttons_of, click
 
@@ -290,8 +289,6 @@ def arena(project, progress_file, configured, flipped):
 
     session_config = project / "session_config.yaml"
     update_progress(str(progress_file), "session_config", str(session_config))
-    with update_config(str(configured)) as config:
-        config["output_dir"] = "proc"
 
     widget = ArenaMaskWidget(str(project), str(configured), str(session_config))
     buttons = buttons_of(widget.view)
@@ -354,17 +351,14 @@ def extracted(project, configured, arena):
     ``skip_extracted`` carries over from cell 5, where the notebook sets it,
     so a second run of the cell extracts nothing.
     """
-    from moseq2_app.util import update_config
     from moseq2_extract.gui import extract_found_sessions
-
-    with update_config(str(configured)) as config:
-        config["cluster_type"] = "local"
 
     extract_found_sessions(
         str(project),
         str(configured),
         extract_all=True,
         skip_extracted=True,
+        run_cmd=False,
     )
     return project
 
@@ -381,7 +375,7 @@ def flipped(project, configured, raw_sessions):
     from moseq2_app.util import update_config
 
     classifier = raw_sessions / "flip_classifier_k2_c57_10to13weeks.npz"
-    with update_config(str(configured)) as config:
+    with update_config(str(configured), section="extract") as config:
         config["flip_classifier"] = str(classifier)
     return classifier
 
@@ -431,23 +425,14 @@ def pca(project, progress_file, configured, grouped):
     mouse's shape varies. Everything from here on is expressed in that basis
     rather than in pixels.
 
-    Runs under dask, which is why the cell configures workers.
+    Runs under dask on the ``pca`` section's settings, which the cell leaves
+    at the defaults config.yaml holds.
     """
     from moseq2_app.gui.progress import update_progress
-    from moseq2_app.util import camera_for_pca, update_config
     from moseq2_pca.gui import train_pca_command
 
     pca_dirname = str(project / "_pca") + "/"
     paths = update_progress(str(progress_file), "pca_dirname", pca_dirname)
-    with update_config(str(configured)) as config:
-        config["overwrite_pca"] = False
-        config["gaussfilter_space"] = (1.5, 1)
-        config["medfilter_space"] = [0]
-        config["medfilter_time"] = [0]
-        if camera_for_pca(config.get("camera_type"), paths["train_data_dir"], paths["base_dir"]) == "azure":
-            config["gaussfilter_space"] = (2.25, 1.5)
-            config["tailfilter_size"] = (13, 13)
-        config["nworkers"] = 1
 
     train_pca_command(paths, pca_dirname, "pca")
     return Path(pca_dirname)
@@ -479,17 +464,15 @@ def changepoints(project, progress_file, configured, scores):
     how a kappa is chosen, so this is the yardstick rather than an output.
     """
     from moseq2_app.gui.progress import update_progress
-    from moseq2_app.util import update_config
     from moseq2_pca.gui import compute_changepoints_command
 
-    with update_config(str(configured)) as config:
-        config["dims"] = 300
     paths = update_progress(str(progress_file), "changepoints_path", "changepoints")
     compute_changepoints_command(paths["train_data_dir"], paths, "changepoints")
     return Path(paths["pca_dirname"]) / "changepoints.h5"
 
 
-#: What cell 17 sets before the model is fit.
+#: The model section's values cell 17 shows (it sets ``robust`` and ``nfolds``; the rest are the defaults
+#: config.yaml already holds).
 MODEL_SETTINGS = {
     "checkpoint_freq": -1,
     "use_checkpoint": False,
@@ -499,7 +482,6 @@ MODEL_SETTINGS = {
     "save_model": True,
     "separate_trans": False,
     "num_iter": 100,
-    "select_groups": False,
     "kappa": None,
     "hold_out": False,
     "nfolds": 2,
@@ -521,7 +503,7 @@ def model_settings(project, progress_file, configured, changepoints):
     models = project / "models"
     update_progress(str(progress_file), "model_path", str(models / "model.p"))
     paths = update_progress(str(progress_file), "base_model_path", str(models) + "/")
-    with update_config(str(configured)) as config:
+    with update_config(str(configured), section="model") as config:
         config.update(MODEL_SETTINGS)
     return paths
 
@@ -558,12 +540,12 @@ def two_models(project, progress_file, configured, model):
 
     second = model.parent / f"model_kappa_{SECOND_KAPPA}.p"
     paths = update_progress(str(progress_file), "model_path", str(second))
-    with update_config(str(configured)) as config:
+    with update_config(str(configured), section="model") as config:
         config["kappa"] = SECOND_KAPPA
     try:
         learn_model_command(paths)
     finally:
-        with update_config(str(configured)) as config:
+        with update_config(str(configured), section="model") as config:
             config["kappa"] = MODEL_SETTINGS["kappa"]
         update_progress(str(progress_file), "model_path", str(model))
     return {"model.p": model, second.name: second}
@@ -576,7 +558,7 @@ def configured(project, progress_file):
     from moseq2_extract.gui import generate_config_command
 
     config = project / "config.yaml"
-    generate_config_command(str(config), camera_type="k2")
+    generate_config_command(str(config), camera_type="auto")
     update_progress(str(progress_file), "config_file", str(config))
     return config
 

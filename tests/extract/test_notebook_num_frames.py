@@ -28,7 +28,7 @@ def test_notebook_batch_extraction_honours_num_frames(tmp_path, raw_sessions, mo
     config_file = project / "config.yaml"
     generate_config_command(str(config_file), camera_type="k2")
     config = read_yaml(str(config_file))
-    config["num_frames"] = NUM_FRAMES
+    config["extract"]["num_frames"] = NUM_FRAMES
     write_yaml(config, str(config_file))
 
     extract_found_sessions(str(project), str(config_file))

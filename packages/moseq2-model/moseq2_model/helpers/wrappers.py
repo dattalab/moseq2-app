@@ -111,7 +111,8 @@ def learn_model_wrapper(input_file, dest_file, config_data):
 
     # Parse index file and update metadata information; namely groups
     # If no group data in pca data, use group info from index file
-    select_groups = config_data.get("select_groups", False)
+    # groups are not selected by prompt: a kappa scan's job cannot answer one
+    select_groups = False
     index_data, data_metadata = process_indexfile(
         config_data.get("index", None),
         data_metadata,
@@ -120,7 +121,6 @@ def learn_model_wrapper(input_file, dest_file, config_data):
     )
 
     # Get keys to include in training set
-    # TODO: select_groups not implemented
     if index_data is not None:
         data_dict, data_metadata = select_data_to_model(
             index_data, data_dict, data_metadata, select_groups
@@ -322,7 +322,7 @@ def apply_model_wrapper(model_file, pc_file, dest_file, config_data):
     save_dict(filename=dest_file, obj_to_save=applied_model_data)
 
 
-def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, settings_name):
+def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, settings_name, learn=None, project=None):
     """
     Wrapper function to output multiple model training commands for a range of kappa values.
 
@@ -331,6 +331,8 @@ def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, settings_
     config_data (dict): Dictionary containing model training parameters
     output_dir (str): Path to output directory to save trained models and their settings files
     settings_name (str): File name format string of each fit's settings file, given the model's number and kappa
+    learn (LearnModelOptions): the learn-model settings the scan does not declare; None for their defaults
+    project (moseq2_common.project.Project): the project each settings file's ``job:`` block names
 
     Returns:
     command_string (str): CLI command string for model training commands.
@@ -350,7 +352,8 @@ def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, settings_
     kappas = get_scan_range_kappas(data_dict, config_data)
 
     # Get model training command strings
-    command_string = create_command_strings(input_file, output_dir, config_data, kappas, settings_name)
+    command_string = create_command_strings(input_file, output_dir, config_data, kappas, settings_name,
+                                            learn=learn, project=project)
 
     # Ensure output directory exists
     os.makedirs(dirname(config_data["out_script"]), exist_ok=True)

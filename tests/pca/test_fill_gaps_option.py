@@ -53,9 +53,11 @@ def test_typing_fill_gaps_stops_with_why(tmp_path, received, value):
     assert received == []
 
 
-def test_a_config_file_holding_fill_gaps_is_accepted(tmp_path, received):
+def test_a_config_file_holding_fill_gaps_stops_naming_it(tmp_path, received):
+    """No PCA step has a fill_gaps setting, so the pca section's key stops the step, as any unknown key does."""
     config = tmp_path / "config.yaml"
-    write_yaml({"fill_gaps": True}, str(config))
+    write_yaml({"pca": {"fill_gaps": True}}, str(config))
     result = apply_pca(tmp_path, "--config-file", str(config))
-    assert result.exit_code == 0, result.output
-    assert len(received) == 1 and "fill_gaps" not in received[0]
+    assert result.exit_code != 0
+    assert "`fill_gaps`" in result.output and "`pca`" in result.output
+    assert received == []

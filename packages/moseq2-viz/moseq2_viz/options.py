@@ -5,6 +5,9 @@ its click type and its help text; ``cli.py`` generates the commands' options
 from these classes, and ``steps.py`` takes an instance. The files a step works
 on (the commands' arguments, ``--output-file`` and ``--output-dir``) are not
 settings: they are the steps' arguments and plain options in ``cli.py``.
+
+``CrowdMovieOptions`` reads ``config.yaml``'s ``crowd_movies`` section
+(``CROWD_MOVIE_STAGE``); the other classes have no section.
 """
 
 from __future__ import annotations
@@ -74,6 +77,8 @@ class CrowdMovieOptions(SyllableCoverageOptions):
     (``available_cpus``).
     """
 
+    SECTION = "crowd_movies"
+
     max_examples: int = option(20, "--max-examples", "-m", type=int, help="number of examples to show")
     processes: int | None = option(
         None, "--processes", type=int,
@@ -105,10 +110,14 @@ class CrowdMovieOptions(SyllableCoverageOptions):
     legacy_jitter_fix: bool = option(False, "--legacy-jitter-fix", type=bool,
                                      help="Set to true if you notice jitter in your crowd movies")
     frame_path: str = option("frames", "--frame-path", type=str, help="Path to depth frames in h5 file")
-    progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, help="Show verbose progress bars.")
+    progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, setting=False,
+                                help="Show verbose progress bars.")
     pad: int = option(10, "--pad", help="Pad crowd movie videos with this many frames.")
     seed: int = option(0, "--seed", type=int,
                        help="Defines random seed for selecting syllable instances to plot")
+    select_median_duration_instances: bool = option(
+        False, "--select-median-duration-instances", is_flag=True,
+        help="Show the examples whose duration is closest to the syllable's median duration")
 
     def __post_init__(self):
         if self.processes is None:
@@ -169,3 +178,7 @@ class StatsPlotOptions(SyllableCoverageOptions):
     exp_group: str | None = option(None, "--exp-group", type=str, help="Name of experimental group")
     colors: tuple | None = option(None, "-c", "--colors", type=str, multiple=True,
                                   help="Colors to plot groups with")
+
+
+#: The class of the crowd-movie step, whose fields config.yaml's ``crowd_movies`` section may set.
+CROWD_MOVIE_STAGE = (CrowdMovieOptions,)

@@ -24,7 +24,7 @@ from moseq2_common.yaml import read_yaml, write_yaml
 COMMANDS = ("train-pca", "apply-pca", "compute-changepoints")
 
 #: What the Extract notebook's PCA cell sets before training (cell 13, a Kinect v2 project).
-NOTEBOOK_PCA_SETTINGS = {"overwrite_pca": False, "gaussfilter_space": (1.5, 1), "medfilter_space": [0],
+NOTEBOOK_PCA_SETTINGS = {"gaussfilter_space": (1.5, 1), "medfilter_space": [0],
                          "medfilter_time": [0], "nworkers": 1}
 
 
@@ -65,9 +65,9 @@ def called(monkeypatch, steps, options):
 
 RESULTS = {"train_pca": "TrainPCAResult", "apply_pca": "ApplyPCAResult",
            "compute_changepoints": "ChangepointsResult"}
-RESULT_FIELDS = {"train_pca": {"components_file": None, "shim_config_data": {}},
-                 "apply_pca": {"scores_file": None, "shim_config_data": {}},
-                 "compute_changepoints": {"changepoints_file": None, "shim_config_data": {}}}
+RESULT_FIELDS = {"train_pca": {"components_file": None},
+                 "apply_pca": {"scores_file": None},
+                 "compute_changepoints": {"changepoints_file": None}}
 
 
 @pytest.mark.parametrize("command", COMMANDS)
@@ -98,7 +98,7 @@ def test_the_notebook_functions_call_the_steps(tmp_path, called, options):
     from moseq2_pca.gui import apply_pca_command, compute_changepoints_command, train_pca_command
 
     config = tmp_path / "config.yaml"
-    write_yaml({"rank": 30}, str(config))
+    write_yaml({"pca": {"rank": 30}}, str(config))
     paths = {"config_file": str(config), "train_data_dir": str(tmp_path / "aggregate_results"),
              "pca_dirname": str(tmp_path / "_pca"), "index_file": str(tmp_path / "moseq2-index.yaml"),
              "scores_path": str(tmp_path / "_pca" / "pca_scores.h5")}
@@ -130,7 +130,9 @@ def test_both_front_ends_hand_the_wrapper_the_same_settings(tmp_path, monkeypatc
         config = tmp_path / front_end / "config.yaml"
         config.parent.mkdir()
         generate_config_command(str(config), camera_type="k2")
-        write_yaml({**read_yaml(str(config)), **NOTEBOOK_PCA_SETTINGS}, str(config))
+        data = read_yaml(str(config))
+        data["pca"].update(NOTEBOOK_PCA_SETTINGS)
+        write_yaml(data, str(config))
         configs.append(config)
 
     result = CliRunner().invoke(
