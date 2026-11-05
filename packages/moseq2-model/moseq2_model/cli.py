@@ -17,7 +17,14 @@ import click
 from click.core import ParameterSource
 
 from moseq2_common.bookkeeping import project_index
-from moseq2_common.options import click_options, command_project, command_settings, explicit_values, project_file_option
+from moseq2_common.options import (
+    ProjectGroup,
+    click_options,
+    command_project,
+    command_settings,
+    explicit_values,
+    project_file_option,
+)
 from moseq2_common.project import find_project, is_job_file
 from moseq2_model import steps
 from moseq2_model.options import (
@@ -30,7 +37,7 @@ from moseq2_model.options import (
 from moseq2_model.util import count_frames as count_frames_wrapper
 
 
-@click.group(context_settings={"show_default": True})
+@click.group(cls=ProjectGroup, context_settings={"show_default": True})
 @click.version_option()
 def cli():
     pass

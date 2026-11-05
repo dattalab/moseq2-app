@@ -3,7 +3,8 @@
 ``generate-config`` and ``download-flip-file`` on the command line and the
 Extract notebook's ``generate_config_command`` and ``download_flip_command``
 call these. They are the setup commands: they write ``config.yaml`` on a
-person's behalf, where no pipeline step does.
+person's behalf, where no pipeline step does. Both stop on a project made by
+MoSeq2 1.5.0 or earlier (``moseq2_common.project.check_not_old``) before writing.
 
 ``config.yaml`` holds ``camera_type`` at its top level and one section per
 stage (``extract``, ``pca``, ``model``, ``crowd_movies``), each holding every
@@ -19,6 +20,7 @@ from os.path import abspath, dirname, exists
 from pathlib import Path
 
 from moseq2_common.options import check_top_level, read_config, setting_fields
+from moseq2_common.project import check_not_old
 from moseq2_common.yaml import write_config
 from moseq2_extract.helpers.wrappers import flip_file_wrapper
 from moseq2_extract.recordings import find_recordings
@@ -103,8 +105,10 @@ def generate_config(output_file: str, camera_type: str, *, overwrite: bool) -> P
     ``camera_type`` is ``kinect`` (or ``k2``), ``azure``, or ``auto``, which
     takes ``azure`` when every recording in ``output_file``'s folder is an
     ``.mkv`` and ``kinect`` otherwise. An existing file is replaced only when
-    ``overwrite`` is True; otherwise it is kept as it is.
+    ``overwrite`` is True; otherwise it is kept as it is. A folder holding a
+    1.5.0 project stops with ``OldProjectError``.
     """
+    check_not_old(dirname(abspath(output_file)))
     if exists(output_file) and not overwrite:
         return Path(output_file)
     camera = {"k2": "kinect"}.get(camera_type, camera_type)
@@ -125,9 +129,10 @@ def download_flip_file(config_file: str, output_dir: str, selection: int | None)
     """Download a flip classifier into ``output_dir`` and name it in ``config_file``'s ``extract`` section.
 
     ``selection`` is the classifier's number in the list ``flip_file_wrapper``
-    prints; None asks for it. A config file without sections stops before
-    anything is downloaded.
+    prints; None asks for it. A config file without sections, or a folder
+    holding a 1.5.0 project, stops before anything is downloaded.
     """
+    check_not_old(dirname(abspath(config_file)))
     if exists(config_file):
         check_top_level(config_file, read_config(config_file))
     return Path(flip_file_wrapper(config_file, output_dir, selected_flip=selection))

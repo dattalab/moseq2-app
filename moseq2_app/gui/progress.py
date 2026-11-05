@@ -10,6 +10,12 @@ from moseq2_extract.helpers.data import check_completion_status
 from collections import Counter
 from pathlib import PurePath
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS, find_recordings
+from moseq2_common.project import outdated_names
+
+#: The 1.5 progress functions the 1.5 notebooks import: each stops with a message to download the 1.6
+#: notebooks, which start from ``moseq2_app.project.start``.
+__getattr__ = outdated_names(__name__, ("restore_progress_vars", "check_progress", "update_progress",
+                                        "progress_path_sanity_check"))
 
 
 def generate_missing_metadata(sess_dir, sess_name):

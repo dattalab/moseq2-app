@@ -18,6 +18,9 @@ help text live together. From that class:
 - ``project_file_option`` and ``command_project`` give the viz and model
   commands their ``--project-file``: the project's ``moseq2-project.yaml``, by
   default the working folder's.
+- ``ProjectGroup`` is the click group of every command-line program: each of
+  its commands first stops on a project made by MoSeq2 1.5.0 or earlier
+  (``moseq2_common.project.check_not_old``).
 
 ``config.yaml`` has one section per stage, named by each class's ``SECTION``
 (``extract``, ``pca``, ``model``, ``crowd_movies``), and ``camera_type`` at its
@@ -50,6 +53,8 @@ __all__ = [
     "TOP_LEVEL_KEYS",
     "ConfigFileError",
     "Options",
+    "ProjectCommand",
+    "ProjectGroup",
     "arena_fields",
     "click_options",
     "command_settings",
@@ -433,3 +438,36 @@ def command_project(project_file, command: str, *, required: bool):
             )
         return Project.at(cwd)
     return find_project()
+
+
+class ProjectCommand(click.Command):
+    """A command that stops on a project made by MoSeq2 1.5.0 or earlier before it runs.
+
+    Its options are parsed first, so ``--help`` answers anywhere. The folders
+    checked are the working folder, the folder of a ``--project-file`` given,
+    and the project ``--config-file`` (or the ``config-file`` argument) belongs
+    to (``find_project``).
+    """
+
+    def invoke(self, ctx: click.Context) -> Any:
+        from moseq2_common.project import OldProjectError, check_not_old, find_project
+
+        folders = [Path.cwd()]
+        if ctx.params.get("project_file"):
+            folders.append(Path(ctx.params["project_file"]).absolute().parent)
+        if ctx.params.get("config_file"):
+            project = find_project(ctx.params["config_file"])
+            folders.append(project.folder if project is not None
+                           else Path(ctx.params["config_file"]).absolute().parent)
+        try:
+            for folder in folders:
+                check_not_old(folder)
+        except OldProjectError as error:
+            raise click.ClickException(str(error)) from None
+        return super().invoke(ctx)
+
+
+class ProjectGroup(click.Group):
+    """A command-line program whose commands are ``ProjectCommand``s."""
+
+    command_class = ProjectCommand

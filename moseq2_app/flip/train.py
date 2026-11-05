@@ -21,6 +21,11 @@ from moseq2_extract.options import EXTRACT_STAGE
 from moseq2_extract.session_config import read_entries, recording_entry
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
+from moseq2_common.project import outdated_names
+
+#: 1.5's ``CleanParameters``, which the 1.5 flip notebook imports, stops with a message to download
+#: the 1.6 notebooks (its settings are extraction's, ``moseq2_common.frames.CleaningOptions``).
+__getattr__ = outdated_names(__name__, ("CleanParameters",))
 
 
 #: How a user gets labels from the widget into training, as every message about

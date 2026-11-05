@@ -24,21 +24,27 @@ notebook's group widget.
 What the project holds and where each step's outputs are is in its bookkeeping
 file, ``moseq2-project.yaml`` (``moseq2_common.bookkeeping``).
 
-A ``config.yaml`` without sections was written by MoSeq2 1.5.0 or earlier.
-1.6.0 does not read or convert it, and stops with ``OldProjectError``.
+A project made by MoSeq2 1.5.0 or earlier shows itself by a ``config.yaml``
+without sections, or by 1.5.0's ``progress.yaml`` or ``moseq2-index.yaml`` with
+no ``moseq2-project.yaml`` beside it. 1.6.0 does not read or convert one:
+``check_not_old`` stops on it with ``OldProjectError``, and every command, setup
+command and the notebooks' project cell call it first. A name a 1.5 notebook
+imports that 1.6.0 removed stops the import with ``OutdatedNotebookError``
+(``outdated_names``).
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 
 from moseq2_common.yaml import read_yaml, write_config
 
-__all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "Project", "find_project", "is_job_file",
-           "old_project_message", "read_groups", "session_key", "standalone_note", "write_groups",
+__all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "OutdatedNotebookError", "Project",
+           "check_not_old", "find_project", "is_job_file", "old_project_message", "outdated_names",
+           "outdated_notebook_message", "read_groups", "session_key", "standalone_note", "write_groups",
            "write_job_settings"]
 
 CONFIG_NAME = "config.yaml"
@@ -48,6 +54,16 @@ SESSION_CONFIG_NAME = "session_config.yaml"
 
 class OldProjectError(Exception):
     """A project made by MoSeq2 1.5.0 or earlier, which 1.6.0 does not read."""
+
+
+class OutdatedNotebookError(ImportError):
+    """A 1.5 notebook importing a name MoSeq2 1.6.0 removed."""
+
+
+#: 1.5.0's files that show a project was made by it, when no ``moseq2-project.yaml`` is beside them,
+#: and the words the message gives for each.
+_OLD_FILES = (("progress.yaml", "it is 1.5.0's progress file"),
+              ("moseq2-index.yaml", "it is 1.5.0's index file"))
 
 
 def old_project_message(file: Path, reason: str) -> str:
@@ -61,6 +77,65 @@ def old_project_message(file: Path, reason: str) -> str:
         "(or linking to) the raw recordings and start there with the 1.6 notebooks or "
         "`moseq2-extract generate-config`."
     )
+
+
+def _has_no_sections(config_file: Path) -> bool:
+    """Whether ``config_file`` holds settings outside any section, as 1.5.0's did.
+
+    A file that cannot be read is not judged here; reading its settings names the problem.
+    """
+    from moseq2_common.options import SECTIONS, TOP_LEVEL_KEYS
+
+    try:
+        data = read_yaml(config_file)
+    except Exception:  # noqa: BLE001 -- read_settings reports an unreadable file, with what to do
+        return False
+    return (isinstance(data, Mapping) and not any(name in data for name in SECTIONS)
+            and any(key not in TOP_LEVEL_KEYS for key in data))
+
+
+def check_not_old(folder: str | os.PathLike) -> None:
+    """Stop with ``OldProjectError`` when ``folder`` holds a project made by MoSeq2 1.5.0 or earlier.
+
+    That is a ``config.yaml`` without sections, or a ``progress.yaml`` or
+    ``moseq2-index.yaml`` with no ``moseq2-project.yaml`` beside it. The message
+    names the file that showed it. Nothing in the folder is written.
+    """
+    folder = Path(folder)
+    config = folder / CONFIG_NAME
+    if config.is_file() and _has_no_sections(config):
+        raise OldProjectError(old_project_message(config, "its settings have no sections"))
+    if (folder / "moseq2-project.yaml").is_file():
+        return
+    for name, reason in _OLD_FILES:
+        if (folder / name).is_file():
+            raise OldProjectError(old_project_message(folder / name, reason))
+
+
+def outdated_notebook_message(module: str, name: str) -> str:
+    """What to do when a 1.5 notebook imports ``module.name``, which 1.6.0 removed."""
+    return (
+        f"This notebook was written for MoSeq2 1.5 and uses `{module}.{name}`, which MoSeq2 1.6.0 does not "
+        "have. Download the 1.6 notebooks from https://github.com/dattalab/moseq2-app/tree/release/notebooks "
+        "and start from their first cell. A project the 1.5 notebooks started is finished on 1.5.0: "
+        '`python -m pip install "moseq2-app==1.5.0"`.'
+    )
+
+
+def outdated_names(module: str, names: Iterable[str]) -> Callable[[str], object]:
+    """A module ``__getattr__`` under which each of ``names`` stops with ``OutdatedNotebookError``.
+
+    ``names`` are what the 1.5 notebooks import from ``module`` that 1.6.0
+    removed; any other missing name is the usual ``AttributeError``.
+    """
+    names = frozenset(names)
+
+    def __getattr__(name: str):
+        if name in names:
+            raise OutdatedNotebookError(outdated_notebook_message(module, name))
+        raise AttributeError(f"module {module!r} has no attribute {name!r}")
+
+    return __getattr__
 
 
 @dataclass(frozen=True)

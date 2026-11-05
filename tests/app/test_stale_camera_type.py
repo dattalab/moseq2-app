@@ -203,6 +203,12 @@ def test_the_pca_cell_trains_with_the_filters_config_yaml_holds(tmp_path, capsys
 
 
 def test_the_notebook_no_longer_infers_the_camera_for_pca():
-    """The camera's filters are config.yaml's, written by generate-config: nothing decides them at run time."""
-    assert not hasattr(app_util, "camera_for_pca")
+    """The camera's filters are config.yaml's, written by generate-config: nothing decides them at run time.
+
+    ``camera_for_pca`` is left only as the name a 1.5 notebook imports, which stops it.
+    """
+    from moseq2_common.project import OutdatedNotebookError
+
+    with pytest.raises(OutdatedNotebookError, match="camera_for_pca"):
+        app_util.camera_for_pca
     assert "camera_for_pca" not in code_cell(NOTEBOOK, PCA_CELL)
