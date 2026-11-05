@@ -91,7 +91,7 @@ def test_sessions_of_another_size_stop_before_scoring(tmp_path, no_dask):
 
 
 def test_sessions_of_different_sizes_say_where_crop_size_is_set(tmp_path):
-    """A recording the arena tool listed takes crop_size from its session_config.yaml entry."""
+    """A recording saved in the arena tool takes crop_size from its session_config.yaml entry."""
     paths = make_sessions(tmp_path / "input", {"uuid-a": (80, 80), "uuid-b": (64, 64)})
     with pytest.raises(ValueError) as e:
         check_frame_shapes(list(paths.values()), [{"uuid": uuid} for uuid in paths])

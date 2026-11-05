@@ -63,10 +63,10 @@ _KEY = "moseq2_option"
 SECTIONS = ("extract", "pca", "model", "crowd_movies")
 
 #: The keys config.yaml holds at its top level, outside the sections.
-#: ``session_config_path`` leaves with PR 4.2, the three output paths with PR 4.3
-#: (``moseq2_pca.cli.shim_write_back_paths``); ``job`` is a job settings file's.
+#: The three output paths leave with PR 4.3 (``moseq2_pca.cli.shim_write_back_paths``);
+#: ``job`` is a job settings file's.
 TOP_LEVEL_KEYS = ("camera_type", "groups", "exclude", "job",
-                  "session_config_path", "pca_file", "pca_file_scores", "changepoint_file")
+                  "pca_file", "pca_file_scores", "changepoint_file")
 
 O = TypeVar("O", bound="Options")
 F = TypeVar("F", bound=Callable[..., Any])

@@ -267,34 +267,28 @@ def transitions(analysis_paths, labeled):
 def arena(project, progress_file, configured, flipped):
     """Cell 5: the per-recording parameters extraction reads.
 
-    The cell registers a session config path and opens the arena mask widget.
-    Opening it is what writes the file: the widget detects each recording's
-    camera parameters and saves a copy of the configuration's extraction
-    settings per recording.
-
-    Clicking "save session parameters and move to next" once per recording is
-    what the walkthrough did. It keeps the detected parameters as they are and
-    records them, which is the state the walkthrough's own session config is
-    in. Advancing also computes each recording's arena mask and a short test
-    extraction, so the chain reaches cell 6 having already exercised both.
+    The cell opens the arena mask widget on the project folder. Opening it
+    writes nothing: the widget shows each recording's settings, with its
+    camera parameters detected. Clicking "save session parameters and move to
+    next" once per recording is what the walkthrough did; each click saves
+    that recording's arena settings as its entry in ``session_config.yaml``,
+    which is the state the walkthrough's own session config is in. Advancing
+    also computes each recording's arena mask and a short test extraction, so
+    the chain reaches cell 6 having already exercised both.
     """
     import panel as pn
 
-    from moseq2_app.gui.progress import update_progress
     from moseq2_app.roi.widget import ArenaMaskWidget
 
     from widgets import buttons_of, click
 
     pn.extension()
 
-    session_config = project / "session_config.yaml"
-    update_progress(str(progress_file), "session_config", str(session_config))
-
-    widget = ArenaMaskWidget(str(project), str(configured), str(session_config))
+    widget = ArenaMaskWidget(str(project))
     buttons = buttons_of(widget.view)
     for _ in widget.sessions:
         click(buttons["Save session parameters and move to next"])
-    return session_config
+    return project / "session_config.yaml"
 
 
 @pytest.fixture(scope="session")

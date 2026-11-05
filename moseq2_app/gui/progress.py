@@ -12,7 +12,7 @@ from os.path import dirname, basename, exists, join, abspath
 from moseq2_extract.helpers.data import check_completion_status
 from collections import Counter
 from pathlib import PurePath
-from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS, find_recordings, session_keys
+from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS, find_recordings
 
 
 def generate_missing_metadata(sess_dir, sess_name):
@@ -94,7 +94,7 @@ def _extracted_paths(data_dir, flipped=False, max_depth=DEFAULT_MAX_DEPTH):
     folders = list(dict.fromkeys(dirname(r) for r in search.recordings))
     folders += [dirname(p) for p in sorted(glob(join(glob_escape(data_dir), '*', 'proc')))
                 if dirname(p) not in folders]
-    names = session_keys([join(f, 'proc') for f in folders], data_dir)
+    names = _folder_names([join(f, 'proc') for f in folders], data_dir)
 
     path_dict = {}
     for folder in sorted(folders, key=lambda f: names[join(f, 'proc')]):
@@ -118,13 +118,42 @@ def _extracted_paths(data_dir, flipped=False, max_depth=DEFAULT_MAX_DEPTH):
     return path_dict
 
 
+def _folder_names(paths, root):
+    """
+    Name the folder each of ``paths`` is in, as the notebook's lists show it.
+
+    A folder is named by its own name when no other path's folder has that name;
+    folders that share a name (``GroupA/mouse1`` and ``GroupB/mouse1``) are each
+    named by their path below ``root``, with ``/`` between folders on every system.
+
+    Args:
+    paths (iterable): paths of files.
+    root (str): the project folder they were found under.
+
+    Returns:
+    (dict): each path's folder name, by path.
+    """
+    root = abspath(root)
+    folders = {p: abspath(dirname(abspath(p))) for p in paths}
+    owners = {}
+    for folder in set(folders.values()):
+        owners.setdefault(basename(folder), []).append(folder)
+
+    def name(folder):
+        if len(owners[basename(folder)]) == 1 or folder == root:
+            return basename(folder)
+        return '/'.join(PurePath(os.path.relpath(folder, root)).parts)
+
+    return {p: name(f) for p, f in folders.items()}
+
+
 def _session_names(data_dir, recordings):
     """
-    Name each recording by its session folder (``session_keys``): the folder's name, or its path
+    Name each recording by its session folder (``_folder_names``): the folder's name, or its path
     below data_dir when two session folders share a name (``GroupA/mouse1`` and ``GroupB/mouse1``).
     Recordings sharing a folder (several archives) are each named by their own path below data_dir.
     """
-    keys = session_keys(recordings, data_dir)
+    keys = _folder_names(recordings, data_dir)
     counts = Counter(keys.values())
     return [keys[r] if counts[keys[r]] == 1
             else '/'.join(PurePath(os.path.relpath(r, abspath(data_dir))).parts)
@@ -144,7 +173,7 @@ def get_session_paths(data_dir, extracted=False, flipped=False, exts=['dat', 'mk
     beside each recording is returned instead.
 
     Sessions are named by their folder's name, or by the folder's path below data_dir when two
-    session folders share a name, as ``session_config.yaml`` names them.
+    session folders share a name.
 
     Args:
     data_dir (str): path to directory containing all session folders.

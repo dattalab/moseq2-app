@@ -88,8 +88,10 @@ def run_arena_cell(root):
     tree = ast.parse(code_cell(NOTEBOOK, ARENA_CELL))
     last = tree.body.pop()
     exec(compile(tree, "<arena cell>", "exec"), namespace)
-    eval(compile(ast.Expression(last.value), "<arena cell>", "eval"), namespace)
-    return read_yaml(str(root / "session_config.yaml"))["session_1"]
+    widget = eval(compile(ast.Expression(last.value), "<arena cell>", "eval"), namespace)
+    # what the tool shows for the recording; opening it saves nothing
+    (key,) = [key for key in widget.session_config if key.startswith("session_1/")]
+    return widget.session_config[key]
 
 
 # ------------------------------------------------------------------- arena tool (R4)

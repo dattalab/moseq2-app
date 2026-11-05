@@ -401,11 +401,9 @@ def test_each_recording_reports_itself_finished(extracted):
 def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
     """15. The contract between cell 5 and this one.
 
-    ``extract_command`` follows ``session_config_path`` out of the project
-    config and takes the settings the arena widget sets from the entry
-    belonging to the recording, so what a user settled on in the widget is
-    literally what the extraction ran with. The entry's other values are the
-    config's, copied when the widget opened, so every saved value is what the
+    ``extract_command`` reads the project's ``session_config.yaml`` and takes
+    the settings the arena widget sets from the entry belonging to the
+    recording, so what a user settled on in the widget is literally what the
     extraction ran with. The h5 records that set, which is where the two are
     compared.
     """
@@ -416,7 +414,7 @@ def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
                 key: plain(value[()].tolist() if value.shape else value[()])
                 for key, value in f["metadata/extraction/parameters"].items()
             }
-        for key, value in saved[name].items():
+        for key, value in saved[f"{name}/depth.avi"].items():
             if key in NOT_COMPARABLE or key not in used:
                 continue
             recorded = used[key]

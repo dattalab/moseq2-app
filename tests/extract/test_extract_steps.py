@@ -249,8 +249,7 @@ def test_a_typed_depth_range_is_used_as_given(project, called):
 
 def test_recording_settings_is_the_dict_extraction_hands_its_wrapper(steps):
     """One function gives the arena tool what extraction is handed: the options resolved from
-    config.yaml's settings and the entry's arena settings (and any setting config.yaml lacks),
-    tuples as the options hold them."""
+    config.yaml's settings and the entry's arena settings, tuples as the options hold them."""
     from moseq2_extract.session_config import recording_options, recording_settings
 
     config_data = {"bg_roi_depth_range": [600, 700], "noise_tolerance": 20, "fps": 30, "extra": 1}

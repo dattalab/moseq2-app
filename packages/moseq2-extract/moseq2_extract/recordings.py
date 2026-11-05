@@ -15,16 +15,13 @@ one with "depth" in its name, then the first in ``.dat``, ``.mkv``, ``.avi``,
 ``.tar.gz`` order. Each ``.tar.gz`` (or ``.tgz``) archive is a session of its
 own and carries its ``metadata.json`` inside it.
 
-A session is named by its folder's name, or by its folder's path below the
-project folder when two session folders share a name (``session_keys``).
-``session_config.yaml`` is keyed by those names, and ``session_config_key``
-finds a recording's entry from the recording's path alone.
+A session is its recording, keyed by the recording's path relative to the
+project folder (``moseq2_common.project.session_key``).
 """
 
 import os
 from dataclasses import dataclass, field
-from os.path import abspath, basename, exists, isdir, join, realpath
-from pathlib import PurePath
+from os.path import abspath, exists, isdir, join, realpath
 
 #: The recording types the pipeline reads, in the order one is preferred over
 #: another when a session folder holds several.
@@ -313,75 +310,3 @@ def find_recordings(
 
     search.recordings = sorted(found)
     return search
-
-
-def session_keys(recordings, root):
-    """
-    Name each recording's session folder, as ``session_config.yaml`` and the notebook's lists name it.
-
-    A folder is named by its own name when no other recording's folder has that
-    name, which is every folder in most projects. Folders that share a name
-    (``GroupA/mouse1`` and ``GroupB/mouse1``) are each named by their path below
-    ``root``, with ``/`` between folders on every system, so that each keeps its
-    own parameters.
-
-    Args:
-    recordings (iterable): paths of recordings, from ``find_recordings``.
-    root (str): the project folder they were found under.
-
-    Returns:
-    (dict): the name of each recording's session folder, by recording path.
-    """
-    root = abspath(root)
-    folders = {r: abspath(os.path.dirname(abspath(r))) for r in recordings}
-    owners = {}
-    for folder in set(folders.values()):
-        owners.setdefault(basename(folder), []).append(folder)
-
-    def key(folder):
-        if len(owners[basename(folder)]) == 1 or folder == root:
-            return basename(folder)
-        return "/".join(PurePath(os.path.relpath(folder, root)).parts)
-
-    return {r: key(f) for r, f in folders.items()}
-
-
-def _key_parts(key):
-    return tuple(part for part in str(key).replace("\\", "/").split("/") if part)
-
-
-def session_config_key(session_configs, recording, by_folder_name=True):
-    """
-    The entry of ``session_config.yaml`` that holds a recording's parameters.
-
-    An entry named by a path (``GroupA/mouse1``, written when two session
-    folders share a name) is the recording's when the recording's folder path
-    ends with it; the longest such entry is taken. Otherwise, with
-    ``by_folder_name``, the entry named by the folder's own name is. The project
-    folder is not needed, so extraction, which is handed a recording and the
-    config, finds the entry the arena tool wrote.
-
-    Args:
-    session_configs (dict): ``session_config.yaml`` as read.
-    recording (str): path to the recording.
-    by_folder_name (bool): fall back to the entry named by the folder's own name.
-
-    Returns:
-    (str or None): the entry's key, or None when there is none.
-    """
-    if not session_configs:
-        return None
-    folder = PurePath(abspath(os.path.dirname(abspath(recording)))).parts
-    best = None
-    for key in session_configs:
-        parts = _key_parts(key)
-        if len(parts) < 2 or len(parts) > len(folder):
-            continue
-        if folder[-len(parts):] == parts and (best is None or len(parts) > len(_key_parts(best))):
-            best = key
-    if best is not None:
-        return best
-    name = basename(os.path.dirname(abspath(recording)))
-    if by_folder_name and name in session_configs:
-        return name
-    return None

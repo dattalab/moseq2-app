@@ -1,10 +1,8 @@
 import click
 from pathlib import Path
 from moseq2_app.steps import train_flip_classifier
-from moseq2_common.frames import CleaningOptions
-from moseq2_common.options import ConfigFileError, read_settings
+from moseq2_common.options import ConfigFileError
 from moseq2_common.project import OldProjectError
-from moseq2_extract.options import EXTRACT_STAGE
 
 
 @click.command()
@@ -20,27 +18,24 @@ from moseq2_extract.options import EXTRACT_STAGE
     "--config-file",
     type=click.Path(),
     default=None,
-    help="Path to the config.yaml you extract with, whose cleaning settings the training frames are "
-         "cleaned with; extraction's defaults without it",
+    help="Path to the config.yaml you extract with: each session's training frames are cleaned with its "
+         "extract section and the session's session_config.yaml entry; extraction's defaults without it",
 )
 def main(data_index_path, prefix, classifier_type, config_file):
     if len(prefix) > 0 and not prefix.endswith("_"):
         prefix += "_"
 
+    print(f"Training {classifier_type} classifier")
     try:
-        # the extract section of config.yaml, where extraction reads its cleaning settings
-        cleaning = read_settings(config_file, CleaningOptions, stage_classes=EXTRACT_STAGE)
+        # each session cleaned as extraction cleans its recording, or with extraction's defaults
+        train_flip_classifier(
+            data_index_path,
+            Path(data_index_path).with_name(f"{prefix}{classifier_type}_flip_classifier.p"),
+            config_file,
+            classifier=classifier_type.upper(),
+        )
     except (ConfigFileError, OldProjectError) as error:
         raise click.ClickException(str(error)) from None
-
-    print(f"Training {classifier_type} classifier")
-    # cleaned as extraction cleans with the config file's settings, or its defaults
-    train_flip_classifier(
-        data_index_path,
-        Path(data_index_path).with_name(f"{prefix}{classifier_type}_flip_classifier.p"),
-        CleaningOptions.resolve(cleaning),
-        classifier=classifier_type.upper(),
-    )
 
 
 if __name__ == "__main__":

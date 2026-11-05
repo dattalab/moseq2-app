@@ -11,6 +11,12 @@ job they submit, is a settings file in ``config.yaml``'s sectioned shape with a
 session's or the models' folder, so a step run from it takes its project from the
 block, never from where the file is.
 
+Per-recording settings live in ``session_config.yaml`` (``SESSION_CONFIG_NAME``)
+in the project folder, found without a pointer in ``config.yaml``. Its entries
+are keyed by session: the recording's path relative to the project folder, with
+``/`` between folders on every system (``session_key``), so a project moved or
+copied elsewhere still finds them.
+
 A ``config.yaml`` without sections was written by MoSeq2 1.5.0 or earlier.
 1.6.0 does not read or convert it, and stops with ``OldProjectError``.
 """
@@ -20,14 +26,16 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from moseq2_common.yaml import read_yaml, write_config
 
-__all__ = ["CONFIG_NAME", "OldProjectError", "Project", "find_project", "old_project_message",
-           "standalone_note", "write_job_settings"]
+__all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "Project", "find_project", "is_job_file",
+           "old_project_message", "session_key", "standalone_note", "write_job_settings"]
 
 CONFIG_NAME = "config.yaml"
+#: The file holding each recording's arena-tool settings, in the project folder.
+SESSION_CONFIG_NAME = "session_config.yaml"
 
 
 class OldProjectError(Exception):
@@ -62,7 +70,23 @@ class Project:
         folder = Path(folder)
         return cls(folder=folder, config_file=folder / CONFIG_NAME,
                    bookkeeping_file=folder / "moseq2-project.yaml",
-                   session_config_file=folder / "session_config.yaml")
+                   session_config_file=folder / SESSION_CONFIG_NAME)
+
+
+def session_key(project: Project, recording: str | os.PathLike) -> str:
+    """The session a recording is: its path relative to ``project``'s folder, ``/`` between folders.
+
+    ``cohort1/saline_example_4/depth.avi`` on every system. A recording outside the
+    project folder is keyed by its path from there (``../elsewhere/depth.avi``), or by
+    its absolute path where no relative path exists (another drive on Windows).
+    """
+    folder = os.path.abspath(project.folder)
+    path = os.path.abspath(recording)
+    try:
+        relative = os.path.relpath(path, folder)
+    except ValueError:
+        relative = path
+    return "/".join(PurePath(relative).parts)
 
 
 def _job_project(config_file: str | os.PathLike):
@@ -77,6 +101,15 @@ def _job_project(config_file: str | os.PathLike):
     if not isinstance(data, Mapping) or not isinstance(data.get("job"), Mapping):
         return None
     return data["job"]
+
+
+def is_job_file(config_file: str | os.PathLike | None) -> bool:
+    """Whether ``config_file`` is a job settings file (it has a ``job:`` block).
+
+    A job's settings already hold its recording's ``session_config.yaml`` entry,
+    so a step run from one does not lay the entry over them again.
+    """
+    return bool(config_file) and _job_project(config_file) is not None
 
 
 def find_project(config_file: str | os.PathLike | None = None,

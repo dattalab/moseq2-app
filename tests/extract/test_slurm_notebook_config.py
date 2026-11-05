@@ -98,13 +98,7 @@ def test_notebook_slurm_jobs_read_the_session_config(project, jobs):
     the tool sets from its own entry, and the others from the config file."""
     root, config = project
     session_config = root / "session_config.yaml"
-    write_yaml(
-        {SESSION: {**read_yaml(str(config))["extract"], "fps": 15, "crop_size": [110, 110]}},
-        str(session_config),
-    )
-    data = read_yaml(str(config))
-    data["session_config_path"] = str(session_config)
-    write_yaml(data, str(config))
+    write_yaml({f"{SESSION}/depth.avi": {"fps": 15, "crop_size": [110, 110]}}, str(session_config))
 
     commands, received = jobs(root, config)
 
@@ -120,10 +114,7 @@ def test_notebook_slurm_jobs_for_a_recording_missing_from_the_session_config(
     config file's values."""
     root, config = project
     session_config = root / "session_config.yaml"
-    write_yaml({"another_session": {"fps": 15}}, str(session_config))
-    data = read_yaml(str(config))
-    data["session_config_path"] = str(session_config)
-    write_yaml(data, str(config))
+    write_yaml({"another_session/depth.avi": {"crop_size": [110, 110]}}, str(session_config))
 
     commands, received = jobs(root, config)
 

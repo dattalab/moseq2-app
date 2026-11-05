@@ -1,7 +1,7 @@
 """Writing and reading ``config.yaml`` in its sectioned shape, for tests that set a few settings by hand.
 
-A 1.6 ``config.yaml`` holds ``camera_type`` (and, until later pull requests,
-``session_config_path`` and the PCA output paths) at its top level, and every
+A 1.6 ``config.yaml`` holds ``camera_type`` (and, until a later pull request,
+the PCA output paths) at its top level, and every
 other setting in the section of its stage. These helpers take the settings of
 one section as a flat dict, the way the tests list them.
 """
@@ -11,8 +11,7 @@ from __future__ import annotations
 from moseq2_common.yaml import read_yaml, write_yaml
 
 #: The keys config.yaml keeps at its top level (``moseq2_common.options.TOP_LEVEL_KEYS``).
-TOP_LEVEL = ("camera_type", "groups", "exclude", "job", "session_config_path", "pca_file", "pca_file_scores",
-             "changepoint_file")
+TOP_LEVEL = ("camera_type", "groups", "exclude", "job", "pca_file", "pca_file_scores", "changepoint_file")
 
 
 def sectioned(flat: dict, section: str = "extract") -> dict:
