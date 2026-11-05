@@ -362,7 +362,7 @@ def run_slurm_extract(
     Each session is extracted with the settings ``recording_configs`` resolves: the arena tool's settings from its
     entry in the session config, every other setting from the config file, and the options typed on the command
     line over both. Each session gets a config.yaml of its own in its output directory whenever there is a session
-    config or a typed option.
+    config or a typed option; it holds those merged settings and no ``session_config_path``.
 
     Args:
     input_dir (str): directory the sessions were found in; extract_out_script is written there.
@@ -408,8 +408,11 @@ def run_slurm_extract(
                 makedirs(output_dir)
 
             # the recording's settings: the arena tool's from its session config entry,
-            # the rest from the config file, typed options over both
-            write_yaml(resolved.configs[depth_file], join(output_dir, "config.yaml"))
+            # the rest from the config file, typed options over both. It holds the entry
+            # already, so it names no session_config.yaml for the job's extract to apply again.
+            job_config = {key: value for key, value in resolved.configs[depth_file].items()
+                          if key != "session_config_path"}
+            write_yaml(job_config, join(output_dir, "config.yaml"))
 
     # Construct sbatch command for slurm
     commands = ""

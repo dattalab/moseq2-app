@@ -21,7 +21,7 @@ from click.testing import CliRunner
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from commands import split_command
-from moseq2_common.yaml import write_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 
 def run(*args):
@@ -288,6 +288,18 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
     assert call["num_frames"] is None
     assert tuple(call["config"]["crop_size"]) == (90, 90)
     assert call["config"]["fps"] == 20
+
+
+def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, slurm_extracted):
+    """Each job's config.yaml already holds the recording's entry, so the job's
+    ``extract`` has no session_config.yaml to lay over the typed options again."""
+    root, config = project
+    slurm_extracted(root, config, "--crop-size", "80", "80")
+    job_config = read_yaml(str(root / SESSION / "proc" / "config.yaml"))
+
+    assert "session_config_path" not in job_config
+    assert tuple(job_config["crop_size"]) == (80, 80)
+    assert job_config["manual_set_depth_range"] is False
 
 
 # ``extract FILE`` resolves the recording's entry in session_config.yaml by the
