@@ -183,7 +183,7 @@ class Analysis:
 
 def _no_current_model(project: Project) -> BookkeepingError:
     return BookkeepingError(
-        f"{project.bookkeeping_file} names no current model yet, so there is no model to analyse. Fit one "
+        f"{project.bookkeeping_file} names no current model yet, so there is no model to analyze. Fit one "
         "with the Extract-Modeling notebook's modeling cell or `moseq2-model learn-model`, or pass the file "
         "name of a model in the project's models folder to choose_model."
     )
