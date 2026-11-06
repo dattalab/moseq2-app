@@ -14,7 +14,6 @@ own, apart from extraction's.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 import click
@@ -42,8 +41,9 @@ class DaskOptions(Options):
 
     SECTION = "pca"
 
-    dask_cache_path: str = option(os.path.join(os.getcwd(), '_pca'), '--dask-cache-path', '-d',
-                                  type=click.Path(), help='Path to spill data to disk for dask')
+    dask_cache_path: str | None = option(None, '--dask-cache-path', '-d', type=click.Path(),
+                                         help='Path to spill data to disk for dask (default: the folder the step '
+                                              'writes to, _pca in the project folder)')
     dask_port: str = option('8787', '--dask-port', type=str, help="Port to access dask dashboard")
     queue: str = option('debug', '-q', '--queue', type=str, help="Cluster queue/partition for submitting jobs")
     nworkers: int = option(1, '-n', '--nworkers', type=int, help="Number of workers")

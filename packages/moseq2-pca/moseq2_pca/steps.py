@@ -168,6 +168,14 @@ def _check(step, sessions, *files):
     check_frame_counts(h5s)
 
 
+def _settings(opts, output_dir):
+    """What a wrapper runs with: ``opts``, with Dask spilling into ``output_dir`` when no ``dask_cache_path``
+    is set."""
+    settings = opts.as_dict()
+    settings['dask_cache_path'] = settings.get('dask_cache_path') or abspath(output_dir)
+    return settings
+
+
 def _keep_existing(written, overwrite):
     """Whether the person keeps an existing ``written`` rather than overwrite it, asked as the wrappers ask."""
     if overwrite or not written.exists():
@@ -232,7 +240,7 @@ def train_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Tr
     if _keep_existing(written, opts.overwrite_pca_train):
         return TrainPCAResult(components_file=None)
     record = _start("train-pca", opts, sessions, project)
-    settings = {**opts.as_dict(), 'overwrite_pca_train': True}
+    settings = {**_settings(opts, output_dir), 'overwrite_pca_train': True}
     components = _write(record, written, TRAIN_FIGURES, lambda name: bool(
         train_pca_wrapper(sessions, settings, output_dir, name).get('pca_file')))
     _record(project, "components", components)
@@ -251,7 +259,7 @@ def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Ap
     if _keep_existing(written, opts.overwrite_pca_apply):
         return ApplyPCAResult(scores_file=None)
     record = _start("apply-pca", opts, sessions, project, components_file)
-    settings = {**opts.as_dict(), 'pca_file': components_file, 'overwrite_pca_apply': True}
+    settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'overwrite_pca_apply': True}
     scores = _write(record, written, (), lambda name: apply_pca_wrapper(sessions, settings, output_dir, name)[1])
     _record(project, "scores", scores)
     return ApplyPCAResult(scores_file=scores)
@@ -267,7 +275,7 @@ def compute_changepoints(input_dir: str | None, output_dir: str, output_file: st
     _check("compute-changepoints", sessions, (components, CHANGEPOINTS_COMPONENTS_ADVICE))
     check_trained_settings(components, project)
     record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
-    settings = {**opts.as_dict(), 'pca_file': components_file, 'pca_file_scores': scores_file}
+    settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'pca_file_scores': scores_file}
 
     def work(name):
         compute_changepoints_wrapper(sessions, settings, output_dir, name)
