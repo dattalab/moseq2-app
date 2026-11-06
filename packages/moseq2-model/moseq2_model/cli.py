@@ -22,6 +22,7 @@ from moseq2_common.options import (
     click_options,
     command_project,
     command_settings,
+    described_argument,
     explicit_values,
     project_file_option,
 )
@@ -44,6 +45,15 @@ def cli():
     pass
 
 
+#: Where the PC scores and a fitted model usually are, for the messages of a missing argument.
+_SCORES = "the .h5 apply-pca writes (_pca/pca_scores.h5 in a project)"
+_LEARN_EXAMPLE = "For example, from the project folder: `moseq2-model learn-model _pca/pca_scores.h5 models/model.p`."
+
+
+def _scores(what):
+    return described_argument("input_file", type=click.Path(exists=True), missing=f"the PC scores {what}, {_SCORES}.")
+
+
 _PROJECT_FILE_HELP = ("The project's moseq2-project.yaml, whose sessions and groups (in its config.yaml) the "
                       "command uses; by default the project in the folder the command runs in")
 
@@ -62,7 +72,8 @@ APPLY_MODEL_ORDER = ("model_file", "pc_file", "dest_file", "var_name", "project_
 
 @cli.command(name="count-frames", help="Count the number of frames in given h5 file (pca_scores)")
 @click_options(CountFramesOptions, order=("input_file", "var_name"), others={
-    "input_file": click.argument("input_file", type=click.Path(exists=True)),
+    "input_file": described_argument("input_file", type=click.Path(exists=True),
+                                     missing=f"the PC scores file whose frames to count, {_SCORES}."),
 })
 @click.pass_context
 def count_frames(ctx, input_file, **_):
@@ -72,8 +83,11 @@ def count_frames(ctx, input_file, **_):
 
 @cli.command(name="learn-model", help="Train ARHMM on PC Scores with given training parameters")
 @click_options(LearnModelOptions, order=LEARN_MODEL_ORDER, others={
-    "input_file": click.argument("input_file", type=click.Path(exists=True)),
-    "dest_file": click.argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)),
+    "input_file": described_argument("input_file", type=click.Path(exists=True),
+                                     missing=f"the PC scores to fit the model to, {_SCORES}. {_LEARN_EXAMPLE}"),
+    "dest_file": described_argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True),
+                                    missing="the file to write the fitted model to, a .p file (the notebook writes "
+                                            f"models/model.p in the project folder). {_LEARN_EXAMPLE}"),
     "project_file": project_file_option(_PROJECT_FILE_HELP),
     "config_file": click.option("--config-file", type=click.Path(), default=None,
                                 help="Path to a config.yaml whose settings this fit uses; "
@@ -107,9 +121,14 @@ def learn_model(ctx, input_file, dest_file, config_file, **_):
 
 @cli.command(name="apply-model", help="Apply pre-trained ARHMM to PC scores.")
 @click_options(ApplyModelOptions, order=APPLY_MODEL_ORDER, others={
-    "model_file": click.argument("model_file", type=click.Path(exists=True)),
-    "pc_file": click.argument("pc_file", type=click.Path(exists=True)),
-    "dest_file": click.argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True)),
+    "model_file": described_argument("model_file", type=click.Path(exists=True),
+                                     missing="the fitted model to apply, the .p file learn-model writes "
+                                             "(models/model.p in a project)."),
+    "pc_file": described_argument("pc_file", type=click.Path(exists=True),
+                                  missing=f"the PC scores to label with the model, {_SCORES}."),
+    "dest_file": described_argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True),
+                                    missing="the file to write the labels to, a .p file (for example "
+                                            "models/applied_model.p in the project folder)."),
     "project_file": project_file_option(_PROJECT_FILE_HELP),
 })
 @click.pass_context
@@ -126,8 +145,11 @@ def apply_model(ctx, model_file, pc_file, dest_file, **_):
              "model-000-1000.p), which its command passes to learn-model --config-file. The models enter "
              "the project's moseq2-project.yaml when get-best-model compares them.")
 @click_options(KappaScanOptions, order=KAPPA_SCAN_ORDER, others={
-    "input_file": click.argument("input_file", type=click.Path(exists=True)),
-    "output_dir": click.argument("output_dir", type=click.Path(exists=False)),
+    "input_file": _scores("to fit the models to"),
+    "output_dir": described_argument("output_dir", type=click.Path(exists=False),
+                                     missing="the folder to write the scan's models and their job files into "
+                                             "(for example models/kappa_scan in the project folder), which "
+                                             "moseq2-viz get-best-model then compares."),
     "project_file": project_file_option(_PROJECT_FILE_HELP),
 })
 @click.pass_context

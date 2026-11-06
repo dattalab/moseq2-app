@@ -521,12 +521,17 @@ def find_record(target: str, cwd: str | os.PathLike | None = None) -> tuple[Path
 def print_record_command() -> click.Command:
     """``print-record``, for each program's command group."""
 
-    from moseq2_common.options import ProjectCommand
+    from moseq2_common.options import ProjectCommand, described_argument
 
     @click.command("print-record", cls=ProjectCommand, help="Print the record of the run that wrote an output: an .h5, a figure "
                    "or model, a session folder in aggregate_results, or a session key. Paste it into a "
                    "GitHub issue.")
-    @click.argument("output")
+    @described_argument(
+        "output",
+        missing="the output whose record to print: an .h5 (such as _pca/pca.h5), a figure, a model, a "
+                "crowd-movie folder, a session's folder in aggregate_results, or (from the project folder) a "
+                "session key such as cohort1/saline_example_4/depth.avi.",
+    )
     def print_record(output):
         path, text = find_record(output)
         click.echo(f"# record of {path}")

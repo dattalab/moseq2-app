@@ -66,14 +66,16 @@ def called(monkeypatch, steps):
 
 @pytest.fixture
 def files(tmp_path):
-    """The argument files, existing (the commands check that they do), in a project with no sessions yet."""
-    from configs import write_bookkeeping
+    """The argument files, existing (the commands check that they do), in a project of one session (a command
+    with no session to work on stops)."""
+    from configs import write_bookkeeping, write_session_labels
 
     (tmp_path / "models").mkdir()
     for name in ("model.p", "changepoints.h5"):
         (tmp_path / name).write_text("")
     (tmp_path / "config.yaml").write_text("camera_type: auto\n")
-    write_bookkeeping(tmp_path)
+    write_bookkeeping(tmp_path, ["aggregate_results/session_0"])
+    write_session_labels(tmp_path, ["aggregate_results/session_0"])
     return tmp_path
 
 

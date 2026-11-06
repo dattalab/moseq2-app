@@ -35,15 +35,17 @@ class PCAInputOptions(Options):
                                help="Path to log-likelihood mask in h5 files")
 
 
+_DASK_CACHE_HELP = ('Path to spill data to disk for dask (default: the folder the step writes to, _pca in the project '
+                    'folder)')
+
+
 @dataclass(frozen=True, kw_only=True)
 class DaskOptions(Options):
     """The dask cluster a PCA step runs on."""
 
     SECTION = "pca"
 
-    dask_cache_path: str | None = option(None, '--dask-cache-path', '-d', type=click.Path(),
-                                         help='Path to spill data to disk for dask (default: the folder the step '
-                                              'writes to, _pca in the project folder)')
+    dask_cache_path: str | None = option(None, '--dask-cache-path', '-d', type=click.Path(), help=_DASK_CACHE_HELP)
     dask_port: str = option('8787', '--dask-port', type=str, help="Port to access dask dashboard")
     queue: str = option('debug', '-q', '--queue', type=str, help="Cluster queue/partition for submitting jobs")
     nworkers: int = option(1, '-n', '--nworkers', type=int, help="Number of workers")
@@ -116,7 +118,8 @@ class ChangepointsOptions(PCAInputOptions, DaskOptions):
                           help="Half-width of the smoothing window in frames, rounded down to whole frames. "
                                "The Gaussian inside it has a standard deviation of 1.5 frames. Also sets how "
                                "many frames are trimmed from each end of the changepoint curve (6 x sigma).")
-    # -d is also --dask-cache-path's short flag, as in 1.5.0; click gives it to --dims
+    # -d is --dims here, as click resolved 1.5.0's two uses of it, so --dask-cache-path has no short flag
+    dask_cache_path: str | None = option(None, '--dask-cache-path', type=click.Path(), help=_DASK_CACHE_HELP)
     dims: int = option(300, '-d', '--dims', type=int, help="Number of random projections to use")
     verbose: bool = option(False, '--verbose', '-v', is_flag=True, setting=False,
                            help="Print sessions as they are being loaded.")

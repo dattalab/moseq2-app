@@ -172,10 +172,11 @@ def test_crowd_movie_workers_follow_the_cpus_available_to_the_process(affinity, 
 
     assert CrowdMovieOptions().processes == expected
 
-    from configs import write_bookkeeping
+    from configs import write_bookkeeping, write_session_labels
 
     (tmp_path / "model.p").write_text("placeholder")  # an empty input stops a step
-    write_bookkeeping(tmp_path)
+    write_bookkeeping(tmp_path, ["aggregate_results/session_0"])  # a project with no session stops the command
+    write_session_labels(tmp_path, ["aggregate_results/session_0"])
     project_file = str(tmp_path / "moseq2-project.yaml")
     result = CliRunner().invoke(cli, ["make-crowd-movies", str(tmp_path / "model.p"), "--project-file", project_file,
                                       "--specific-syllable", "0", "-o", str(tmp_path / "out")],

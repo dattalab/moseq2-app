@@ -22,6 +22,9 @@ help text live together. From that class:
 - ``ProjectGroup`` is the click group of every command-line program: each of
   its commands first stops on a project made by MoSeq2 1.5.0 or earlier
   (``moseq2_common.project.check_not_old``).
+- ``described_argument`` is a required command-line argument that, when left
+  out, says what it is and where it usually is in a project, instead of click's
+  bare "Missing argument".
 
 ``config.yaml`` has one section per stage, named by each class's ``SECTION``
 (``extract``, ``pca``, ``model``, ``crowd_movies``), and ``camera_type`` at its
@@ -61,6 +64,7 @@ __all__ = [
     "command_settings",
     "explicit_values",
     "command_project",
+    "described_argument",
     "option",
     "output_folder",
     "project_file_option",
@@ -439,9 +443,34 @@ _PROJECT = "moseq2_common.project"
 
 
 def _command_name(ctx: click.Context) -> str:
-    """The command as a person types it: ``moseq2-viz make-df``."""
-    package = ctx.command.callback.__module__.split(".")[0] if ctx.command.callback else ""
+    """The command as a person types it: ``moseq2-viz make-df``, named by the program it belongs to."""
+    root = ctx.find_root().command if ctx.parent is not None else ctx.command
+    callback = root.callback or ctx.command.callback
+    package = callback.__module__.split(".")[0] if callback else ""
     return f"{package.replace('_', '-')} {ctx.info_name}".strip()
+
+
+class DescribedArgument(click.Argument):
+    """A required argument that, when left out, says what it is and where it usually is (``missing``)."""
+
+    def __init__(self, *args, missing: str, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.missing = missing
+
+    def process_value(self, ctx: click.Context, value: Any) -> Any:
+        try:
+            return super().process_value(ctx, value)
+        except click.MissingParameter:
+            raise click.UsageError(
+                f"`{_command_name(ctx)}` needs {(self.metavar or self.name).upper()}, {self.missing}", ctx=ctx
+            ) from None
+
+
+def described_argument(name: str, *, missing: str, **kwargs) -> Callable[[F], F]:
+    """A required ``click.argument`` whose absence is explained by ``missing``, a sentence that completes
+    "`moseq2-model learn-model` needs INPUT_FILE, ": what the argument is and where it usually is in a project.
+    """
+    return click.argument(name, cls=DescribedArgument, missing=missing, **kwargs)
 
 
 def command_project(ctx: click.Context, *, required: bool = False):
@@ -455,8 +484,9 @@ def command_project(ctx: click.Context, *, required: bool = False):
     (``output_folder``). It is resolved once per command.
 
     A ``--project-file`` that does not exist stops the command. With
-    ``required``, so does a project without a ``moseq2-project.yaml`` to read,
-    naming where it looked and ``--project-file``.
+    ``required``, so does finding no project, naming the folder it looked in and
+    both ways out (the project folder, ``--project-file``), and a project
+    without a ``moseq2-project.yaml`` to read, saying to aggregate its sessions.
     """
     from moseq2_common.bookkeeping import BOOKKEEPING_NAME
     from moseq2_common.project import Project, find_project
@@ -474,11 +504,19 @@ def command_project(ctx: click.Context, *, required: bool = False):
         else:
             ctx.meta[_PROJECT] = find_project(ctx.params.get("config_file"))
     project = ctx.meta[_PROJECT]
-    if required and (project is None or not Path(project.bookkeeping_file).is_file()):
-        folder = project.folder if project is not None else Path.cwd()
+    if required and project is None:
         raise click.ClickException(
-            f"`{_command_name(ctx)}` needs a project's {BOOKKEEPING_NAME}, and there is none in {folder}. Run it "
-            f"from the project folder, or pass `--project-file /path/to/project/{BOOKKEEPING_NAME}`."
+            f"`{_command_name(ctx)}` works on the sessions a project's {BOOKKEEPING_NAME} lists, and found no "
+            f"project: there is no config.yaml in {Path.cwd()}, and no --project-file was given. Run it from the "
+            f"project folder, or name the project with `--project-file /path/to/project/{BOOKKEEPING_NAME}`."
+        )
+    if required and not Path(project.bookkeeping_file).is_file():
+        raise click.ClickException(
+            f"`{_command_name(ctx)}` works on the sessions a project's {BOOKKEEPING_NAME} lists, and there is no "
+            f"{BOOKKEEPING_NAME} in {project.folder} yet, so the project has no sessions. Run "
+            f"`moseq2-extract aggregate-results` in {project.folder} (or the notebook's aggregation cell) to list "
+            "its extractions. If the project is another folder, run the command from there, or name it with "
+            f"`--project-file /path/to/project/{BOOKKEEPING_NAME}`."
         )
     return project
 

@@ -23,6 +23,7 @@ from moseq2_common.options import (
     click_options,
     command_project,
     command_settings,
+    described_argument,
     explicit_values,
     output_folder,
     project_file_option,
@@ -62,12 +63,33 @@ def _project_file():
 
 
 def _sessions(ctx):
-    """The sessions of the project the command runs on, as an index in memory."""
-    return session_index(command_project(ctx, required=True))
+    """The sessions of the project the command runs on, as an index in memory; the command stops when the
+    project has none to work on."""
+    project = command_project(ctx, required=True)
+    index = session_index(project)
+    if not index["files"]:
+        if index.get("excluded"):
+            raise click.ClickException(
+                f"Every session {project.bookkeeping_file} lists is under exclude in {project.config_file}, so "
+                f"`{ctx.info_name}` has no session to work on. Remove at least one session from exclude in "
+                f"{project.config_file}."
+            )
+        raise click.ClickException(
+            f"{project.bookkeeping_file} lists no sessions, so `{ctx.info_name}` has none to work on. Run "
+            f"`moseq2-extract aggregate-results` in {project.folder} (or the notebook's aggregation cell) to list "
+            "the project's extractions."
+        )
+    return index
 
 
-def _argument(name):
-    return click.argument(name, type=click.Path(exists=True, resolve_path=True))
+def _argument(name, missing):
+    return described_argument(name, type=click.Path(exists=True, resolve_path=True), missing=missing)
+
+
+def _model(what, name="model-fit"):
+    """A command's fitted-model argument, ``what`` saying what the command does with it."""
+    return _argument(name, f"the fitted model {what}, the .p file learn-model writes (models/model.p in a project, "
+                           "or the model get-best-model picked).")
 
 
 def _output_file(name):
@@ -101,9 +123,16 @@ def add_group(ctx, **_):
 )
 @click_options(BestModelOptions,
                order=("model_dir", "cp_path", "output_file", "plot_all", "ext", "objective", "project_file"),
-               others={"model_dir": _argument("model-dir"), "cp_path": _argument("cp-path"),
-                       "output_file": click.argument("output-file",
-                                                     type=click.Path(exists=False, resolve_path=True)),
+               others={"model_dir": _argument("model-dir",
+                                              "the folder holding the models to compare, the OUTPUT_DIR given to "
+                                              "moseq2-model kappa-scan (for example models/kappa_scan in the "
+                                              "project folder)."),
+                       "cp_path": _argument("cp-path", "the changepoints file moseq2-pca compute-changepoints "
+                                                       "writes (_pca/changepoints.h5 in a project)."),
+                       "output_file": described_argument(
+                           "output-file", type=click.Path(exists=False, resolve_path=True),
+                           missing="the path of the comparison figure to write, without its extension (for "
+                                   "example plots/best_model in the project folder)."),
                        "project_file": project_file_option(
                            "The project's moseq2-project.yaml, which lists the models compared and the one picked "
                            "as its current model; by default the project in the folder the command runs in")})
@@ -118,7 +147,7 @@ def get_best_fit_model(ctx, model_dir, cp_path, output_file, **_):
     help="Make a dataframe containing syllable and scalar information from the project's sessions and a model fit file",
 )
 # no settings: the output file's extension picks the format
-@_argument("model-fit")
+@_model("whose syllables to tabulate")
 @click.option("--output-file", type=click.Path(), default=None, show_default=False,
               help="Filename to store dataframe (default: moseq_df.csv in the project folder)")
 @_project_file()
@@ -141,7 +170,7 @@ def make_df(ctx, model_fit, output_file, **_):
     "frame_path", "progress_bar", "pad", "seed", "select_median_duration_instances", "project_file",
 ), others={
     "project_file": _project_file(),
-    "model_path": _argument("model-path"),
+    "model_path": _model("whose syllables to render as crowd movies", "model-path"),
     "output_dir": click.option("--output-dir", "-o", type=click.Path(), default=None, show_default=False,
                                help="Path to store files (default: crowd_movies in the project folder)"),
 })
@@ -207,7 +236,7 @@ def plot_verbose_position_heatmaps(ctx, output_file, **_):
     "scale_node_by_usage", "width_per_group", "project_file",
 ), others={
     "project_file": _project_file(),
-    "model_fit": _argument("model-fit"),
+    "model_fit": _model("whose transitions to plot"),
     "output_file": _output_file("transitions"),
 })
 @click.pass_context
@@ -225,7 +254,7 @@ def plot_transition_graph(ctx, model_fit, output_file, **_):
     "group", "ordering", "ctrl_group", "exp_group", "colors", "project_file",
 ), others={
     "project_file": _project_file(),
-    "model_fit": _argument("model-fit"),
+    "model_fit": _model("whose syllable statistics to plot"),
     "output_file": _output_file("syll_stat"),
 })
 @click.pass_context
