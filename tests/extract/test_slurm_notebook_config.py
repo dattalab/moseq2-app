@@ -39,7 +39,7 @@ def project(tmp_path):
     with a value changed from its default."""
     session = tmp_path / SESSION
     session.mkdir()
-    (session / "depth.avi").touch()
+    (session / "depth.avi").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     (session / "metadata.json").write_text("{}")
 
     config = tmp_path / "config.yaml"

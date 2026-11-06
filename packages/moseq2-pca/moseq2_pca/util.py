@@ -355,6 +355,32 @@ CROP_SIZE_SOURCES = (
 )
 
 
+def check_frame_counts(h5s, h5_path='/frames'):
+    """
+    Stop before PCA when a session's extraction holds a different number of
+    frames and timestamps. PCA places each dropped frame from the timestamps,
+    one per frame, so without that match the dropped frames cannot be placed
+    and the session's timing is unknown. An extraction without timestamps is
+    not checked here (PCA times its frames from its frame rate).
+
+    Args:
+    h5s (list): paths to the sessions' extracted h5 files.
+    h5_path (str): path to the frames inside each h5 file.
+    """
+    for h5 in h5s:
+        with h5py.File(h5, 'r') as f:
+            path = timestamps_path(f)
+            if path is None or h5_path not in f:
+                continue
+            n_frames, n_timestamps = len(f[h5_path]), len(f[path])
+        if n_frames != n_timestamps:
+            raise ValueError(
+                f'The extraction {h5} holds {n_frames} frames ({h5_path}) and {n_timestamps} timestamps '
+                f'({path}). Each frame needs one timestamp, so its dropped frames cannot be placed and its '
+                f'timing is unknown. Extract that session again, then run this step again.'
+            )
+
+
 def check_frame_shapes(h5s, dicts, h5_path='/frames'):
     """
     Stop before PCA when the sessions' frames are not all the same size. Every

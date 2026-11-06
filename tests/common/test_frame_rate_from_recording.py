@@ -223,3 +223,55 @@ def test_extraction_settings_have_no_fps():
 
     for cls in (ExtractOptions, ApplyPCAOptions, ChangepointsOptions, BestModelOptions):
         assert "fps" not in {f.name for f in dataclasses.fields(cls)}, cls.__name__
+
+
+# ---------------------------------------------------------------- behavioural statistics
+
+
+def test_syllable_durations_use_each_sessions_own_rate(tmp_path):
+    """A syllable held for 30 frames lasts 2 s in a 15 fps session and 1 s in a 30 fps one; the statistics
+    table (``moseq_df``'s per-syllable statistics, the stats plots) reads each session's rate from its
+    extraction. 1.5.0 divided every session's frame counts by 30."""
+    import pandas as pd
+
+    from moseq2_viz.model.util import compute_behavioral_statistics
+
+    rows = []
+    for uuid, rate in (("slow", RATE), ("fast", 30)):
+        h5 = tmp_path / f"{uuid}.h5"
+        with h5py.File(h5, "w") as f:
+            f["metadata/fps"] = float(rate)
+        labels = [0] * 30 + [1] * 10
+        onsets = [True] + [False] * 29 + [True] + [False] * 9
+        for label, onset in zip(labels, onsets):
+            rows.append({"group": "g", "uuid": uuid, "h5_path": str(h5), "labels (original)": label,
+                         "labels (usage sort)": label, "onset": onset, "velocity_2d_mm": np.float32(1.0)})
+    stats = compute_behavioral_statistics(pd.DataFrame(rows), count="usage")
+    duration = stats.set_index(["uuid", "syllable"])["duration"]
+    assert duration[("slow", 0)] == pytest.approx(30 / RATE)
+    assert duration[("fast", 0)] == pytest.approx(1.0)
+    assert duration[("slow", 1)] == pytest.approx(10 / RATE)
+
+
+def test_the_flip_preview_movie_plays_at_the_sessions_rate(tmp_path, monkeypatch):
+    """Applying the flip classifier writes each session's flipped preview at the session's own rate."""
+    import moseq2_app.flip.widget as widget
+
+    h5 = tmp_path / "s" / "results.h5"
+    h5.parent.mkdir()
+    with h5py.File(h5, "w") as f:
+        f["frames"] = np.zeros((4, 8, 8), dtype="uint8")
+        f["scalars/angle"] = np.zeros(4)
+        f["metadata/fps"] = float(RATE)
+    rates = []
+
+    def preview(path, frames, *, fps, **kwargs):
+        rates.append(fps)
+
+    monkeypatch.setattr(widget, "write_frames_preview", preview)
+    monkeypatch.setattr(widget, "get_flips", lambda frames, **kwargs: np.zeros(len(frames), dtype=bool))
+    monkeypatch.setattr(widget, "_note_flip_correction", lambda *args, **kwargs: None)
+    flip = widget.FlipClassifierWidget.__new__(widget.FlipClassifierWidget)
+    flip.sessions = {"s": h5}
+    flip.apply_flip_classifier("clf.p", write_movie=True, verbose=False)
+    assert rates == [RATE]

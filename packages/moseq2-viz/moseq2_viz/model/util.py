@@ -17,6 +17,7 @@ from typing import Iterator, Any, Dict
 from cytoolz.curried import get
 from os.path import join, basename, dirname
 from moseq2_common.h5 import h5_to_dict
+from moseq2_common.timestamps import frame_rate
 from moseq2_viz.util import star
 from collections import defaultdict, OrderedDict
 from scipy.spatial.distance import jensenshannon
@@ -462,7 +463,22 @@ def get_syllable_usages(data, max_syllable=100, count='usage'):
     return dict(usages)
 
 
-def compute_behavioral_statistics(scalar_df, groupby=['group', 'uuid'], count='usage', fps=30,
+def session_frame_rates(scalar_df):
+    """Each session's frame rate, by uuid, read from its extraction (the ``h5_path`` column)."""
+    if 'h5_path' not in scalar_df.columns:
+        raise ValueError(
+            'Syllable durations need each session\'s frame rate, which is read from its extraction file, and '
+            'this dataframe has no h5_path column naming the files. Make the dataframe with make-df (or the '
+            'Analysis notebook\'s dataframe cell), or pass fps= to compute_behavioral_statistics.'
+        )
+    rates = {}
+    for uuid, h5 in scalar_df.groupby('uuid')['h5_path'].first().items():
+        with h5py.File(h5, 'r') as f:
+            rates[uuid] = frame_rate(f)
+    return rates
+
+
+def compute_behavioral_statistics(scalar_df, groupby=['group', 'uuid'], count='usage', fps=None,
                                   usage_normalization=True, syllable_key='labels (usage sort)'):
     """
     Compute syllable statistics merged with the scalar features.
@@ -471,7 +487,8 @@ def compute_behavioral_statistics(scalar_df, groupby=['group', 'uuid'], count='u
     scalar_df (pandas.DataFrame): Scalar measuresments for full dataset, including metadata for all the sessions.
     groupby (list of strings): list of columns to run the pandas groupby() on the scalar_df.
     count (str): method to compute syllable mean usage, either 'usage' or 'frames'. 
-    fps (int): frames per second that the data was acquired in.
+    fps (float): frames per second for every session; None (the default) takes each session's own rate
+        from its extraction (``session_frame_rates``).
     usage_normalization (bool): indicates whether to normalize syllable usages by the value counts.
     syllable_key (str): column to rename to "syllable" for convenient referencing later on.
 
@@ -517,8 +534,15 @@ def compute_behavioral_statistics(scalar_df, groupby=['group', 'uuid'], count='u
     trials = scalar_df['onset'].cumsum()
     trials.name = 'trials'
     durations = scalar_df.groupby(groupby_with_syllable + [trials])['onset'].count()
-    # average duration in seconds
-    durations = durations.groupby(groupby_with_syllable).mean() / fps
+    # average duration in seconds, at each session's own frame rate
+    rates = session_frame_rates(scalar_df) if fps is None else {}
+    if fps is not None or len(set(rates.values())) == 1:
+        durations = durations.groupby(groupby_with_syllable).mean() / (fps if fps is not None else
+                                                                        next(iter(rates.values())))
+    else:
+        trial_rates = scalar_df['uuid'].map(rates).groupby(
+            [scalar_df[c] for c in groupby_with_syllable] + [trials]).first()
+        durations = (durations / trial_rates.values).groupby(groupby_with_syllable).mean()
     durations.name = 'duration'
 
     features = scalar_df.groupby(groupby_with_syllable)[feature_cols].agg(['mean', 'std', 'min', 'max'])

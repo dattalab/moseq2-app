@@ -52,7 +52,7 @@ def received(monkeypatch):
 )
 def test_extract_crop_size(typed, expected, tmp_path, received):
     recording = tmp_path / "depth.avi"
-    recording.touch()
+    recording.write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     config = tmp_path / "config.yaml"
     write_yaml({"extract": {"crop_size": [120, 120]}}, str(config))
 
@@ -72,7 +72,7 @@ def project(tmp_path):
     ``compress_threads`` are not, so the config file's apply."""
     session = tmp_path / SESSION
     session.mkdir()
-    (session / "depth.avi").touch()
+    (session / "depth.avi").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     (session / "metadata.json").write_text("{}")
 
     session_config = tmp_path / "session_config.yaml"
@@ -340,7 +340,7 @@ def test_extract_file_without_a_session_entry_uses_the_config_file(project, rece
     root, config = project
     other = root / "session_2"
     other.mkdir()
-    (other / "depth.avi").touch()
+    (other / "depth.avi").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     run("extract", str(other / "depth.avi"), "--config-file", str(config))
 
     settings = received[0]

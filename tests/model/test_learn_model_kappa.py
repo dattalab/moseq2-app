@@ -10,6 +10,7 @@ before anything is loaded, naming the file, the value and what to do.
 
 from __future__ import annotations
 
+import h5py
 import pytest
 from click.testing import CliRunner
 
@@ -28,7 +29,7 @@ def fits(monkeypatch):
 
 def learn_model(tmp_path, settings):
     scores = tmp_path / "pca_scores.h5"
-    scores.touch()
+    h5py.File(scores, "w").close()  # a placeholder: the fit is stubbed, and an empty input stops a step
     config = tmp_path / "config.yaml"
     write_yaml({"model": settings}, str(config))
     result = CliRunner().invoke(

@@ -14,6 +14,7 @@ import warnings
 from collections import OrderedDict
 
 import numpy as np
+import h5py
 import pytest
 from click.testing import CliRunner
 
@@ -43,7 +44,7 @@ def learn(tmp_path, monkeypatch):
     monkeypatch.setattr(model_steps, "learn_model_wrapper",
                         lambda i, d, config: received.append(config))
     scores = tmp_path / "pca_scores.h5"
-    scores.touch()
+    h5py.File(scores, "w").close()  # a placeholder: the fit is stubbed, and an empty input stops a step
 
     def run(*args):
         result = CliRunner().invoke(

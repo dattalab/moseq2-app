@@ -52,7 +52,7 @@ def project(tmp_path):
     root = tmp_path / "project"
     for name in SESSIONS:
         (root / name).mkdir(parents=True)
-        (root / name / "depth.dat").touch()
+        (root / name / "depth.dat").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
         (root / name / "metadata.json").write_text("{}")
 
     config = root / "config.yaml"

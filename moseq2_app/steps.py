@@ -17,7 +17,7 @@ from typing import Sequence
 
 from moseq2_app.flip.train import (create_training_dataset, save_classifier, session_cleaning, train_classifier,
                                    training_settings)
-from moseq2_common.records import start_record, write_record
+from moseq2_common.records import check_inputs, start_record, write_record
 from moseq2_viz import steps as viz_steps
 from moseq2_viz.options import CrowdMovieOptions
 
@@ -89,6 +89,8 @@ def train_flip_classifier(frame_ranges_file: str, out_path: str, config_file: st
     Returns:
     (FlipTrainingResult): the training set and the classifier written.
     """
+    check_inputs("train-flip-classifier", {frame_ranges_file: (
+        "Label frames in the Flip-Classifier-Training notebook's labeling widget and save them again.")})
     record = start_record("train-flip-classifier", {"classifier": classifier},
                           [path for path in (config_file, frame_ranges_file) if path])
     cleaning = session_cleaning(frame_ranges_file, config_file)

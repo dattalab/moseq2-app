@@ -34,7 +34,7 @@ def project(tmp_path):
     for name in SESSIONS:
         session = tmp_path / name
         session.mkdir()
-        (session / "depth.avi").touch()
+        (session / "depth.avi").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
         (session / "metadata.json").write_text("{}")
     (tmp_path / "config.yaml").write_text("extract:\n  cluster_type: local\n")
     return tmp_path

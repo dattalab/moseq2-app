@@ -34,8 +34,13 @@ and the recording's arena entry, and ``read_record`` serves display and checks.
 record of an output, a session's folder or a session key.
 
 Outputs and their record are written together through a temporary name renamed
-into place (``atomic_output``), so an interrupted step leaves the previous output
-and record as they were.
+into place (``atomic_output``, or ``atomic_outputs`` for the files a writer names
+from one stem), so an interrupted step leaves the previous output and record as
+they were.
+
+Each step checks the files it reads before any work (``check_inputs``): one that
+does not exist, is empty or cannot be read stops it with a message naming the
+step, the file and what to do (``InputError``).
 """
 
 from __future__ import annotations
@@ -58,9 +63,9 @@ import numpy as np
 
 from moseq2_common.yaml import dump_block_yaml, read_yaml
 
-__all__ = ["RECORD_ATTRIBUTE", "Record", "atomic_output", "fingerprint", "find_record", "print_record_command",
-           "read_record", "record_text", "sidecar_path", "start_record", "write_h5_record", "write_record",
-           "write_sidecar"]
+__all__ = ["RECORD_ATTRIBUTE", "InputError", "Record", "atomic_output", "atomic_outputs", "check_inputs",
+           "fingerprint", "find_record", "print_record_command", "read_record", "record_text", "sidecar_path",
+           "start_record", "write_h5_record", "write_record", "write_sidecar"]
 
 #: The attribute of an ``.h5`` output holding its record.
 RECORD_ATTRIBUTE = "provenance"
@@ -341,6 +346,59 @@ def atomic_output(path: str | os.PathLike, temporary: str | os.PathLike | None =
         raise
     if temporary.exists():
         os.replace(temporary, path)
+
+
+@contextlib.contextmanager
+def atomic_outputs(stem: str | os.PathLike, suffixes: Sequence[str]) -> Iterator[Path]:
+    """Yield a temporary stem beside ``stem`` (``.<name>.partial``) for a writer that names its files from a
+    stem; each ``<temporary stem><suffix>`` the block writes is renamed to ``<stem><suffix>`` when the block
+    completes (``atomic_output`` for each), the first suffix last. If the block stops, every temporary file is
+    deleted and the files under the final names are as they were."""
+    stem = Path(stem)
+    temporary = stem.with_name(f".{stem.name}.partial")
+    with contextlib.ExitStack() as stack:
+        for suffix in suffixes:
+            stack.enter_context(atomic_output(f"{stem}{suffix}", f"{temporary}{suffix}"))
+        yield temporary
+
+
+# ------------------------------------------------------------------ checking inputs
+
+
+class InputError(ValueError):
+    """A file a step needs that does not exist, is empty or cannot be read."""
+
+
+def _input_problem(path: Path) -> str | None:
+    """What is wrong with ``path`` as an input (``does not exist``, ``is empty``, ``could not be read: ...``),
+    or None. A folder is checked only for existing; an ``.h5`` is opened."""
+    if not path.exists():
+        return "does not exist"
+    if path.is_dir():
+        return None
+    try:
+        if path.stat().st_size == 0:
+            return "is empty"
+        with open(path, "rb") as handle:
+            handle.read(1)
+        if path.suffix == ".h5":
+            with h5py.File(path, "r"):
+                pass
+    except OSError as error:
+        return f"could not be read: {error}"
+    return None
+
+
+def check_inputs(step: str, inputs: Mapping[str | os.PathLike, str]) -> None:
+    """Stop ``step`` before its work when a file it reads does not exist, is empty or cannot be read.
+
+    ``inputs`` maps each file to what the person should do when it is unusable; the message names the step,
+    the file and the problem, then says that.
+    """
+    for path, what_to_do in inputs.items():
+        problem = _input_problem(Path(path))
+        if problem is not None:
+            raise InputError(f"{step} needs {path}, which {problem}. {what_to_do}")
 
 
 def _stored_text(path: Path) -> str | None:
