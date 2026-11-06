@@ -19,7 +19,9 @@ a SLURM job's settings file never does.
 
 The viz and model steps take the sessions as an index in memory
 (``session_index``), the shape ``moseq2_viz.util.parse_index`` reads, built from
-this file and ``config.yaml``'s groups each time and never written.
+this file and ``config.yaml``'s groups each time and never written. It leaves
+out the sessions ``config.yaml``'s ``exclude`` lists, so every step after
+extraction does, and prints one line naming them.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from dataclasses import dataclass, field
 from os.path import abspath, dirname
 from pathlib import Path, PurePosixPath
 
-from moseq2_common.project import Project, read_groups, session_key
+from moseq2_common.project import Project, check_session_names, exclude_note, read_exclude, read_groups, session_key
 from moseq2_common.yaml import read_yaml, write_yaml
 
 __all__ = ["BOOKKEEPING_NAME", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session", "load",
@@ -168,18 +170,31 @@ def _metadata(h5: Path, fallback: str) -> dict:
     return metadata
 
 
-def session_index(project: Project) -> dict:
+def session_index(project: Project, *, exclude: bool = True) -> dict:
     """The project's sessions as an index in memory: 1.5.0's parsed-index shape, absolute paths.
 
     ``{"files": [{"uuid", "group", "metadata", "path": (h5, yaml), "key"}], "pca_path": scores or "",
-    "bookkeeping_file": the file it was read from}``,
+    "bookkeeping_file": the file it was read from, "excluded": {key: uuid}}`` (``excluded`` only when
+    sessions are left out),
     each session's group from ``config.yaml``'s ``groups`` (``default`` when it names none). Sessions are
     listed in the order they were recorded (``StartTime``), then by name.
+
+    With ``exclude`` (the default), the sessions ``config.yaml``'s ``exclude`` lists are left out of
+    ``files``, listed in ``excluded`` and named in one printed line; the group widget and ``add-group``
+    pass False to list every session. A key in ``groups``, ``exclude`` or ``session_config.yaml`` that
+    is not a session of the project is printed as a warning (``check_session_names``).
     """
     bookkeeping = load(project)
     groups = read_groups(project)
+    for warning in check_session_names(project, bookkeeping.sessions):
+        print(warning)
+    left_out = [key for key in read_exclude(project) if key in bookkeeping.sessions] if exclude else []
+    if left_out:
+        print(exclude_note(left_out))
     entries = []
     for key, session in bookkeeping.sessions.items():
+        if key in left_out:
+            continue
         h5 = session_h5(project, session)
         entries.append({
             "uuid": session.uuid,
@@ -192,8 +207,11 @@ def session_index(project: Project) -> dict:
     entries.sort(key=lambda f: (str(f["metadata"].get("StartTime") or "")[:19],
                                 str(f["metadata"].get("SessionName")), f["key"]))
     scores = bookkeeping.pca.get("scores")
-    return {"files": entries, "pca_path": str(resolve_path(project, scores)) if scores else "",
-            "bookkeeping_file": str(project.bookkeeping_file)}
+    index = {"files": entries, "pca_path": str(resolve_path(project, scores)) if scores else "",
+             "bookkeeping_file": str(project.bookkeeping_file)}
+    if left_out:
+        index["excluded"] = {key: bookkeeping.sessions[key].uuid for key in left_out}
+    return index
 
 
 def project_index(project: Project | None) -> dict | None:

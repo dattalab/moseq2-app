@@ -663,6 +663,56 @@ def parse_batch_modeling(filename):
     return results_dict
 
 
+def is_separate_trans(model: dict) -> bool:
+    """Whether ``model`` was fit with a separate transition matrix per group."""
+    if (model.get('run_parameters') or {}).get('separate_trans'):
+        return True
+    return 'SeparateTrans' in str((model.get('model_parameters') or {}).get('model_class', ''))
+
+
+def index_groups(index) -> dict:
+    """Each session's uuid in ``index`` (a session index, sorted or not, or an index file): (key, group)."""
+    from moseq2_viz.util import get_sorted_index
+
+    if isinstance(index, str):
+        index = get_sorted_index(index)
+    files = index['files']
+    entries = files.items() if isinstance(files, dict) else ((f['uuid'], f) for f in files)
+    return {str(uuid): (entry.get('key') or entry.get('metadata', {}).get('SessionName') or str(uuid),
+                        entry['group']) for uuid, entry in entries}
+
+
+def group_changes(model: dict, groups) -> dict:
+    """The sessions whose group in ``groups`` ({uuid: group}) differs from the one ``model`` was fit with.
+
+    Returns {uuid: (fit-time group, current group)}; a session ``groups`` does not name is left out.
+    """
+    fitted = (model.get('metadata') or {}).get('groups') or {}
+    if isinstance(fitted, list):
+        fitted = dict(zip(model['metadata']['uuids'], fitted))
+    return {str(uuid): (str(then), str(groups[str(uuid)])) for uuid, then in fitted.items()
+            if str(uuid) in groups and str(then) != str(groups[str(uuid)])}
+
+
+def report_group_changes(model, index, name=None) -> dict:
+    """Print the sessions whose group in ``index`` differs from the one ``model`` was fit with.
+
+    ``model`` is a model file or a loaded model; ``name`` names it in the message (by default its path).
+    Returns the changes, {uuid: (fit-time group, current group)}.
+    """
+    if index is None:
+        return {}
+    model_path = name if name is not None else model
+    model = parse_model_results(model) if isinstance(model, str) else model
+    current = index_groups(index)
+    changes = group_changes(model, {uuid: group for uuid, (_, group) in current.items()})
+    if changes:
+        listed = ', '.join(f'{current[uuid][0]} ({then} then, {now} now)' for uuid, (then, now) in changes.items())
+        print(f'{len(changes)} sessions are in a different group now than when {model_path} was fit: {listed}. '
+              'The analysis uses the groups in config.yaml.')
+    return changes
+
+
 def parse_model_results(model_obj, restart_idx=0, resample_idx=-1,
                         map_uuid_to_keys: bool = False,
                         sort_labels_by_usage: bool = False,

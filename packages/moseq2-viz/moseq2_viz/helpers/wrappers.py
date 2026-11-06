@@ -26,6 +26,7 @@ from moseq2_viz.viz import (
     plot_cp_comparison,
 )
 from moseq2_viz.model.util import (
+    report_group_changes,
     relabel_by_usage,
     parse_model_results,
     get_best_fit,
@@ -439,13 +440,16 @@ def plot_transition_graph_wrapper(index_file, model_fit, output_file, config_dat
             model_data["labels"], count=config_data["count"]
         )[0]
 
-    # # Get modeled session uuids to compute group-mean transition graph for
-    label_group, _ = get_trans_graph_groups(model_data)
+    report_group_changes(model_data, sorted_index, model_fit)
+
+    # Get modeled session uuids to compute group-mean transition graph for: the groups in config.yaml,
+    # or those a separate-transition model was fit with
+    label_group, _ = get_trans_graph_groups(model_data, sorted_index, model_fit)
 
     if (config_data.get("group") is not None) and len(config_data.get("group")) > 0:
         group = sorted(list(config_data.get("group")))
     else:
-        group = sorted(list(set(label_group)))
+        group = sorted({g for g in label_group if g is not None})
 
     print("Computing transition matrices...")
     try:
@@ -545,9 +549,9 @@ def make_crowd_movies_wrapper(index_file, model_path, output_dir, config_data):
 
     # Optionally generate crowd movies from independent sources, i.e. groups, or individual sessions.
     if separate_by == "groups":
-        # Get the groups to separate the arrays by - use model-assigned groups because index file could
-        # be different
-        _grp = model_fit["metadata"]["groups"]
+        # Get the groups to separate the arrays by: each session's group in config.yaml now
+        _grp = {k: sorted_index["files"][k]["group"] for k in model_fit["metadata"]["groups"]
+                if k in sorted_index["files"]}
         group_keys = groupby(lambda k: _grp[k], _grp)
 
         # Write crowd movies for each group

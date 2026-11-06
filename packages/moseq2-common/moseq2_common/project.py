@@ -18,8 +18,11 @@ are keyed by session: the recording's path relative to the project folder, with
 copied elsewhere still finds them.
 
 Groups are a setting: ``config.yaml``'s top-level ``groups`` maps each session
-key to its group. ``write_groups`` is its one writer, used by ``add-group`` and the
-notebook's group widget.
+key to its group, and its ``exclude`` lists the sessions every step after
+extraction leaves out. ``write_groups`` is their one writer, used by
+``add-group`` and the notebook's group widget. A key in ``groups``, ``exclude``
+or ``session_config.yaml`` that names no session of the project is a warning
+(``check_session_names``), never an error.
 
 What the project holds and where each step's outputs are is in its bookkeeping
 file, ``moseq2-project.yaml`` (``moseq2_common.bookkeeping``).
@@ -44,7 +47,8 @@ from moseq2_common.yaml import read_yaml, write_config
 
 __all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "OutdatedNotebookError", "Project",
            "check_not_old", "find_project", "is_job_file", "old_project_message", "outdated_names",
-           "outdated_notebook_message", "read_groups", "session_key", "standalone_note", "write_groups",
+           "outdated_notebook_message", "check_session_names", "exclude_note", "read_exclude", "read_groups",
+           "session_key", "standalone_note", "write_groups",
            "write_job_settings"]
 
 CONFIG_NAME = "config.yaml"
@@ -254,10 +258,70 @@ def read_groups(project: Project) -> dict[str, str]:
     return {str(key): str(value) for key, value in groups.items()}
 
 
-def write_groups(project: Project, groups: Mapping[str, str]) -> None:
-    """Set ``config.yaml``'s ``groups`` to ``groups``, the rest of the file as it was."""
+def read_exclude(project: Project) -> list[str]:
+    """``config.yaml``'s ``exclude``: the session keys every step after extraction leaves out.
+
+    Empty without a config.yaml or an ``exclude``.
+    """
+    from moseq2_common.options import read_config
+
+    if not Path(project.config_file).is_file():
+        return []
+    exclude = read_config(project.config_file).get("exclude") or []
+    if isinstance(exclude, str):
+        exclude = [exclude]
+    if not isinstance(exclude, list):
+        raise ValueError(
+            f"{project.config_file}'s `exclude` holds {type(exclude).__name__}, not a list of sessions. Write "
+            "it as one `- session` line per session to leave out (each session's recording path in the "
+            "project, as `groups` names it), or delete it to leave no session out."
+        )
+    return [str(key) for key in exclude]
+
+
+def exclude_note(keys: Iterable[str]) -> str:
+    """The line a step prints when it leaves out the sessions ``keys``, which ``exclude`` lists."""
+    keys = list(keys)
+    return f"Leaving out the {len(keys)} sessions under exclude in config.yaml: {', '.join(keys)}."
+
+
+def check_session_names(project: Project, sessions: Iterable[str] | None = None) -> list[str]:
+    """A warning for each key in ``groups``, ``exclude`` or ``session_config.yaml`` that is not a session.
+
+    ``sessions`` are the keys of the project's sessions; None reads them from its
+    bookkeeping file. Before any session is listed there is nothing to compare
+    with, and no warning. A ``session_config.yaml`` that cannot be read is not
+    judged here; extraction reads it and names the problem.
+    """
+    if sessions is None:
+        from moseq2_common.bookkeeping import load
+
+        sessions = load(project).sessions
+    sessions = set(sessions)
+    if not sessions:
+        return []  # nothing aggregated yet to compare the names with
+    named = [(project.config_file, key) for key in [*read_groups(project), *read_exclude(project)]]
+    if Path(project.session_config_file).is_file():
+        try:
+            entries = read_yaml(str(project.session_config_file))
+        except Exception:  # noqa: BLE001 -- extraction reports an unreadable session_config.yaml
+            entries = None
+        if isinstance(entries, Mapping):
+            named += [(project.session_config_file, str(key)) for key in entries]
+    return [f"{file} names {key}, which is not a recording in this project. It is ignored; correct or delete "
+            "the entry if the recording moved."
+            for file, key in named if key not in sessions]
+
+
+def write_groups(project: Project, groups: Mapping[str, str], exclude: Iterable[str] | None = None) -> None:
+    """Set ``config.yaml``'s ``groups`` to ``groups``, and its ``exclude`` to ``exclude`` when given.
+
+    The rest of the file stays as it was.
+    """
     from moseq2_common.options import read_config
 
     data = read_config(project.config_file)
     data["groups"] = {str(key): str(value) for key, value in groups.items()}
+    if exclude is not None:
+        data["exclude"] = [str(key) for key in exclude]
     write_config(data, str(project.config_file))

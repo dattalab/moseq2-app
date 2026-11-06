@@ -89,7 +89,7 @@ def _figures(output_file, suffix=""):
 
 def add_group(project: Project, opts: AddGroupOptions) -> AddGroupResult:
     """Set the group of the project's sessions whose metadata matches; write ``config.yaml``'s ``groups``."""
-    changed = add_group_wrapper(session_index(project), opts.as_dict())
+    changed = add_group_wrapper(session_index(project, exclude=False), opts.as_dict())
     write_groups(project, {**read_groups(project), **changed})
     return AddGroupResult(changed=changed)
 

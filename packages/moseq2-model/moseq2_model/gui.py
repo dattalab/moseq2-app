@@ -82,16 +82,14 @@ def apply_model_command(project_folder, model_file, dest_name=None):
     """
     project = Project.at(project_folder)
     config = read_settings(project.config_file, ApplyModelOptions, stage_classes=MODEL_STAGE)
-    # the command line's --load-groups defaults to True; the notebook reads it as False when config.yaml has none
-    # (shim R12, removed by PR 4.6)
-    opts = ApplyModelOptions.resolve(config=config, explicit={"load_groups": config.get("load_groups", False)})
+    opts = ApplyModelOptions.resolve(config=config)
 
-    # apply model to data
+    # apply model to data, each session in its group from config.yaml
     steps.apply_model(
         model_file,
         _scores(project),
         join(project_folder, APPLIED_MODELS_DIRNAME, dest_name or basename(model_file)),
         opts,
-        index=None,  # shim L3, removed by PR 4.6
+        index=project_index(project),
         project=project,
     )

@@ -12,20 +12,37 @@ from collections import OrderedDict
 from cytoolz import sliding_window, complement
 from matplotlib.lines import Line2D
 
-def get_trans_graph_groups(model_fit):
+def get_trans_graph_groups(model_fit, index=None, model_name=None):
     """
     Get the groups and their respective session uuids to use in transition graph generation.
 
+    With ``index`` (the project's sessions), each session is in its group there, as config.yaml has it now,
+    and a session the index leaves out (``exclude``) has group None, so no group's graph includes it. A model
+    fit with a separate transition matrix per group keeps the groups it was fit with, and says so.
+
     Args:
     model_fit (dict): trained model ARHMM containing training data UUIDs.
+    index (dict, str or None): the project's sessions; None for the groups the model was fit with.
+    model_name (str or None): the model, as the message about a separate-transition model names it.
 
     Returns:
-    label_group (list): list of groups for each included session
+    label_group (list): list of groups for each included session (None for a session left out)
     model_uuids (list): list of corresponding UUIDs for each included session in the model
     """
+    from moseq2_viz.model.util import index_groups, is_separate_trans
 
     model_uuids = model_fit.get('train_list', model_fit['keys'])
-    label_group = [model_fit['metadata']['groups'][k] for k in model_uuids]
+    fitted = model_fit['metadata']['groups']
+    if index is None:
+        return [fitted[k] for k in model_uuids], model_uuids
+
+    current = index_groups(index)
+    if is_separate_trans(model_fit):
+        print(f'{model_name or "The model"} was fit with a separate transition matrix per group, so its '
+              'transition analysis uses the groups it was fit with.')
+        label_group = [fitted[k] if str(k) in current else None for k in model_uuids]
+    else:
+        label_group = [current[str(k)][1] if str(k) in current else None for k in model_uuids]
 
     return label_group, model_uuids
 

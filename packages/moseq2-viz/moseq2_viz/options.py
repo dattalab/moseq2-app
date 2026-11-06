@@ -26,7 +26,7 @@ class AddGroupOptions(Options):
 
     key: str = option("SubjectName", "--key", "-k", type=str,
                       help="metadata field to search for value to match")
-    value: tuple | str = option("Mouse", "--value", "-v", type=str, multiple=True, help="Value to match for")
+    value: tuple | str = option(("Mouse",), "--value", "-v", type=str, multiple=True, help="Value to match for")
     group: str = option("Group1", "--group", "-g", type=str, help="Group name to set")
     exact: bool = option(False, "--exact", "-e", type=bool, is_flag=True, help="Exact match only")
     lowercase: bool = option(False, "--lowercase", type=bool, is_flag=True,

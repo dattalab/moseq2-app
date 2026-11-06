@@ -31,9 +31,8 @@ COMMANDS = {
     "plot-stats": ("plot_stats", "StatsPlotOptions", ("model.p",)),
 }
 
-#: Options a command needs to start. ``add-group`` stops on its own default
-#: ``--value`` ("Value must be an iterable."), as 1.5.0's does.
-TYPED = {"add-group": ["-v", "Mouse"]}
+#: Options a command needs to start: none, each runs on its defaults.
+TYPED = {}
 
 
 @pytest.fixture

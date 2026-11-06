@@ -9,7 +9,9 @@ MoSeq2 1.5.0 or earlier (``moseq2_common.project.check_not_old``) before writing
 ``config.yaml`` holds ``camera_type`` at its top level and one section per
 stage (``extract``, ``pca``, ``model``, ``crowd_movies``), each holding every
 setting of its stage's steps at its default, with the camera's preset values
-(``CAMERA_PRESETS``) in place of the defaults they replace.
+(``CAMERA_PRESETS``) in place of the defaults they replace, and an empty
+``exclude`` list, where the sessions every step after extraction leaves out are
+named.
 """
 
 from __future__ import annotations
@@ -121,6 +123,7 @@ def generate_config(output_file: str, camera_type: str, *, overwrite: bool) -> P
     data = {"camera_type": _CAMERA_TYPE[camera]}
     for section, classes in _stages().items():
         data[section] = {**_defaults(classes), **preset.get(section, {})}
+    data["exclude"] = []
     write_config(data, output_file)
     return Path(output_file)
 

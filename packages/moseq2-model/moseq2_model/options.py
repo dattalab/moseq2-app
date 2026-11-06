@@ -108,7 +108,8 @@ class ApplyModelOptions(Options):
 
     var_name: str = option('scores', '--var-name', type=str, help="Variable name in input file with PCs")
     load_groups: bool = option(True, '--load-groups', type=bool,
-                               help="If groups should be loaded with the PC scores.")
+                               help="If groups should be loaded with the PC scores. In a project, each "
+                                    "session's group is the one config.yaml's groups gives it.")
 
 
 @dataclass(frozen=True, kw_only=True)

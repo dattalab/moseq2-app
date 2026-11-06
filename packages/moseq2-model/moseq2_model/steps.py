@@ -9,8 +9,9 @@ settings into one options object and call these. A step needs no
 Each step hands its work function (the ``*_wrapper`` in
 ``moseq2_model.helpers.wrappers``) the options as a dict, with ``index``: the
 project's sessions and groups as an index in memory
-(``moseq2_common.bookkeeping.session_index``), or None. ``apply_model`` leaves
-``index`` out when it is None, as the notebook's apply-model always has (L3).
+(``moseq2_common.bookkeeping.session_index``), or None. The index leaves out the
+sessions ``config.yaml``'s ``exclude`` lists, and so do the fit and the applied
+labels.
 
 Inside a project (``project``), ``learn_model`` records the model in the
 project's bookkeeping file as fitted and current, and ``apply_model`` records
@@ -95,8 +96,7 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
 def apply_model(model_file: str, pc_file: str, dest_file: str, opts: ApplyModelOptions, *,
                 index: dict | None = None, project: Project | None = None) -> ApplyModelResult:
     """Label the PC scores in ``pc_file`` with the model in ``model_file``; write them to ``dest_file``."""
-    paths = {} if index is None else {'index': index}
-    apply_model_wrapper(model_file, pc_file, dest_file, _settings(opts, paths))
+    apply_model_wrapper(model_file, pc_file, dest_file, _settings(opts, {'index': index}))
     result = ApplyModelResult(applied_file=Path(dest_file))
     if project is not None:
         applied = relative_path(project, result.applied_file)

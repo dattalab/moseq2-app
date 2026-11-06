@@ -222,14 +222,17 @@ def transitions(analysis, labeled):
     Cell 12 draws these and cell 13 exports them, so the computation is
     shared.
     """
+    from moseq2_common.bookkeeping import session_index
     from moseq2_viz.model.trans_graph import get_group_trans_mats, get_trans_graph_groups
-    from moseq2_viz.model.util import parse_model_results, relabel_by_usage
+    from moseq2_viz.model.util import parse_model_results, relabel_by_usage, report_group_changes
 
     model_data = parse_model_results(str(analysis.model))
     model_data["labels"] = relabel_by_usage(model_data["labels"], count="usage")[0]
 
-    label_group, uuids = get_trans_graph_groups(model_data)
-    group = sorted(set(label_group))
+    index = session_index(analysis.project)
+    report_group_changes(model_data, index, str(analysis.model))
+    label_group, uuids = get_trans_graph_groups(model_data, index, str(analysis.model))
+    group = sorted({g for g in label_group if g is not None})
     trans_mats, usages = get_group_trans_mats(
         model_data["labels"], label_group, group, labeled, normalize=TRANSITION_NORMALIZE
     )

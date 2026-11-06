@@ -7,6 +7,7 @@ import sys
 import glob
 import click
 import numpy as np
+from collections import OrderedDict
 from copy import deepcopy
 from cytoolz import valmap
 from moseq2_model.train.util import (
@@ -291,6 +292,14 @@ def apply_model_wrapper(model_file, pc_file, dest_file, config_data):
         config_data.get("default_group", "n/a"),
         select_groups=False,
     )
+
+    # leave out the sessions config.yaml's exclude lists
+    if index_data is not None:
+        excluded = set((index_data.get("excluded") or {}).values())
+        if excluded:
+            data_dict = OrderedDict((k, v) for k, v in data_dict.items() if k not in excluded)
+            if data_metadata.get("uuids") is not None:
+                data_metadata["uuids"] = [k for k in data_metadata["uuids"] if k not in excluded]
 
     # Apply model
     syllables = apply_model(

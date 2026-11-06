@@ -10,7 +10,9 @@ itself, so this cell is the one that makes the rest of the project mean
 something.
 
 It shows an editable table of the project's sessions: session, subject, group,
-uuid and filename, with only the group column editable. A user selects the rows
+exclude, uuid and filename, with only the group and exclude columns editable.
+Ticking a session's exclude saves it in ``config.yaml``'s ``exclude``, which every
+step after extraction leaves out. A user selects the rows
 for one condition, types its name, presses "Set Group Name" to write it into the
 selected rows, and presses "Save Groups" to save each session's group in
 ``config.yaml``'s ``groups``, keyed by its recording. The first button changes
@@ -99,19 +101,37 @@ def test_the_table_shows_every_recording(scratch_project):
         "SessionName",
         "SubjectName",
         "group",
+        "exclude",
         "uuid",
         "filename",
     ]
     assert sorted(table["SessionName"]) == RECORDINGS
     assert set(table["group"]) == {"default"}
+    assert not table["exclude"].any()
 
 
-def test_only_the_group_can_be_edited(scratch_project):
+def test_only_the_group_and_exclude_can_be_edited(scratch_project):
     """3. The table is for labelling, not for correcting the metadata."""
     widget = open_table(scratch_project)
 
     assert widget.col_opts["editable"] is False
-    assert widget.col_defs == {"group": {"editable": True, "toolTip": "editable"}}
+    assert widget.col_defs == {
+        "group": {"editable": True, "toolTip": "editable"},
+        "exclude": {"editable": True, "toolTip": "leave the session out of every step after extraction"},
+    }
+
+
+def test_ticking_exclude_saves_the_session_in_exclude(scratch_project):
+    """3b. A session ticked in the exclude column is saved in config.yaml's exclude, and shown ticked again."""
+    widget = open_table(scratch_project)
+    table = widget.qgrid_widget.get_changed_df()
+    row = next(i for i, name in zip(table.index, table["SessionName"]) if name == "saline_example_1")
+    widget.qgrid_widget.edit_cell(row, "exclude", True)
+    widget.save_groups_button.click()
+
+    assert read_yaml(str(scratch_project / "config.yaml"))["exclude"] == ["saline_example_1/depth.avi"]
+    reopened = open_table(scratch_project).qgrid_widget.get_changed_df()
+    assert dict(zip(reopened["SessionName"], reopened["exclude"]))["saline_example_1"]
 
 
 def test_setting_a_name_changes_only_the_selected_rows(scratch_project):
