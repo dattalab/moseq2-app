@@ -9,12 +9,15 @@ from click.testing import CliRunner
 
 import moseq2_pca.cli as pca_cli
 import moseq2_pca.steps as pca_steps
+from configs import write_bookkeeping, write_session_labels
 from moseq2_common.yaml import write_yaml
 
 
 @pytest.fixture
-def received(monkeypatch):
-    """What ``train-pca`` hands its wrapper, instead of training."""
+def received(monkeypatch, tmp_path):
+    """What ``train-pca`` hands its wrapper, instead of training, in a project (``tmp_path``) of one session."""
+    write_bookkeeping(tmp_path, ["aggregate_results/session_0"])
+    write_session_labels(tmp_path, ["aggregate_results/session_0"])
     calls = []
 
     def record(input_dir, config, output_dir, output_file):
@@ -73,8 +76,11 @@ def test_train_pca_zero_min_height_from_config(typed, expected, tmp_path, receiv
 
 
 @pytest.fixture
-def changepoints_received(monkeypatch):
-    """What ``compute-changepoints`` hands its wrapper, instead of computing."""
+def changepoints_received(monkeypatch, tmp_path):
+    """What ``compute-changepoints`` hands its wrapper, instead of computing, in a project (``tmp_path``) of one
+    session."""
+    write_bookkeeping(tmp_path, ["aggregate_results/session_0"])
+    write_session_labels(tmp_path, ["aggregate_results/session_0"])
     calls = []
 
     def record(input_dir, config, output_dir, output_file):

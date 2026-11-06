@@ -18,16 +18,17 @@ from os.path import abspath, join, exists, splitext, basename, dirname
 from moseq2_pca.helpers.data import get_pca_paths, get_pca_yaml_data, load_pcs_for_cp
 from moseq2_pca.pca.util import apply_pca_dask, apply_pca_local, train_pca_dask, get_changepoints_dask
 from moseq2_common.frames import select_strel
-from moseq2_pca.util import recursive_find_h5s, initialize_dask, set_dask_config, close_dask, \
+from moseq2_pca.util import find_extractions, initialize_dask, set_dask_config, close_dask, \
             check_timestamps, check_frame_shapes, check_frames_match_pca, \
             check_training_memory, dask_messages_to
 
 def load_and_check_data(input_dir, output_dir, config_data):
     """
-    Load relevant h5 and yaml files found in given input directory, then check for timestamps and warn the user if they are missing.
+    Load the sessions' extractions, then check for timestamps and warn the user if they are missing.
 
     Args:
-    input_dir (str): input directory containing extracted h5 files to find
+    input_dir (str or list): the sessions: a folder to search for extracted h5 files, or the sessions' h5 files
+        in the order to read them (``moseq2_pca.util.find_extractions``)
     output_dir (str): directory name to save pca results
 
     Returns:
@@ -47,8 +48,7 @@ def load_and_check_data(input_dir, output_dir, config_data):
     if not exists(output_dir):
         os.makedirs(output_dir)
 
-    # find directories with .dat files tchat either have incomplete or no extractions
-    h5s, dicts, yamls = recursive_find_h5s(input_dir)
+    h5s, dicts, yamls = find_extractions(input_dir)
 
     check_timestamps(h5s)  # function to check whether timestamp files are found
     check_frame_shapes(h5s, dicts, config_data.get('h5_path', '/frames'))
@@ -60,7 +60,7 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
     Wrapper function to train PCA.
 
     Args:
-    input_dir (int): path to directory containing all h5+yaml files
+    input_dir (str or list): the sessions, a folder or h5 files (``load_and_check_data``)
     config_data (dict): dict of relevant PCA parameters (image filtering etc.)
     output_dir (str): path to directory to store PCA data
     output_file (str): pca model filename
@@ -208,7 +208,7 @@ def apply_pca_wrapper(input_dir, config_data, output_dir, output_file):
     Wrapper function to obtain PCA Scores.
 
     Args:
-    input_dir (int): path to directory containing all h5+yaml files
+    input_dir (str or list): the sessions, a folder or h5 files (``load_and_check_data``)
     config_data (dict): dict of relevant PCA parameters (image filtering etc.)
     output_dir (str): path to directory to store PCA data
     output_file (str): pca model filename
@@ -305,7 +305,7 @@ def compute_changepoints_wrapper(input_dir, config_data, output_dir, output_file
     Wrapper function to compute model-free Changepoints.
 
     Args:
-    input_dir (int): path to directory containing all h5+yaml files
+    input_dir (str or list): the sessions, a folder or h5 files (``load_and_check_data``)
     config_data (dict): dict of relevant PCA parameters (image filtering etc.)
     output_dir (str): path to directory to store PCA data
     output_file (str): pca model filename

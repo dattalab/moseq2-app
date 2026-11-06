@@ -62,3 +62,18 @@ def write_bookkeeping(project, session_files=(), **pca) -> None:
     write_yaml({"sessions": sessions,
                 "pca": {name: relative_path(project, Path(project.folder) / path) for name, path in pca.items()}},
                str(project.bookkeeping_file))
+
+
+def write_session_labels(project, session_files=()) -> None:
+    """For each folder in ``session_files`` (as ``write_bookkeeping`` takes them), an extraction file holding
+    only the session's uuid (``uuid-<i>``), for tests whose PCA work is replaced but whose steps read the
+    project's sessions."""
+    from pathlib import Path
+
+    import h5py
+
+    for i, path in enumerate(session_files):
+        folder = Path(project) / path
+        folder.mkdir(parents=True, exist_ok=True)
+        with h5py.File(folder / "results.h5", "a") as f:
+            f["metadata/uuid"] = f"uuid-{i}"
