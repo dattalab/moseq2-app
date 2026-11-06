@@ -68,7 +68,7 @@ def _extraction(tmp_path, name, timestamps, unit):
         f["timestamps"] = timestamps
         if unit is not None:
             f["timestamps"].attrs["unit"] = unit
-    (tmp_path / f"{name}.yaml").write_text(f"uuid: {name}\nmetadata: {{}}\n")
+        f["metadata/uuid"] = name
     (tmp_path / f"{name}.mp4").touch()
     return str(tmp_path / f"{name}.mp4")
 

@@ -27,6 +27,7 @@ from moseq2_common.options import (
     project_file_option,
 )
 from moseq2_common.project import find_project
+from moseq2_common.records import print_record_command
 from moseq2_viz import steps
 from moseq2_viz.options import (
     CROWD_MOVIE_STAGE,
@@ -212,3 +213,6 @@ def plot_stats(ctx, project_file, model_fit, output_file, **_):
     opts = _resolve(ctx, StatsPlotOptions)
     steps.plot_stats(_sessions(ctx, project_file), model_fit, output_file, opts)
     click.echo(f'Syllable {opts.stat} graph created successfully')
+
+
+cli.add_command(print_record_command())

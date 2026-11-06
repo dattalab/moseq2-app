@@ -9,7 +9,7 @@
 A companion to cell 11 rather than a step of its own. The violins there label
 their points by uuid, so a user who sees an outlier has a uuid and nothing
 else. This prints the recording behind it: session, subject, start time, and
-the two files it was built from.
+its extraction file.
 
 The uuid is matched as a substring, which is why the notebook's example is
 two characters. A user reads enough of a uuid off a hover label to be
@@ -30,7 +30,7 @@ from moseq2_app.util import uuid_lookup
 from test_05_arena_mask import RECORDINGS
 
 #: The fields the lookup prints, in the order it prints them.
-REPORTED = ("SessionName", "SubjectName", "StartTime", "h5Path", "yamlPath")
+REPORTED = ("SessionName", "SubjectName", "StartTime", "h5Path")
 
 
 @pytest.fixture

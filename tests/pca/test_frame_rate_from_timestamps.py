@@ -16,7 +16,7 @@ import pytest
 from dask.distributed import Client
 
 from moseq2_pca.pca.util import apply_pca_dask
-from moseq2_pca.util import get_changepoints, write_yaml
+from moseq2_pca.util import get_changepoints
 
 N = 300
 # a Kinect's frames arrive about 33.4 ms apart
@@ -39,8 +39,8 @@ def session(tmp_path, uuid, timestamps_ms):
     with h5py.File(h5, "w") as f:
         f["frames"] = np.random.default_rng(0).random((len(timestamps_ms), 4, 4))
         f["timestamps"] = timestamps_ms
-    write_yaml({"uuid": uuid}, str(tmp_path / f"{uuid}.yaml"))
-    return str(h5), str(tmp_path / f"{uuid}.yaml")
+        f["metadata/uuid"] = uuid
+    return str(h5), str(h5)
 
 
 def apply(tmp_path, client, h5, yml):

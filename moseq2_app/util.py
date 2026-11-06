@@ -153,8 +153,8 @@ def uuid_lookup(target_uuid, uuid_dict_source):
             # is being handed in order to go and open it into one they have to
             # edit first.
             metadata = info['metadata']
-            metadata['h5Path'], metadata['yamlPath'] = info['path']
-            for field in ('SessionName', 'SubjectName', 'StartTime', 'h5Path', 'yamlPath'):
+            metadata['h5Path'] = info['path'][0]
+            for field in ('SessionName', 'SubjectName', 'StartTime', 'h5Path'):
                 print(f'  {field}: {metadata[field]}')
 
 @dataclass(frozen=True)

@@ -5,7 +5,8 @@ The notebook-only pipeline steps of moseq2-app.
 crowd-movie comparison tool show, through moseq2-viz's ``make_crowd_movies`` step.
 ``train_flip_classifier`` trains a flip classifier on the frames labeled in the
 Flip-Classifier-Training notebook, each session's cleaned as extraction cleans that
-recording.
+recording. The classifier's record (``moseq2_common.records``) is written beside it as
+``<classifier>.yaml``.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import Sequence
 
 from moseq2_app.flip.train import create_training_dataset, save_classifier, session_cleaning, train_classifier
+from moseq2_common.records import start_record, write_record
 from moseq2_viz import steps as viz_steps
 from moseq2_viz.options import CrowdMovieOptions
 
@@ -80,7 +82,14 @@ def train_flip_classifier(frame_ranges_file: str, out_path: str, config_file: st
     Returns:
     (FlipTrainingResult): the training set and the classifier written.
     """
+    record = start_record("train-flip-classifier", {"classifier": classifier},
+                          [path for path in (config_file, frame_ranges_file) if path])
     cleaning = session_cleaning(frame_ranges_file, config_file)
+    record.note("cleaning", {name: opts.as_dict() for name, opts in cleaning.items()})
     training_data = create_training_dataset(frame_ranges_file, cleaning)
     save_classifier(train_classifier(training_data, classifier=classifier), out_path)
-    return FlipTrainingResult(training_data=Path(training_data), classifier=Path(out_path))
+    result = FlipTrainingResult(training_data=Path(training_data), classifier=Path(out_path))
+    if result.classifier.is_file():
+        write_record(result.classifier,
+                     record.finish({"files": [str(result.classifier), str(result.training_data)]}))
+    return result

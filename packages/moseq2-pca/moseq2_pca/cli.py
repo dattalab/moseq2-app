@@ -18,6 +18,7 @@ import click
 from moseq2_common.bookkeeping import load, resolve_path
 from moseq2_common.options import ProjectGroup, click_options, command_settings, explicit_values
 from moseq2_common.project import find_project
+from moseq2_common.records import print_record_command
 from moseq2_pca import steps
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
 from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
@@ -132,6 +133,9 @@ def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, p
 def clip_scores(ctx, pca_file, clip_samples, **_):
     opts = ClipScoresOptions.resolve(explicit=explicit_values(ctx, ClipScoresOptions))
     clip_scores_wrapper(pca_file, clip_samples, opts.from_end)
+
+
+cli.add_command(print_record_command())
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ from dask.distributed import Client
 
 from moseq2_extract.util import load_timestamps
 from moseq2_pca.pca.util import apply_pca_dask
-from moseq2_pca.util import get_changepoints, insert_nans, write_yaml
+from moseq2_pca.util import get_changepoints, insert_nans
 
 N = 300
 EXACT = np.arange(N) / 30
@@ -96,10 +96,10 @@ def test_scores_get_an_empty_row_for_a_single_drop_at_exact_spacing(tmp_path, cl
     with h5py.File(h5, "w") as f:
         f["frames"] = np.random.default_rng(0).random((len(timestamps), 4, 4))
         f["timestamps"] = timestamps * 1000
-    write_yaml({"uuid": "s"}, str(tmp_path / "s.yaml"))
+        f["metadata/uuid"] = "s"
     save_file = str(tmp_path / "pca_scores")
     apply_pca_dask(
-        np.ones((2, 16)), [str(h5)], [str(tmp_path / "s.yaml")], use_fft=False,
+        np.ones((2, 16)), [str(h5)], [str(h5)], use_fft=False,
         clean_params={"gaussfilter_time": 0, "medfilter_time": [0]},
         save_file=save_file, chunk_size=64, mask_params={}, missing_data=False,
         client=client, h5_path="/frames",

@@ -17,6 +17,7 @@ import pytest
 
 from moseq2_app.flip import train
 from moseq2_common.frames import CleaningOptions
+from moseq2_common.records import write_h5_record
 from moseq2_common.yaml import write_yaml
 
 
@@ -112,8 +113,8 @@ def test_the_cleaned_third_follows_the_cleaning_parameters(tmp_path):
 
 def _extracted_session(root, name, uuid, frames, stored):
     """A recording in ``root/name`` and its extraction in its session folder in ``aggregate_results/``:
-    ``results.h5`` holding ``frames``, the uuid and the cleaning settings ``stored`` as extraction
-    stores its settings, and ``results.yaml`` beside it."""
+    ``results.h5`` holding ``frames``, the uuid, and a record whose options hold the cleaning settings
+    ``stored`` (``moseq2_common.records``)."""
     folder = root / "aggregate_results" / name
     folder.mkdir(parents=True)
     (root / name).mkdir()
@@ -122,9 +123,7 @@ def _extracted_session(root, name, uuid, frames, stored):
     with h5py.File(h5, "w") as f:
         f["frames"] = frames
         f["metadata/uuid"] = uuid
-        for key, value in stored.items():
-            f[f"metadata/extraction/parameters/{key}"] = value
-    write_yaml({"complete": True, "skip": False, "uuid": uuid}, str(folder / "results.yaml"))
+        write_h5_record(f, {"step": "extract", "options": dict(stored)})
     return h5
 
 

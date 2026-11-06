@@ -84,7 +84,7 @@ def local(monkeypatch):
     """What each local extraction hands ``extract_wrapper``, instead of running it."""
     calls = {}
 
-    def record(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None):
+    def record(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None, record=None):
         calls[input_file] = {"config": config_data, "num_frames": num_frames}
         return output_dir
 
@@ -109,7 +109,7 @@ def slurm(monkeypatch):
         monkeypatch.setattr(
             extract_steps,
             "extract_wrapper",
-            lambda f, out, config, num_frames=None, skip=False, uuid=None: calls.update(
+            lambda f, out, config, num_frames=None, skip=False, uuid=None, record=None: calls.update(
                 {f: {"config": config, "num_frames": num_frames}}
             ),
         )

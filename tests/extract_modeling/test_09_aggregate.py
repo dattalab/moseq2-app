@@ -68,8 +68,7 @@ def test_the_sessions_carry_each_extractions_uuid(aggregated, project):
 def test_each_entry_points_at_its_session_folder(aggregated, project):
     """3. The sessions are the files extraction wrote, in their folders."""
     for name, entry in entries(aggregated).items():
-        assert [Path(p) for p in entry["path"]] == [proc(project, name) / "results.h5",
-                                                    proc(project, name) / "results.yaml"]
+        assert [Path(p) for p in entry["path"]] == [proc(project, name) / "results.h5"]
 
 
 def test_aggregation_lists_the_sessions_and_nothing_else(bookkeeping_as_aggregated, project):

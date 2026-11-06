@@ -21,49 +21,49 @@ from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
 from moseq2_common.frames import clean_frames as clean_frames_spatial, odd_kernel
+from moseq2_common.h5 import extraction_labels
 from moseq2_common.timestamps import frame_steps, timestamps_path
-from moseq2_common.yaml import read_yaml as _read_yaml, write_yaml
+from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from dask.distributed import Client
 from dask_jobqueue import SLURMCluster
 from os.path import join, exists, abspath, expanduser
 
 
-def recursive_find_h5s(root_dir=os.getcwd(),
-                       ext='.h5',
-                       yaml_string='{}.yaml'):
+def recursive_find_h5s(root_dir=os.getcwd(), ext='.h5'):
     """
-    Recursively find h5 files, along with yaml files with the same basename
+    Recursively find the extractions under ``root_dir``: the ``.h5`` files holding frames and a session uuid.
 
     Args:
     root_dir (str): path to base directory to begin recursive search in.
     ext (str): extension to search for
-    yaml_string (str): string for filename formatting when saving data
 
     Returns:
     h5s (list): list of found h5 files
-    dicts (list): list of found metadata files
-    yamls (list): list of found yaml files
+    dicts (list): each extraction's ``uuid`` and acquisition ``metadata``, read from its ``.h5``
+    sources (list): the files each session's uuid is read from: the ``.h5`` files themselves
     """
 
     if not ext.startswith('.'):
         ext = '.' + ext
 
-    def has_frames(f):
+    def extraction(f):
         try:
             with h5py.File(f, 'r') as h5f:
-                return 'frames' in h5f
+                if 'frames' not in h5f or 'metadata/uuid' not in h5f:
+                    return None
+            uuid, metadata = extraction_labels(f)
         except OSError:
             warnings.warn(f'Error reading {f}, skipping...')
-            return False
+            return None
+        return {'uuid': uuid, 'metadata': metadata}
 
-    h5s = glob(join(abspath(root_dir), '**', f'*{ext}'), recursive=True)
-    h5s = filter(lambda f: exists(yaml_string.format(f.replace(ext, ''))), h5s)
-    h5s = list(filter(has_frames, h5s))
-    yamls = list(map(lambda f: yaml_string.format(f.replace(ext, '')), h5s))
-    dicts = list(map(_read_yaml, yamls))
+    found = [(h5, extraction(h5)) for h5 in glob(join(abspath(root_dir), '**', f'*{ext}'), recursive=True)]
+    found = [(h5, info) for h5, info in found if info is not None]
+    h5s = [h5 for h5, _ in found]
+    dicts = [info for _, info in found]
 
-    return h5s, dicts, yamls
+    return h5s, dicts, list(h5s)
 
 
 def gauss_smooth(signal, win_length=None, sig=1.5, kernel=None):
@@ -309,7 +309,7 @@ def _frame_shapes(h5s, dicts, h5_path='/frames'):
             if h5_path not in f:
                 continue
             shape = tuple(f[h5_path].shape[1:])
-        uuid = (meta or {}).get('uuid', 'no uuid in its yaml')
+        uuid = (meta or {}).get('uuid', 'no uuid in its .h5')
         shapes.append((shape, uuid, h5))
     return shapes
 

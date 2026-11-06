@@ -47,7 +47,7 @@ def stand_in(skipped=(SKIPPED,), fails=(FAILS,)):
     recording and None when it skips one already extracted.
     """
 
-    def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None):
+    def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None, record=None):
         if any(name in input_file for name in fails):
             raise ValueError(f"the depth video in {input_file} is broken\nsecond line")
         if any(name in input_file for name in skipped):

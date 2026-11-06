@@ -19,6 +19,8 @@ import h5py
 import pytest
 from click.testing import CliRunner
 
+from moseq2_common.records import read_record
+
 import moseq2_extract.cli as extract_cli
 from moseq2_extract.io.video import get_movie_info, load_movie_data
 
@@ -54,9 +56,9 @@ def test_a_tarball_extracts_beside_the_archive(tarball):
     assert result.exception is None, result.output
 
     proc = tarball.parent / "proc"
-    for name in ("results.h5", "results.mp4", "results.yaml"):
+    for name in ("results.h5", "results.mp4"):
         assert (proc / name).is_file(), f"{name} missing from {proc}: {sorted(p.name for p in proc.iterdir())}"
     with h5py.File(proc / "results.h5", "r") as f:
         assert f["frames"].shape[0] == N_FRAMES
         assert len(f["timestamps"]) == N_FRAMES
-    assert "complete: true" in (proc / "results.yaml").read_text()
+    assert read_record(proc / "results.h5")["step"] == "extract"

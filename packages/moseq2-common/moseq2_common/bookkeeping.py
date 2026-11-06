@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from os.path import abspath, dirname
 from pathlib import Path, PurePosixPath
 
+from moseq2_common.h5 import extraction_labels
 from moseq2_common.project import Project, check_session_names, exclude_note, read_exclude, read_groups, session_key
 from moseq2_common.yaml import read_yaml, write_yaml
 
@@ -158,13 +159,11 @@ def sessions_folder(project: Project, bookkeeping: Bookkeeping | None = None) ->
 
 
 def _metadata(h5: Path, fallback: str) -> dict:
-    """The acquisition metadata the session's results yaml holds, beside its ``.h5``."""
-    yaml_file = h5.with_suffix(".yaml")
+    """The acquisition metadata the session's extraction holds (``metadata/acquisition`` in its ``.h5``)."""
     try:
-        stored = (read_yaml(str(yaml_file)) or {}).get("metadata")
+        _, metadata = extraction_labels(h5)
     except OSError:
-        stored = None
-    metadata = dict(stored) if isinstance(stored, dict) else {}
+        metadata = {}
     metadata.setdefault("SessionName", fallback)
     metadata.setdefault("SubjectName", fallback)
     return metadata
@@ -200,7 +199,7 @@ def session_index(project: Project, *, exclude: bool = True) -> dict:
             "uuid": session.uuid,
             "group": groups.get(key, DEFAULT_GROUP),
             "metadata": _metadata(h5, key),
-            "path": (str(h5), str(h5.with_suffix(".yaml"))),
+            "path": (str(h5),),
             "key": key,
         })
     # recording order: the start time to the second, as 1.5.0's aggregated file names began with it

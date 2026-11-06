@@ -13,6 +13,10 @@ project's sessions and groups as an index in memory
 sessions ``config.yaml``'s ``exclude`` lists, and so do the fit and the applied
 labels.
 
+Each output carries the record of the run (``moseq2_common.records``): the model
+and the kappa scan's script in a ``.yaml`` beside them (``model.p``: ``model.yaml``), an applied model in
+its ``.h5``'s ``/provenance`` attribute.
+
 Inside a project (``project``), ``learn_model`` records the model in the
 project's bookkeeping file as fitted and current, and ``apply_model`` records
 the applied model. A fit run from a kappa scan's job settings file is given no
@@ -28,6 +32,7 @@ from pathlib import Path
 from moseq2_model.helpers.wrappers import apply_model_wrapper, kappa_scan_fit_models_wrapper, learn_model_wrapper
 from moseq2_common.bookkeeping import relative_path, update
 from moseq2_common.project import Project
+from moseq2_common.records import start_record, write_record
 from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
 
 #: The file name of each kappa-scan fit's settings, in the scan's output folder beside its model, given the
@@ -61,11 +66,30 @@ def _settings(opts, paths):
     return {**paths, **opts.as_dict()}
 
 
+def _start(step, opts, project, *files):
+    """The record of ``step``, its inputs ``files`` and the project's config.yaml."""
+    settings = [project.config_file] if project is not None and project.config_file.is_file() else []
+    return start_record(step, opts, [*settings, *[f for f in files if f]], project=project)
+
+
+def _sessions(index):
+    """The extraction files the sessions of ``index`` name."""
+    if not isinstance(index, dict):
+        return []
+    entries = index.get("files", [])
+    return [entry["path"][0] for entry in (entries.values() if isinstance(entries, dict) else entries)]
+
+
 def learn_model(input_file: str, dest_file: str, opts: LearnModelOptions, *,
                 index: dict | None = None, project: Project | None = None) -> LearnModelResult:
     """Fit an AR-HMM to the PC scores in ``input_file``; write the model to ``dest_file``."""
+    record = _start("learn-model", opts, project, input_file, *_sessions(index))
     figure = learn_model_wrapper(input_file, dest_file, _settings(opts, {'index': index}))
     result = LearnModelResult(model_file=Path(realpath(dest_file)), figure_file=Path(figure) if figure else None)
+    if isinstance(index, dict) and isinstance(index.get("files"), list):
+        record.note("groups", {entry.get("key", entry.get("uuid")): entry.get("group") for entry in index["files"]})
+    write_record(result.model_file, record.finish({"files": [str(result.model_file),
+                                                             *([str(result.figure_file)] if figure else [])]}))
     if project is not None:
         model = relative_path(project, result.model_file)
 
@@ -88,16 +112,22 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
     settings the scan does not declare (``checkpoint_freq``, ``use_checkpoint``, ``default_group``). Its
     ``job:`` block names ``project``.
     """
+    record = _start("kappa-scan", opts, project, input_file)
     commands = kappa_scan_fit_models_wrapper(input_file, _settings(opts, {'index': index}), output_dir,
                                              KAPPA_SCAN_SETTINGS_NAME, learn=learn, project=project)
-    return KappaScanResult(script=Path(opts.out_script), commands=commands)
+    result = KappaScanResult(script=Path(opts.out_script), commands=commands)
+    if result.script.is_file():
+        write_record(result.script, record.finish({"files": [str(result.script)]}))
+    return result
 
 
 def apply_model(model_file: str, pc_file: str, dest_file: str, opts: ApplyModelOptions, *,
                 index: dict | None = None, project: Project | None = None) -> ApplyModelResult:
     """Label the PC scores in ``pc_file`` with the model in ``model_file``; write them to ``dest_file``."""
+    record = _start("apply-model", opts, project, model_file, pc_file, *_sessions(index))
     apply_model_wrapper(model_file, pc_file, dest_file, _settings(opts, {'index': index}))
     result = ApplyModelResult(applied_file=Path(dest_file))
+    write_record(result.applied_file, record.finish({"files": [str(result.applied_file)]}))
     if project is not None:
         applied = relative_path(project, result.applied_file)
 

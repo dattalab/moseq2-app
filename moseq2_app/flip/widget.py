@@ -1,3 +1,4 @@
+import io
 import h5py
 import pickle
 import warnings
@@ -6,6 +7,7 @@ import holoviews as hv
 from tqdm import tqdm
 import numpy as np
 from pathlib import Path
+from moseq2_common.records import RECORD_ATTRIBUTE, fingerprint, record_text
 from moseq2_common.yaml import read_yaml
 from collections import defaultdict
 from moseq2_extract.extract.proc import get_flips
@@ -46,12 +48,28 @@ _patch_holoviews_stream_update()
 
 
 def _extraction_complete(file_path: Path):
-    return read_yaml(file_path)['complete']
+    """Whether ``file_path`` is a finished extraction: an ``.h5`` under its final name holding frames."""
+    try:
+        with h5py.File(file_path, 'r') as f:
+            return 'frames' in f and 'metadata/uuid' in f
+    except OSError:
+        return False
+
+
+def _note_flip_correction(f, clf_path, settings):
+    """Note in the extraction's record (its ``/provenance`` attribute) the classifier that flipped its frames."""
+    stored = f.attrs.get(RECORD_ATTRIBUTE)
+    if stored is None:
+        return
+    record = read_yaml(io.StringIO(stored.decode() if isinstance(stored, bytes) else str(stored)))
+    record.setdefault('notes', {})['flip_correction'] = {
+        'classifier': str(Path(clf_path).resolve()), 'fingerprint': fingerprint(clf_path), **settings}
+    f.attrs[RECORD_ATTRIBUTE] = record_text(record)
 
 
 def _find_extractions(data_path: str):
     files = Path(data_path).glob('**/*.h5')
-    files = sorted(f for f in files if _extraction_complete(f.with_suffix('.yaml')))
+    files = sorted(f for f in files if _extraction_complete(f))
     if len(set([f.name for f in files])) < len(files):
         files = {f.parent.name + '/' + f.name: f for f in files}
     else:
@@ -396,6 +414,8 @@ class FlipClassifierWidget:
                         video_pipe.communicate()
                         video_pipe = None
 
+                    _note_flip_correction(f, clf_path, {'chunk_size': chunk_size, 'chunk_overlap': chunk_overlap,
+                                                        'smoothing': smoothing})
                     f.attrs['flip_correction'] = 'complete'
 
     @property

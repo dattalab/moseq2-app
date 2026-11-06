@@ -91,7 +91,7 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
     monkeypatch.setattr(
         extract_steps,
         "extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None: received.update(config),
+        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None, record=None: received.update(config),
     )
     extract_command(str(project / "saline_example_0" / "depth.avi"), None, str(project / "config.yaml"))
 

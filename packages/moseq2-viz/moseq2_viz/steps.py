@@ -15,6 +15,11 @@ or as the dict the wrapper takes.
 ``add_group`` writes ``config.yaml``'s ``groups``, and ``get_best_model``
 records the model it picks as the project's current model in its
 ``moseq2-project.yaml``.
+
+Every other step writes the record of its run (``moseq2_common.records``) as
+a ``.yaml`` beside its output (``sidecar_path``): ``<figure>.yaml`` for a figure
+named without ``.png``/``.pdf``, ``moseq_df.yaml`` for ``moseq_df.csv``,
+``crowd_movies.yaml`` for the crowd-movie folder.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from typing import Any
 
 from moseq2_common.bookkeeping import relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
+from moseq2_common.records import start_record, write_record
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
     get_best_fit_model_wrapper,
@@ -87,6 +93,27 @@ def _figures(output_file, suffix=""):
     return [Path(f"{output_file}{suffix}.png"), Path(f"{output_file}{suffix}.pdf")]
 
 
+def _start(step, opts, index, *files) -> Any:
+    """The record of ``step``: its inputs ``files``, the sessions ``index`` names and the project's
+    settings, when ``index`` is a project's sessions."""
+    sessions, project = [], None
+    if isinstance(index, dict):
+        entries = index.get("files", [])
+        sessions = [entry["path"][0] for entry in (entries.values() if isinstance(entries, dict) else entries)]
+        if index.get("bookkeeping_file"):
+            project = Project.at(Path(index["bookkeeping_file"]).parent)
+    elif isinstance(index, (str, Path)):
+        files = (index, *files)
+    settings = [project.config_file] if project is not None and project.config_file.is_file() else []
+    return start_record(step, opts if opts is not None else {}, [*settings, *[f for f in files if f], *sessions],
+                        project=project)
+
+
+def _finish(record, output, files):
+    """Write ``record``, finished with ``files``, beside ``output``."""
+    write_record(output, record.finish({"files": [str(f) for f in files if Path(f).exists()]}))
+
+
 def add_group(project: Project, opts: AddGroupOptions) -> AddGroupResult:
     """Set the group of the project's sessions whose metadata matches; write ``config.yaml``'s ``groups``."""
     changed = add_group_wrapper(session_index(project, exclude=False), opts.as_dict())
@@ -100,9 +127,13 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
 
     In a project, the model picked becomes the project's current model.
     """
+    record = _start("get-best-model", opts, None, model_dir, cp_path)
     best_model_info, figure = get_best_fit_model_wrapper(
         model_dir, cp_path, output_file, opts.plot_all, opts.ext, opts.objective
     )
+    if output_file is not None:
+        record.note("best_model", best_model_info.get(f"best model - {opts.objective}"))
+        _finish(record, output_file, _figures(output_file))
     best = best_model_info.get(f"best model - {opts.objective}")
     if project is not None and best:
         model = relative_path(project, best)
@@ -124,42 +155,59 @@ def make_df(model_fit: str, index: dict | str, output_file: str | Path) -> MakeD
     extension = output_file.suffix[1:]
     if extension not in ["csv", "parquet"]:
         raise ValueError(f"Extension {extension} is not supported. Please use .csv or .parquet.")
+    record = _start("make-df", None, index, model_fit)
     make_df_wrapper(model_fit, index, output_file, extension)
-    return MakeDfResult(dataframe_file=output_file,
-                        stats_file=output_file.with_name(f"{output_file.stem}_stats.{extension}"))
+    result = MakeDfResult(dataframe_file=output_file,
+                          stats_file=output_file.with_name(f"{output_file.stem}_stats.{extension}"))
+    _finish(record, output_file, [result.dataframe_file, result.stats_file])
+    return result
 
 
 def make_crowd_movies(index: dict | str, model_path: str, output_dir: str, opts: CrowdMovieOptions) -> CrowdMoviesResult:
     """Write a crowd movie for each syllable into ``output_dir``."""
-    return CrowdMoviesResult(movies=make_crowd_movies_wrapper(index, model_path, output_dir, opts.as_dict()))
+    record = _start("make-crowd-movies", opts, index, model_path)
+    result = CrowdMoviesResult(movies=make_crowd_movies_wrapper(index, model_path, output_dir, opts.as_dict()))
+    _finish(record, output_dir, [movie for movies in result.movies.values() for movie in movies]
+            if isinstance(result.movies, dict) else [])
+    return result
 
 
 def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:
     """Plot each group's scalar summary to ``<output_file>_summary``."""
+    record = _start("plot-scalar-summary", opts, index)
     plot_scalar_summary_wrapper(index, output_file, colors=opts.colors)
+    _finish(record, f"{output_file}_summary", _figures(output_file, "_summary"))
     return FiguresResult(figure_files=_figures(output_file, "_summary"))
 
 
 def plot_group_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
     """Plot each group's mean position heatmap to ``output_file``."""
+    record = _start("plot-group-position-heatmaps", opts, index)
     plot_mean_group_position_pdf_wrapper(index, output_file, normalize=opts.normalize)
+    _finish(record, output_file, _figures(output_file))
     return FiguresResult(figure_files=_figures(output_file))
 
 
 def plot_verbose_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
     """Plot each session's position heatmap to ``output_file``."""
+    record = _start("plot-verbose-position-heatmaps", opts, index)
     plot_verbose_pdfs_wrapper(index, output_file, normalize=opts.normalize)
+    _finish(record, output_file, _figures(output_file))
     return FiguresResult(figure_files=_figures(output_file))
 
 
 def plot_transition_graph(index: dict | str, model_fit: str, output_file: str,
                           opts: TransitionGraphOptions) -> FiguresResult:
     """Plot each group's transition graph to ``output_file``."""
+    record = _start("plot-transition-graph", opts, index, model_fit)
     plot_transition_graph_wrapper(index, model_fit, output_file, opts.as_dict())
+    _finish(record, output_file, _figures(output_file))
     return FiguresResult(figure_files=_figures(output_file))
 
 
 def plot_stats(index: dict | str, model_fit: str, output_file: str, opts: StatsPlotOptions) -> FiguresResult:
     """Plot a syllable statistic for each group to ``output_file``."""
+    record = _start("plot-stats", opts, index, model_fit)
     plot_syllable_stat_wrapper(model_fit, index, output_file, **opts.as_dict())
+    _finish(record, output_file, _figures(output_file))
     return FiguresResult(figure_files=_figures(output_file))
