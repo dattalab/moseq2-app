@@ -16,6 +16,8 @@ own folder. The cells that would change the extractions in place are not run.
 
 from __future__ import annotations
 
+import html
+import os
 import pickle
 import re
 import shutil
@@ -501,16 +503,83 @@ def test_training_on_older_saved_labels_warns(notebook, recwarn):
         assert len(data["frames"]) == 6 * 40
 
 
+def extracted_again(h5):
+    """What extracting the session again leaves behind, as far as any check can tell: its ``.h5`` carrying
+    the record of a new extraction run."""
+    from moseq2_common.records import start_record, write_h5_record
+
+    with h5py.File(h5, "a") as f:
+        write_h5_record(f, start_record("extract", {}, []).finish({}))
+
+
+def extracted_on(h5):
+    """When the extraction that wrote ``h5`` ended, as the widget's message gives it."""
+    from datetime import datetime
+
+    from moseq2_common.records import run_of
+
+    return datetime.fromisoformat(run_of(h5)["ended"]).strftime("%Y-%m-%d %H:%M")
+
+
+def test_saving_flip_labels_writes_a_record_naming_each_extraction_run(notebook):
+    """Saving the ranges writes their record beside the file: the save step, its time, and each labelled
+    session's extraction with the run that wrote it. The ranges file holds the sessions and the ranges only."""
+    from moseq2_common.records import read_record, run_of
+
+    widget = notebook["FF"]
+    sessions = list(widget.sessions)
+    label(widget, sessions[0], 10, 40, left=False)
+    label(widget, sessions[-1], 100, 120, left=True)
+    run_cell(SAVE, notebook)
+
+    labels = Path(widget.training_data_path)
+    with open(labels, "rb") as f:
+        assert len(pickle.load(f)) == 2
+    assert labels.with_suffix(".yaml").is_file()
+    record = read_record(labels)
+    assert record["step"] == "save-flip-labels"
+    assert record["started"] and record["ended"]
+    named = {entry["session"]: entry for entry in record["inputs"]}
+    assert sorted(named) == sorted({sessions[0], sessions[-1]})
+    for session, entry in named.items():
+        assert entry["path"] == os.path.abspath(widget.sessions[session])
+        assert entry["run"] == run_of(widget.sessions[session])
+
+
+def test_flip_labels_for_a_flipped_extraction_are_not_attached(notebook, tmp_path, configured):
+    """Applying a flip classifier rotates the frames the ranges point into; it is noted in the extraction's
+    record with when it ran, and the saved ranges are not attached."""
+    from datetime import datetime
+
+    from moseq2_app.flip.widget import _note_flip_correction
+    from moseq2_common.records import run_of
+
+    widget = notebook["FF"]
+    session = list(widget.sessions)[0]
+    label(widget, session, 10, 40, left=False)
+    run_cell(SAVE, notebook)
+    h5 = Path(widget.sessions[session])
+    classifier = tmp_path / "flip-classifier.pkl"
+    classifier.write_bytes(b"a classifier")
+    with h5py.File(h5, "a") as f:
+        _note_flip_correction(f, classifier, {"chunk_size": 4000, "chunk_overlap": 0, "smoothing": 51})
+
+    widget = open_notebook(tmp_path, configured)["FF"]
+    assert widget.curr_total_selected_frames == 0, "ranges for the unflipped frames were attached"
+    flipped_on = datetime.fromisoformat(run_of(h5)["flip_corrected"]).strftime("%Y-%m-%d %H:%M")
+    assert f"and {h5} was flipped by a flip classifier on {flipped_on}." in html.unescape(
+        widget.labels_check.object), widget.labels_check.object
+
+
 def test_flip_labels_for_a_changed_extraction_are_not_attached_silently(notebook, tmp_path, configured):
     """The saved ranges label the frames of each session's extraction as they were.
 
-    Re-extracting a session, or applying a flip classifier to it, rewrites the
-    frames the ranges point into. The widget reopened after that shows none of the
-    saved ranges, names the extraction and the file, and asks: wipe the labels and
-    continue, or stop. Until a choice is made, nothing writes the file.
+    Re-extracting a session rewrites the frames the ranges point into, and the
+    extraction's record names the new run. The widget reopened after that shows
+    none of the saved ranges, names the extraction and the file, and asks: wipe
+    the labels and continue, or stop. Until a choice is made, nothing writes the
+    file.
     """
-    import os
-
     import panel as pn
 
     widget = notebook["FF"]
@@ -520,15 +589,15 @@ def test_flip_labels_for_a_changed_extraction_are_not_attached_silently(notebook
     labels = Path(widget.training_data_path)
     kept = labels.read_bytes()
     h5 = Path(widget.sessions[session])
-    stat = os.stat(h5)
-    os.utime(h5, (stat.st_atime + 120, stat.st_mtime + 120))
+    labelled_on = extracted_on(h5)
+    extracted_again(h5)
 
     reopened = open_notebook(tmp_path, configured)
     widget = reopened["FF"]
     assert widget.curr_total_selected_frames == 0, "ranges for the old frames were attached"
     shown = widget.labels_check.object
-    assert f"The labels in {labels} were made for {h5}" in shown
-    assert f"{h5} is newer than the labels" in shown
+    assert (f"The labels in {labels} were made for {h5} as extracted on {labelled_on}, and {h5} was "
+            f"extracted again on {extracted_on(h5)}.") in html.unescape(shown), shown
     choice = {b.name: b for b in widget.show().select(pn.widgets.Button) if b.name in ("Wipe labels and continue", "Stop")}
     assert sorted(choice) == ["Stop", "Wipe labels and continue"]
 
@@ -543,7 +612,7 @@ def test_flip_labels_for_a_changed_extraction_are_not_attached_silently(notebook
     widget = reopened["FF"]
     choice = {b.name: b for b in widget.show().select(pn.widgets.Button)}
     press(choice["Wipe labels and continue"])
-    assert not labels.exists()
+    assert not labels.exists() and not labels.with_suffix(".yaml").exists()
     label(widget, session, 50, 60, left=True)
     run_cell(SAVE, reopened)
     assert saved_ranges(widget) == {session: [(True, 50, 60)]}

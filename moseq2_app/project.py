@@ -8,14 +8,16 @@ names, and each output older than what it was built from: PC scores computed
 before one of their sessions was re-extracted, a model fit before the scores
 were computed again, an output computed from a file that no longer exists, and
 PCA outputs or a model computed before a session was added to the project. An
-output is older when the fingerprint its record holds for an input differs
-from that input's now, when a recorded input is gone, or, for PCA outputs and
-fitted models, when a listed session ``config.yaml`` does not exclude is not
-among its recorded inputs. This is a message only: no step reads it, or a
-record, to decide what to run.
-Every later cell takes the project folder and reads the bookkeeping file when it
-needs a path, so nothing is kept between cells. A project made by MoSeq2 1.5.0
-or earlier stops here, before anything else runs.
+output is older when an input its record holds is no longer that file
+(``moseq2_common.records.unchanged``: an input the pipeline wrote now carries
+the record of another run; any other input differs in size or content), when a
+recorded input is gone, or, for PCA outputs and fitted models, when a listed
+session ``config.yaml`` does not exclude is not among its recorded inputs. No
+file time is read, so a project copied elsewhere shows nothing older. This is a
+message only: no step reads it, or a record, to decide what to run. Every later
+cell takes the project folder and reads the bookkeeping file when it needs a
+path, so nothing is kept between cells. A project made by MoSeq2 1.5.0 or
+earlier stops here, before anything else runs.
 """
 
 from __future__ import annotations
@@ -23,11 +25,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from datetime import datetime
-
 from moseq2_common.bookkeeping import load, resolve_path, session_h5
 from moseq2_common.project import Project, check_not_old, read_exclude
-from moseq2_common.records import fingerprint, read_record
+from moseq2_common.records import read_record, run_of, unchanged, written_on
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
 
 __all__ = ["progress", "start", "stale_outputs", "summary"]
@@ -64,18 +64,19 @@ def _outputs(project, bookkeeping):
 
 
 def stale_outputs(project: Project) -> list[str]:
-    """A line for each output the bookkeeping file names that is older than its inputs: an input whose
-    fingerprint now differs from the one the output's record holds, an input that no longer exists, and, for a
+    """A line for each output the bookkeeping file names that is older than its inputs: an input that is no
+    longer the file the output's record holds (``unchanged``), an input that no longer exists, and, for a
     PCA output or a fitted model, a listed session ``config.yaml`` does not exclude that is not among its
     inputs (aggregated after it was computed). The settings files are not inputs in this sense; a changed
-    setting takes effect when a step is run again. Inputs are compared by size and content, never by time."""
+    setting takes effect when a step is run again. An input the pipeline wrote is compared by the run its record
+    names, any other by size and content, never by time."""
     bookkeeping = load(project)
     sessions = {str(session_h5(project, s)): key for key, s in bookkeeping.sessions.items()}
     excluded = set(read_exclude(project))
     included = [h5 for h5, key in sessions.items() if key not in excluded]
     settings = {str(Path(p).absolute()) for p in (project.config_file, project.session_config_file,
                                                   project.bookkeeping_file)}
-    now, lines = {}, []
+    lines = []
     for stored, output, all_sessions in _outputs(project, bookkeeping):
         try:
             record = read_record(output)
@@ -84,8 +85,7 @@ def stale_outputs(project: Project) -> list[str]:
         step = record.get("step", "the step that wrote it")
         read = set()
         for entry in record.get("inputs") or []:
-            recorded = entry.get("fingerprint") if isinstance(entry, dict) else None
-            if not isinstance(recorded, dict):
+            if not isinstance(entry, dict) or not (isinstance(entry.get("fingerprint"), dict) or entry.get("run")):
                 continue
             path = resolve_path(project, entry["relative_path"]) if entry.get("relative_path") else Path(entry["path"])
             read.add(str(path))
@@ -100,16 +100,15 @@ def stale_outputs(project: Project) -> list[str]:
                 else:
                     lines.append(f"{stored} was computed from {name}, which no longer exists; run {step} again.")
                 continue
-            if str(path) not in now:
-                now[str(path)] = fingerprint(path)
-            if (now[str(path)]["size"], now[str(path)]["sha256"]) == (recorded.get("size"), recorded.get("sha256")):
+            if unchanged(entry, path):
                 continue
-            when = datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+            run = run_of(path)
+            when = f" ({written_on(run['ended'])})" if run is not None and run.get("ended") else ""
             if str(path) in sessions:
-                lines.append(f"{stored} was computed before {sessions[str(path)]} was re-extracted ({when}); "
+                lines.append(f"{stored} was computed before {sessions[str(path)]} was re-extracted{when}; "
                              f"run {step} again to include it.")
             else:
-                lines.append(f"{stored} was computed before {name} was written again ({when}); run {step} again "
+                lines.append(f"{stored} was computed before {name} was written again{when}; run {step} again "
                              "to use it.")
         if all_sessions and read & set(sessions):
             lines += [f"{stored} was computed before {sessions[h5]} was added to the project; run {step} again "

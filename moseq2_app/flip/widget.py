@@ -7,6 +7,7 @@ import panel as pn
 import holoviews as hv
 from tqdm import tqdm
 import numpy as np
+from datetime import datetime
 from pathlib import Path
 from moseq2_common.records import RECORD_ATTRIBUTE, fingerprint, record_text
 from moseq2_common.timestamps import frame_rate
@@ -16,7 +17,8 @@ from moseq2_extract.extract.proc import get_flips
 from moseq2_extract.util import gen_batch_sequence
 from moseq2_common.video import write_frames_preview
 from moseq2_app.flip.train import SAVE_AND_RETRAIN
-from moseq2_app.labels import STOP, WIPE, labels_for, stale, stale_labels_message, stopped_message
+from moseq2_app.labels import (FLIP_LABELS_STEP, STOP, WIPE, labelled_in, remove_labels, save_record, stale,
+                               stale_labels_message, stopped_message)
 
 
 # Workaround for HoloViews/Bokeh _buffers parameter issue
@@ -60,13 +62,15 @@ def _extraction_complete(file_path: Path):
 
 
 def _note_flip_correction(f, clf_path, settings):
-    """Note in the extraction's record (its ``/provenance`` attribute) the classifier that flipped its frames."""
+    """Note in the extraction's record (its ``/provenance`` attribute) the classifier that flipped its frames
+    and when (``applied``), which makes it another state of the session's frames (``moseq2_common.records.run_of``)."""
     stored = f.attrs.get(RECORD_ATTRIBUTE)
     if stored is None:
         return
     record = read_yaml(io.StringIO(stored.decode() if isinstance(stored, bytes) else str(stored)))
     record.setdefault('notes', {})['flip_correction'] = {
-        'classifier': str(Path(clf_path).resolve()), 'fingerprint': fingerprint(clf_path), **settings}
+        'classifier': str(Path(clf_path).resolve()), 'fingerprint': fingerprint(clf_path), **settings,
+        'applied': datetime.now().astimezone().isoformat()}
     f.attrs[RECORD_ATTRIBUTE] = record_text(record)
 
 
@@ -174,13 +178,12 @@ class FlipClassifierWidget:
         if not path.exists():
             return
         with open(path, 'rb') as f:
-            saved = pickle.load(f)
-        saved_paths, saved_ranges = saved[:2]
+            saved_paths, saved_ranges = pickle.load(f)
 
-        # ranges label the frames as they were; an extraction rewritten since (re-extracted, or flipped by
-        # a classifier) is not what they label
-        made_for = saved[2] if len(saved) > 2 else {}
-        found = [stale(made_for.get(session), self.sessions[session], 'is a different extraction')
+        # ranges label the frames as they were; an extraction written since (re-extracted, or flipped by
+        # a classifier) carries the record of another run and is not what they label
+        made_for = {entry.get('session'): entry for entry in labelled_in(path)}
+        found = [stale(made_for[session], self.sessions[session], 'extracted')
                  for session in made_for if session in self.sessions]
         found = [one for one in found if one is not None]
         if found:
@@ -217,7 +220,7 @@ class FlipClassifierWidget:
 
     def wipe_labels(self):
         """Delete the saved labels made for other frames, and label from nothing."""
-        Path(self.training_data_path).unlink(missing_ok=True)
+        remove_labels(self.training_data_path)
         self.stale_labels = None
         self.labels_box.visible = False
         self.save_button.disabled = False
@@ -251,7 +254,7 @@ class FlipClassifierWidget:
         if not self.unsaved or not path.exists():
             return
         with open(path, 'rb') as f:
-            _, saved = pickle.load(f)[:2]
+            _, saved = pickle.load(f)
         saved_ranges = [r for ranges in saved.values() for _, r in ranges]
         if not saved_ranges:
             return
@@ -365,16 +368,18 @@ class FlipClassifierWidget:
         return pn.Row(self.widgets, self.frame_display)
 
     def save_frame_ranges(self):
-        """Write the ranges the widget shows to ``training_data_path``, replacing what it held, with the
-        fingerprint of each labeled session's extraction (``moseq2_app.labels``)."""
+        """Write the ranges the widget shows to ``training_data_path``, replacing what it held, and the save's
+        record beside it, naming each labeled session's extraction and the run that wrote it
+        (``moseq2_app.labels``)."""
         if self.stale_labels is not None:
             raise ValueError(f'{self.stale_labels} Nothing was saved: choose {WIPE} or {STOP} in the labeling '
                              'widget above.')
         ranges = dict(self.selected_frame_ranges_dict)
-        made_for = {session: labels_for(self.sessions[session]) for session, labeled in ranges.items()
-                    if labeled and session in self.sessions}
+        labelled = [{'path': self.sessions[session], 'session': session} for session, labeled in ranges.items()
+                    if labeled and session in self.sessions]
         with open(self.training_data_path, 'wb') as f:
-            pickle.dump((self.sessions, ranges, made_for), f)
+            pickle.dump((self.sessions, ranges), f)
+        save_record(self.training_data_path, FLIP_LABELS_STEP, labelled)
         self.mark_saved()
             
     def apply_flip_classifier(self, clf_path, chunk_size=4000, chunk_overlap=0,

@@ -6,8 +6,10 @@ way (``Record.note``, ``Record.ran_with``), and finishes it when its outputs are
 written (``Record.finish``). The record is one YAML text block: the
 ``/provenance`` attribute of an ``.h5`` output (``write_h5_record``), and a
 ``.yaml`` beside any other output (``write_sidecar``, ``sidecar_path``): the
-file's name with ``.yaml`` for its extension (``model.p``: ``model.yaml``), or a
-figure's name without ``.png``/``.pdf``, or a folder's name, with ``.yaml`` added.
+file's name with ``.yaml`` for its extension (``model.p``: ``model.yaml``), a
+``.yaml`` output's stem with ``.record.yaml`` (``syll_info.yaml``:
+``syll_info.record.yaml``), or a figure's name without ``.png``/``.pdf``, or a
+folder's name, with ``.yaml`` added.
 
 A record holds:
 
@@ -19,8 +21,9 @@ A record holds:
   only when the packages run from a git checkout;
 - ``options``: the settings the step ran with, after every detection;
 - ``inputs``: each input file with its absolute path, its path relative to the
-  project, its size, modification time and ``fingerprint``, and what describes
-  its data (frame count, resolution, frame rate, camera) where the step knows it;
+  project, its ``fingerprint`` (size and content hash), for a file the pipeline
+  wrote the ``run`` its own record names (``run_of``), and what describes its
+  data (frame count, resolution, frame rate, camera) where the step knows it;
 - ``notes``: anything else the step found worth saying (a missing metadata.json);
 - ``outputs``: the outputs' array shapes and types, and the files written.
 
@@ -30,6 +33,13 @@ identifies the user or the machine beyond what its paths contain.
 
 Records are read back to check, never to run on: a step runs on ``config.yaml``
 and the recording's arena entry, and ``read_record`` serves display and checks.
+
+No check reads a file's modification time. A file the pipeline wrote is
+identified by the run its record names: the step and its start and end times
+(``run_of``); a file carrying no record, such as a raw recording, which nothing
+rewrites, by its size and the hash of its first and last MB (``fingerprint``).
+``unchanged`` asks whether a file is still the one a record's input names, so a
+project copied elsewhere with new file times is the same project.
 ``print-record`` (``print_record_command``), on all four programs, prints the
 record of an output, a session's folder or a session key.
 
@@ -67,7 +77,8 @@ from moseq2_common.yaml import dump_block_yaml, read_yaml
 
 __all__ = ["RECORD_ATTRIBUTE", "InputError", "Record", "StepInputError", "atomic_output", "atomic_outputs",
            "check_inputs", "fingerprint", "find_record", "partial_name", "print_record_command", "read_record",
-           "record_text", "sidecar_path", "start_record", "write_h5_record", "write_record", "write_sidecar"]
+           "record_text", "run_of", "sidecar_path", "start_record", "unchanged", "write_h5_record", "write_record",
+           "write_sidecar", "written_on"]
 
 #: The attribute of an ``.h5`` output holding its record.
 RECORD_ATTRIBUTE = "provenance"
@@ -168,8 +179,8 @@ def _invocation() -> tuple[str, str | None]:
 
 
 def fingerprint(path: str | os.PathLike) -> dict:
-    """``path``'s size, modification time and SHA-256: of the whole file up to ``SMALL_FILE``, else of its
-    first and last 1 MB (about 0.02 s for any size)."""
+    """``path``'s size and SHA-256: of the whole file up to ``SMALL_FILE``, else of its first and last 1 MB
+    (about 0.02 s for any size). No file time: a copy of a file has its fingerprint."""
     path = Path(path)
     stat = path.stat()
     digest = hashlib.sha256()
@@ -183,9 +194,44 @@ def fingerprint(path: str | os.PathLike) -> dict:
             handle.seek(-_EDGE, os.SEEK_END)
             digest.update(handle.read(_EDGE))
             hashed = "first and last 1 MB"
-    return {"size": stat.st_size,
-            "modified": datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(),
-            "sha256": digest.hexdigest(), "hashed": hashed}
+    return {"size": stat.st_size, "sha256": digest.hexdigest(), "hashed": hashed}
+
+
+def run_of(path: str | os.PathLike) -> dict | None:
+    """The run that wrote ``path``, from the record it carries: its ``step``, ``started`` and ``ended``, and,
+    for an extraction a flip classifier was applied to, when that was (``flip_corrected``). None when ``path``
+    carries no record it can be read from (a raw recording, a downloaded flip classifier)."""
+    try:
+        record = read_record(path)
+    except Exception:  # an unreadable record identifies nothing; the file is then known by its fingerprint
+        return None
+    if not isinstance(record, Mapping):
+        return None
+    run = {"step": record.get("step"), "started": record.get("started"), "ended": record.get("ended")}
+    flip = (record.get("notes") or {}).get("flip_correction")
+    if isinstance(flip, Mapping) and flip.get("applied"):
+        run["flip_corrected"] = flip["applied"]
+    return run
+
+
+def unchanged(entry: Mapping, path: str | os.PathLike) -> bool:
+    """Whether ``path`` is still the file a record's input ``entry`` describes: the same run (``run_of``) when
+    either names one, else the same size and content hash. Never by file time."""
+    run = run_of(path)
+    if run is not None or entry.get("run") is not None:
+        return run == entry.get("run")
+    recorded = entry.get("fingerprint")
+    if not isinstance(recorded, Mapping):
+        return False
+    now = fingerprint(path)
+    return (now["size"], now["sha256"]) == (recorded.get("size"), recorded.get("sha256"))
+
+
+def written_on(when) -> str:
+    """A record's time (``ended``, ``flip_corrected``) as messages give it: ``2026-11-06 14:03``."""
+    if not isinstance(when, datetime):
+        when = datetime.fromisoformat(str(when))
+    return when.strftime("%Y-%m-%d %H:%M")
 
 
 def _relative(path: Path, project) -> str | None:
@@ -209,6 +255,9 @@ def _describe_input(item, project) -> dict:
             out["fingerprint"] = fingerprint(path)
         except OSError as error:
             out["fingerprint"] = _unknown(f"{path} could not be read ({error})")
+        run = run_of(path)
+        if run is not None:
+            out["run"] = run
     else:
         out["fingerprint"] = _unknown(f"{path} does not exist")
     out.update({name: _plain(value) for name, value in facts.items()})
@@ -302,9 +351,12 @@ def write_h5_record(h5: h5py.File, record: Mapping) -> None:
 
 def sidecar_path(output: str | os.PathLike) -> Path:
     """Where the record of ``output`` is written: beside a file under its name with ``.yaml`` for its
-    extension (``model.p``: ``model.yaml``), and beside a figure's name without extension or a folder with
-    ``.yaml`` added (``plots/usage``: ``plots/usage.yaml``)."""
+    extension (``model.p``: ``model.yaml``), beside a ``.yaml`` output under its stem with ``.record.yaml``
+    (``syll_info.yaml``: ``syll_info.record.yaml``), and beside a figure's name without extension or a
+    folder with ``.yaml`` added (``plots/usage``: ``plots/usage.yaml``)."""
     output = Path(str(output).rstrip("/\\"))
+    if output.suffix == ".yaml":
+        return output.with_name(f"{output.stem}.record.yaml")
     if output.is_file():
         return output.with_suffix(".yaml")
     return Path(f"{output}.yaml")
@@ -426,8 +478,6 @@ def _stored_text(path: Path) -> str | None:
         if text is None:
             return None
         return text.decode() if isinstance(text, bytes) else str(text)
-    if path.suffix == ".yaml":
-        return None
     sidecar = sidecar_path(path)
     return sidecar.read_text() if sidecar.is_file() else None
 

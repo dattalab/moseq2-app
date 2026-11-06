@@ -6,9 +6,8 @@ import os
 import html
 import numpy as np
 import ipywidgets as widgets
-from moseq2_app.labels import (LABELS_FOR, STOP, WIPE, read_syllable_labels, stale, stale_labels_message,
-                               stopped_message)
-from moseq2_common.yaml import read_yaml
+from moseq2_app.labels import (STOP, WIPE, index_project, read_syllable_labels, remove_labels,
+                               stale_labels_message, stale_syllable_labels, stopped_message)
 from ipywidgets import interactive_output
 from IPython.display import display
 from moseq2_app.gui.progress import get_session_paths
@@ -89,15 +88,15 @@ def interactive_syllable_labeler_wrapper(model_path, index, crowd_movie_dir, out
         output = widgets.interactive_output(labeler.interactive_syllable_labeler, {'syllables': labeler.syll_select})
         display(labeler.clear_button, labeler.syll_select, output)
 
-    # labels made for another model, or before this one was fit, are not attached to it
+    # labels made for another model, or for an earlier fit of this one, are not attached to it
     found = None
     if os.path.exists(output_file):
-        found = stale((read_yaml(output_file) or {}).get(LABELS_FOR), model_path, 'is a different model')
+        found = stale_syllable_labels(output_file, model_path, index_project(index))
     if found is None:
         open_labeler()
     else:
         def wipe():
-            os.remove(output_file)
+            remove_labels(output_file)
             open_labeler()
 
         display(stale_labels_prompt(stale_labels_message(output_file, [found]), wipe,

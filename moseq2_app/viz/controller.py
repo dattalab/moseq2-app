@@ -26,7 +26,7 @@ from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_app import steps
-from moseq2_app.labels import LABELS_FOR, labels_for, read_syllable_labels
+from moseq2_app.labels import SYLLABLE_LABELS_STEP, index_project, read_syllable_labels, save_record
 from moseq2_viz.steps import crowd_movies_out_of_date, rerender_message
 from moseq2_viz.helpers.wrappers import init_wrapper_function
 from moseq2_viz.options import CrowdMovieOptions
@@ -107,6 +107,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
 
         super().__init__()
         self.save_path = save_path
+        self.project = index_project(index)
 
         # max_sylls is either automatically set in the wrapper.py function interactive_syllable_labeler_wrapper()
         # by passing max_syllables=None to the wrapper/main.py function::label_syllables. Otherwise, if a integer
@@ -169,8 +170,9 @@ class SyllableLabeler(SyllableLabelerWidgets):
         for syll in range(self.max_sylls):
             tmp[syll].pop('group_info', None)
 
-        # Write to file, with the model the labels are for
-        write_yaml({**tmp, **self.unshown_syll_info, LABELS_FOR: labels_for(self.model_path)}, self.save_path)
+        # Write the labels, then the save's record beside them, naming the model and the run that fit it
+        write_yaml({**tmp, **self.unshown_syll_info}, self.save_path)
+        save_record(self.save_path, SYLLABLE_LABELS_STEP, [self.model_path], project=self.project)
 
         if curr_syll is not None:
             # Update the syllable dropdown options

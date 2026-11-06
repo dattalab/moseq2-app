@@ -62,7 +62,8 @@ def test_update_config_leaves_the_file_alone_when_a_value_cannot_be_saved(tmp_pa
 
 
 def test_syllable_labels_are_written_in_the_shared_format(tmp_path):
-    from moseq2_app.labels import LABELS_FOR, labels_for
+    """``syll_info.yaml`` holds the labels only; what they label is in its record beside it."""
+    from moseq2_common.records import read_record
 
     path = tmp_path / "syll_info.yaml"
     model = tmp_path / "model.p"
@@ -76,16 +77,17 @@ def test_syllable_labels_are_written_in_the_shared_format(tmp_path):
         max_sylls=2,
         unshown_syll_info={7: {"label": "groom", "desc": "", "crowd_movie_path": ""}},
         save_path=str(path),
+        project=None,
     )
     SyllableLabeler.write_syll_info(labeller)
     expected = {
         0: {"label": "rear", "desc": "saut é", "crowd_movie_path": SPACED},
         1: {"label": "", "desc": "", "crowd_movie_path": ""},
         7: {"label": "groom", "desc": "", "crowd_movie_path": ""},
-        LABELS_FOR: labels_for(model),
     }
     assert path.read_text() == dump_yaml(expected)
     assert read_yaml(path) == expected
+    assert [entry["path"] for entry in read_record(path)["inputs"]] == [str(model)]
 
 
 @pytest.mark.parametrize("mapping", [2, 3], ids=["progress", "syll_info"])

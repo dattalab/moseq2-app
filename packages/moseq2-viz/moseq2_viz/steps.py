@@ -29,8 +29,8 @@ session's extraction that does not exist, is empty or cannot be read
 (``moseq2_common.records.check_inputs``).
 
 Crowd movies are a cache: the syllable labeler reuses a folder of them only
-while its record shows they were rendered from the same model (by its
-fingerprint), with the same ``crowd_movies`` settings and from the same sessions
+while its record shows they were rendered from the same model (the run its
+record names), with the same ``crowd_movies`` settings and from the same sessions
 (``crowd_movies_out_of_date``), and otherwise renders them again and says why
 (``rerender_message``). The record is read to check, never to render with.
 """
@@ -45,8 +45,8 @@ from typing import Any
 
 from moseq2_common.bookkeeping import SESSION_ADVICE, relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
-from moseq2_common.records import (atomic_outputs, check_inputs, fingerprint, read_record, record_text,
-                                   sidecar_path, start_record, write_record)
+from moseq2_common.records import (atomic_outputs, check_inputs, read_record, record_text, sidecar_path,
+                                   start_record, unchanged, write_record)
 from moseq2_common.yaml import read_yaml
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
@@ -255,8 +255,8 @@ def crowd_movies_out_of_date(output_dir: str, model_path: str, index: dict, opts
     ``opts``; an empty list when they can.
 
     The folder's record (``crowd_movies.yaml`` beside it) names what the movies were rendered from: the model
-    with its fingerprint, the settings and the sessions. Files are matched by their path in the project, so a
-    project copied elsewhere with its file times keeps its movies.
+    with the run that fit it, the settings and the sessions. Files are matched by their path in the project and
+    the model by its run (``unchanged``), never by file time, so a project copied elsewhere keeps its movies.
     """
     try:
         record = read_record(output_dir)
@@ -273,7 +273,7 @@ def crowd_movies_out_of_date(output_dir: str, model_path: str, index: dict, opts
               if isinstance(entry, dict)}
     reasons = []
     model = inputs.get(where(model_path))
-    if model is None or model.get("fingerprint") != fingerprint(model_path):
+    if model is None or not unchanged(model, model_path):
         reasons.append("the model changed since they were made")
     recorded, current = record.get("options") or {}, _as_recorded(opts.as_dict())
     changed = sorted(name for name in set(recorded) | set(current)
