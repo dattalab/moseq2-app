@@ -6,7 +6,6 @@ resolves the step's settings and calls the step in ``moseq2_extract.steps`` (or
 ``moseq2_extract.setup``).
 """
 
-import os
 import re
 from dataclasses import replace
 from os.path import exists, join
@@ -181,40 +180,35 @@ def extract_found_sessions(
 
 
 @filter_warnings
-def aggregate_extract_results_command(
-    project_folder, format="{start_time}_{session_name}_{subject_name}", output_dir="aggregate_results/",
-    mouse_threshold=None,
-):
+def aggregate_extract_results_command(project_folder, output_dir=None, mouse_threshold=None):
     """
-    Copy every finished extraction in the project into ``output_dir``, named from its metadata, and list
-    each as one of the project's sessions in its bookkeeping file (moseq2-project.yaml).
+    List every extracted recording in the project as one of its sessions in its bookkeeping file
+    (moseq2-project.yaml). Each session's files are already in its folder in ``aggregate_results/``,
+    where extraction wrote them; nothing is copied.
 
     Args:
     project_folder (str): the project folder, holding config.yaml and the recordings.
-    format (str): filename format for info to include in filenames
-    output_dir (str): the folder to copy the extractions into, relative to the project folder.
+    output_dir (str): the folder holding the session folders, relative to the project folder, when the
+        extraction was given one; None for the project's ``aggregate_results/``.
     mouse_threshold (float): min threshold of extracted mouse height to include a session
     in the aggregated sesssions to ensure sessions with no extracted mouse is not included in the aggregated sessions.
     None takes config.yaml's ``extract`` section, else ``AggregateOptions``' default.
 
     Returns:
-    sessions (list): the sessions this run added, by key.
+    sessions (list): the sessions this run listed, by key.
     """
-
-    # the project's folder, where the command line's is the working directory's (PR 4.5)
-    output_dir = join(project_folder, output_dir)
-
-    if not exists(output_dir):
-        os.makedirs(output_dir)
-
     project = find_project(cwd=project_folder)
-    config = read_settings(project.config_file if project is not None else None,
-                           AggregateOptions, stage_classes=EXTRACT_STAGE)
-    explicit = {"format": format}
-    if mouse_threshold is not None:
-        explicit["mouse_threshold"] = mouse_threshold
+    if project is None:
+        raise FileNotFoundError(
+            f"There is no config.yaml in {project_folder}, so it is not a project folder. Run this cell with "
+            "the folder holding config.yaml and the recordings (the project the first cell names), or write "
+            "a config.yaml there with the notebook's config cell."
+        )
+    config = read_settings(project.config_file, AggregateOptions, stage_classes=EXTRACT_STAGE)
+    explicit = {} if mouse_threshold is None else {"mouse_threshold": mouse_threshold}
     opts = AggregateOptions.resolve(config=config, explicit=explicit)
-    return steps.aggregate_results(project_folder, output_dir, opts, project=project).sessions
+    folder = None if output_dir is None else join(project_folder, output_dir)
+    return steps.aggregate_results(project, opts, output_dir=folder).sessions
 
 
 def download_flip_command(output_dir, config_file="", selection=1):
@@ -250,8 +244,9 @@ def extract_command(
 
     Args:
     input_file (str): path to depth file to extract.
-    output_dir (str): path to output directory.
-    config_file (str): path to config file (config.yaml).
+    output_dir (str): the folder the recording's outputs go in; None for its session's folder in the
+        project's aggregate_results (outside a project, proc beside the recording).
+    config_file (str): path to config file (config.yaml), or a SLURM job's settings file.
     num_frames (int): number of frames to extract. If None, all frames are extracted.
     skip (bool): skip already extracted file.
     cli_options (dict): parameters typed on the command line; they take precedence over the config file and the session config.
@@ -262,6 +257,6 @@ def extract_command(
 
     resolved = recordings_options(config_file, [input_file], cli_options)
     opts = replace(resolved[input_file], num_frames=num_frames, skip_completed=skip)
-    result = steps.extract(input_file, output_dir, opts)
+    result = steps.extract(input_file, output_dir, opts, project=find_project(config_file))
 
     return None if result.h5_file is None else str(result.h5_file.parent)

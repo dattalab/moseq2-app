@@ -88,7 +88,7 @@ def azure_extraction(tmp_path_factory):
          "--output-dir", str(session_dir / "proc")],
     )
     assert result.exit_code == 0, result.output + repr(result.exception)
-    return session_dir / "proc" / "results_00.h5"
+    return session_dir / "proc" / "results.h5"
 
 
 def test_an_azure_extraction_reaches_pca_at_30_fps(azure_extraction):

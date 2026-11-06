@@ -33,6 +33,6 @@ def test_notebook_batch_extraction_honours_num_frames(tmp_path, raw_sessions, mo
 
     extract_found_sessions(str(project), str(config_file))
 
-    with h5py.File(project / SESSION / "proc" / "results_00.h5", "r") as f:
+    with h5py.File(project / "aggregate_results" / SESSION / "results.h5", "r") as f:
         assert f["frames"].shape[0] == NUM_FRAMES
         assert f["timestamps"].shape[0] == NUM_FRAMES

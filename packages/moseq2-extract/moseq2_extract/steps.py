@@ -12,21 +12,28 @@ Each step hands its work function (``get_roi_wrapper``, ``extract_wrapper``,
 ``aggregate_extract_results_wrapper`` in ``moseq2_extract.helpers.wrappers``)
 the options as a dict, and extraction records that dict among the extraction's
 parameters (``metadata/extraction/parameters`` in the results ``.h5``).
+
+Inside a project, a recording's outputs go into its session's folder in
+``aggregate_results/`` (``moseq2_extract.recordings.session_outputs``) and keep
+the uuid ``moseq2-project.yaml`` gave the session; outside one, ``extract``
+writes into ``proc/`` beside the recording. ``aggregate_results`` lists the
+extracted sessions in ``moseq2-project.yaml``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from os.path import abspath, join
+from os.path import abspath
 from pathlib import Path
 
 from moseq2_common.bookkeeping import Session, load, relative_path, update
-from moseq2_common.project import Project, session_key
+from moseq2_common.project import Project, find_project as find_project_of, session_key
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
-from moseq2_extract.recordings import find_recordings, recording_of_extraction
+from moseq2_extract.recordings import (extracted_in, find_recordings, project_keys, session_outputs,
+                                       standalone_outputs)
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
 _WRAPPER_ARGUMENTS = ("num_frames", "skip_completed")
@@ -40,7 +47,7 @@ class FindRoiResult:
 
 @dataclass(frozen=True)
 class ExtractResult:
-    #: The extraction's ``results_XX.h5``; None when the recording was skipped as already extracted.
+    #: The extraction's ``results.h5``; None when the recording was skipped as already extracted.
     h5_file: Path | None
 
 
@@ -58,7 +65,7 @@ class BatchExtractResult:
 
 @dataclass(frozen=True)
 class AggregateResult:
-    #: The session keys this run copied into the output folder (recorded in the bookkeeping file in a project).
+    #: The session keys listed in the bookkeeping file by this run.
     sessions: list
 
 
@@ -78,17 +85,39 @@ def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions) -> FindR
     return FindRoiResult(roi_files=[path for path in written if path.is_file()])
 
 
-def extract(input_file: str, output_dir: str | None, opts: ExtractOptions) -> ExtractResult:
-    """Extract ``input_file`` into ``<recording folder>/<output_dir>`` (``proc`` when None)."""
+def _output_folder(input_file, output_dir, project, keys=None):
+    """Where ``input_file``'s outputs go: ``output_dir`` when given (a relative one below the recording's
+    folder), its session's folder in a project, else ``proc/`` beside it."""
+    if output_dir is not None:
+        return Path(abspath(input_file)).parent / output_dir
+    if project is None:
+        return standalone_outputs(input_file).folder
+    return session_outputs(project, session_key(project, input_file), keys=keys).folder
+
+
+def _session_uuid(input_file, project):
+    """The uuid moseq2-project.yaml gave the recording's session; None before it lists the session."""
+    if project is None:
+        return None
+    listed = load(project).sessions.get(session_key(project, input_file))
+    return listed.uuid if listed is not None else None
+
+
+def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
+            project: Project | None = None) -> ExtractResult:
+    """Extract ``input_file``.
+
+    Its outputs go into ``output_dir`` when given (relative to the recording's folder), into its session's folder in ``project``'s
+    ``aggregate_results/`` (``session_outputs``), or outside a project into ``proc/`` beside it.
+    In a project, a session ``moseq2-project.yaml`` lists keeps its uuid.
+    """
     settings = _settings(opts, leave_out=_WRAPPER_ARGUMENTS)
-    if output_dir is None:
-        output_dir = "proc"
-    folder = extract_wrapper(input_file, output_dir, settings, num_frames=opts.num_frames,
-                             skip=opts.skip_completed)
-    if folder is None:
+    folder = _output_folder(input_file, output_dir, project)
+    written = extract_wrapper(input_file, str(folder), settings, num_frames=opts.num_frames,
+                              skip=opts.skip_completed, uuid=_session_uuid(input_file, project))
+    if written is None:
         return ExtractResult(h5_file=None)
-    index = opts.bg_roi_index[0] if isinstance(opts.bg_roi_index, (list, tuple)) else opts.bg_roi_index
-    return ExtractResult(h5_file=Path(folder) / f"results_{index:02d}.h5")
+    return ExtractResult(h5_file=Path(written) / "results.h5")
 
 
 def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str,
@@ -99,8 +128,8 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
 
     The search looks for ``opts.extensions`` down to ``opts.max_depth`` folders
     below ``input_dir`` and, unless ``opts.skip_checks`` is set, leaves out each
-    recording whose ``results_00.yaml`` in its output folder records a finished
-    extraction. The command line and the notebook both list recordings this way.
+    recording whose ``results.h5`` exists in its session folder. The command line
+    and the notebook both list recordings this way.
 
     Each recording is extracted with ``config.yaml``'s ``extract`` settings, the
     arena tool's settings from its entry in ``session_config.yaml``, and
@@ -112,61 +141,60 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
     opts: the search, the cluster type and the SLURM job settings; ``num_frames`` and
         ``skip_completed`` apply to every recording.
     config_file: the project's ``config.yaml``.
-    output_dir: each recording's output folder, below its own folder; None for ``proc``.
+    output_dir: the folder holding the session folders; None for the project's ``aggregate_results/``.
     explicit: options typed on the command line, applied over each recording's settings.
     select: picks the recordings to extract from those found (the notebook's prompt).
     project: the project each SLURM job's settings file names (``moseq2_common.project.write_job_settings``).
     """
-    folder = output_dir if output_dir is not None else "proc"
+    project = project if project is not None else find_project_of(config_file)
     search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth,
-                             skip_extracted=not opts.skip_checks,
-                             results_yaml=join(folder, "results_00.yaml"))
+                             extracted=None if opts.skip_checks else extracted_in(project, output_dir))
     message = search.report()
     if message:
         print(message)
     if not search.recordings:
         return BatchExtractResult(found=[], extracted=[], failures=[], script=None)
     to_extract = list(select(search.recordings) if select is not None else search.recordings)
+    keys = set(project_keys(project)) | {session_key(project, r) for r in to_extract}
+    folders = {recording: str(session_outputs(project, session_key(project, recording), keys=keys,
+                                              sessions_dir=output_dir).folder)
+               for recording in to_extract}
 
     if opts.cluster_type == "local":
         failures = run_local_extract(to_extract, config_file, opts.skip_completed, num_frames=opts.num_frames,
-                                     output_dir=output_dir, cli_options=dict(explicit) if explicit else None)
+                                     output_dirs=folders, cli_options=dict(explicit) if explicit else None)
         failed = {path for path, _ in failures}
         return BatchExtractResult(found=list(search.recordings),
                                   extracted=[Path(p) for p in to_extract if p not in failed],
                                   failures=failures, script=None)
 
-    job = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": folder}
+    job = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": output_dir}
     run_slurm_extract(input_dir, to_extract, job, opts.skip_completed, num_frames=opts.num_frames,
-                      cli_options=dict(explicit) if explicit else None, project=project)
+                      cli_options=dict(explicit) if explicit else None, project=project, output_dirs=folders)
     # run_slurm_extract records where it wrote the script
     return BatchExtractResult(found=list(search.recordings), extracted=[], failures=[],
                               script=Path(job["extract_out_script"]))
 
 
-def aggregate_results(input_dir: str, output_dir: str, opts: AggregateOptions, *,
-                      project: Project | None = None) -> AggregateResult:
-    """Copy every finished extraction under ``input_dir`` into ``output_dir``.
+def aggregate_results(project: Project, opts: AggregateOptions, *, input_dir: str | None = None,
+                      output_dir: str | None = None) -> AggregateResult:
+    """List every extracted recording of ``project`` as a session in its bookkeeping file.
 
-    In a project, each copied extraction becomes a session in the bookkeeping file
-    (``moseq2_common.bookkeeping``), keyed by its recording; sessions aggregated
-    before are kept, and nothing else in the file changes. Outside a project, nothing
-    is recorded.
+    Each recording found under ``input_dir`` (the project folder by default) whose ``results.h5``
+    exists in its session folder (in ``output_dir``, the project's ``aggregate_results/`` by default)
+    becomes a session, keyed by the recording, with the uuid its extraction carries. Nothing is copied.
+    Sessions listed before are kept, and nothing else in the file changes.
     """
-    copied = aggregate_extract_results_wrapper(input_dir, opts.format, output_dir, opts.mouse_threshold)
-    if project is None:
-        return AggregateResult(sessions=[])
-
-    sessions = [Session(key=session_key(project, recording), recording=session_key(project, recording),
-                        folder=relative_path(project, copy), uuid=uuid)
-                for recording, copy, uuid in ((recording_of_extraction(source), copy, uuid)
-                                              for source, copy, uuid in copied)]
+    found = aggregate_extract_results_wrapper(str(input_dir or project.folder), output_dir, opts.mouse_threshold,
+                                              project=project)
+    sessions = [Session(key=key, recording=key, folder=relative_path(project, folder), uuid=uuid)
+                for key, folder, uuid in found]
 
     def add(bookkeeping):
         for session in sessions:
             bookkeeping.sessions[session.key] = session
 
     update(project, add)
-    print(f"{len(sessions)} session(s) added to {project.bookkeeping_file}; it lists "
+    print(f"{len(sessions)} session(s) listed in {project.bookkeeping_file}; it lists "
           f"{len(load(project).sessions)} in all.")
     return AggregateResult(sessions=[session.key for session in sessions])

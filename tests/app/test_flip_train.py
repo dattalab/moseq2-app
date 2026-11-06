@@ -111,19 +111,20 @@ def test_the_cleaned_third_follows_the_cleaning_parameters(tmp_path):
 
 
 def _extracted_session(root, name, uuid, frames, stored):
-    """A recording in ``root/name`` and its extraction in ``proc``: ``results_00.h5`` holding
-    ``frames``, the uuid and the cleaning settings ``stored`` as extraction stores its settings,
-    and ``results_00.yaml`` beside it."""
-    folder = root / name
-    (folder / "proc").mkdir(parents=True)
-    (folder / "depth.dat").touch()
-    h5 = folder / "proc" / "results_00.h5"
+    """A recording in ``root/name`` and its extraction in its session folder in ``aggregate_results/``:
+    ``results.h5`` holding ``frames``, the uuid and the cleaning settings ``stored`` as extraction
+    stores its settings, and ``results.yaml`` beside it."""
+    folder = root / "aggregate_results" / name
+    folder.mkdir(parents=True)
+    (root / name).mkdir()
+    (root / name / "depth.dat").touch()
+    h5 = folder / "results.h5"
     with h5py.File(h5, "w") as f:
         f["frames"] = frames
         f["metadata/uuid"] = uuid
         for key, value in stored.items():
             f[f"metadata/extraction/parameters/{key}"] = value
-    write_yaml({"complete": True, "skip": False, "uuid": uuid}, str(folder / "proc" / "results_00.yaml"))
+    write_yaml({"complete": True, "skip": False, "uuid": uuid}, str(folder / "results.yaml"))
     return h5
 
 
@@ -148,7 +149,8 @@ def flip_project(tmp_path):
         frames = rng.integers(0, 80, size=(10, 20, 20)).astype(np.uint8)
         h5s[name] = _extracted_session(root, name, f"uuid-{i}", frames, DEFAULT_STORED)
     write_yaml({"sessions": {f"{name}/depth.dat": {"recording": f"{name}/depth.dat",
-                                                   "folder": h5.relative_to(root).as_posix(), "uuid": f"uuid-{i}"}
+                                                   "folder": h5.parent.relative_to(root).as_posix(),
+                                                   "uuid": f"uuid-{i}"}
                              for i, (name, h5) in enumerate(h5s.items())}},
                str(root / "moseq2-project.yaml"))
     write_yaml({"session_b/depth.dat": {"spatial_filter_size": [5]}}, str(root / "session_config.yaml"))
@@ -209,25 +211,26 @@ def test_training_warns_when_a_session_was_extracted_with_other_cleaning_setting
 
 
 def test_a_sessions_recording_is_found_through_the_bookkeeping_file(tmp_path, monkeypatch):
-    """Labeled sessions are aggregated files with no uuid and no results yaml beside them: the project's
+    """Labeled sessions are extraction files with no uuid and no results yaml beside them: the project's
     moseq2-project.yaml says which recording each one is, so session_b's arena-tool entry reaches training."""
     from moseq2_app.steps import train_flip_classifier
     from moseq2_extract.gui import generate_config_command
 
     root = tmp_path / "project"
-    (root / "aggregate_results").mkdir(parents=True)
+    root.mkdir(parents=True)
     generate_config_command(str(root / "config.yaml"), camera_type="k2")
     rng = np.random.default_rng(0)
     h5s, sessions = {}, {}
     for i, name in enumerate(("session_a", "session_b")):
         (root / name).mkdir()
         (root / name / "depth.dat").touch()
-        h5 = root / "aggregate_results" / f"2019-03-20_{name}_results_00.h5"
+        h5 = root / "aggregate_results" / name / "results.h5"
+        h5.parent.mkdir(parents=True)
         with h5py.File(h5, "w") as f:
             f["frames"] = rng.integers(0, 80, size=(10, 20, 20)).astype(np.uint8)
         h5s[name] = h5
         key = f"{name}/depth.dat"
-        sessions[key] = {"recording": key, "folder": f"aggregate_results/{h5.name}", "uuid": f"uuid-{i}"}
+        sessions[key] = {"recording": key, "folder": f"aggregate_results/{name}", "uuid": f"uuid-{i}"}
     write_yaml({"sessions": sessions}, str(root / "moseq2-project.yaml"))
     write_yaml({"session_b/depth.dat": {"spatial_filter_size": [5]}}, str(root / "session_config.yaml"))
     index = root / "flip-training-frame-ranges.p"
@@ -257,7 +260,7 @@ def test_a_labeled_session_the_project_does_not_list_is_named(flip_project, monk
     train_flip_classifier(str(index), str(tmp_path / "flip.p"), str(root / "config.yaml"))
 
     out = capsys.readouterr().out
-    assert str(root / "session_b" / "proc" / "results_00.h5") in out
+    assert str(root / "aggregate_results" / "session_b" / "results.h5") in out
     assert str(root / "moseq2-project.yaml") in out
     assert {spatial for spatial, _ in calls} == {(3,)}
     assert sum(frames for _, frames in calls) == 20

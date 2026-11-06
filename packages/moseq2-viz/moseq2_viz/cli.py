@@ -28,7 +28,6 @@ from moseq2_common.options import (
 )
 from moseq2_common.project import find_project
 from moseq2_viz import steps
-from moseq2_viz.helpers.wrappers import copy_h5_metadata_to_yaml_wrapper
 from moseq2_viz.options import (
     CROWD_MOVIE_STAGE,
     AddGroupOptions,
@@ -99,23 +98,6 @@ def add_group(ctx, project_file, **_):
 @click.pass_context
 def get_best_fit_model(ctx, model_dir, cp_path, output_file, **_):
     steps.get_best_model(model_dir, cp_path, output_file, _resolve(ctx, BestModelOptions), project=find_project())
-
-
-# recurse through directories, find h5 files with completed extractions, make a manifest
-# and copy the contents to a new directory
-@cli.command(
-    name="copy-h5-metadata-to-yaml",
-    help="Copy metadata within an h5 file to a yaml file.",
-)
-@click.option(
-    "--input-dir",
-    "-i",
-    type=click.Path(),
-    default=os.getcwd(),
-    help="Directory to find h5 files",
-)
-def copy_h5_metadata_to_yaml(input_dir):
-    copy_h5_metadata_to_yaml_wrapper(input_dir)
 
 
 @cli.command(

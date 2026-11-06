@@ -62,7 +62,7 @@ def corrupt(project, recording, frames):
     Setting the scalars to NaN is what a frame the extraction could not
     measure looks like on disk, which is what ``corrupted`` counts.
     """
-    with h5py.File(proc(project, recording) / "results_00.h5", "r+") as f:
+    with h5py.File(proc(project, recording) / "results.h5", "r+") as f:
         for scalar in f["scalars"]:
             values = f[f"scalars/{scalar}"][:]
             values[:frames] = np.nan

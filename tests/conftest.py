@@ -272,12 +272,11 @@ def arena(project, started, configured, flipped):
 
 @pytest.fixture(scope="session")
 def aggregation(tmp_path_factory, project, started, extracted):
-    """Cell 9: gather every extraction into one directory and list the sessions.
+    """Cell 9: list every extraction as one of the project's sessions.
 
-    Until now each recording's output has sat beside the recording. Modeling
-    reads one directory, so the cell copies every extraction into
-    ``aggregate_results/`` under a name built from the acquisition metadata,
-    and lists each as one of the project's sessions in ``moseq2-project.yaml``.
+    Extraction has written each recording's files into its own folder in
+    ``aggregate_results/``; the cell copies nothing and lists each extracted
+    recording as one of the project's sessions in ``moseq2-project.yaml``.
     That file is what every cell from here on reads its sessions from.
 
     Returns the bookkeeping file and a copy of it as this cell wrote it, since

@@ -5,7 +5,7 @@
 which finds the project's recordings and leaves out the ones already extracted.
 Both search every recording type the pipeline reads (``.dat``, ``.mkv``,
 ``.avi``, ``.tar.gz``) unless told otherwise, and both leave out a recording
-whose ``results_00.yaml`` records a finished extraction: the command line
+whose ``results.h5`` is in its session folder in ``aggregate_results/``: the command line
 unless ``--skip-checks`` is given, the notebook while ``skip_extracted`` is
 True, as its cell sets it.
 
@@ -22,7 +22,6 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from moseq2_common.yaml import write_yaml
 
 from moseq2_extract.cli import batch_extract
 from moseq2_extract.gui import extract_found_sessions, generate_config_command
@@ -61,9 +60,10 @@ def extracted(monkeypatch):
 
 
 def mark_extracted(folder):
-    """What a finished extraction leaves behind, as far as skipping reads it."""
-    (folder / "proc").mkdir()
-    write_yaml({"complete": True, "uuid": "x"}, str(folder / "proc" / "results_00.yaml"))
+    """What a finished extraction leaves behind, as far as skipping reads it: its session's ``results.h5``."""
+    session = folder.parent / "aggregate_results" / folder.name
+    session.mkdir(parents=True)
+    (session / "results.h5").touch()
 
 
 def every_recording(root):
@@ -127,7 +127,7 @@ def test_a_rerun_with_some_recordings_extracted_extracts_the_rest(project, extra
 
     assert sorted(extracted) == [r for r in every_recording(project) if not r.endswith("depth.avi")]
     assert "nothing to extract" not in output, output
-    assert ("1 recording(s) already extracted were left out, each with a finished extraction recorded "
-            f"beside it (such as {project / 'avi_session' / 'proc' / 'results_00.yaml'}). To include them, "
+    assert ("1 recording(s) already extracted were left out, each with its extraction file written "
+            f"(such as {project / 'aggregate_results' / 'avi_session' / 'results.h5'}). To include them, "
             "set skip_extracted to False (in the notebook) or add --skip-checks "
             "(moseq2-extract batch-extract).") in output, output

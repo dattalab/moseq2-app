@@ -194,8 +194,6 @@ class AggregateOptions(Options):
 
     SECTION = "extract"
 
-    format: str = option("{start_time}_{session_name}_{subject_name}", "--format", "-f", type=str,
-                         help="New file name formats from resepective metadata")
     mouse_threshold: float = option(0, "--mouse-threshold", type=float,
                                     help="Threshold value for mean depth to include frames in aggregated results")
 

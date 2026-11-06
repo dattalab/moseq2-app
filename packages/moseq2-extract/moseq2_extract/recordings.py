@@ -16,12 +16,24 @@ one with "depth" in its name, then the first in ``.dat``, ``.mkv``, ``.avi``,
 own and carries its ``metadata.json`` inside it.
 
 A session is its recording, keyed by the recording's path relative to the
-project folder (``moseq2_common.project.session_key``).
+project folder (``moseq2_common.project.session_key``). Inside a project, every
+file the pipeline writes for a session goes into the session's own folder in
+``aggregate_results/`` (``session_outputs``), named from its key
+(``session_folder_name``): nothing is written beside or into a recording. Outside
+a project, ``moseq2-extract extract FILE`` writes into ``proc/`` beside the
+recording. A recording is extracted when its ``results.h5`` exists under that
+name; extraction writes it under a temporary name and renames it when done.
 """
 
+import hashlib
 import os
+from collections.abc import Collection
 from dataclasses import dataclass, field
-from os.path import abspath, dirname, exists, isdir, join, realpath
+from os.path import abspath, exists, isdir, join, realpath
+from pathlib import Path, PurePosixPath
+
+from moseq2_common.bookkeeping import SESSION_FILE, load, resolve_path
+from moseq2_common.project import Project, session_key
 
 #: The recording types the pipeline reads, in the order one is preferred over
 #: another when a session folder holds several.
@@ -29,6 +41,11 @@ RECORDING_EXTENSIONS = (".dat", ".mkv", ".avi", ".tar.gz")
 
 #: How many folders below the project folder the search goes by default.
 DEFAULT_MAX_DEPTH = 5
+
+#: The folder in a project holding one folder per session.
+SESSIONS_FOLDER = "aggregate_results"
+#: The folder beside a recording that ``extract FILE`` writes into outside a project.
+STANDALONE_FOLDER = "proc"
 
 _ARCHIVE_EXTENSIONS = (".tar.gz", ".tgz")
 
@@ -68,12 +85,6 @@ def _preference(name):
     return ("depth" not in name.lower(), order, name)
 
 
-def _completed(status_file):
-    from moseq2_extract.helpers.data import check_completion_status
-
-    return check_completion_status(status_file)
-
-
 def _join_words(items, last="or"):
     items = list(items)
     if len(items) <= 1:
@@ -92,7 +103,7 @@ class RecordingSearch:
     recordings (list): paths of the recordings found, sorted.
     without_metadata (list): session folders holding a found recording but no metadata.json.
     passed_over (list): (folder, reason) for each folder left out, in the order met.
-    extracted (list): (recording, results yaml) for each recording left out as already extracted.
+    extracted (list): (recording, its extraction file) for each recording left out as already extracted.
     too_deep (list): folders whose subfolders lie deeper than ``max_depth`` and were not searched.
     """
 
@@ -109,11 +120,11 @@ class RecordingSearch:
     def warnings(self):
         """One line per session folder whose recording has no metadata.json beside it."""
         return [
-            f"Warning: {folder} has no metadata.json. Its recording {name} is included, and a "
-            "default metadata.json, with the session named after the folder, is written there "
-            "when the recording is extracted or listed by the progress cell. If the acquisition "
-            f"software wrote a metadata.json for this recording, copy it into {folder} first so "
-            "the subject and session names are kept."
+            f"Warning: {folder} has no metadata.json. Its recording {name} is included, and its "
+            "extraction gets an empty subject name and the folder's name as its session name; "
+            "nothing is written into the folder. If the acquisition software wrote a metadata.json "
+            f"for this recording, copy it into {folder} before extracting so the subject and "
+            "session names are kept."
             for folder, name in self.without_metadata
         ]
 
@@ -136,8 +147,8 @@ class RecordingSearch:
             return "\n".join(lines)
 
         extracted_line = (
-            f"{len(self.extracted)} recording(s) already extracted were left out, each with a "
-            f"finished extraction recorded beside it (such as {self.extracted[0][1]}). To include "
+            f"{len(self.extracted)} recording(s) already extracted were left out, each with its "
+            f"extraction file written (such as {self.extracted[0][1]}). To include "
             "them, set skip_extracted to False (in the notebook) or add --skip-checks "
             "(moseq2-extract batch-extract)."
         ) if self.extracted else None
@@ -206,8 +217,7 @@ def find_recordings(
     root,
     extensions=RECORDING_EXTENSIONS,
     max_depth=DEFAULT_MAX_DEPTH,
-    skip_extracted=False,
-    results_yaml=join("proc", "results_00.yaml"),
+    extracted=None,
 ):
     """
     Find the depth recordings under ``root``.
@@ -216,8 +226,9 @@ def find_recordings(
     root (str): the project folder.
     extensions (iterable): recording extensions to look for, with or without the leading dot.
     max_depth (int): how many folders below ``root`` to search; ``root`` itself is level 0.
-    skip_extracted (bool): leave out recordings whose ``results_yaml`` records a finished extraction.
-    results_yaml (str): where an extraction's results yaml sits, relative to the recording's folder.
+    extracted (callable): to leave out the recordings already extracted, a function taking the list of
+        every recording found and returning {recording: its extraction file} for those extracted
+        (``extracted_in``); None leaves none out.
 
     Returns:
     (RecordingSearch): the recordings found, sorted, and what was passed over and why;
@@ -243,7 +254,6 @@ def find_recordings(
     seen_folders = set()
     seen_recordings = set()
     found = []
-    results_folder = results_yaml.split(os.sep)[0] if os.sep in results_yaml else None
 
     for folder, dirs, files in os.walk(root, followlinks=True):
         real = realpath(folder)
@@ -255,7 +265,7 @@ def find_recordings(
             continue
         seen_folders.add(real)
         if level >= max_depth:
-            if [d for d in dirs if d != results_folder]:
+            if [d for d in dirs if d != STANDALONE_FOLDER]:
                 search.too_deep.append(folder)
             dirs[:] = []
 
@@ -300,30 +310,108 @@ def find_recordings(
             if realpath(path) in seen_recordings:
                 continue
             seen_recordings.add(realpath(path))
-            if skip_extracted and _completed(join(folder, results_yaml)):
-                search.extracted.append((path, join(folder, results_yaml)))
-                continue
             if name not in archives and not exists(join(folder, "metadata.json")):
                 if (folder, name) not in search.without_metadata:
                     search.without_metadata.append((folder, name))
             found.append(path)
 
-    search.recordings = sorted(found)
+    done = extracted(sorted(found)) if extracted is not None else {}
+    search.extracted = [(path, str(done[path])) for path in sorted(found) if path in done]
+    search.without_metadata = [(folder, name) for folder, name in search.without_metadata
+                               if join(folder, name) not in done]
+    search.recordings = sorted(path for path in found if path not in done)
     return search
 
 
-def recording_of_extraction(h5):
-    """The recording an extraction's ``.h5`` (``<recording folder>/<output folder>/results_XX.h5``) was made from.
+def session_folder_name(key: str, keys: Collection[str]) -> str:
+    """The name of session ``key``'s folder in ``aggregate_results/``, among the sessions ``keys``.
 
-    The recording found in the folder above the output folder; for an archive, which is
-    extracted into a folder named after it, the archive beside that folder. When neither is
-    there (the recording was moved), the folder above the output folder stands for it.
+    The recording's folder path with ``/`` as ``_`` (``cohort1/saline_example_4/depth.avi`` is
+    ``cohort1_saline_example_4``); the recording's own name, without its extension, is added when its
+    folder holds more than one recording of ``keys`` (several archives), and is the name of a recording
+    in the project folder itself. A name that two keys still share gets the first six characters of
+    each key's SHA-1 appended, so two sessions never share a folder and a name does not depend on the
+    order of ``keys``.
     """
-    folder = dirname(dirname(abspath(h5)))
-    search = find_recordings(folder, max_depth=0)
-    if search.recordings:
-        return search.recordings[0]
-    for extension in _ARCHIVE_EXTENSIONS:
-        if exists(folder + extension):
-            return folder + extension
-    return folder
+    def parts(k):
+        return [part for part in PurePosixPath(k.replace("\\", "/")).parts if part not in ("", ".", "..", "/")]
+
+    def flat(k):
+        *folder, name = parts(k) or [k]
+        siblings = [other for other in keys if parts(other)[:-1] == folder] if folder else [k]
+        stem = _stem(name)
+        pieces = folder + ([stem] if len(set(siblings) | {k}) > 1 or not folder else [])
+        return "_".join(piece.replace(":", "_") for piece in pieces)
+
+    keys = set(keys) | {key}
+    name = flat(key)
+    if any(flat(other) == name for other in keys if other != key):
+        name = f"{name}_{hashlib.sha1(key.encode('utf-8')).hexdigest()[:6]}"
+    return name
+
+
+@dataclass(frozen=True)
+class SessionOutputs:
+    """Where one session's outputs are: its folder and the files extraction writes in it."""
+
+    folder: Path
+    #: The extraction (``results.h5``); a session is extracted when this exists.
+    h5: Path
+    #: The extraction's preview movie (``results.mp4``).
+    movie: Path
+    #: The images extraction writes: ``background``, ``first_frame``, and with their settings
+    #: ``plane_background`` and ``graduated_background``.
+    images: dict
+
+
+def outputs_in(folder) -> SessionOutputs:
+    """The names extraction writes in ``folder``."""
+    folder = Path(folder)
+    h5 = folder / SESSION_FILE
+    return SessionOutputs(folder=folder, h5=h5, movie=h5.with_suffix(".mp4"), images={
+        "background": folder / "bground.tiff", "first_frame": folder / "first_frame.tiff",
+        "plane_background": folder / "plane_bground.tiff", "graduated_background": folder / "new_bg.tiff"})
+
+
+def project_keys(project: Project, max_depth: int = DEFAULT_MAX_DEPTH) -> list:
+    """The session keys of every recording in ``project``'s folder."""
+    return [session_key(project, r) for r in find_recordings(project.folder, max_depth=max_depth).recordings]
+
+
+def session_outputs(project: Project, key: str, *, keys: Collection[str] | None = None,
+                    sessions_dir=None) -> SessionOutputs:
+    """Where session ``key``'s outputs are in ``project``.
+
+    The folder ``moseq2-project.yaml`` names for the session when it lists it; otherwise
+    ``session_folder_name`` of the key among ``keys`` (by default, every recording in the
+    project), in ``sessions_dir`` (by default the project's ``aggregate_results/``). A
+    ``sessions_dir`` given is used as given.
+    """
+    if sessions_dir is None:
+        listed = load(project).sessions.get(key)
+        if listed is not None and listed.folder:
+            return outputs_in(resolve_path(project, listed.folder))
+        sessions_dir = Path(project.folder) / SESSIONS_FOLDER
+    if keys is None:
+        keys = project_keys(project)
+    return outputs_in(Path(sessions_dir) / session_folder_name(key, keys))
+
+
+def extracted_in(project: Project, sessions_dir=None):
+    """The ``extracted`` function ``find_recordings`` takes: each recording whose ``results.h5`` exists."""
+    def extracted(recordings):
+        keys = {session_key(project, r): r for r in recordings}
+        everything = set(keys) | set(project_keys(project))
+        done = {}
+        for key, recording in keys.items():
+            h5 = session_outputs(project, key, keys=everything, sessions_dir=sessions_dir).h5
+            if h5.is_file():
+                done[recording] = h5
+        return done
+
+    return extracted
+
+
+def standalone_outputs(recording) -> SessionOutputs:
+    """Where ``extract FILE`` writes outside a project: ``proc/`` beside the recording."""
+    return outputs_in(Path(abspath(recording)).parent / STANDALONE_FOLDER)

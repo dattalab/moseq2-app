@@ -14,8 +14,10 @@ no default of its own, and the arena tool saves exactly the settings
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import inspect
+import os
 
 import pytest
 from click.testing import CliRunner
@@ -63,7 +65,7 @@ def called(monkeypatch, steps, setup):
         calls["batch_extract"].append(opts)
         return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
 
-    def aggregate_results(input_dir, output_dir, opts, **kwargs):
+    def aggregate_results(project, opts, **kwargs):
         calls["aggregate_results"].append(opts)
         return steps.AggregateResult(sessions=[])
 
@@ -94,6 +96,17 @@ def project(tmp_path):
     return tmp_path, recording, config
 
 
+@contextlib.contextmanager
+def working_in(folder):
+    """Run with ``folder`` as the working folder, as a person running a command from the project does."""
+    before = os.getcwd()
+    os.chdir(folder)
+    try:
+        yield
+    finally:
+        os.chdir(before)
+
+
 def invoke(*args):
     result = CliRunner().invoke(extract_cli.cli, [str(a) for a in args], catch_exceptions=False)
     assert result.exit_code == 0, result.output
@@ -106,7 +119,8 @@ def test_every_extract_command_calls_its_step(project, called, options):
     invoke("find-roi", recording, "--config-file", config)
     invoke("extract", recording, "--config-file", config)
     invoke("batch-extract", root, "--config-file", config)
-    invoke("aggregate-results", "-i", root, "-o", root / "aggregate_results")
+    with working_in(root):
+        invoke("aggregate-results", "-i", root, "-o", root / "aggregate_results")
     invoke("generate-config", "-o", root / "new_config.yaml")
     invoke("download-flip-file", config, "--output-dir", root)
 
@@ -128,7 +142,7 @@ def test_the_notebook_functions_call_the_steps(project, called, options):
 
     extract_found_sessions(str(root), str(config), [".dat"])
     extract_command(str(recording), None, str(config))
-    aggregate_extract_results_command(str(root), "{session_name}", "aggregate_results/")
+    aggregate_extract_results_command(str(root))
     generate_config_command(str(root / "new_config.yaml"), camera_type="azure")
     download_flip_command(str(root), str(config), selection=1)
 
@@ -195,11 +209,10 @@ def test_the_aggregate_function_takes_its_defaults_from_the_options_class(projec
 
     monkeypatch.setattr(gui, "AggregateOptions", Changed)
     root, _, _ = project
-    gui.aggregate_extract_results_command(str(root), "{session_name}", "aggregate_results/")
-    gui.aggregate_extract_results_command(str(root), "{session_name}", "aggregate_results/", mouse_threshold=2.0)
+    gui.aggregate_extract_results_command(str(root))
+    gui.aggregate_extract_results_command(str(root), mouse_threshold=2.0)
 
-    assert [(o.format, o.mouse_threshold) for o in called["aggregate_results"]] == [
-        ("{session_name}", 5.0), ("{session_name}", 2.0)]
+    assert [o.mouse_threshold for o in called["aggregate_results"]] == [5.0, 2.0]
 
 
 def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monkeypatch, steps):

@@ -101,7 +101,10 @@ def project_1_6_from_bundle(bundle, dest):
     and a ``progress.yaml``. The copy's ``config.yaml`` holds the same settings in
     their stages' sections, with the index's groups as its ``groups``, and its
     ``moseq2-project.yaml`` lists the index's sessions (keyed by ``SessionName``,
-    since the bundle holds no recordings), the PCA files and the model. The
+    since the bundle holds no recordings), the PCA files and the model. Each
+    session's aggregated files are moved into its own folder in
+    ``aggregate_results/`` under the names extraction gives them (``results.h5``,
+    ``results.yaml``, ``results.mp4``), as a 1.6 project holds them. The
     ``crowd_movies`` section is left empty: 1.5.0 made its crowd movies with
     their own defaults and read none of them from ``config.yaml``, whose
     ``gaussfilter_space`` and the like were PCA's. The index and progress file
@@ -127,11 +130,19 @@ def project_1_6_from_bundle(bundle, dest):
         config[section] = {key: value for key, value in flat.items() if key in names}
     config["crowd_movies"] = {}
 
+    from moseq2_extract.recordings import session_folder_name
+
     index = read_yaml(str(bundle / "moseq2-index.yaml"))
+    keys = [str(entry["metadata"]["SessionName"]) for entry in index["files"]]
     sessions, groups = {}, {}
-    for entry in index["files"]:
-        key = str(entry["metadata"]["SessionName"])
-        sessions[key] = {"recording": key, "folder": Path(entry["path"][0]).as_posix(), "uuid": str(entry["uuid"])}
+    for key, entry in zip(keys, index["files"]):
+        h5 = dest / Path(entry["path"][0])
+        folder = Path("aggregate_results") / session_folder_name(key, keys)
+        (dest / folder).mkdir(parents=True, exist_ok=True)
+        for suffix in (".h5", ".yaml", ".mp4"):
+            if h5.with_suffix(suffix).is_file():
+                shutil.move(str(h5.with_suffix(suffix)), str(dest / folder / f"results{suffix}"))
+        sessions[key] = {"recording": key, "folder": folder.as_posix(), "uuid": str(entry["uuid"])}
         groups[key] = str(entry["group"])
     config["groups"] = groups
     write_config(config, str(dest / "config.yaml"))

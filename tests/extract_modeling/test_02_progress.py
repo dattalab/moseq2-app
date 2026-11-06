@@ -13,10 +13,11 @@ the sessions, the PCA files and the models. Every later cell takes the project
 folder and reads that file when it needs a path, so nothing is carried between
 cells.
 
-Extractions are found by the ``proc/*.mp4`` beside each recording and the
-``complete`` key of the yaml beside it, so a project in any state of extraction
-is a few empty files, and the reported states below are built that way rather
-than by running the pipeline.
+A recording is extracted when its ``results.h5`` exists in its folder in
+``aggregate_results/``, and an extraction stopped partway leaves its unfinished
+``.results.h5.partial`` there, so a project in any state of extraction is a few
+empty files, and the reported states below are built that way rather than by
+running the pipeline.
 """
 
 from __future__ import annotations
@@ -33,20 +34,19 @@ def build_project(root, n_sessions=4, n_extracted=0, n_incomplete=0):
     """A project folder whose recordings are extracted up to a given point.
 
     Sessions are found by their recording files and extractions by the
-    ``proc/*.mp4`` beside each recording, so empty files are enough to be
-    found. The one thing read rather than stat'd is the per-session
-    ``complete`` flag.
+    ``results.h5`` in each session's folder, so empty files are enough to be
+    found.
     """
     root.mkdir(parents=True, exist_ok=True)
     marked = 0
     for i in range(n_sessions):
         session = root / f"session_{i}"
-        (session / "proc").mkdir(parents=True, exist_ok=True)
+        session.mkdir(parents=True, exist_ok=True)
         (session / "depth.avi").touch()
         if marked < n_extracted + n_incomplete:
-            complete = marked < n_extracted
-            (session / "proc" / "results_00.mp4").touch()
-            (session / "proc" / "results_00.yaml").write_text(f"complete: {complete}\n")
+            folder = root / "aggregate_results" / f"session_{i}"
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / ("results.h5" if marked < n_extracted else ".results.h5.partial")).touch()
             marked += 1
     return root
 
@@ -120,16 +120,16 @@ def test_extraction_counts(tmp_path, capsys, state, expected):
 
 
 def test_an_incomplete_extraction_is_named(tmp_path, capsys):
-    """An extraction whose results file says it did not finish was stopped
-    partway, most often by a job or kernel killed for memory or time. The
-    line says so, where to look and how to redo it."""
+    """An extraction that left its unfinished file was stopped partway, most
+    often by a job or kernel killed for memory or time. The line says so,
+    where to look and how to redo it."""
     path = build_project(tmp_path / "proj", n_extracted=0, n_incomplete=1)
     start(str(path))
     session = tmp_path / "proj" / "session_0"
-    proc = session / "proc"
+    proc = tmp_path / "proj" / "aggregate_results" / "session_0"
     assert (
-        f"Extraction of session_0 started but did not finish: {proc / 'results_00.yaml'} "
-        "records it as incomplete. An extraction stopped partway leaves this behind, most "
+        f"Extraction of session_0 started but did not finish: {proc / '.results.h5.partial'} "
+        "is the unfinished extraction. An extraction stopped partway leaves this behind, most "
         "often because the job or notebook kernel running it was stopped, for example "
         "killed for running out of memory or for reaching its time limit. Look in "
         f"{proc} for what it wrote and, if it ran on SLURM, in the job's log, "
@@ -140,11 +140,8 @@ def test_an_incomplete_extraction_is_named(tmp_path, capsys):
 
 
 def test_a_directory_named_for_mp4_does_not_hide_extractions(tmp_path, capsys):
-    """An extraction's .yaml is found by swapping its .mp4's extension.
-
-    Nothing else in the path is the extension, however the directories
-    holding the project are named.
-    """
+    """However the folders holding the project are named, an extraction is its session folder's
+    ``results.h5``."""
     path = build_project(tmp_path / "mp4_archive" / "proj", n_extracted=4)
     start(str(path))
     assert "Extraction Progress: 4 out of 4 session(s) extracted" in capsys.readouterr().out
@@ -157,7 +154,7 @@ def test_reports_what_the_bookkeeping_file_lists(tmp_path, capsys):
     (root / "config.yaml").write_text("camera_type: auto\n")
     write_yaml({
         "sessions": {f"session_{i}/depth.avi": {"recording": f"session_{i}/depth.avi",
-                                                 "folder": f"aggregate_results/s{i}.h5", "uuid": str(i)}
+                                                 "folder": f"aggregate_results/session_{i}", "uuid": str(i)}
                      for i in range(4)},
         "pca": {"components": "_pca/pca.h5", "scores": "_pca/pca_scores.h5"},
         "models": {"fitted": ["models/model.p", "models/model_kappa_100.p"], "current": "models/model.p",

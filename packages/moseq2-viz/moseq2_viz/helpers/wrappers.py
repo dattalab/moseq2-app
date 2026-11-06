@@ -3,20 +3,15 @@ Wrapper functions CLI and GUI.
 """
 
 import os
-import shutil
 import matplotlib as mpl
 from glob import glob
-from tqdm.auto import tqdm
 from cytoolz import keyfilter, groupby
-from os.path import exists, join, dirname, basename
+from os.path import exists, join, dirname
 from moseq2_viz.scalars.util import scalars_to_dataframe, compute_all_pdf_data
 from moseq2_viz.io.video import write_crowd_movies, write_crowd_movie_info_file
 from moseq2_viz.util import (
     parse_index,
     get_index_hits,
-    get_metadata_path,
-    clean_dict,
-    recursive_find_h5s,
 )
 from moseq2_viz.model.trans_graph import (
     get_trans_graph_groups,
@@ -39,8 +34,6 @@ from moseq2_viz.model.util import (
     make_separate_crowd_movies,
     labels_to_changepoints,
 )
-from moseq2_common.h5 import h5_to_dict
-from moseq2_common.yaml import write_yaml
 
 
 def _make_directories(crowd_movie_path, plot_path):
@@ -589,33 +582,6 @@ def make_crowd_movies_wrapper(index_file, model_path, output_dir, config_data):
         }
 
     return cm_paths
-
-
-def copy_h5_metadata_to_yaml_wrapper(input_dir):
-    """
-    Copy h5 metadata dictionary contents into the respective file's yaml file.
-
-    Args:
-    input_dir (str): path to directory that contains h5 files.
-    """
-
-    h5s, dicts, yamls = recursive_find_h5s(input_dir)
-    to_load = [
-        (tmp, yml, file)
-        for tmp, yml, file in zip(dicts, yamls, h5s)
-        if tmp["complete"] and not tmp["skip"]
-    ]
-
-    # load in all of the h5 files, grab the extraction metadata, reformat to improve readability
-    # then stage the copy
-    for _dict, _yml, _h5 in tqdm(to_load, desc="Copying data to yamls"):
-        metadata_path = get_metadata_path(_h5)
-        _dict["metadata"] = clean_dict(h5_to_dict(_h5, metadata_path))
-
-        # Atomically write updated yaml
-        new_file = f"{basename(_yml)}_update.yaml"
-        write_yaml(_dict, new_file)
-        shutil.move(new_file, _yml)
 
 
 def make_df_wrapper(model_file, index_file, output_file: "Path", save_extension):

@@ -165,14 +165,14 @@ def test_accepting_the_prompt_regenerates(tmp_path, monkeypatch):
     """5b. Accepting it replaces the file with fresh defaults."""
     path = tmp_path / "config.yaml"
     generate_config_command(str(path), camera_type="k2")
-    path.write_text("edited_by_hand: true\n")
+    path.write_text("extract:\n  edited_by_hand: true\n")
 
     monkeypatch.setattr("builtins.input", lambda *_: "y")
     message = generate_config_command(str(path), camera_type="k2")
 
     assert message == "Configuration file has been successfully generated."
     rewritten = plain(read_yaml(str(path)))
-    assert "edited_by_hand" not in rewritten
+    assert "edited_by_hand" not in rewritten["extract"]
     assert rewritten["extract"]["bg_roi_depth_range"] == [650, 750]
 
 
