@@ -6,16 +6,14 @@ import os
 import h5py
 import click
 import logging
-import datetime
 import warnings
 import numpy as np
 import dask.array as da
 from moseq2_common.h5 import h5_to_dict
-from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
 from moseq2_pca.viz import plot_pca_results, changepoint_dist
 from os.path import abspath, join, exists, splitext, basename, dirname
-from moseq2_pca.helpers.data import get_pca_paths, get_pca_yaml_data, load_pcs_for_cp
+from moseq2_pca.helpers.data import get_pca_paths, load_pcs_for_cp, trained_cleaning, write_trained_settings
 from moseq2_pca.pca.util import apply_pca_dask, apply_pca_local, train_pca_dask, get_changepoints_dask
 from moseq2_common.frames import select_strel
 from moseq2_pca.util import find_extractions, initialize_dask, set_dask_config, close_dask, \
@@ -156,14 +154,6 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
         else:
             stacked_array_mask = None
 
-        params = config_data
-        params['start_time'] = f'{datetime.datetime.now():%Y-%m-%d_%H-%M-%S}'
-        params['inputs'] = h5s
-
-        # Update PCA config yaml file
-        config_store = f'{save_file}.yaml'
-        write_yaml(params, config_store)
-
         # Compute Principal Components
         try:
             output_dict = \
@@ -191,10 +181,11 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
         # Plotting training results
         plot_pca_results(output_dict, save_file, output_dir)
 
-        # Saving PCA to h5 file
+        # Saving PCA to h5 file, with the settings it was trained with
         with h5py.File(f'{save_file}.h5', 'w') as f:
             for k, v in output_dict.items():
                 f.create_dataset(k, data=v, compression='gzip', dtype='float32')
+            write_trained_settings(f, config_data)
 
         config_data['pca_file'] = f'{save_file}.h5'
     except:
@@ -248,11 +239,8 @@ def apply_pca_wrapper(input_dir, config_data, output_dir, output_file):
     check_frames_match_pca(h5s, dicts, pca_components, config_data['pca_file'],
                            config_data.get('h5_path', '/frames'))
 
-    # Get the yaml for pca, check parameters, if we used fft, be sure to turn on here...
-    pca_yaml = splitext(pca_file)[0] + '.yaml'
-
-    # Get filtering parameters and optional PCA reconstruction parameters (if missing_data == True)
-    use_fft, clean_params, mask_params, missing_data = get_pca_yaml_data(pca_yaml)
+    # The filters, height range and missing-data settings the components were trained with
+    use_fft, clean_params, mask_params, missing_data = trained_cleaning(pca_file)
 
     with warnings.catch_warnings():
         # Compute PCA Scores locally (without dask)

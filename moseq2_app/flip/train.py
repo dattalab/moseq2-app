@@ -16,6 +16,7 @@ from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
 from moseq2_common.options import read_settings
 from moseq2_common.records import read_record
 from moseq2_common.project import find_project
+from moseq2_extract.extract.flip_classifier import TRAINING_SETTINGS_ATTRIBUTE
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_extract.options import EXTRACT_STAGE
 from moseq2_extract.session_config import read_entries, recording_entry
@@ -278,6 +279,29 @@ def train_classifier(
     return pipeline.fit(frames, flipped)
 
 
-def save_classifier(clf_pipeline, out_path: str):
+def training_settings(data_index_path: str, cleaning) -> dict:
+    """What a classifier trained on these labels carries (``moseq2_extract.extract.flip_classifier.training_settings``).
+
+    Args:
+    data_index_path (str): the saved frame ranges (``flip-training-frame-ranges.p``).
+    cleaning (Mapping or CleaningOptions): the cleaning settings, as ``create_training_dataset`` takes them.
+
+    Returns:
+    (dict): ``crop_size``, the labeled frames' size, and ``cleaning``, each distinct set of cleaning settings
+        the labeled sessions were cleaned with.
+    """
+    session_paths, data_index = _load_frame_ranges(Path(data_index_path))
+    with h5py.File(session_paths[next(iter(data_index))], "r") as f:
+        crop_size = [int(n) for n in f["frames"].shape[1:]]
+    if not isinstance(cleaning, Mapping):
+        cleaning = {k: cleaning for k in data_index}
+    distinct = dict.fromkeys(cleaning[k] for k in data_index)
+    return {"crop_size": crop_size, "cleaning": [_plain(opts.as_dict()) for opts in distinct]}
+
+
+def save_classifier(clf_pipeline, out_path: str, settings: Mapping | None = None):
+    """Save the classifier to ``out_path``, carrying ``settings`` (``training_settings``) when given."""
+    if settings is not None:
+        setattr(clf_pipeline, TRAINING_SETTINGS_ATTRIBUTE, dict(settings))
     joblib.dump(clf_pipeline, out_path)
     print(f"Classifier saved to {out_path}")

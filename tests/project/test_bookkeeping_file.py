@@ -128,7 +128,8 @@ def project_copy(cli_project, tmp_path):
 
 
 def stub_pca_work(monkeypatch):
-    """The PCA work functions replaced by ones that write an empty output and record what they were given.
+    """The PCA work functions replaced by ones that write an empty output (the components with the settings
+    they were trained with) and record what they were given.
 
     Each call is recorded as (step, the options dict it was handed, the file it wrote).
     """
@@ -144,7 +145,11 @@ def stub_pca_work(monkeypatch):
         return path
 
     def train(input_dir, config, output_dir, output_file):
+        from moseq2_pca.helpers.data import write_trained_settings
+
         path = written(output_dir, output_file)
+        with h5py.File(path, "a") as f:
+            write_trained_settings(f, config)
         calls.append(("train_pca", dict(config), path))
         return {**config, "pca_file": str(path)}
 

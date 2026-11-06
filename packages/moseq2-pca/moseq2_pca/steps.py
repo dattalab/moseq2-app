@@ -29,6 +29,13 @@ finds it: the components, the scores, the changepoints. No step writes
 Each ``.h5`` a step writes holds the record of the run (``moseq2_common.records``)
 as its ``/provenance`` attribute: the options, every extraction and file read, and
 the arrays written, with the figures written beside it.
+
+The components carry the settings they were trained with (``TRAINED_SETTINGS``:
+the filters, the height range, FFT and missing-data PCA), as their ``.h5``'s
+``/settings`` attribute. ``apply_pca`` and ``compute_changepoints`` prepare
+each session's frames with those values, and, inside a project, stop before any
+work when ``config.yaml``'s ``pca`` section sets one of them to another value
+(``check_trained_settings``).
 """
 
 from __future__ import annotations
@@ -40,8 +47,10 @@ from pathlib import Path
 import h5py
 
 from moseq2_common.bookkeeping import BookkeepingError, relative_path, session_index, sessions_folder, update
+from moseq2_common.options import read_config
 from moseq2_common.project import Project
 from moseq2_common.records import start_record, write_h5_record
+from moseq2_pca.helpers.data import TRAINED_SETTINGS, TrainedSettingsError, read_trained_settings
 from moseq2_pca.helpers.wrappers import apply_pca_wrapper, compute_changepoints_wrapper, train_pca_wrapper
 from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
 from moseq2_pca.util import find_extractions
@@ -62,6 +71,51 @@ class ApplyPCAResult:
 @dataclass(frozen=True)
 class ChangepointsResult:
     changepoints_file: Path
+
+
+def _shown(value):
+    """A setting's value as config.yaml writes it."""
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_shown(v) for v in value) + "]"
+    return str(value)
+
+
+def _same(setting, trained, configured):
+    """Whether two values of ``setting`` are the same once read as ``train-pca`` reads them."""
+    def plain(value):
+        value = getattr(TrainPCAOptions.resolve(config={setting: value}), setting)
+        return list(value) if isinstance(value, tuple) else value
+    return plain(trained) == plain(configured)
+
+
+def check_trained_settings(components_file, project: Project | None) -> None:
+    """Stop when ``project``'s ``config.yaml`` sets a setting the components were trained with to another value.
+
+    Each of ``TRAINED_SETTINGS`` that the ``pca`` section sets is compared with the value the components in
+    ``components_file`` carry. Nothing is checked outside a project, or when either file does not exist yet
+    (the step itself then says which is missing).
+    """
+    if project is None or not Path(components_file).is_file() or not Path(project.config_file).is_file():
+        return
+    section = read_config(project.config_file).get("pca") or {}
+    configured = {key: section[key] for key in TRAINED_SETTINGS if section.get(key) is not None}
+    if not configured:
+        return
+    trained = read_trained_settings(components_file)
+    differ = [
+        f"The PCA components in {components_file} were trained with {key} {_shown(trained[key])}, but the pca "
+        f"section of {project.config_file} sets {_shown(value)}. Scores and changepoints must use the trained "
+        f"value: set {key} back to {_shown(trained[key])} in {project.config_file}, or train PCA again with these "
+        "settings."
+        for key, value in configured.items() if not _same(key, trained[key], value)
+    ]
+    if differ:
+        raise TrainedSettingsError("\n".join(differ))
+
+
+def _components(components_file, output_dir):
+    """The components a step reads: ``components_file``, else ``<output_dir>/pca.h5``."""
+    return components_file or join(abspath(output_dir), 'pca.h5')
 
 
 def _written(output_dir, output_file):
@@ -124,16 +178,16 @@ def train_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Tr
     result = TrainPCAResult(components_file=Path(pca_file) if pca_file else None)
     stem = str(_written(output_dir, output_file).with_suffix(""))
     _write_record(record, result.components_file,
-                  [f"{stem}{name}" for name in ("_components.png", "_components.pdf", "_scree.png", "_scree.pdf",
-                                                ".yaml")])
+                  [f"{stem}{name}" for name in ("_components.png", "_components.pdf", "_scree.png", "_scree.pdf")])
     _record(project, "components", result.components_file)
     return result
 
 
 def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: ApplyPCAOptions, *,
               components_file: str | None = None, project: Project | None = None) -> ApplyPCAResult:
-    """Compute each session's PC scores with the components in ``components_file``; write
-    ``<output_dir>/<output_file>.h5``."""
+    """Compute each session's PC scores with the components in ``components_file``, preparing the frames
+    with the settings the components were trained with; write ``<output_dir>/<output_file>.h5``."""
+    check_trained_settings(_components(components_file, output_dir), project)
     sessions = _sessions(input_dir, project)
     record = _start("apply-pca", opts, sessions, project, components_file)
     _, success = apply_pca_wrapper(sessions, {**opts.as_dict(), 'pca_file': components_file},
@@ -147,7 +201,9 @@ def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Ap
 def compute_changepoints(input_dir: str | None, output_dir: str, output_file: str, opts: ChangepointsOptions, *,
                          components_file: str | None = None,
                          scores_file: str | None = None, project: Project | None = None) -> ChangepointsResult:
-    """Compute the model-free changepoints; write ``<output_dir>/<output_file>.h5``."""
+    """Compute the model-free changepoints, with missing-data PCA when the components were trained with it;
+    write ``<output_dir>/<output_file>.h5``."""
+    check_trained_settings(_components(components_file, output_dir), project)
     sessions = _sessions(input_dir, project)
     record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
     compute_changepoints_wrapper(

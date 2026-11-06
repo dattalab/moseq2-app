@@ -223,6 +223,18 @@ def load_flip_classifier(flip_file):
     return joblib.load(flip_file)
 
 
+#: The attribute a classifier trained by ``moseq2_app.steps.train_flip_classifier`` carries: the crop size of
+#: the frames it was trained on (``crop_size``) and the cleaning settings (``moseq2_common.frames.CleaningOptions``)
+#: of each distinct way its labeled sessions were cleaned (``cleaning``, a list). The published classifiers do
+#: not carry it.
+TRAINING_SETTINGS_ATTRIBUTE = "training_settings"
+
+
+def training_settings(clf):
+    """The settings ``clf`` was trained with (``TRAINING_SETTINGS_ATTRIBUTE``), or None when it carries none."""
+    return getattr(clf, TRAINING_SETTINGS_ATTRIBUTE, None)
+
+
 def is_legacy_pickle_failure(exc):
     """Whether this load failed because the file is a scikit-learn 0.19 pickle.
 
