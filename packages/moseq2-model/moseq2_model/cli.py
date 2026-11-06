@@ -7,24 +7,34 @@ else the project ``--config-file`` belongs to (a kappa-scan fit's settings file
 names its project), else the working folder's. It reads the ``model`` section of
 ``--config-file`` or, without one, of the project's ``config.yaml``, resolves the
 settings and calls its step in ``moseq2_model.steps``, with the sessions and
-their groups from the project's ``moseq2-project.yaml`` and ``config.yaml``.
+their groups from the project's ``moseq2-project.yaml`` and ``config.yaml``,
+less ``exclude`` (``--exclude`` and ``--no-exclude`` replace it for one run). In
+a project the PC scores are the ones its ``moseq2-project.yaml`` names when
+left out, and the models go into its ``models/`` (``applied_models/``), as the
+notebook writes them.
 """
 
 from dataclasses import replace
 from os.path import join
+from pathlib import Path
 
 import click
 from click.core import ParameterSource
 
 from moseq2_common.bookkeeping import project_index
 from moseq2_common.options import (
+    ProjectDefault,
     ProjectGroup,
     click_options,
     command_project,
+    PROJECT_SCORES,
     command_settings,
-    described_argument,
+    exclude_options,
     explicit_values,
+    in_project,
+    project_argument,
     project_file_option,
+    typed_exclude,
 )
 from moseq2_common.project import is_job_file
 from moseq2_common.records import print_record_command
@@ -50,8 +60,17 @@ _SCORES = "the .h5 apply-pca writes (_pca/pca_scores.h5 in a project)"
 _LEARN_EXAMPLE = "For example, from the project folder: `moseq2-model learn-model _pca/pca_scores.h5 models/model.p`."
 
 
-def _scores(what):
-    return described_argument("input_file", type=click.Path(exists=True), missing=f"the PC scores {what}, {_SCORES}.")
+def _scores(what, name="input_file"):
+    return project_argument(name, type=click.Path(exists=True), missing=f"the PC scores {what}, {_SCORES}.",
+                            default=PROJECT_SCORES)
+
+
+#: Where the notebook writes a fitted model and a kappa scan's models.
+MODELS = in_project("models", make="Run `moseq2-model kappa-scan` in the project folder to fit models there.")
+#: Where the notebook writes an applied model: ``applied_models/`` in the project, named as the model applied.
+APPLIED = ProjectDefault(
+    "applied_models/<the model's file name> in the project folder",
+    lambda project, params: Path(project.folder, "applied_models", Path(params["model_file"]).name))
 
 
 _PROJECT_FILE_HELP = ("The project's moseq2-project.yaml, whose sessions and groups (in its config.yaml) the "
@@ -63,17 +82,17 @@ _MODEL_ORDER = ("check_every", "robust", "separate_trans", "nlags", "noise_level
                 "var_name", "num_iter", "ncpus", "nfolds", "hold_out_seed", "hold_out")
 LEARN_MODEL_ORDER = ("input_file", "dest_file", *_MODEL_ORDER, "kappa", "checkpoint_freq", "use_checkpoint",
                      "project_file",
-                     "config_file", "default_group", "verbose")
+                     "config_file", "default_group", "verbose", "exclude", "no_exclude")
 KAPPA_SCAN_ORDER = ("input_file", "output_dir", "project_file", "out_script", "n_models", "prefix", "cluster_type",
                     "scan_scale", "min_kappa", "max_kappa", "memory", "wall_time", "partition", "get_cmd", "run_cmd",
-                    *_MODEL_ORDER)
-APPLY_MODEL_ORDER = ("model_file", "pc_file", "dest_file", "var_name", "project_file", "load_groups")
+                    *_MODEL_ORDER, "exclude", "no_exclude")
+APPLY_MODEL_ORDER = ("model_file", "pc_file", "dest_file", "var_name", "project_file", "load_groups", "exclude",
+                     "no_exclude")
 
 
 @cli.command(name="count-frames", help="Count the number of frames in given h5 file (pca_scores)")
 @click_options(CountFramesOptions, order=("input_file", "var_name"), others={
-    "input_file": described_argument("input_file", type=click.Path(exists=True),
-                                     missing=f"the PC scores file whose frames to count, {_SCORES}."),
+    "input_file": _scores("file whose frames to count"),
 })
 @click.pass_context
 def count_frames(ctx, input_file, **_):
@@ -83,15 +102,17 @@ def count_frames(ctx, input_file, **_):
 
 @cli.command(name="learn-model", help="Train ARHMM on PC Scores with given training parameters")
 @click_options(LearnModelOptions, order=LEARN_MODEL_ORDER, others={
-    "input_file": described_argument("input_file", type=click.Path(exists=True),
-                                     missing=f"the PC scores to fit the model to, {_SCORES}. {_LEARN_EXAMPLE}"),
-    "dest_file": described_argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True),
-                                    missing="the file to write the fitted model to, a .p file (the notebook writes "
-                                            f"models/model.p in the project folder). {_LEARN_EXAMPLE}"),
+    "input_file": project_argument("input_file", type=click.Path(exists=True), default=PROJECT_SCORES,
+                                   missing=f"the PC scores to fit the model to, {_SCORES}. {_LEARN_EXAMPLE}"),
+    "dest_file": project_argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True),
+                                  default=in_project("models", "model.p"),
+                                  missing="the file to write the fitted model to, a .p file (the notebook writes "
+                                          f"models/model.p in the project folder). {_LEARN_EXAMPLE}"),
     "project_file": project_file_option(_PROJECT_FILE_HELP),
     "config_file": click.option("--config-file", type=click.Path(), default=None,
                                 help="Path to a config.yaml whose settings this fit uses; "
                                      "options typed on the command line take precedence over it"),
+    **exclude_options(),
 })
 @click.pass_context
 def learn_model(ctx, input_file, dest_file, config_file, **_):
@@ -112,24 +133,26 @@ def learn_model(ctx, input_file, dest_file, config_file, **_):
             "uses the CPUs the job or machine gives it, and --ncpus does not change that."
         )
     project = command_project(ctx)
+    index = project_index(project, exclude=typed_exclude(ctx))
     if is_job_file(config_file):
         # a kappa-scan fit: its settings file names the project, whose bookkeeping only the scan's submitter writes
-        steps.learn_model(input_file, dest_file, opts, index=project_index(project))
+        steps.learn_model(input_file, dest_file, opts, index=index)
     else:
-        steps.learn_model(input_file, dest_file, opts, index=project_index(project), project=project)
+        steps.learn_model(input_file, dest_file, opts, index=index, project=project)
 
 
 @cli.command(name="apply-model", help="Apply pre-trained ARHMM to PC scores.")
 @click_options(ApplyModelOptions, order=APPLY_MODEL_ORDER, others={
-    "model_file": described_argument("model_file", type=click.Path(exists=True),
-                                     missing="the fitted model to apply, the .p file learn-model writes "
-                                             "(models/model.p in a project)."),
-    "pc_file": described_argument("pc_file", type=click.Path(exists=True),
-                                  missing=f"the PC scores to label with the model, {_SCORES}."),
-    "dest_file": described_argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True),
-                                    missing="the file to write the labels to, a .p file (for example "
-                                            "models/applied_model.p in the project folder)."),
+    "model_file": project_argument("model_file", type=click.Path(exists=True),
+                                   missing="the fitted model to apply, the .p file learn-model writes "
+                                           "(models/model.p in a project)."),
+    "pc_file": _scores("to label with the model", "pc_file"),
+    "dest_file": project_argument("dest_file", type=click.Path(file_okay=True, writable=True, resolve_path=True),
+                                  default=APPLIED,
+                                  missing="the file to write the labels to, a .p file (the notebook writes "
+                                          "applied_models/<the model's file name> in the project folder)."),
     "project_file": project_file_option(_PROJECT_FILE_HELP),
+    **exclude_options(),
 })
 @click.pass_context
 def apply_model(ctx, model_file, pc_file, dest_file, **_):
@@ -137,7 +160,8 @@ def apply_model(ctx, model_file, pc_file, dest_file, **_):
     config = command_settings(ctx, ApplyModelOptions, stage_classes=MODEL_STAGE)
     opts = ApplyModelOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyModelOptions))
     project = command_project(ctx)
-    steps.apply_model(model_file, pc_file, dest_file, opts, index=project_index(project), project=project)
+    steps.apply_model(model_file, pc_file, dest_file, opts, index=project_index(project, exclude=typed_exclude(ctx)),
+                      project=project)
 
 
 @cli.command(name="kappa-scan", help="Batch train multiple models to scan over different kappa values. Each "
@@ -146,11 +170,12 @@ def apply_model(ctx, model_file, pc_file, dest_file, **_):
              "the project's moseq2-project.yaml when get-best-model compares them.")
 @click_options(KappaScanOptions, order=KAPPA_SCAN_ORDER, others={
     "input_file": _scores("to fit the models to"),
-    "output_dir": described_argument("output_dir", type=click.Path(exists=False),
-                                     missing="the folder to write the scan's models and their job files into "
-                                             "(for example models/kappa_scan in the project folder), which "
-                                             "moseq2-viz get-best-model then compares."),
+    "output_dir": project_argument("output_dir", type=click.Path(exists=False), default=MODELS,
+                                   missing="the folder to write the scan's models and their job files into "
+                                           "(the notebook writes them into models in the project folder), which "
+                                           "moseq2-viz get-best-model then compares."),
     "project_file": project_file_option(_PROJECT_FILE_HELP),
+    **exclude_options(),
 })
 @click.pass_context
 def kappa_scan_fit_models(ctx, input_file, output_dir, **_):
@@ -160,7 +185,7 @@ def kappa_scan_fit_models(ctx, input_file, output_dir, **_):
     learn = LearnModelOptions.resolve(config=config)
     project = command_project(ctx)
     steps.kappa_scan(input_file, output_dir, replace(opts, out_script=join(output_dir, opts.out_script)),
-                     index=project_index(project), learn=learn, project=project)
+                     index=project_index(project, exclude=typed_exclude(ctx)), learn=learn, project=project)
 
 
 cli.add_command(print_record_command())

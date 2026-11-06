@@ -363,8 +363,11 @@ def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, learn=Non
     kappas = get_scan_range_kappas(data_dict, config_data)
 
     # Get model training command strings
+    # a list of sessions to leave out given to the scan (not config.yaml's) goes on each fit's command line
+    index = config_data.get("index")
     command_string = create_command_strings(input_file, output_dir, config_data, kappas, learn=learn,
-                                            project=project)
+                                            project=project,
+                                            exclude=index.get("exclude") if isinstance(index, dict) else None)
 
     # Ensure output directory exists
     os.makedirs(dirname(config_data["out_script"]), exist_ok=True)

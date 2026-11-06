@@ -11,7 +11,10 @@ Each step hands its work function (the ``*_wrapper`` in
 project's sessions and groups as an index in memory
 (``moseq2_common.bookkeeping.session_index``), or None. The index leaves out the
 sessions ``config.yaml``'s ``exclude`` lists, and so do the fit and the applied
-labels.
+labels. A step given ``exclude`` (``[]`` for none) or ``groups`` uses them in
+place of ``config.yaml``'s for that run (``moseq2_common.bookkeeping.index_for_run``),
+and a kappa scan's fits carry an ``exclude`` given to it on their command lines.
+The record notes the sessions used and left out.
 
 Each output carries the record of the run (``moseq2_common.records``): the model
 and the kappa scan's script in a ``.yaml`` beside them (``model.p``: ``model.yaml``), an applied model in
@@ -35,7 +38,7 @@ from os.path import realpath
 from pathlib import Path
 
 from moseq2_model.helpers.wrappers import apply_model_wrapper, kappa_scan_fit_models_wrapper, learn_model_wrapper
-from moseq2_common.bookkeeping import relative_path, update
+from moseq2_common.bookkeeping import index_for_run, note_sessions, relative_path, update
 from moseq2_common.project import Project
 from moseq2_common.records import atomic_outputs, check_inputs, start_record, write_record
 from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
@@ -92,10 +95,13 @@ def _sessions(index):
 
 
 def learn_model(input_file: str, dest_file: str, opts: LearnModelOptions, *,
-                index: dict | None = None, project: Project | None = None) -> LearnModelResult:
+                index: dict | None = None, project: Project | None = None,
+                exclude: list[str] | None = None, groups: dict | None = None) -> LearnModelResult:
     """Fit an AR-HMM to the PC scores in ``input_file``; write the model to ``dest_file``."""
     _check("learn-model", (input_file, SCORES_ADVICE))
+    index = index_for_run(index, exclude=exclude, groups=groups)
     record = _start("learn-model", opts, project, input_file, *_sessions(index))
+    note_sessions(record, index)
     figure = learn_model_wrapper(input_file, dest_file, _settings(opts, {'index': index}))
     result = LearnModelResult(model_file=Path(realpath(dest_file)), figure_file=Path(figure) if figure else None)
     if isinstance(index, dict) and isinstance(index.get("files"), list):
@@ -116,7 +122,8 @@ def learn_model(input_file: str, dest_file: str, opts: LearnModelOptions, *,
 
 
 def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, index: dict | None = None,
-               learn: LearnModelOptions | None = None, project: Project | None = None) -> KappaScanResult:
+               learn: LearnModelOptions | None = None, project: Project | None = None,
+               exclude: list[str] | None = None, groups: dict | None = None) -> KappaScanResult:
     """Write ``opts.out_script``, one ``learn-model`` command per kappa, each saving its model in ``output_dir``.
 
     Each fit's learn-model settings go to its job settings file beside its model
@@ -128,7 +135,9 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
     models enter it when ``get-best-model`` compares them.
     """
     _check("kappa-scan", (input_file, SCORES_ADVICE))
+    index = index_for_run(index, exclude=exclude, groups=groups)
     record = _start("kappa-scan", opts, project, input_file)
+    note_sessions(record, index)
     commands = kappa_scan_fit_models_wrapper(input_file, _settings(opts, {'index': index}), output_dir,
                                              learn=learn, project=project)
     result = KappaScanResult(script=Path(opts.out_script), commands=commands)
@@ -138,10 +147,13 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
 
 
 def apply_model(model_file: str, pc_file: str, dest_file: str, opts: ApplyModelOptions, *,
-                index: dict | None = None, project: Project | None = None) -> ApplyModelResult:
+                index: dict | None = None, project: Project | None = None,
+                exclude: list[str] | None = None, groups: dict | None = None) -> ApplyModelResult:
     """Label the PC scores in ``pc_file`` with the model in ``model_file``; write them to ``dest_file``."""
     _check("apply-model", (model_file, MODEL_ADVICE), (pc_file, SCORES_ADVICE))
+    index = index_for_run(index, exclude=exclude, groups=groups)
     record = _start("apply-model", opts, project, model_file, pc_file, *_sessions(index))
+    note_sessions(record, index)
     result = ApplyModelResult(applied_file=Path(dest_file))
     # the labels and their record are written under temporary names and renamed into place together
     stem, extension = result.applied_file.with_suffix(""), result.applied_file.suffix

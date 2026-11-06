@@ -21,7 +21,11 @@ The PCA, model and viz steps take the sessions as an index in memory
 (``session_index``), the shape ``moseq2_viz.util.parse_index`` reads, built from
 this file and ``config.yaml``'s groups each time and never written. It leaves
 out the sessions ``config.yaml``'s ``exclude`` lists, so every step after
-extraction does, and prints one line naming them.
+extraction does, and prints one line naming them. ``exclude`` is a setting like
+any other: a list given for one run (``--exclude``, ``--no-exclude``, a step's
+``exclude=``) replaces ``config.yaml``'s for that run, and ``groups=`` likewise
+replaces its groups. ``extraction_keys`` names the extractions found in a folder
+by their session keys, so the list applies to a typed ``--input-dir`` too.
 """
 
 from __future__ import annotations
@@ -34,10 +38,11 @@ from pathlib import Path, PurePosixPath
 
 from moseq2_common.h5 import extraction_labels
 from moseq2_common.project import Project, check_session_names, exclude_note, read_exclude, read_groups, session_key
-from moseq2_common.records import StepInputError
+from moseq2_common.records import InputError, StepInputError
 from moseq2_common.yaml import read_yaml, write_yaml
 
-__all__ = ["BOOKKEEPING_NAME", "SESSION_ADVICE", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session", "load",
+__all__ = ["BOOKKEEPING_NAME", "SESSION_ADVICE", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session",
+           "check_given_exclude", "exclude_line", "extraction_keys", "index_for_run", "load", "note_sessions",
            "project_index", "recording_order", "relative_path", "resolve_path", "session_h5", "session_index",
            "sessions_folder", "update"]
 
@@ -184,27 +189,66 @@ def recording_order(metadata: dict | None, name: str) -> tuple:
     return str(metadata.get("StartTime") or "")[:19], str(metadata.get("SessionName") or name), name
 
 
-def session_index(project: Project, *, exclude: bool = True) -> dict:
+def exclude_line(left_out, *, given: bool, in_project: bool = True) -> str | None:
+    """The line a run prints naming the sessions it leaves out, ``left_out``: from ``config.yaml``'s ``exclude``,
+    or, when ``given``, the list given for this run. None when there is nothing to say (none left out, none
+    given)."""
+    left_out = list(left_out)
+    if not given:
+        return exclude_note(left_out) if left_out else None
+    instead = ", in place of config.yaml's exclude" if in_project else ""
+    if not left_out:
+        return f"Leaving out no session for this run{instead}."
+    count = "the 1 session" if len(left_out) == 1 else f"the {len(left_out)} sessions"
+    return f"Leaving out {count} given for this run{instead}: {', '.join(left_out)}."
+
+
+def check_given_exclude(given, keys, where) -> None:
+    """Stop when a session key in the list ``given`` for this run is not one of ``keys``, the sessions it
+    chooses among (named in ``where``): a typo would otherwise leave the session in."""
+    keys = list(keys)
+    unknown = [key for key in given if key not in keys]
+    if not unknown:
+        return
+    shown = ", ".join(keys[:5]) + (f" and {len(keys) - 5} more" if len(keys) > 5 else "")
+    raise InputError(
+        f"The sessions to leave out given for this run name {', '.join(unknown)}, which "
+        f"{'is not a session' if len(unknown) == 1 else 'are not sessions'} here. A session is named by its "
+        f"recording's path in its project, as {where} lists it ({shown}). Correct the name, or leave it out."
+    )
+
+
+def session_index(project: Project, *, exclude=None, groups=None) -> dict:
     """The project's sessions as an index in memory: 1.5.0's parsed-index shape, absolute paths.
 
     ``{"files": [{"uuid", "group", "metadata", "path": (h5,), "key"}], "pca_path": scores or "",
-    "bookkeeping_file": the file it was read from, "excluded": {key: uuid}}`` (``excluded`` only when
-    sessions are left out),
-    each session's group from ``config.yaml``'s ``groups`` (``default`` when it names none). Sessions are
-    listed in the order they were recorded (``StartTime``), then by name.
+    "bookkeeping_file": the file it was read from, "excluded": {key: uuid}, "exclude": [key]}``
+    (``excluded`` only when sessions are left out, ``exclude`` only when a list was given),
+    each session's group from ``config.yaml``'s ``groups``, or from ``groups`` when given (``default`` for a
+    session it names none for). Sessions are listed in the order they were recorded (``StartTime``), then by
+    name.
 
-    With ``exclude`` (the default), the sessions ``config.yaml``'s ``exclude`` lists are left out of
-    ``files``, listed in ``excluded`` and named in one printed line; the group widget and ``add-group``
-    pass False to list every session. A key in ``groups``, ``exclude`` or ``session_config.yaml`` that
-    is not a session of the project is printed as a warning (``check_session_names``).
+    ``exclude`` None leaves out the sessions ``config.yaml``'s ``exclude`` lists; a list given (``[]`` for
+    none) replaces it, and a key in it that is not a session stops (``check_given_exclude``). The sessions
+    left out are listed in ``excluded`` and named in one printed line (``exclude_line``), printed also for a
+    list given empty. ``exclude=False`` lists every session and prints no line: the group widget and
+    ``add-group`` list them so. A key in ``groups``, ``exclude`` or ``session_config.yaml``
+    that is not a session of the project is printed as a warning (``check_session_names``).
     """
     bookkeeping = load(project)
-    groups = read_groups(project)
+    groups = read_groups(project) if groups is None else {str(key): str(value) for key, value in groups.items()}
     for warning in check_session_names(project, bookkeeping.sessions):
         print(warning)
-    left_out = [key for key in read_exclude(project) if key in bookkeeping.sessions] if exclude else []
-    if left_out:
-        print(exclude_note(left_out))
+    if exclude is False:
+        left_out = []
+    elif exclude is None:
+        left_out = [key for key in read_exclude(project) if key in bookkeeping.sessions]
+    else:
+        left_out = list(dict.fromkeys(str(key) for key in exclude))
+        check_given_exclude(left_out, bookkeeping.sessions, project.bookkeeping_file)
+    line = exclude_line(left_out, given=exclude is not None) if exclude is not False else None
+    if line:
+        print(line)
     entries = []
     for key, session in bookkeeping.sessions.items():
         if key in left_out:
@@ -225,11 +269,91 @@ def session_index(project: Project, *, exclude: bool = True) -> dict:
              "bookkeeping_file": str(project.bookkeeping_file)}
     if left_out:
         index["excluded"] = {key: bookkeeping.sessions[key].uuid for key in left_out}
+    if exclude is not None and exclude is not False:
+        index["exclude"] = left_out
     return index
 
 
-def project_index(project: Project | None) -> dict | None:
-    """``session_index`` of ``project``; None outside a project or before any session is aggregated."""
-    if project is None or not load(project).sessions:
+def project_index(project: Project | None, *, exclude=None, groups=None) -> dict | None:
+    """``session_index`` of ``project``; None outside a project or before any session is aggregated.
+
+    A list to leave out given outside a project stops, since there are no sessions for it to name.
+    """
+    if project is None:
+        if exclude:
+            raise InputError(
+                f"The sessions to leave out given for this run ({', '.join(exclude)}) name sessions of a project, "
+                "and this runs outside one. Run it from the project folder (or name the project with "
+                "--project-file), or leave --exclude out."
+            )
         return None
-    return session_index(project)
+    if not load(project).sessions:
+        return None
+    return session_index(project, exclude=exclude, groups=groups)
+
+
+def index_for_run(index, *, exclude=None, groups=None):
+    """``index`` with ``exclude`` and ``groups`` in place of ``config.yaml``'s, for a step given an index and one
+    of them; ``index`` itself when neither is given, or when it was already built with that ``exclude``.
+
+    The index is built again from its project (``session_index``), so it must be a project's.
+    """
+    if exclude is None and groups is None:
+        return index
+    if groups is None and isinstance(index, dict) and index.get("exclude") == list(dict.fromkeys(exclude)):
+        return index
+    if not isinstance(index, dict) or not index.get("bookkeeping_file"):
+        raise InputError(
+            "exclude= and groups= choose among a project's sessions, and the sessions given are not a project's. "
+            "Pass the project's sessions, session_index(Project.at(project_folder)), or leave exclude and groups "
+            "out."
+        )
+    return session_index(Project.at(Path(index["bookkeeping_file"]).parent), exclude=exclude, groups=groups)
+
+
+def note_sessions(record, index) -> None:
+    """Note in ``record`` the sessions of ``index`` a run used and those it left out, by key."""
+    if not isinstance(index, dict) or not isinstance(index.get("files"), list) or not index.get("bookkeeping_file"):
+        return
+    record.note("sessions", [entry.get("key") for entry in index["files"]])
+    record.note("exclude", list(index.get("excluded") or {}))
+
+
+def _owning_project(path: Path) -> Project | None:
+    """The project whose folder holds ``path`` and a ``moseq2-project.yaml``, nearest first."""
+    for folder in path.parents:
+        if (folder / BOOKKEEPING_NAME).is_file():
+            return Project.at(folder)
+    return None
+
+
+def extraction_keys(h5s, uuids, project: Project | None, folder) -> list[str]:
+    """The session key of each extraction in ``h5s`` (with its ``uuids``), found under ``folder``.
+
+    An extraction that is a session of ``project`` (the running project), by its path or its uuid, is that
+    session; one that is a session of the project holding it (another project, ``--input-dir`` pointed into
+    it) is that one's session, keyed as that project keys it. Any other is keyed by its path relative to
+    ``folder``, ``/`` between folders.
+    """
+    tables = {}
+
+    def table(owner):
+        key = str(Path(owner.folder).resolve())
+        if key not in tables:
+            sessions = load(owner).sessions
+            tables[key] = ({str(session_h5(owner, s).resolve()): k for k, s in sessions.items()},
+                           {s.uuid: k for k, s in sessions.items()})
+        return tables[key]
+
+    keys = []
+    for h5, uuid in zip(h5s, uuids):
+        path = Path(h5).resolve()
+        found = None
+        if project is not None:
+            by_path, by_uuid = table(project)
+            found = by_path.get(str(path)) or by_uuid.get(uuid)
+        owner = _owning_project(path) if found is None else None
+        if owner is not None:
+            found = table(owner)[0].get(str(path))
+        keys.append(found or Path(os.path.relpath(path, Path(folder).resolve())).as_posix())
+    return keys

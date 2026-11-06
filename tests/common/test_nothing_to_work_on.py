@@ -63,7 +63,7 @@ EXTRACT = [
     ("extract", [], ["INPUT_FILE", "depth recording", "session_1/depth.avi"]),
     ("convert-raw-to-avi", [], ["INPUT_FILE", "depth.dat"]),
     ("copy-slice", [], ["INPUT_FILE", "depth recording"]),
-    ("batch-extract", [], ["INPUT_FOLDER", "project folder", "moseq2-extract batch-extract ."]),
+    ("batch-extract", [], ["INPUT_FOLDER", "project folder", "left out when run from a project folder"]),
     ("batch-extract", ["."], ["{folder}", "project folder", "--config-file"]),
     ("aggregate-results", [], ["{folder}", "project folder"]),
     ("download-flip-file", [], ["{folder}", "project folder", "config.yaml", "generate-config"]),
@@ -100,7 +100,7 @@ def test_a_typed_input_dir_with_no_extractions_names_it(empty):
     assert written(empty) == ["extractions"]
 
 
-@pytest.mark.parametrize("command, by_hand", [("apply-pca", "--pca-file"), ("compute-changepoints", "--output-dir")])
+@pytest.mark.parametrize("command, by_hand", [("apply-pca", "--pca-file"), ("compute-changepoints", "--pca-file")])
 def test_pca_components_not_found_outside_a_project_name_both_ways_out(empty, command, by_hand):
     import numpy as np
 

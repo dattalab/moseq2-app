@@ -8,7 +8,10 @@ an options object, such as ``plot_stats(session_index(Project.at("my_project")),
 
 ``index`` is the project's sessions with their groups as an index in memory
 (``moseq2_common.bookkeeping.session_index``); a path to a 1.5.0
-``moseq2-index.yaml`` is read the same way. Each step hands its work function
+``moseq2-index.yaml`` is read the same way. A step given ``exclude`` (``[]`` for
+none) or ``groups`` uses them in place of ``config.yaml``'s for that run
+(``moseq2_common.bookkeeping.index_for_run``), and its record notes the
+sessions used and left out. Each step hands its work function
 (the ``*_wrapper`` in ``moseq2_viz.helpers.wrappers``) the options, as keywords
 or as the dict the wrapper takes.
 
@@ -43,7 +46,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from moseq2_common.bookkeeping import SESSION_ADVICE, relative_path, session_index, update
+from moseq2_common.bookkeeping import SESSION_ADVICE, index_for_run, note_sessions, relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
 from moseq2_common.records import (InputError, atomic_outputs, check_inputs, read_record, record_text,
                                    sidecar_path, start_record, unchanged, write_record)
@@ -129,8 +132,10 @@ def _start(step, opts, index, *files) -> Any:
     if isinstance(index, (str, Path)):
         files = (index, *files)
     settings = [project.config_file] if project is not None and project.config_file.is_file() else []
-    return start_record(step, opts if opts is not None else {}, [*settings, *[f for f in files if f], *sessions],
-                        project=project)
+    record = start_record(step, opts if opts is not None else {}, [*settings, *[f for f in files if f], *sessions],
+                          project=project)
+    note_sessions(record, index)
+    return record
 
 
 def _finish(record, output, files):
@@ -217,8 +222,10 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
                            figure_files=_figures(output_file) if output_file is not None else [])
 
 
-def make_df(model_fit: str, index: dict | str, output_file: str | Path) -> MakeDfResult:
+def make_df(model_fit: str, index: dict | str, output_file: str | Path, *,
+            exclude: list[str] | None = None, groups: dict | None = None) -> MakeDfResult:
     """Write the syllable and scalar dataframe, and its statistics, as ``.csv`` or ``.parquet``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     output_file = Path(output_file)
     extension = output_file.suffix[1:]
     if extension not in ["csv", "parquet"]:
@@ -234,8 +241,10 @@ def make_df(model_fit: str, index: dict | str, output_file: str | Path) -> MakeD
     return result
 
 
-def make_crowd_movies(index: dict | str, model_path: str, output_dir: str, opts: CrowdMovieOptions) -> CrowdMoviesResult:
+def make_crowd_movies(index: dict | str, model_path: str, output_dir: str, opts: CrowdMovieOptions, *,
+                      exclude: list[str] | None = None, groups: dict | None = None) -> CrowdMoviesResult:
     """Write a crowd movie for each syllable into ``output_dir``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     _check("make-crowd-movies", index, (model_path, MODEL_ADVICE))
     record = _start("make-crowd-movies", opts, index, model_path)
     # movies rendered partway never carry a record, so the labeler renders them again
@@ -298,8 +307,10 @@ def rerender_message(output_dir: str, reasons: list[str]) -> str:
     return f"Rendering the crowd movies in {str(output_dir).rstrip(os.sep + '/')} again: {'; '.join(reasons)}."
 
 
-def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:
+def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummaryOptions, *,
+                        exclude: list[str] | None = None, groups: dict | None = None) -> FiguresResult:
     """Plot each group's scalar summary to ``<output_file>_summary``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     _check("plot-scalar-summary", index)
     record = _start("plot-scalar-summary", opts, index)
     _figures_written(record, output_file,
@@ -307,8 +318,10 @@ def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummary
     return FiguresResult(figure_files=_figures(output_file, "_summary"))
 
 
-def plot_group_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
+def plot_group_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions, *,
+                                 exclude: list[str] | None = None, groups: dict | None = None) -> FiguresResult:
     """Plot each group's mean position heatmap to ``output_file``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     _check("plot-group-position-heatmaps", index)
     record = _start("plot-group-position-heatmaps", opts, index)
     _figures_written(record, output_file,
@@ -316,8 +329,10 @@ def plot_group_position_heatmaps(index: dict | str, output_file: str, opts: Heat
     return FiguresResult(figure_files=_figures(output_file))
 
 
-def plot_verbose_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
+def plot_verbose_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions, *,
+                                   exclude: list[str] | None = None, groups: dict | None = None) -> FiguresResult:
     """Plot each session's position heatmap to ``output_file``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     _check("plot-verbose-position-heatmaps", index)
     record = _start("plot-verbose-position-heatmaps", opts, index)
     _figures_written(record, output_file,
@@ -326,8 +341,10 @@ def plot_verbose_position_heatmaps(index: dict | str, output_file: str, opts: He
 
 
 def plot_transition_graph(index: dict | str, model_fit: str, output_file: str,
-                          opts: TransitionGraphOptions) -> FiguresResult:
+                          opts: TransitionGraphOptions, *, exclude: list[str] | None = None,
+                          groups: dict | None = None) -> FiguresResult:
     """Plot each group's transition graph to ``output_file``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     _check("plot-transition-graph", None, (model_fit, MODEL_ADVICE))  # it reads the model's labels only
     record = _start("plot-transition-graph", opts, index, model_fit)
     _figures_written(record, output_file,
@@ -335,8 +352,10 @@ def plot_transition_graph(index: dict | str, model_fit: str, output_file: str,
     return FiguresResult(figure_files=_figures(output_file))
 
 
-def plot_stats(index: dict | str, model_fit: str, output_file: str, opts: StatsPlotOptions) -> FiguresResult:
+def plot_stats(index: dict | str, model_fit: str, output_file: str, opts: StatsPlotOptions, *,
+               exclude: list[str] | None = None, groups: dict | None = None) -> FiguresResult:
     """Plot a syllable statistic for each group to ``output_file``."""
+    index = index_for_run(index, exclude=exclude, groups=groups)
     _check("plot-stats", index, (model_fit, MODEL_ADVICE))
     record = _start("plot-stats", opts, index, model_fit)
     _figures_written(record, output_file,
