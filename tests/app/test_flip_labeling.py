@@ -25,6 +25,8 @@ import h5py
 import numpy as np
 import pytest
 
+from moseq2_common.records import StepInputError
+
 from cells import code_cell
 
 NOTEBOOK = "Flip-Classifier-Training-Notebook.ipynb"
@@ -436,17 +438,17 @@ SAVE_AND_RETRAIN = "click Save Labels (or run the notebook's save cell), then ru
 def test_training_labels_never_saved_says_to_save(notebook):
     """Label a range and run training without saving: the ranges file was never written.
 
-    Python's bare ``No such file or directory`` does not say that the ranges
-    on screen reach training only once saved.
+    Training stops before any work with the step's input error, which names
+    the ranges file and says to label frames in the widget and save them.
     """
     widget = notebook["FF"]
     label(widget, list(widget.sessions)[0], 10, 40, left=False)
-    with pytest.raises(FileNotFoundError) as raised:
+    with pytest.raises(StepInputError) as raised:
         run_cell(TRAIN, notebook)
     message = str(raised.value)
     assert widget.training_data_path in message
-    assert "only once they are saved" in message
-    assert SAVE_AND_RETRAIN in message
+    assert "does not exist" in message
+    assert "labeling widget and save them" in message
 
 
 def test_training_on_an_empty_save_says_to_save(notebook):
