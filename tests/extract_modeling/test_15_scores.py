@@ -72,14 +72,19 @@ def test_the_scores_are_keyed_by_uuid(scores, grouped):
             assert f[f"metadata/{uuid}/SessionName"][()].decode() == name
 
 
-def test_a_frame_with_no_mouse_becomes_the_mean_pose(scores, grouped, project):
+def test_a_frame_with_no_mouse_becomes_the_mean_pose(scores, grouped, project, pca):
     """4. Current behaviour, captured.
 
-    The opening frames of each recording have no mouse, because the
-    background was built from a single frame and cancels it. Those frames
-    project to a vector of zeros, which in this basis is not a gap: it is the
-    mean pose exactly. Nothing else in the file marks them, so the model in
-    cell 18 reads them as the animal having held the average posture.
+    A frame in which the extraction found no mouse is all zeros, and it goes
+    through the same filtering and projection as every other frame. It comes
+    out as a vector of zeros, which in this basis is not a gap: it is the mean
+    pose exactly. Nothing else in the file marks it, so the model in cell 18
+    reads it as the animal having held the average posture.
+
+    Whether a fixture recording contains such frames depends on how well its
+    background cancels the floor, so the projection is checked directly on a
+    frame of zeros, and each recording is checked for blank scores exactly
+    where its extraction is empty, however many that is.
 
     Zero in every component is a pose no real frame produces, so the frames
     remain identifiable, and at full recording length they are a handful in
@@ -87,6 +92,19 @@ def test_a_frame_with_no_mouse_becomes_the_mean_pose(scores, grouped, project):
     them as NaN for the model to skip, is a different decision rather than an
     obviously better one.
     """
+    from moseq2_pca.helpers.data import trained_cleaning
+    from moseq2_pca.pca.util import _scores
+    from moseq2_pca.util import clean_frames
+
+    with h5py.File(pca / "pca.h5") as f:
+        components = f["components"][:]
+    use_fft, clean_params, mask_params, missing_data = trained_cleaning(str(pca / "pca.h5"))
+    assert not use_fft and not missing_data
+
+    no_mouse = clean_frames(np.zeros((3, 80, 80), dtype="float32"), **clean_params)
+    projected = _scores(no_mouse.reshape(3, PIXELS), components, None, mask_params)
+    np.testing.assert_array_equal(projected, np.zeros((3, RANK)))
+
     with h5py.File(scores) as f:
         for name, uuid in uuids(grouped).items():
             with h5py.File(proc(project, name) / "results.h5") as extraction:
@@ -94,7 +112,6 @@ def test_a_frame_with_no_mouse_becomes_the_mean_pose(scores, grouped, project):
             projected = f[f"scores/{uuid}"][:]
             blank = (projected == 0).all(axis=1)
 
-            assert empty.any(), f"{name} has no empty frames to check"
             np.testing.assert_array_equal(blank, empty, err_msg=name)
             assert np.isfinite(projected).all(), f"{name}: a score is not a number"
 
