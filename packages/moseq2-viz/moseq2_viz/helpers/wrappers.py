@@ -9,7 +9,7 @@ from cytoolz import keyfilter, groupby
 from os.path import exists, join, dirname
 from moseq2_common.records import atomic_output, partial_name
 from moseq2_viz.scalars.util import scalars_to_dataframe, compute_all_pdf_data
-from moseq2_viz.io.video import write_crowd_movies, write_crowd_movie_info_file
+from moseq2_viz.io.video import write_crowd_movies
 from moseq2_viz.util import (
     parse_index,
     get_index_hits,
@@ -544,14 +544,6 @@ def make_crowd_movies_wrapper(index_file, model_path, output_dir, config_data):
         config_data["max_syllable"] = 1
     else:
         config_data["crowd_syllables"] = range(config_data["max_syllable"])
-
-    # Write parameter information yaml file in crowd movies directory
-    write_crowd_movie_info_file(
-        model_path=model_path,
-        model_fit=model_fit,
-        index_file=index_file,
-        output_dir=output_dir,
-    )
 
     # Ensuring movie separation parameter is found
     separate_by = config_data.get("separate_by", "default").lower()

@@ -4,11 +4,15 @@ The notebooks' project cell.
 ``start`` names the project the notebook works in, the folder holding
 ``config.yaml``, and prints what it holds (``progress``): how many of its
 recordings are extracted, its sessions, the outputs its ``moseq2-project.yaml``
-names, and each output older than a re-run of what it was built from (PC scores
-computed before one of their sessions was re-extracted, a model fit before the
-scores were computed again). An output is older when the fingerprint its record
-holds for an input differs from that input's now. This is a message only: no
-step reads it, or a record, to decide what to run.
+names, and each output older than what it was built from: PC scores computed
+before one of their sessions was re-extracted, a model fit before the scores
+were computed again, an output computed from a file that no longer exists, and
+PCA outputs or a model computed before a session was added to the project. An
+output is older when the fingerprint its record holds for an input differs
+from that input's now, when a recorded input is gone, or, for PCA outputs and
+fitted models, when a listed session ``config.yaml`` does not exclude is not
+among its recorded inputs. This is a message only: no step reads it, or a
+record, to decide what to run.
 Every later cell takes the project folder and reads the bookkeeping file when it
 needs a path, so nothing is kept between cells. A project made by MoSeq2 1.5.0
 or earlier stops here, before anything else runs.
@@ -22,7 +26,7 @@ from pathlib import Path
 from datetime import datetime
 
 from moseq2_common.bookkeeping import load, resolve_path, session_h5
-from moseq2_common.project import Project, check_not_old
+from moseq2_common.project import Project, check_not_old, read_exclude
 from moseq2_common.records import fingerprint, read_record
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH
 
@@ -51,46 +55,65 @@ def summary(project: Project) -> str:
 
 
 def _outputs(project, bookkeeping):
-    """Each output the bookkeeping file names, as (the path it stores, the file)."""
-    stored = [bookkeeping.pca.get(name) for name in ("components", "scores", "changepoints")]
-    stored += list(bookkeeping.models.get("fitted") or []) + list(bookkeeping.applied_models)
-    return [(path, resolve_path(project, path)) for path in stored if path]
+    """Each output the bookkeeping file names, as (the path it stores, the file, whether it is built from all
+    the project's sessions: the PCA outputs and the fitted models)."""
+    pca = [bookkeeping.pca.get(name) for name in ("components", "scores", "changepoints")]
+    stored = [(path, True) for path in [*pca, *(bookkeeping.models.get("fitted") or [])]]
+    stored += [(path, False) for path in bookkeeping.applied_models]
+    return [(path, resolve_path(project, path), all_sessions) for path, all_sessions in stored if path]
 
 
 def stale_outputs(project: Project) -> list[str]:
-    """A line for each output the bookkeeping file names that is older than a re-run of one of its inputs:
-    an input whose fingerprint now differs from the one the output's record holds. The settings files are
-    not inputs in this sense; a changed setting takes effect when a step is run again."""
+    """A line for each output the bookkeeping file names that is older than its inputs: an input whose
+    fingerprint now differs from the one the output's record holds, an input that no longer exists, and, for a
+    PCA output or a fitted model, a listed session ``config.yaml`` does not exclude that is not among its
+    inputs (aggregated after it was computed). The settings files are not inputs in this sense; a changed
+    setting takes effect when a step is run again. Inputs are compared by size and content, never by time."""
     bookkeeping = load(project)
     sessions = {str(session_h5(project, s)): key for key, s in bookkeeping.sessions.items()}
+    excluded = set(read_exclude(project))
+    included = [h5 for h5, key in sessions.items() if key not in excluded]
     settings = {str(Path(p).absolute()) for p in (project.config_file, project.session_config_file,
                                                   project.bookkeeping_file)}
     now, lines = {}, []
-    for stored, output in _outputs(project, bookkeeping):
+    for stored, output, all_sessions in _outputs(project, bookkeeping):
         try:
             record = read_record(output)
         except (OSError, ValueError):
             continue
+        step = record.get("step", "the step that wrote it")
+        read = set()
         for entry in record.get("inputs") or []:
             recorded = entry.get("fingerprint") if isinstance(entry, dict) else None
             if not isinstance(recorded, dict):
                 continue
             path = resolve_path(project, entry["relative_path"]) if entry.get("relative_path") else Path(entry["path"])
-            if str(path) in settings or not path.is_file():
+            read.add(str(path))
+            if str(path) in settings:
+                continue
+            name = entry.get("relative_path") or entry["path"]
+            if not path.is_file():
+                if str(path) in sessions:
+                    lines.append(f"{stored} was computed from the extraction of {sessions[str(path)]} ({name}), "
+                                 "which no longer exists; extract that session again, or list its recording "
+                                 f"under exclude in config.yaml, then run {step} again.")
+                else:
+                    lines.append(f"{stored} was computed from {name}, which no longer exists; run {step} again.")
                 continue
             if str(path) not in now:
                 now[str(path)] = fingerprint(path)
             if (now[str(path)]["size"], now[str(path)]["sha256"]) == (recorded.get("size"), recorded.get("sha256")):
                 continue
             when = datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
-            step = record.get("step", "the step that wrote it")
             if str(path) in sessions:
                 lines.append(f"{stored} was computed before {sessions[str(path)]} was re-extracted ({when}); "
                              f"run {step} again to include it.")
             else:
-                name = entry.get("relative_path") or entry["path"]
                 lines.append(f"{stored} was computed before {name} was written again ({when}); run {step} again "
                              "to use it.")
+        if all_sessions and read & set(sessions):
+            lines += [f"{stored} was computed before {sessions[h5]} was added to the project; run {step} again "
+                      "to include it." for h5 in included if h5 not in read]
     return lines
 
 

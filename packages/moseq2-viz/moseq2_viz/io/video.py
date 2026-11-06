@@ -4,8 +4,6 @@ Helper functions for handling crowd movie file writing and video metadata mainte
 
 import warnings
 import h5py
-import numpy as np
-import os
 from os.path import join
 from tqdm.auto import tqdm
 import multiprocessing as mp
@@ -17,7 +15,6 @@ from cytoolz.itertoolz import first
 from cytoolz.dicttoolz import valfilter
 from moseq2_viz.model.util import get_syllable_slices
 from cytoolz.curried import valmap
-from moseq2_common.yaml import write_yaml
 
 
 def check_video_parameters(index: dict) -> dict:
@@ -50,40 +47,6 @@ def check_video_parameters(index: dict) -> dict:
     vid_parameters = valmap(first, found)
     vid_parameters["resolution"] = None
     return vid_parameters
-
-
-def write_crowd_movie_info_file(model_path, model_fit, index_file, output_dir):
-    """
-    Create an info.yaml file in the crowd movie directory that holds model training parameters.
-
-    Args:
-    model_path (str): path to model used to generate movies
-    model_fit (dict): loaded ARHMM mdoel results
-    index_file (str or dict): path to the index file used with the model, or the sessions in memory
-        (``moseq2_common.bookkeeping.session_index``)
-    output_dir (str): path to crowd movies directory to store file in.
-    """
-
-    # Crowd movie info file contents; used to indicate the modeling state the crowd_movies were generated from
-    info_parameters = ["model_class", "kappa", "gamma", "alpha"]
-
-    # Loading parameters to dict to save to file in output directory
-    info_file = join(output_dir, "info.yaml")
-    info_dict = {k: model_fit["model_parameters"][k] for k in info_parameters}
-
-    # Adding model and index file paths
-    info_dict["model_path"] = model_path
-    # sessions held in memory name the bookkeeping file they were read from
-    info_dict["index_path"] = (str(index_file) if isinstance(index_file, (str, os.PathLike))
-                               else index_file.get("bookkeeping_file"))
-
-    # Convert numpy dtypes to their corresponding primitives
-    info_dict = valmap(
-        lambda v: v.item() if isinstance(v, np.generic) else v, info_dict
-    )
-
-    # Write metadata info file
-    write_yaml(info_dict, info_file)
 
 
 def write_crowd_movies(

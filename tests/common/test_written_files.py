@@ -2,7 +2,7 @@
 
 Every package writes YAML through ``moseq2_common.yaml``. Before that module
 existed, extract, pca, viz and app each carried their own copy of one writer,
-and a user's existing files, configs, indexes and crowd-movie info are in
+and a user's existing files, configs and indexes are in
 that writer's format, and so is the
 bookkeeping file, ``moseq2-project.yaml``. These tests
 hold each file the notebook chain writes to it.
@@ -70,21 +70,6 @@ def test_generated_config_is_written_one_setting_per_line(tmp_path, camera_type)
     config = tmp_path / "config.yaml"
     generate_config_command(str(config), camera_type=camera_type)
     assert_written_as_a_config(config, tmp_path)
-
-
-def test_crowd_movie_info_is_written_as_before(tmp_path):
-    from moseq2_viz.io.video import write_crowd_movie_info_file
-
-    model_fit = {
-        "model_parameters": {
-            "model_class": "ARHMM",
-            "kappa": np.int64(212414),
-            "gamma": 1000.0,
-            "alpha": 5.7,
-        }
-    }
-    write_crowd_movie_info_file("model.p", model_fit, "moseq2-index.yaml", str(tmp_path))
-    assert_written_as_before(tmp_path / "info.yaml", tmp_path)
 
 
 def test_session_config_is_written_as_before(arena, tmp_path):
