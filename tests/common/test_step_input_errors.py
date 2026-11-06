@@ -5,7 +5,7 @@ Every check at the top of a step raises one kind of error
 (``InputError``), a bookkeeping file that lists no sessions or cannot be read
 (``BookkeepingError``), PCA components trained with other settings than
 ``config.yaml``'s (``TrainedSettingsError``), a flip classifier that is missing,
-unreadable or trained for another crop size or cleaning, and an extraction whose
+unreadable or trained for another crop size, and an extraction whose
 frames and timestamps disagree in number. A command (``ProjectCommand``) prints
 its message and exits 1, so the person reads what to do instead of the last line
 of a Python traceback.
@@ -73,16 +73,6 @@ def classifier_for_other_crop_size(tmp_path):
     validate_flip_classifier({"flip_classifier": str(tmp_path / "flip.p"), "crop_size": (80, 80)})
 
 
-def classifier_for_other_cleaning(tmp_path):
-    from moseq2_common.frames import CleaningOptions
-    from moseq2_extract.helpers.wrappers import validate_flip_classifier
-
-    cleaning = {**CleaningOptions().as_dict(), "spatial_filter_size": [7]}
-    joblib.dump(types.SimpleNamespace(training_settings={"crop_size": [80, 80], "cleaning": [cleaning]}),
-                tmp_path / "flip.p")
-    validate_flip_classifier({"flip_classifier": str(tmp_path / "flip.p"), "crop_size": (80, 80)})
-
-
 def frames_without_timestamps(tmp_path):
     from moseq2_pca.util import check_frame_counts
 
@@ -93,7 +83,7 @@ def frames_without_timestamps(tmp_path):
 
 
 @pytest.mark.parametrize("check", [no_sessions, untrained_components, missing_classifier, unreadable_classifier,
-                                   classifier_for_other_crop_size, classifier_for_other_cleaning,
+                                   classifier_for_other_crop_size,
                                    frames_without_timestamps])
 def test_an_unusable_input_prints_as_a_message(tmp_path, monkeypatch, check):
     from moseq2_common.records import StepInputError

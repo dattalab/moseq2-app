@@ -176,6 +176,59 @@ def test_the_preview_stops_on_a_flip_classifier_that_does_not_fit_the_crop_size(
     assert "expects 6400 pixels (i.e. crop_size (80, 80))" in str(stopped.value)
 
 
+def _classifier_trained_at(root, config_file):
+    """A flip classifier trained on 80 x 80 frames, cleaned with ``config_file``'s extract settings."""
+    import pickle
+
+    import h5py
+    import numpy as np
+
+    from moseq2_app.steps import train_flip_classifier
+
+    root.mkdir()
+    rng = np.random.default_rng(0)
+    with h5py.File(root / "session.h5", "w") as f:
+        frames = np.zeros((30, 80, 80), dtype=np.uint8)
+        frames[:, 35:45, 10:40] = 50
+        frames[:, 30:50, 40:65] = 80
+        f["frames"] = frames + rng.integers(0, 5, size=frames.shape, dtype=np.uint8)
+    with (root / "flip-training-frame-ranges.p").open("wb") as f:
+        pickle.dump(({"session": str(root / "session.h5")}, {"session": [(False, range(0, 30))]}), f)
+    return str(train_flip_classifier(str(root / "flip-training-frame-ranges.p"), str(root / "flip.p"),
+                                     str(config_file)).classifier)
+
+
+def test_the_preview_warns_on_a_filter_the_flip_classifier_was_not_trained_with(project, tmp_path, raw_sessions):
+    """L13: "Compute extraction" runs extraction's flip-classifier check. A filter tuned in the tool
+    to a value the classifier was not trained with gets extraction's warning, naming the recording,
+    the setting and both values, and the preview is still computed and shown."""
+    import warnings
+
+    classifier = _classifier_trained_at(tmp_path / "flip", project / "config.yaml")
+    _, widget = _save_then_change_config(project, raw_sessions, {"flip_classifier": classifier})
+    data = widget.session_data
+    data.frames_to_extract = 5
+    recording = str(project / "saline_example_0" / "depth.avi")
+
+    def preview():
+        data.images = {**data.images, "Extracted mouse": None}
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            click(buttons_of(widget.view)["Compute extraction"])
+        assert data.images["Extracted mouse"] is not None and len(data.images["Extracted mouse"]) == 5
+        from moseq2_extract.helpers.wrappers import FlipClassifierCleaningWarning
+
+        return [str(w.message) for w in caught if issubclass(w.category, FlipClassifierCleaningWarning)]
+
+    assert preview() == []
+
+    data.spatial_filter = "[5]"
+    [message] = preview()
+    assert classifier in message and recording in message
+    assert "spatial_filter_size is [5] now, [3] in training" in message
+    assert "session_config.yaml" in message
+
+
 def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monkeypatch, raw_sessions):
     """ "Compute arena mask" finds the arena with config.yaml's settings outside the tool's,
     and writes the background into the folder extraction writes to, the recording's session folder."""
