@@ -268,12 +268,15 @@ def exclude_note(keys: Iterable[str]) -> str:
 
 
 def check_session_names(project: Project, sessions: Iterable[str] | None = None) -> list[str]:
-    """A warning for each key in ``groups``, ``exclude`` or ``session_config.yaml`` that is not a session.
+    """A warning for each key in ``groups`` or ``exclude`` that is not a session, and each key in
+    ``session_config.yaml`` with no recording at that path in the project.
 
     ``sessions`` are the keys of the project's sessions; None reads them from its
     bookkeeping file. Before any session is listed there is nothing to compare
-    with, and no warning. A ``session_config.yaml`` that cannot be read is not
-    judged here; extraction reads it and names the problem.
+    with, and no warning. A ``session_config.yaml`` entry for a recording not
+    aggregated yet (not extracted, a SLURM job still queued) is extraction's, and
+    not named. A ``session_config.yaml`` that cannot be read is not judged here;
+    extraction reads it and names the problem.
     """
     if sessions is None:
         from moseq2_common.bookkeeping import load
@@ -289,7 +292,8 @@ def check_session_names(project: Project, sessions: Iterable[str] | None = None)
         except Exception:  # noqa: BLE001 -- extraction reports an unreadable session_config.yaml
             entries = None
         if isinstance(entries, Mapping):
-            named += [(project.session_config_file, str(key)) for key in entries]
+            named += [(project.session_config_file, str(key)) for key in entries
+                      if not (Path(project.folder) / str(key)).exists()]
     return [f"{file} names {key}, which is not a recording in this project. It is ignored; correct or delete "
             "the entry if the recording moved."
             for file, key in named if key not in sessions]

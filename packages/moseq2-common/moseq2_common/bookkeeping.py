@@ -34,21 +34,27 @@ from pathlib import Path, PurePosixPath
 
 from moseq2_common.h5 import extraction_labels
 from moseq2_common.project import Project, check_session_names, exclude_note, read_exclude, read_groups, session_key
+from moseq2_common.records import StepInputError
 from moseq2_common.yaml import read_yaml, write_yaml
 
-__all__ = ["BOOKKEEPING_NAME", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session", "load",
+__all__ = ["BOOKKEEPING_NAME", "SESSION_ADVICE", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session", "load",
            "project_index", "recording_order", "relative_path", "resolve_path", "session_h5", "session_index",
            "sessions_folder", "update"]
 
 BOOKKEEPING_NAME = "moseq2-project.yaml"
-#: A session's extraction file, in its folder; its preview movie and results yaml share the name.
+#: A session's extraction file, in its folder; its preview movie shares the name.
 SESSION_FILE = "results.h5"
+
+#: What to do when a session's extraction, which a step after extraction reads, is unusable.
+SESSION_ADVICE = ("Extract that session again (moseq2-extract extract, or the notebook's extraction cell), then "
+                  "run this step again; or, to leave the session out, list its recording under exclude in "
+                  "config.yaml (the group widget's exclude column).")
 
 #: The group of a session ``config.yaml``'s ``groups`` does not name.
 DEFAULT_GROUP = "default"
 
 
-class BookkeepingError(ValueError):
+class BookkeepingError(StepInputError, ValueError):
     """A bookkeeping file that cannot be read, or that lacks what a step needs."""
 
 
@@ -181,7 +187,7 @@ def recording_order(metadata: dict | None, name: str) -> tuple:
 def session_index(project: Project, *, exclude: bool = True) -> dict:
     """The project's sessions as an index in memory: 1.5.0's parsed-index shape, absolute paths.
 
-    ``{"files": [{"uuid", "group", "metadata", "path": (h5, yaml), "key"}], "pca_path": scores or "",
+    ``{"files": [{"uuid", "group", "metadata", "path": (h5,), "key"}], "pca_path": scores or "",
     "bookkeeping_file": the file it was read from, "excluded": {key: uuid}}`` (``excluded`` only when
     sessions are left out),
     each session's group from ``config.yaml``'s ``groups`` (``default`` when it names none). Sessions are
@@ -208,8 +214,9 @@ def session_index(project: Project, *, exclude: bool = True) -> dict:
             "uuid": session.uuid,
             "group": groups.get(key, DEFAULT_GROUP),
             "metadata": _metadata(h5, key),
-            # 1.5.0's (h5, yaml) pair, the shape the viz and model readers take; nothing reads the second
-            "path": (str(h5), str(h5.with_suffix(".yaml"))),
+            # a sequence whose first item is the extraction, the shape the viz and model readers take (1.5.0's
+            # (h5, yaml) pair; extraction writes no yaml)
+            "path": (str(h5),),
             "key": key,
         })
     entries.sort(key=lambda f: recording_order(f["metadata"], f["key"]))

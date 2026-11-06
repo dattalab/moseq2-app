@@ -72,7 +72,7 @@ def test_every_session_that_does_not_line_up_is_named(tmp_path):
     assert "uuid-a" not in message
     assert str(fitted_on) in message
     assert "PCA was run again after the model was fit" in message
-    assert "pca_path" in message
+    assert "Compute the PCA scores again with the components the model was fit on" in message
     assert "fit the model again" in message
 
 

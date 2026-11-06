@@ -164,12 +164,12 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
                                max_height=config_data['max_height'], client=client,
                                iters=config_data['missing_data_iters'],
                                recon_pcs=config_data['recon_pcs'])
-        except Exception as e:
-            # Clearing all data from Dask client in case of interrupted PCA
-            logging.error(e)
-            logging.error(e.__traceback__)
-            click.echo('Training interrupted. Closing Dask Client. You may find logs of the error here:')
-            click.echo('---- ', join(output_dir, 'train.log'))
+        except BaseException:
+            # Clearing all data from Dask client in case of interrupted PCA; no components were computed, so
+            # the step stops with the error
+            click.echo(f'Training interrupted. Closing Dask Client. Dask\'s messages are in '
+                       f'{join(output_dir, "train.log")}.')
+            raise
         finally:
             # After Success or failure: Shutting down Dask client and clearing any residual data
             close_dask(client, cluster, config_data['timeout'])
@@ -177,20 +177,16 @@ def train_pca_wrapper(input_dir, config_data, output_dir, output_file):
             # close all open h5 files
             [fp.close() for fp in h5ps]
 
-    try:
-        # Plotting training results
-        plot_pca_results(output_dict, save_file, output_dir)
+    # Plotting training results
+    plot_pca_results(output_dict, save_file, output_dir)
 
-        # Saving PCA to h5 file, with the settings it was trained with
-        with h5py.File(f'{save_file}.h5', 'w') as f:
-            for k, v in output_dict.items():
-                f.create_dataset(k, data=v, compression='gzip', dtype='float32')
-            write_trained_settings(f, config_data)
+    # Saving PCA to h5 file, with the settings it was trained with
+    with h5py.File(f'{save_file}.h5', 'w') as f:
+        for k, v in output_dict.items():
+            f.create_dataset(k, data=v, compression='gzip', dtype='float32')
+        write_trained_settings(f, config_data)
 
-        config_data['pca_file'] = f'{save_file}.h5'
-    except:
-        click.echo('Could not save PCA since the training was interrupted.')
-        pass
+    config_data['pca_file'] = f'{save_file}.h5'
 
     return config_data
 

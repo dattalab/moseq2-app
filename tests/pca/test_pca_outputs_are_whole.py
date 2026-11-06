@@ -113,3 +113,34 @@ def test_declining_to_overwrite_keeps_the_existing_scores(project, monkeypatch):
     assert result.scores_file is None
     assert final.read_bytes() == before
     assert leftovers(project) == []
+
+
+def test_a_failure_while_training_reaches_the_person(project, monkeypatch):
+    """An error inside Dask stops ``train-pca`` with that error, as it stops ``apply-pca``, and nothing is
+    written. The wrapper used to log it and then raise ``AttributeError`` from its own message line."""
+    import moseq2_pca.helpers.wrappers as wrappers
+
+    def failed(**kwargs):
+        raise RuntimeError("a worker ran out of memory")
+
+    monkeypatch.setattr(wrappers, "train_pca_dask", failed)
+    with pytest.raises(RuntimeError, match="a worker ran out of memory"):
+        run(project, "train")
+    assert not (project / "_pca" / "pca.h5").exists()
+    assert leftovers(project) == []
+
+
+def test_a_failure_while_saving_the_components_reaches_the_person(project, monkeypatch):
+    """A failure while plotting or saving the components stops the step with that error. It used to print
+    "Could not save PCA since the training was interrupted." and return, so the command exited 0 with no
+    components."""
+    import moseq2_pca.helpers.wrappers as wrappers
+
+    def failed(*args, **kwargs):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(wrappers, "plot_pca_results", failed)
+    with pytest.raises(OSError, match="No space left on device"):
+        run(project, "train")
+    assert not (project / "_pca" / "pca.h5").exists()
+    assert leftovers(project) == []

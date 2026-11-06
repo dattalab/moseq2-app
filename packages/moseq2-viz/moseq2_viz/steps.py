@@ -43,7 +43,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from moseq2_common.bookkeeping import relative_path, session_index, update
+from moseq2_common.bookkeeping import SESSION_ADVICE, relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
 from moseq2_common.records import (atomic_outputs, check_inputs, fingerprint, read_record, record_text,
                                    sidecar_path, start_record, write_record)
@@ -154,8 +154,6 @@ def _figures_written(record, output_file, write, suffix=""):
 #: What to do about each kind of file an analysis step reads, when it is unusable.
 MODEL_ADVICE = ("Fit the model again (moseq2-model learn-model, or the notebook's modeling cell), or give the "
                 "path of a model file that exists.")
-SESSION_ADVICE = ("Extract that session again (moseq2-extract extract, or the notebook's extraction cell), then "
-                  "run this step again.")
 CHANGEPOINTS_ADVICE = ("Compute the changepoints again (moseq2-pca compute-changepoints, or the notebook's "
                        "changepoints cell), or give the changepoints file it wrote.")
 

@@ -263,3 +263,45 @@ def test_a_labeled_session_the_project_does_not_list_is_named(flip_project, monk
     assert str(root / "moseq2-project.yaml") in out
     assert {spatial for spatial, _ in calls} == {(3,)}
     assert sum(frames for _, frames in calls) == 20
+
+
+def test_an_interrupted_save_leaves_the_previous_classifier(tmp_path, monkeypatch):
+    """A Kernel interrupt while the classifier is written leaves the previous classifier under its name and
+    nothing half-written beside it. The file is written under a temporary name that keeps its extension, from
+    which joblib picks the compression."""
+    out = tmp_path / "flip_classifier.p.gz"
+    out.write_bytes(b"the previous classifier")
+    written = []
+
+    def interrupted(value, path, *args, **kwargs):
+        written.append(str(path))
+        with open(path, "wb") as f:
+            f.write(b"half")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(train.joblib, "dump", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        train.save_classifier(object(), str(out))
+    assert out.read_bytes() == b"the previous classifier"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["flip_classifier.p.gz"]
+    assert written and written[0] != str(out) and written[0].endswith(".gz")
+
+
+def test_an_interrupted_training_set_leaves_no_file(tmp_path, monkeypatch):
+    """The training set is written whole too: an interrupt while saving leaves nothing under its name."""
+    session = tmp_path / "session.h5"
+    with h5py.File(session, "w") as f:
+        f["frames"] = np.zeros((30, 20, 20), dtype=np.uint8)
+    index = tmp_path / "flip-training-frame-ranges.p"
+    with index.open("wb") as f:
+        pickle.dump(({"session": str(session)}, {"session": [(False, range(0, 30))]}), f)
+
+    def interrupted(path, **arrays):
+        with open(path, "wb") as f:
+            f.write(b"half")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(train.np, "savez", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        train.create_training_dataset(str(index), CleaningOptions())
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["flip-training-frame-ranges.p", "session.h5"]

@@ -124,3 +124,19 @@ def test_batch_extract_exits_non_zero_when_a_recording_failed(project, monkeypat
 
     assert result.exit_code == status, result.output
     assert result.exception is None or isinstance(result.exception, SystemExit), result.exception
+
+
+def test_batch_extract_without_a_config_file_stops_and_says_what_to_do(tmp_path, monkeypatch):
+    """Outside a project and without ``--config-file``, ``batch-extract`` stops with a non-zero status,
+    naming the folder it looked in. It used to print "Command not run." and exit 0, so a script carried on."""
+    recordings = tmp_path / "recordings"
+    (recordings / "session_a").mkdir(parents=True)
+    (recordings / "session_a" / "depth.avi").write_bytes(b"\0")
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(extract_cli.cli, ["batch-extract", str(recordings)])
+    assert result.exit_code == 1
+    assert result.output == (
+        f"Error: batch-extract needs a project's config.yaml, and there is none in {tmp_path}. Run it from "
+        "the project folder, pass --config-file /path/to/project/config.yaml, or write a config.yaml here "
+        "first with `moseq2-extract generate-config`.\n"
+    )

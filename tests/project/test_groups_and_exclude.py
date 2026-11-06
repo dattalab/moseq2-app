@@ -198,6 +198,24 @@ def test_an_unknown_session_in_groups_is_a_warning(project):
     assert len(session_index(Project.at(project))["files"]) == len(SESSIONS)
 
 
+def test_an_arena_entry_for_a_recording_not_yet_aggregated_is_not_a_warning(project):
+    """A recording in the project that is not aggregated yet (not extracted, a SLURM job still queued) keeps
+    its ``session_config.yaml`` entry without a warning: extraction uses it. An entry with no recording at its
+    path is still named."""
+    from moseq2_common.project import Project, check_session_names
+
+    recording = project / "cohort2" / "queued" / "depth.avi"
+    recording.parent.mkdir(parents=True)
+    recording.write_bytes(b"depth")
+    write_yaml({"cohort2/queued/depth.avi": {"bg_roi_index": 0},
+                "cohort3/elsewhere/depth.avi": {"bg_roi_index": 0}}, str(project / "session_config.yaml"))
+
+    assert check_session_names(Project.at(project)) == [
+        f"{project / 'session_config.yaml'} names cohort3/elsewhere/depth.avi, which is not a recording in this "
+        "project. It is ignored; correct or delete the entry if the recording moved."
+    ]
+
+
 def test_add_group_without_value_matches_its_default(project):
     """``add-group`` with no ``-v`` matches its default value, ``Mouse``, instead of stopping under click 8.5."""
     from moseq2_viz.cli import cli

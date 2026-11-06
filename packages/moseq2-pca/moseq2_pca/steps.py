@@ -55,7 +55,8 @@ from pathlib import Path
 import click
 import h5py
 
-from moseq2_common.bookkeeping import BookkeepingError, relative_path, session_index, sessions_folder, update
+from moseq2_common.bookkeeping import (SESSION_ADVICE, BookkeepingError, relative_path, session_index, sessions_folder,
+                                       update)
 from moseq2_common.options import read_config
 from moseq2_common.project import Project
 from moseq2_common.records import atomic_outputs, check_inputs, start_record, write_h5_record
@@ -137,11 +138,12 @@ def _written(output_dir, output_file):
     return Path(join(abspath(output_dir), f'{output_file}.h5'))
 
 
-#: What to do about each kind of file a PCA step reads, when it is unusable.
-SESSION_ADVICE = ("Extract that session again (moseq2-extract extract, or the notebook's extraction cell), then "
-                  "run this step again.")
+#: What to do about the components a PCA step reads, when they are unusable (a session's: ``SESSION_ADVICE``).
 COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's PCA cell), or give the components "
                      "file it wrote with --pca-file.")
+#: ``compute-changepoints`` reads the components the project names, and has no --pca-file.
+CHANGEPOINTS_COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's PCA cell), or run this "
+                                  "step in the project whose moseq2-project.yaml names the components.")
 
 
 def _sessions(input_dir, project):
@@ -262,7 +264,7 @@ def compute_changepoints(input_dir: str | None, output_dir: str, output_file: st
     write ``<output_dir>/<output_file>.h5``."""
     components = _components(components_file, output_dir)
     sessions = _sessions(input_dir, project)
-    _check("compute-changepoints", sessions, (components, COMPONENTS_ADVICE))
+    _check("compute-changepoints", sessions, (components, CHANGEPOINTS_COMPONENTS_ADVICE))
     check_trained_settings(components, project)
     record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
     settings = {**opts.as_dict(), 'pca_file': components_file, 'pca_file_scores': scores_file}

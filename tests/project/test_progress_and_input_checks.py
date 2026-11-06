@@ -222,7 +222,8 @@ def test_an_empty_session_extraction_stops_pca_before_work(project, monkeypatch)
         steps.train_pca(None, str(project / "_pca"), "pca", TrainPCAOptions(), project=Project.at(project))
     assert str(error.value) == (
         f"train-pca needs {h5}, which is empty. Extract that session again (moseq2-extract extract, or the "
-        "notebook's extraction cell), then run this step again."
+        "notebook's extraction cell), then run this step again; or, to leave the session out, list its "
+        "recording under exclude in config.yaml (the group widget's exclude column)."
     )
 
 

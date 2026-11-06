@@ -17,6 +17,7 @@ from typing import Iterator, Any, Dict
 from cytoolz.curried import get
 from os.path import join, basename, dirname
 from moseq2_common.h5 import h5_to_dict
+from moseq2_common.records import InputError
 from moseq2_common.timestamps import frame_rate
 from moseq2_viz.util import star
 from collections import defaultdict, OrderedDict
@@ -108,8 +109,12 @@ def get_best_fit(cp_path, model_results):
     try:
         # Load PCA changepoints
         pca_cps = load_changepoint_distribution(cp_path)
-    except OSError:
-        raise Exception('Please ensure model free changepoint is computed and the resulting file name matches changepoints_path in progress_paths')
+    except OSError as error:
+        raise InputError(
+            f'The changepoints file {cp_path} could not be read ({error}). Compute the changepoints again '
+            '(moseq2-pca compute-changepoints, or the notebook\'s changepoints cell), or give the changepoints '
+            'file it wrote.'
+        ) from None
 
     
     
@@ -891,8 +896,8 @@ def _check_labels_match_scores(mdl, labels, scores_idx, pca_path, index=None):
         + '\n'.join(problems) + '\n'
         + fitted_on
         + 'Likely cause: the model was fit on PCA scores from a different run, for example PCA was run '
-        'again after the model was fit. Point the pca_path in the index file (moseq2-index.yaml) at the '
-        'PCA scores file the model was fit on, or fit the model again on these PCA scores.'
+        'again after the model was fit. Compute the PCA scores again with the components the model was fit '
+        'on, or fit the model again on these PCA scores.'
     )
 
 

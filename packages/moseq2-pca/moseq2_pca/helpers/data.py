@@ -6,6 +6,7 @@ import io
 
 import h5py
 from moseq2_common.yaml import dump_block_yaml, read_yaml
+from moseq2_common.records import StepInputError
 from os.path import join, exists
 from moseq2_common.frames import select_strel
 
@@ -91,7 +92,7 @@ TRAINED_SETTINGS = ('gaussfilter_space', 'gaussfilter_time', 'medfilter_space', 
                     'tailfilter_shape', 'tailfilter_size', 'min_height', 'max_height', 'use_fft',
                     'missing_data', 'mask_threshold', 'mask_height_threshold')
 
-class TrainedSettingsError(ValueError):
+class TrainedSettingsError(StepInputError, ValueError):
     """The PCA components cannot be used with these settings: ``config.yaml`` sets one they were trained with to
     another value, or the components do not say what they were trained with."""
 

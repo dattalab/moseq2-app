@@ -7,6 +7,7 @@ import matplotlib as mpl
 from glob import glob
 from cytoolz import keyfilter, groupby
 from os.path import exists, join, dirname
+from moseq2_common.records import atomic_output, partial_name
 from moseq2_viz.scalars.util import scalars_to_dataframe, compute_all_pdf_data
 from moseq2_viz.io.video import write_crowd_movies, write_crowd_movie_info_file
 from moseq2_viz.util import (
@@ -190,7 +191,9 @@ def get_best_fit_model_wrapper(
 
     # Save the model_stats to csv
     if model_stats is not None:
-        model_stats.to_csv(os.path.join(model_dir, "model_kappa_scan_stats.csv"))
+        stats_file = os.path.join(model_dir, "model_kappa_scan_stats.csv")
+        with atomic_output(stats_file, partial_name(stats_file)) as partial:
+            model_stats.to_csv(partial)
 
     return best_model_info, fig
 

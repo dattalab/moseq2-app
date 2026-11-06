@@ -32,7 +32,7 @@ def plot_pca_results(output_dict, save_file, output_dir):
         logging.error(e)
         logging.error(e.__traceback__)
         click.echo('could not plot components')
-        click.echo('You may find error logs here:', join(output_dir, 'train.log'))
+        click.echo(f"You may find error logs here: {join(output_dir, 'train.log')}")
 
     try:
         # Plotting Scree Plot
@@ -44,7 +44,7 @@ def plot_pca_results(output_dict, save_file, output_dir):
         logging.error(e)
         logging.error(e.__traceback__)
         click.echo('could not plot scree')
-        click.echo('You may find error logs here:', join(output_dir, 'train.log'))
+        click.echo(f"You may find error logs here: {join(output_dir, 'train.log')}")
 
 
 def display_components(components, cmap='gray', headless=False):

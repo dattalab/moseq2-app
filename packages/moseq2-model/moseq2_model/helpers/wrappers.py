@@ -8,10 +8,9 @@ import glob
 import click
 import numpy as np
 from collections import OrderedDict
-from pathlib import Path
 from copy import deepcopy
 from cytoolz import valmap
-from moseq2_common.records import atomic_output
+from moseq2_common.records import atomic_output, partial_name
 from moseq2_model.train.util import (
     ModelNaNError,
     train_model,
@@ -72,13 +71,6 @@ def prepare_output_file(dest_file):
             f"write to the folder {dirname(dest_file)}. Choose a path in a folder you "
             "can write to, or change that folder's permissions, and run again."
         )
-
-
-def partial_name(dest_file):
-    """The temporary name a model or applied-model file is written under: ``.<name>.partial`` with its
-    extension, which tells ``save_dict`` the format."""
-    dest = Path(dest_file)
-    return dest.with_name(f".{dest.stem}.partial{dest.suffix}")
 
 
 def learn_model_wrapper(input_file, dest_file, config_data):
@@ -376,9 +368,10 @@ def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, learn=Non
 
     # Ensure output directory exists
     os.makedirs(dirname(config_data["out_script"]), exist_ok=True)
-    # Write command string to file
-    with open(config_data["out_script"], "w") as f:
-        f.write(command_string)
+    # Write command string to file, under a temporary name renamed into place when complete
+    with atomic_output(config_data["out_script"]) as partial:
+        with open(partial, "w") as f:
+            f.write(command_string)
     print("Commands saved to:", config_data["out_script"])
 
     if config_data["get_cmd"]:
