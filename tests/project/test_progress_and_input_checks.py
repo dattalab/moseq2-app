@@ -1,10 +1,12 @@
 """What the progress display says, and what each step checks before its work.
 
 The notebooks' project cell (``moseq2_app.project.progress``) prints what the
-project holds and names every output older than a re-run of what it was built
-from: PC scores computed before one of their sessions was re-extracted, a model
-fit before the scores were computed again. It finds them by comparing the
-fingerprints an output's record holds for its inputs with the inputs as they are
+project holds and names every output older than what it was built from: PC
+scores computed before one of their sessions was re-extracted, a model fit
+before the scores were computed again, an output computed from a file that no
+longer exists, and PCA outputs or a model computed before a session was added
+to the project. It finds them by comparing the inputs an output's record holds,
+and their fingerprints, with the project's sessions and the inputs as they are
 now. The message is for display; no step reads it or a record to decide what to
 run.
 
@@ -83,8 +85,9 @@ def no_dask(monkeypatch):
 # ------------------------------------------------------------------ the progress display
 
 
-def scores_recorded_from_sessions(project):
-    """PC scores in the project's _pca/, with the record apply-pca writes: each session's extraction an input."""
+def scores_recorded_from_sessions(project, sessions=SESSIONS):
+    """PC scores in the project's _pca/, with the record apply-pca writes: each of ``sessions``' extractions
+    an input."""
     from moseq2_common.bookkeeping import update
     from moseq2_common.project import Project
     from moseq2_common.records import start_record, write_h5_record
@@ -92,7 +95,7 @@ def scores_recorded_from_sessions(project):
     proj = Project.at(project)
     scores = project / "_pca" / "pca_scores.h5"
     scores.parent.mkdir()
-    sessions = [project / "aggregate_results" / folder / "results.h5" for _, folder, _, _ in SESSIONS]
+    sessions = [project / "aggregate_results" / folder / "results.h5" for _, folder, _, _ in sessions]
     record = start_record("apply-pca", {}, [proj.config_file, *sessions], project=proj)
     with h5py.File(scores, "w") as f:
         f["scores/uuid-x"] = np.zeros((200, 10))
@@ -137,6 +140,94 @@ def test_the_project_cell_prints_the_progress(project, capsys):
     write_session(project / "aggregate_results" / folder / "results.h5", uuid, key, startt, seed=9)
     start(str(project))
     assert f"before {key} was re-extracted" in capsys.readouterr().out
+
+
+def model_recorded_from(project, scores, sessions):
+    """A model in the project's models/, with the record learn-model writes: the scores and each of
+    ``sessions``' extractions its inputs."""
+    from moseq2_common.bookkeeping import update
+    from moseq2_common.project import Project
+    from moseq2_common.records import start_record, write_record
+
+    proj = Project.at(project)
+    model = project / "models" / "model.p"
+    model.parent.mkdir()
+    model.write_bytes(b"a model")
+    extractions = [project / "aggregate_results" / folder / "results.h5" for _, folder, _, _ in sessions]
+    record = start_record("learn-model", {}, [proj.config_file, scores, *extractions], project=proj)
+    write_record(model, record.finish({"files": [str(model)]}))
+
+    def change(bookkeeping):
+        bookkeeping.models["fitted"] = ["models/model.p"]
+        bookkeeping.models["current"] = "models/model.p"
+
+    update(proj, change)
+    return model
+
+
+def test_progress_names_outputs_computed_before_a_session_was_added(project):
+    """PC scores and a model computed from the first session only, after which the second was aggregated
+    into the project: each names the session it leaves out and the step to run again. Nothing is compared
+    by file time."""
+    from moseq2_app.project import progress
+    from moseq2_common.project import Project
+
+    scores = scores_recorded_from_sessions(project, SESSIONS[:1])
+    model_recorded_from(project, scores, SESSIONS[:1])
+    added = SESSIONS[1][0]
+
+    shown = progress(Project.at(project))
+    assert (f"_pca/pca_scores.h5 was computed before {added} was added to the project; run apply-pca again "
+            "to include it.") in shown, shown
+    assert (f"models/model.p was computed before {added} was added to the project; run learn-model again "
+            "to include it.") in shown, shown
+    assert f"before {SESSIONS[0][0]}" not in shown and shown.count("again") == 2, shown
+
+
+def test_progress_leaves_out_a_session_listed_under_exclude(project):
+    """A session config.yaml's exclude lists is meant to be left out; scores without it are not named."""
+    from moseq2_app.project import progress
+    from moseq2_common.project import Project
+
+    scores_recorded_from_sessions(project, SESSIONS[:1])
+    config = read_yaml(str(project / "config.yaml"))
+    config["exclude"] = [SESSIONS[1][0]]
+    write_yaml(config, str(project / "config.yaml"))
+    assert "again" not in progress(Project.at(project))
+
+
+def test_progress_names_a_session_extraction_that_no_longer_exists(project):
+    """A session's extraction deleted after apply-pca and learn-model: both outputs name the session whose
+    extraction they were computed from and is gone, rather than passing over it."""
+    from moseq2_app.project import progress
+    from moseq2_common.project import Project
+
+    scores = scores_recorded_from_sessions(project)
+    model_recorded_from(project, scores, SESSIONS)
+    key, folder, _, _ = SESSIONS[1]
+    (project / "aggregate_results" / folder / "results.h5").unlink()
+
+    shown = progress(Project.at(project))
+    for stored, step in (("_pca/pca_scores.h5", "apply-pca"), ("models/model.p", "learn-model")):
+        assert (f"{stored} was computed from the extraction of {key} (aggregate_results/{folder}/results.h5), "
+                "which no longer exists; extract that session again, or list its recording under exclude in "
+                f"config.yaml, then run {step} again.") in shown, shown
+    assert shown.count("no longer exists") == 2, shown
+
+
+def test_progress_names_another_recorded_input_that_no_longer_exists(project):
+    """The scores a model was fit on, deleted: the model names them."""
+    from moseq2_app.project import progress
+    from moseq2_common.project import Project
+
+    scores = scores_recorded_from_sessions(project)
+    model_recorded_from(project, scores, SESSIONS)
+    scores.unlink()
+
+    shown = progress(Project.at(project))
+    assert ("models/model.p was computed from _pca/pca_scores.h5, which no longer exists; run learn-model "
+            "again.") in shown, shown
+    assert shown.count("no longer exists") == 1, shown
 
 
 # ------------------------------------------------------------------ frame counts

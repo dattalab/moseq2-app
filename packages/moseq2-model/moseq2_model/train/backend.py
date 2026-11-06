@@ -640,9 +640,9 @@ class JaxARHMM(object):
 
 # The four concrete classes carry the names the pyhsmm-backed classes had.
 # ``get_parameters_from_model`` records ``model.__class__.__name__`` as
-# ``model_parameters["model_class"]``, and moseq2-viz writes that straight into
-# the crowd-movie ``info.yaml`` (``moseq2_viz/io/video.py:92``), so the name is
-# user-visible and must not drift when the backend changes underneath.
+# ``model_parameters["model_class"]``, and moseq2-viz reports that as the
+# ``model_type`` column of the syllable dataframe (``moseq2_viz/model/util.py``),
+# so the name is user-visible and must not drift when the backend changes underneath.
 
 
 class CorrectedFastARHMM(JaxARHMM):
