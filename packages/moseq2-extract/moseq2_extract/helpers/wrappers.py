@@ -162,7 +162,6 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
 
     print("Getting background...")
     bground_im = get_bground_im_file(input_file, **config_data)
-    write_image(join(output_dir, "bground.tiff"), bground_im, scale=True)
 
     # readjust depth range
     if not config_data.get("manual_set_depth_range", False):

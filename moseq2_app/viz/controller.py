@@ -5,6 +5,7 @@ Main syllable crowd movie viewing, comparing, and labeling functionality.
 import re
 import os
 import io
+import shutil
 import base64
 import numpy as np
 import pandas as pd
@@ -15,7 +16,7 @@ import ipywidgets as widgets
 from bokeh.layouts import column
 from bokeh.plotting import figure
 from os.path import exists
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.yaml import write_yaml
 from moseq2_viz.util import get_sorted_index
 from bokeh.models import Div, CustomJS, Slider
 from IPython.display import display, clear_output
@@ -25,6 +26,8 @@ from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.model.util import parse_model_results
 from moseq2_app.viz.widgets import SyllableLabelerWidgets, CrowdMovieCompareWidgets
 from moseq2_app import steps
+from moseq2_app.labels import LABELS_FOR, labels_for, read_syllable_labels
+from moseq2_viz.steps import crowd_movies_out_of_date, rerender_message
 from moseq2_viz.helpers.wrappers import init_wrapper_function
 from moseq2_viz.options import CrowdMovieOptions
 from moseq2_viz.scalars.util import (compute_syllable_position_heatmaps, get_syllable_pdfs)
@@ -125,7 +128,7 @@ class SyllableLabeler(SyllableLabelerWidgets):
         # count depends on explained_variance, a typed max_syllables and the moseq2-viz version. Each
         # syllable offered shows its saved entry, or a blank one, and the entries for syllables not
         # offered are written back unchanged.
-        saved = (read_yaml(save_path) or {}) if os.path.exists(save_path) else {}
+        saved = read_syllable_labels(save_path) if os.path.exists(save_path) else {}
         self.syll_info = {i: {**_blank_syll_entry(), **saved.get(i, {}), 'group_info': {}} for i in range(max_sylls)}
         self.unshown_syll_info = {k: v for k, v in saved.items() if k not in self.syll_info}
 
@@ -166,8 +169,8 @@ class SyllableLabeler(SyllableLabelerWidgets):
         for syll in range(self.max_sylls):
             tmp[syll].pop('group_info', None)
 
-        # Write to file
-        write_yaml({**tmp, **self.unshown_syll_info}, self.save_path)
+        # Write to file, with the model the labels are for
+        write_yaml({**tmp, **self.unshown_syll_info, LABELS_FOR: labels_for(self.model_path)}, self.save_path)
 
         if curr_syll is not None:
             # Update the syllable dropdown options
@@ -307,16 +310,24 @@ class SyllableLabeler(SyllableLabelerWidgets):
         crowd_movie_dir (str): Path to directory containing all the generated crowd movies
         """
 
-        def render():
-            return steps.render_syllable_movies(
-                model_path, index, crowd_movie_dir,
-                CrowdMovieOptions.resolve(config=self.crowd_movie_settings),
-                syllables=range(self.max_sylls),
-            )['all']
+        opts = CrowdMovieOptions.resolve(config=self.crowd_movie_settings)
+        syllables = range(self.max_sylls)
 
+        def render():
+            return steps.render_syllable_movies(model_path, index, crowd_movie_dir, opts, syllables=syllables)['all']
+
+        stale = None
+        if os.path.exists(crowd_movie_dir):
+            # the movies are a cache of this model, these settings and these sessions
+            stale = crowd_movies_out_of_date(crowd_movie_dir, model_path, index,
+                                             steps.syllable_movie_options(opts, syllables))
         if not os.path.exists(crowd_movie_dir):
             print('Crowd movies not found. Generating movies...')
             # Generate movies if directory does not exist
+            crowd_movie_paths = render()
+        elif stale:
+            print(rerender_message(crowd_movie_dir, stale))
+            shutil.rmtree(crowd_movie_dir)
             crowd_movie_paths = render()
         else:
             # get existing crowd movie paths
@@ -378,7 +389,7 @@ class CrowdMovieComparison(CrowdMovieCompareWidgets):
 
         if isinstance(syll_info, str):
             if exists(syll_info):
-                self.syll_info = read_yaml(syll_info)
+                self.syll_info = read_syllable_labels(syll_info)
         elif isinstance(syll_info, dict):
             self.syll_info = syll_info
 

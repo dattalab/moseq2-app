@@ -260,7 +260,7 @@ SAVED = "Flip labels saved."
 def saved_ranges(widget):
     """The ranges the file holds, by session, as ``(left, start, stop)``."""
     with open(widget.training_data_path, "rb") as f:
-        _, ranges = pickle.load(f)
+        _, ranges = pickle.load(f)[:2]
     return {
         session: [(left, r.start, r.stop) for left, r in labeled]
         for session, labeled in ranges.items()
@@ -367,7 +367,7 @@ def test_ranges_for_a_session_no_longer_shown_are_named(notebook, tmp_path, conf
     label(widget, session, 10, 40, left=False)
     press(widget.save_button)
     with open(widget.training_data_path, "rb") as f:
-        paths, ranges = pickle.load(f)
+        paths, ranges = pickle.load(f)[:2]
     gone = tmp_path / "elsewhere" / "gone_results_00.h5"
     paths["gone_results_00.h5"] = gone
     ranges["gone_results_00.h5"] = [(True, range(0, 5))]
@@ -497,3 +497,51 @@ def test_training_on_older_saved_labels_warns(notebook, recwarn):
     assert not [w for w in recwarn if "unsaved" in str(w.message)]
     with np.load(notebook["trained"].training_data) as data:
         assert len(data["frames"]) == 6 * 40
+
+
+def test_flip_labels_for_a_changed_extraction_are_not_attached_silently(notebook, tmp_path, configured):
+    """The saved ranges label the frames of each session's extraction as they were.
+
+    Re-extracting a session, or applying a flip classifier to it, rewrites the
+    frames the ranges point into. The widget reopened after that shows none of the
+    saved ranges, names the extraction and the file, and asks: wipe the labels and
+    continue, or stop. Until a choice is made, nothing writes the file.
+    """
+    import os
+
+    import panel as pn
+
+    widget = notebook["FF"]
+    session = list(widget.sessions)[0]
+    label(widget, session, 10, 40, left=False)
+    run_cell(SAVE, notebook)
+    labels = Path(widget.training_data_path)
+    kept = labels.read_bytes()
+    h5 = Path(widget.sessions[session])
+    stat = os.stat(h5)
+    os.utime(h5, (stat.st_atime + 120, stat.st_mtime + 120))
+
+    reopened = open_notebook(tmp_path, configured)
+    widget = reopened["FF"]
+    assert widget.curr_total_selected_frames == 0, "ranges for the old frames were attached"
+    shown = widget.labels_check.object
+    assert f"The labels in {labels} were made for {h5}" in shown
+    assert f"{h5} is newer than the labels" in shown
+    choice = {b.name: b for b in widget.show().select(pn.widgets.Button) if b.name in ("Wipe labels and continue", "Stop")}
+    assert sorted(choice) == ["Stop", "Wipe labels and continue"]
+
+    with pytest.raises(ValueError, match="Wipe labels and continue"):
+        run_cell(SAVE, reopened)
+    press(choice["Stop"])
+    with pytest.raises(ValueError):
+        run_cell(SAVE, reopened)
+    assert labels.read_bytes() == kept
+
+    reopened = open_notebook(tmp_path, configured)
+    widget = reopened["FF"]
+    choice = {b.name: b for b in widget.show().select(pn.widgets.Button)}
+    press(choice["Wipe labels and continue"])
+    assert not labels.exists()
+    label(widget, session, 50, 60, left=True)
+    run_cell(SAVE, reopened)
+    assert saved_ranges(widget) == {session: [(True, 50, 60)]}

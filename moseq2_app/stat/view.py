@@ -23,7 +23,7 @@ from moseq2_app.stat.widgets import SyllableStatBokehCallbacks
 from bokeh.models import (ColumnDataSource, LabelSet, BoxSelectTool, Scatter, ColorBar, RangeSlider, CustomJS, TextInput,
                           Legend, LegendItem, HoverTool, MultiLine, NodesAndLinkedEdges, TapTool)
 from moseq2_viz.util import get_sorted_index
-from moseq2_common.yaml import read_yaml
+from moseq2_app.labels import read_syllable_labels
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import squareform
 from moseq2_viz.model.dist import get_behavioral_distance
@@ -1334,7 +1334,7 @@ def plot_dendrogram(index, model_path, syll_info_path, save_dir, max_syllable = 
     # if there is syll info, name each leaf by its syllable's label. The file can hold
     # entries for more or fewer syllables than the tree draws.
     if exists(syll_info_path):
-        syll_info = read_yaml(syll_info_path)
+        syll_info = read_syllable_labels(syll_info_path)
         labels = np.array([f"{syll_info.get(i, {}).get('label', '')}-{i}" for i in range(len(X))])
     else:
         labels = None

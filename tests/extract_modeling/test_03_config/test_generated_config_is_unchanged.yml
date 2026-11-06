@@ -104,7 +104,6 @@ extract:
   partition: short
   pixel_format: gray16le
   prefix: ''
-  recompute_bg: false
   skip_checks: false
   skip_completed: false
   spatial_filter_size:

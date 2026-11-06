@@ -609,16 +609,22 @@ def plane_run(tmp_path_factory, raw_sessions):
 
 
 @pytest.fixture(scope="module")
-def median_background(tmp_path_factory, plane_run):
-    """The recording's median background, computed from scratch in an empty
-    folder the way the tool computes it, read back as the cache file holds it."""
+def median_run(tmp_path_factory, plane_run):
+    """The recording's median background, computed in an empty folder the way
+    extraction and the tool compute it: the array, and ``bground.tiff`` as written."""
     from moseq2_extract.extract.proc import get_bground_im_file
     from moseq2_extract.io.image import read_image
 
     clean = tmp_path_factory.mktemp("median")
     recording = plane_run["widget"].sessions[f"{STILL_RECORDING}/depth.avi"]
-    get_bground_im_file(recording, frame_stride=1000, output_dir=str(clean))
-    return read_image(str(clean / "bground.tiff"), scale=True)
+    computed = get_bground_im_file(recording, output_dir=str(clean))
+    return computed, read_image(str(clean / "bground.tiff"), scale=True)
+
+
+@pytest.fixture(scope="module")
+def median_background(median_run):
+    """The median background extraction subtracts from, as computed."""
+    return median_run[0]
 
 
 def test_a_plane_background_finds_the_floor_on_the_first_click(plane_run):
@@ -649,11 +655,12 @@ def test_a_plane_background_gives_a_second_extraction_the_same_arena_and_frames(
     np.testing.assert_array_equal(second_frames, first_frames)
 
 
-def test_a_plane_background_leaves_the_median_in_bground_tiff(plane_run, median_background):
-    """The session folder's ``bground.tiff`` is the cache every later reader takes as the
-    median background, so the plane fit never replaces it."""
-    np.testing.assert_array_equal(plane_run["bground.tiff after the first extraction"], median_background)
-    np.testing.assert_array_equal(plane_run["bground.tiff after the second extraction"], median_background)
+def test_a_plane_background_leaves_the_median_in_bground_tiff(plane_run, median_run):
+    """The session folder's ``bground.tiff`` is the median background extraction computed,
+    so the plane fit never replaces it."""
+    _, written = median_run
+    np.testing.assert_array_equal(plane_run["bground.tiff after the first extraction"], written)
+    np.testing.assert_array_equal(plane_run["bground.tiff after the second extraction"], written)
 
 
 def test_a_plane_background_is_what_extraction_subtracts(plane_run, median_background):

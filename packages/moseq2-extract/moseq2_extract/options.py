@@ -43,7 +43,6 @@ class RoiOptions(Options):
 
     progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, setting=False,
                                 help="Show verbose progress bars.")
-    recompute_bg: bool = option(False, "--recompute-bg", help="Overwrite previously computed background image")
     use_plane_bground: bool = option(False, "--use-plane-bground", is_flag=True,
                                      help="Use a plane fit for the background. Useful when mice don't move much")
     noise_tolerance: int = option(30, "--noise-tolerance", type=int, arena=True,
