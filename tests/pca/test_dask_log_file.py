@@ -27,7 +27,7 @@ import pytest
 import moseq2_pca.helpers.wrappers as wrappers
 import moseq2_pca.util as util
 from moseq2_pca.cli import apply_pca, compute_changepoints, train_pca
-from moseq2_pca.util import write_yaml
+from moseq2_pca.helpers.data import write_trained_settings
 
 #: A warning distributed logs without rate limiting (its "Unmanaged memory use is
 #: high" and garbage-collection warnings are let through once per ten seconds,
@@ -125,10 +125,10 @@ def trained(tmp_path):
     out.mkdir()
     with h5py.File(out / "pca.h5", "w") as f:
         f["components"] = np.eye(3, 64, dtype="float32")
-    write_yaml({"use_fft": False, "missing_data": False, "tailfilter_shape": "ellipse",
-                "tailfilter_size": [9, 9], "gaussfilter_space": [1.5, 1], "gaussfilter_time": 0,
-                "medfilter_time": [0], "medfilter_space": [0], "mask_height_threshold": 5,
-                "mask_threshold": -16, "min_height": 10, "max_height": 120}, str(out / "pca.yaml"))
+        write_trained_settings(f, {"use_fft": False, "missing_data": False, "tailfilter_shape": "ellipse",
+                                   "tailfilter_size": [9, 9], "gaussfilter_space": [1.5, 1], "gaussfilter_time": 0,
+                                   "medfilter_time": [0], "medfilter_space": [0], "mask_height_threshold": 5,
+                                   "mask_threshold": -16, "min_height": 10, "max_height": 120})
     return out
 
 

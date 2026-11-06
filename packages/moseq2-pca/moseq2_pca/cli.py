@@ -23,6 +23,7 @@ from moseq2_common.options import ProjectGroup, click_options, command_settings,
 from moseq2_common.project import find_project
 from moseq2_common.records import print_record_command
 from moseq2_pca import steps
+from moseq2_pca.helpers.data import TrainedSettingsError
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
 from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
 
@@ -115,8 +116,11 @@ def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **
     config = command_settings(config_file, ApplyPCAOptions, stage_classes=PCA_STAGE)
     opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
     project = _project_or_input_dir(ctx, config_file, input_dir)
-    steps.apply_pca(input_dir, output_dir, output_file, opts,
-                    components_file=pca_file or recorded_paths(project).get('pca_file'), project=project)
+    try:
+        steps.apply_pca(input_dir, output_dir, output_file, opts,
+                        components_file=pca_file or recorded_paths(project).get('pca_file'), project=project)
+    except TrainedSettingsError as error:
+        raise click.ClickException(str(error)) from None
 
 
 @cli.command('compute-changepoints',
@@ -132,9 +136,12 @@ def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, p
     opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
     project = _project_or_input_dir(ctx, config_file, input_dir)
     recorded = recorded_paths(project)
-    steps.compute_changepoints(input_dir, output_dir, output_file, opts,
-                               components_file=recorded.get('pca_file'),
-                               scores_file=pca_file_scores or recorded.get('pca_file_scores'), project=project)
+    try:
+        steps.compute_changepoints(input_dir, output_dir, output_file, opts,
+                                   components_file=recorded.get('pca_file'),
+                                   scores_file=pca_file_scores or recorded.get('pca_file_scores'), project=project)
+    except TrainedSettingsError as error:
+        raise click.ClickException(str(error)) from None
 
 
 @cli.command('clip-scores', help='Clip specified number of frames from PCA scores at the beginning or end')

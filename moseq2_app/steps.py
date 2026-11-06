@@ -15,7 +15,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Sequence
 
-from moseq2_app.flip.train import create_training_dataset, save_classifier, session_cleaning, train_classifier
+from moseq2_app.flip.train import (create_training_dataset, save_classifier, session_cleaning, train_classifier,
+                                   training_settings)
 from moseq2_common.records import start_record, write_record
 from moseq2_viz import steps as viz_steps
 from moseq2_viz.options import CrowdMovieOptions
@@ -71,7 +72,9 @@ def train_flip_classifier(frame_ranges_file: str, out_path: str, config_file: st
     moseq2-project.yaml lists for it) (``moseq2_app.flip.train.session_cleaning``), or
     extraction's defaults without ``config_file``. A session whose extraction ran with
     other cleaning settings is named, with both values, and trained with the settings
-    it has now.
+    it has now. The classifier carries the crop size of the labeled frames and the
+    cleaning settings it was trained with, which extraction checks before it uses it
+    (``moseq2_extract.helpers.wrappers.validate_flip_classifier``).
 
     Args:
     frame_ranges_file (str): the saved frame ranges (``flip-training-frame-ranges.p``).
@@ -87,7 +90,8 @@ def train_flip_classifier(frame_ranges_file: str, out_path: str, config_file: st
     cleaning = session_cleaning(frame_ranges_file, config_file)
     record.note("cleaning", {name: opts.as_dict() for name, opts in cleaning.items()})
     training_data = create_training_dataset(frame_ranges_file, cleaning)
-    save_classifier(train_classifier(training_data, classifier=classifier), out_path)
+    save_classifier(train_classifier(training_data, classifier=classifier), out_path,
+                    training_settings(frame_ranges_file, cleaning))
     result = FlipTrainingResult(training_data=Path(training_data), classifier=Path(out_path))
     if result.classifier.is_file():
         write_record(result.classifier,

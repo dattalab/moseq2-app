@@ -21,7 +21,8 @@ import pytest
 
 import moseq2_pca.helpers.wrappers as wrappers
 from moseq2_pca.cli import apply_pca, compute_changepoints
-from moseq2_pca.util import check_frame_shapes, write_yaml
+from moseq2_pca.helpers.data import write_trained_settings
+from moseq2_pca.util import check_frame_shapes
 
 
 class ReachedDask(Exception):
@@ -49,11 +50,10 @@ def make_pca(folder, pixels, missing_data=False):
     with h5py.File(pca_file, "w") as f:
         f["components"] = np.zeros((3, pixels), dtype="float32")
         f["mean"] = np.zeros(pixels, dtype="float32")
-    write_yaml({"use_fft": False, "missing_data": missing_data, "tailfilter_shape": "ellipse",
-                "tailfilter_size": [9, 9], "gaussfilter_space": [1.5, 1], "gaussfilter_time": 0,
-                "medfilter_time": [0], "medfilter_space": [0], "mask_height_threshold": 5,
-                "mask_threshold": -16, "min_height": 10, "max_height": 120},
-               str(folder / "pca.yaml"))
+        write_trained_settings(f, {"use_fft": False, "missing_data": missing_data, "tailfilter_shape": "ellipse",
+                                   "tailfilter_size": [9, 9], "gaussfilter_space": [1.5, 1], "gaussfilter_time": 0,
+                                   "medfilter_time": [0], "medfilter_space": [0], "mask_height_threshold": 5,
+                                   "mask_threshold": -16, "min_height": 10, "max_height": 120})
     return str(pca_file)
 
 

@@ -42,7 +42,7 @@ RANK = 25
 
 #: What the cell writes, beyond the figures. A ``train.log`` appears beside
 #: them on some runs and is empty when it does, so it is not one of these.
-ARTEFACTS = ("pca.h5", "pca.yaml")
+ARTEFACTS = ("pca.h5",)
 
 #: Every figure, in both formats.
 FIGURES = ("pca_components", "pca_scree")
@@ -148,19 +148,27 @@ def test_the_mean_pose_is_the_mean_of_the_frames(pca):
     )
 
 
-def test_the_parameters_it_trained_with_are_recorded_beside_it(pca, configured):
+def test_the_parameters_it_trained_with_are_recorded_in_it(pca, configured):
     """7. What makes a decomposition reproducible, or at least explicable.
 
-    The yaml beside the h5 holds the whole configuration the training ran
-    under, including the filters that shaped the frames going in.
+    The h5 carries the settings that shaped the frames going in, which the
+    later PCA steps use (its ``settings`` attribute), and the record of the
+    run holds the whole configuration the training ran under. No yaml is
+    written beside it.
     """
-    recorded = plain(read_yaml(str(pca / "pca.yaml")))
+    import io
 
+    from moseq2_common.records import read_record
+
+    with h5py.File(pca / "pca.h5") as f:
+        trained = plain(read_yaml(io.StringIO(f.attrs["settings"])))
+    recorded = read_record(pca / "pca.h5")["options"]
+
+    assert trained["missing_data"] is False
+    assert trained["gaussfilter_space"] == [1.5, 1]
+    assert trained["medfilter_space"] == [0]
+    assert trained["medfilter_time"] == [0]
     assert recorded["rank"] == RANK
-    assert recorded["missing_data"] is False
-    assert recorded["gaussfilter_space"] == [1.5, 1]
-    assert recorded["medfilter_space"] == [0]
-    assert recorded["medfilter_time"] == [0]
     assert recorded["nworkers"] == 1
 
 

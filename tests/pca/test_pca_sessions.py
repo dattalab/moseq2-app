@@ -25,6 +25,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_pca.util as util
+from moseq2_common.records import read_record
 from moseq2_common.yaml import read_yaml, write_yaml
 
 #: (session key, folder in aggregate_results/, uuid, start time). The folders sort opposite to the start times.
@@ -80,7 +81,7 @@ def exclude(project, keys):
 def trained_on(pca_dir):
     """The uuids of the sessions training read, in the order it read them."""
     uuids = {f"{folder}/results.h5": uuid for _, folder, uuid, _ in SESSIONS}
-    inputs = read_yaml(str(pca_dir / "pca.yaml"))["inputs"]
+    inputs = [item["path"] for item in read_record(pca_dir / "pca.h5")["inputs"] if "uuid" in item]
     return [next(uuid for tail, uuid in uuids.items() if path.endswith(tail)) for path in inputs]
 
 

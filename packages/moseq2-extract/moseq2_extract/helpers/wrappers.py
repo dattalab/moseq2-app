@@ -17,7 +17,7 @@ from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from os.path import join, exists, dirname, basename, abspath, splitext
 from moseq2_extract.io.video import load_movie_data, get_movie_info, write_frames
-from moseq2_extract.extract.flip_classifier import load_flip_classifier
+from moseq2_extract.extract.flip_classifier import load_flip_classifier, training_settings
 from moseq2_extract.util import mouse_threshold_filter, filter_warnings
 from moseq2_extract.helpers.data import (
     recording_frame_rate,
@@ -27,7 +27,8 @@ from moseq2_extract.helpers.data import (
 )
 from moseq2_extract.recordings import find_recordings, outputs_in, project_keys, session_outputs
 from moseq2_common.project import session_key
-from moseq2_common.frames import select_strel
+from dataclasses import fields
+from moseq2_common.frames import CleaningOptions, select_strel
 from moseq2_common.records import atomic_output, start_record, write_h5_record
 from moseq2_extract.util import (
     gen_batch_sequence,
@@ -248,74 +249,118 @@ def warn_without_flip_classifier(input_file, config_data):
     )
 
 
+#: The cleaning settings a trained flip classifier is checked against.
+CLEANING_FIELDS = tuple(f.name for f in fields(CleaningOptions))
+
+
+def _shown(value):
+    """A setting's value as config.yaml writes it."""
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_shown(v) for v in value) + "]"
+    return str(value)
+
+
+def _cleaning(values):
+    """``values``' cleaning settings, as ``CleaningOptions`` reads them, with lists for tuples."""
+    opts = CleaningOptions.resolve(config={k: v for k, v in values.items() if k in CLEANING_FIELDS})
+    return {k: list(v) if isinstance(v, tuple) else v for k, v in opts.as_dict().items()}
+
+
+def _check_trained_cleaning(flip_classifier, trained, config_data):
+    """Stop when extraction cleans frames otherwise than the classifier's training did (``trained``, a list)."""
+    now = _cleaning(config_data)
+    differences = []
+    for stored in trained:
+        then = _cleaning(stored)
+        differ = [name for name in CLEANING_FIELDS if then[name] != now[name]]
+        if not differ:
+            return
+        differences.append((differ, then))
+    differ, then = min(differences, key=lambda item: len(item[0]))
+    listed = "; ".join(f"{name} {_shown(then[name])} in training, {_shown(now[name])} in this extraction"
+                       for name in differ)
+    raise ValueError(
+        f"The flip classifier {flip_classifier} was trained on frames cleaned with other settings than this "
+        f"extraction uses: {listed}. A classifier sees frames as they were cleaned in training, so it would "
+        f"orient these mice less reliably. Set {', '.join(differ)} back to the training values in config.yaml's "
+        "extract section (or in the recording's arena-tool settings), or train the classifier again in the "
+        "Flip-Classifier-Training notebook with the current settings."
+    )
+
+
 def validate_flip_classifier(config_data):
     """
-    Validate that the flip classifier is compatible with the configured crop size.
+    Check the flip classifier before extraction: it exists, it can be read, and it was trained for this crop size
+    and, when it says so, these cleaning settings.
 
-    Raises ValueError early if the flip classifier expects a different number of
-    input features than the crop size would produce, rather than failing silently
-    during extraction.
+    The crop size is checked against the classifier's feature count (the published classifiers) or the crop size
+    it was trained on (``moseq2_extract.extract.flip_classifier.training_settings``, carried by a classifier the
+    Flip-Classifier-Training notebook trained, with its cleaning settings). Each problem raises before any work,
+    naming the classifier and both values.
 
     Args:
-    config_data (dict): extraction configuration containing 'flip_classifier' and 'crop_size'
+    config_data (dict): extraction configuration containing 'flip_classifier', 'crop_size' and the cleaning settings
     """
     flip_classifier = config_data.get("flip_classifier")
     if not flip_classifier:
         return
 
     if not exists(flip_classifier):
-        return
+        raise FileNotFoundError(
+            f"The flip classifier {flip_classifier} (flip_classifier in config.yaml's extract section, or "
+            "--flip-classifier) does not exist. Correct the path; download a classifier with `moseq2-extract "
+            "download-flip-file config.yaml`, which writes its path into config.yaml; or set flip_classifier to "
+            "null to extract without one."
+        )
 
-    crop_size = config_data.get("crop_size", (80, 80))
+    crop_size = tuple(config_data.get("crop_size", (80, 80)))
 
-    # load_flip_classifier rather than joblib.load, for two reasons that each
-    # disable this check on their own. joblib cannot read the pickle-free npz
-    # the package now publishes, and the bare except below turns that into a
-    # silent return, so the guard stops running for every classifier a current
-    # install downloads. And scikit-learn removed n_features_ in 1.2, so even a
-    # classifier that loaded would fall through the getattr; the FlipClassifier
-    # this loader returns defines the attribute itself, which is what brings the
-    # comparison back.
-    #
-    # The except stays as broad as it was. A file that is not a classifier
-    # skipped this check before the port and has to keep skipping it: a config
-    # naming a corrupt classifier should still reach extraction the way it
-    # always did, rather than being stopped here for a new reason.
     try:
         clf = load_flip_classifier(flip_classifier)
-    except Exception:
-        return
+    except Exception as error:
+        raise ValueError(
+            f"The flip classifier {flip_classifier} could not be read ({type(error).__name__}: {error}). Check "
+            "that flip_classifier names a classifier file: one downloaded with `moseq2-extract download-flip-file "
+            "config.yaml` (an .npz), or one saved by the Flip-Classifier-Training notebook."
+        ) from None
 
+    trained = training_settings(clf) or {}
     n_features = getattr(clf, "n_features_", None)
-    if n_features is None:
-        return
+    if n_features is None and trained.get("crop_size") is not None:
+        trained_crop = tuple(trained["crop_size"])
+        if trained_crop != crop_size:
+            raise ValueError(
+                f"The flip classifier {flip_classifier} was trained on frames cropped to {trained_crop}, but "
+                f"crop_size is {crop_size}. Set crop_size to {trained_crop} in config.yaml (in the arena tool, its "
+                f"crop size box), or train the classifier again on extractions made with crop_size {crop_size}."
+            )
+    elif n_features is not None and crop_size[0] * crop_size[1] != n_features:
+        actual_features = crop_size[0] * crop_size[1]
+        expected_crop = int(math.sqrt(n_features))
+        raise ValueError(
+            f"\nFlip classifier / crop size mismatch!\n\n"
+            f"  Your crop_size is {crop_size} ({actual_features} pixels per frame),\n"
+            f"  but the flip classifier at\n"
+            f"    '{flip_classifier}'\n"
+            f"  expects {n_features} pixels (i.e. crop_size ({expected_crop}, {expected_crop})).\n\n"
+            f"  This typically happens when the flip classifier and camera type don't match.\n"
+            f"  The pre-trained flip classifiers are camera-specific:\n"
+            f"    - Kinect v2 (K2) classifiers expect crop_size (80, 80)\n"
+            f"    - Azure / Orbbec classifiers expect crop_size (120, 120)\n"
+            f"  If you generated your config with one camera type but downloaded\n"
+            f"  the flip classifier for a different camera, they won't be compatible.\n\n"
+            f"  To fix this, either:\n"
+            f"  1. Change crop_size in your config.yaml (in the arena tool, its crop size box)\n"
+            f"     to ({expected_crop}, {expected_crop}) to match your current flip classifier.\n"
+            f"  2. Download a flip classifier that matches your current crop_size by\n"
+            f"     re-running the download step with the correct selection:\n"
+            f"       CLI:      moseq2-extract download-flip-file config.yaml\n"
+            f"       Notebook: change the 'selection' parameter in the download cell\n"
+            f"                 (selection=1 for K2, selection=3 for Azure/Orbbec)"
+        )
 
-    actual_features = crop_size[0] * crop_size[1]
-    if actual_features == n_features:
-        return
-
-    expected_crop = int(math.sqrt(n_features))
-    raise ValueError(
-        f"\nFlip classifier / crop size mismatch!\n\n"
-        f"  Your crop_size is {tuple(crop_size)} ({actual_features} pixels per frame),\n"
-        f"  but the flip classifier at\n"
-        f"    '{flip_classifier}'\n"
-        f"  expects {n_features} pixels (i.e. crop_size ({expected_crop}, {expected_crop})).\n\n"
-        f"  This typically happens when the flip classifier and camera type don't match.\n"
-        f"  The pre-trained flip classifiers are camera-specific:\n"
-        f"    - Kinect v2 (K2) classifiers expect crop_size (80, 80)\n"
-        f"    - Azure / Orbbec classifiers expect crop_size (120, 120)\n"
-        f"  If you generated your config with one camera type but downloaded\n"
-        f"  the flip classifier for a different camera, they won't be compatible.\n\n"
-        f"  To fix this, either:\n"
-        f"  1. Change crop_size in your config.yaml (in the arena tool, its crop size box)\n"
-        f"     to ({expected_crop}, {expected_crop}) to match your current flip classifier.\n"
-        f"  2. Download a flip classifier that matches your current crop_size by\n"
-        f"     re-running the download step with the correct selection:\n"
-        f"       CLI:      moseq2-extract download-flip-file config.yaml\n"
-        f"       Notebook: change the 'selection' parameter in the download cell\n"
-        f"                 (selection=1 for K2, selection=3 for Azure/Orbbec)"
-    )
+    if trained.get("cleaning"):
+        _check_trained_cleaning(flip_classifier, trained["cleaning"], config_data)
 
 
 def floor_depth_and_background(bground_im, roi, config_data, output_dir):

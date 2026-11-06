@@ -2,8 +2,8 @@
 
 Every package writes YAML through ``moseq2_common.yaml``. Before that module
 existed, extract, pca, viz and app each carried their own copy of one writer,
-and a user's existing files, configs, indexes, the PCA parameter yaml and
-crowd-movie info, are in that writer's format, and so is the
+and a user's existing files, configs, indexes and crowd-movie info are in
+that writer's format, and so is the
 bookkeeping file, ``moseq2-project.yaml``. These tests
 hold each file the notebook chain writes to it.
 
@@ -97,10 +97,6 @@ def test_bookkeeping_file_is_written_as_the_other_files_are(bookkeeping_as_aggre
                                                             tmp_path):
     assert_written_as_before(bookkeeping_as_aggregated, tmp_path)
     assert_written_as_before(aggregated, tmp_path)
-
-
-def test_pca_parameters_are_written_as_before(pca, tmp_path):
-    assert_written_as_before(Path(pca) / "pca.yaml", tmp_path)
 
 
 def test_project_config_is_written_one_setting_per_line(configured, pca, tmp_path):

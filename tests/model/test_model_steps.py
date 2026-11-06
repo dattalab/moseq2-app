@@ -163,3 +163,28 @@ def test_learn_model_reads_config_file(tmp_path, scores, steps, monkeypatch):
 
     fit = learn("--kappa", "50")
     assert (fit["kappa"], fit["num_iter"]) == (50, 7)
+
+
+def test_apply_model_uses_the_model_s_own_settings(tmp_path, scores, steps, options):
+    """A fitted model carries its hyperparameters: apply-model labels with the model's lags, number of PCs
+    and whitening, whatever config.yaml's model section now sets for the next fit."""
+    from moseq2_model.gui import apply_model_command
+    from moseq2_model.util import load_dict
+
+    from configs import write_bookkeeping
+
+    model = tmp_path / "models" / "model.p"
+    model.parent.mkdir()
+    steps.learn_model(str(scores), str(model), options.LearnModelOptions(num_iter=2, progressbar=False))
+    write_bookkeeping(tmp_path, scores=scores.name)
+    applied = {}
+    for name, section in (("as_fit", {}), ("changed", {"nlags": 1, "npcs": 4, "whiten": "none"})):
+        write_yaml({"model": section}, str(tmp_path / "config.yaml"))
+        apply_model_command(str(tmp_path), str(model), f"{name}.p")
+        applied[name] = load_dict(str(tmp_path / "applied_models" / f"{name}.p"))
+
+    for labels in applied["changed"]["labels"]:
+        assert list(labels[:3]) == [-5] * 3 and labels[3] != -5
+    assert applied["changed"]["run_parameters"]["npcs"] == 10
+    for as_fit, changed in zip(applied["as_fit"]["labels"], applied["changed"]["labels"]):
+        np.testing.assert_array_equal(as_fit, changed)
