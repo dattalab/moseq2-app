@@ -15,9 +15,10 @@ help text live together. From that class:
   order the command's help lists them.
 - ``explicit_values`` returns the options the user typed on the command line,
   including one typed at its default value.
-- ``project_file_option`` and ``command_project`` give the viz and model
-  commands their ``--project-file``: the project's ``moseq2-project.yaml``, by
-  default the working folder's.
+- ``command_project`` is the one project a command runs on: ``--project-file``'s
+  folder (``project_file_option``), else ``--config-file``'s project, else the
+  working folder's. ``command_settings`` reads that project's settings and
+  ``output_folder`` is where its outputs go by default.
 - ``ProjectGroup`` is the click group of every command-line program: each of
   its commands first stops on a project made by MoSeq2 1.5.0 or earlier
   (``moseq2_common.project.check_not_old``).
@@ -61,6 +62,7 @@ __all__ = [
     "explicit_values",
     "command_project",
     "option",
+    "output_folder",
     "project_file_option",
     "read_config",
     "read_settings",
@@ -340,22 +342,23 @@ def read_settings(config_file: str | os.PathLike | None, cls: type[Options], *,
     return settings
 
 
-def command_settings(config_file, cls: type[Options], *, stage_classes: Sequence[type[Options]] = ()) -> dict:
+def command_settings(ctx: click.Context, cls: type[Options], *,
+                     stage_classes: Sequence[type[Options]] = ()) -> dict:
     """A command's settings: ``read_settings`` from its project's config, its errors as click's.
 
     The settings come from ``--config-file`` or, without one, from the
-    ``config.yaml`` of the folder the command runs in. Without either, one line
-    says the command runs outside a project.
+    ``config.yaml`` of the project the command runs on (``command_project``),
+    when it has one. Without a project, one line says the command runs outside
+    a project.
     """
-    from moseq2_common.project import OldProjectError, find_project, standalone_note
+    from moseq2_common.project import OldProjectError, standalone_note
 
-    try:
-        project = find_project(config_file)
-    except ConfigFileError as error:
-        raise click.ClickException(str(error)) from None
+    project = command_project(ctx)
     if project is None:
         click.echo(standalone_note(Path.cwd()))
-    source = config_file or (project.config_file if project is not None else None)
+    source = ctx.params.get("config_file")
+    if not source and project is not None and Path(project.config_file).is_file():
+        source = project.config_file
     try:
         return read_settings(source, cls, stage_classes=stage_classes or (cls,))
     except (ConfigFileError, OldProjectError) as error:
@@ -431,34 +434,59 @@ def project_file_option(help: str):
     return click.option("--project-file", type=click.Path(dir_okay=False), default=None, help=help)
 
 
-def command_project(project_file, command: str, *, required: bool):
-    """The project a viz or model command runs on: ``--project-file``'s folder, else the working folder's.
+#: Where ``command_project`` keeps the project it resolved, in the command's ``ctx.meta``.
+_PROJECT = "moseq2_common.project"
 
-    With ``required``, a command without a ``moseq2-project.yaml`` to read stops with a message
-    naming where it looked and ``--project-file``. Without, it runs outside a project (None)
-    when the working folder holds no ``config.yaml``. A ``--project-file`` that does not exist
-    always stops.
+
+def _command_name(ctx: click.Context) -> str:
+    """The command as a person types it: ``moseq2-viz make-df``."""
+    package = ctx.command.callback.__module__.split(".")[0] if ctx.command.callback else ""
+    return f"{package.replace('_', '-')} {ctx.info_name}".strip()
+
+
+def command_project(ctx: click.Context, *, required: bool = False):
+    """The one project a command runs on, or None outside a project.
+
+    ``--project-file``'s folder, else the project ``--config-file`` belongs to
+    (``find_project``: the file's folder, or the project a job settings file
+    names), else the working folder when it holds a ``config.yaml``. The project
+    gives the command its settings (``command_settings``), its sessions, the
+    bookkeeping file it records in, and the default place of its outputs
+    (``output_folder``). It is resolved once per command.
+
+    A ``--project-file`` that does not exist stops the command. With
+    ``required``, so does a project without a ``moseq2-project.yaml`` to read,
+    naming where it looked and ``--project-file``.
     """
     from moseq2_common.bookkeeping import BOOKKEEPING_NAME
     from moseq2_common.project import Project, find_project
 
-    if project_file:
-        if not Path(project_file).is_file():
-            raise click.ClickException(
-                f"`{command}` needs a project's {BOOKKEEPING_NAME}, and {project_file}, given with "
-                "--project-file, does not exist. Check the path, or run the command from the project folder "
-                "without --project-file."
-            )
-        return Project.at(Path(project_file).absolute().parent)
-    cwd = Path.cwd()
-    if required:
-        if not (cwd / BOOKKEEPING_NAME).is_file():
-            raise click.ClickException(
-                f"`{command}` needs a project's {BOOKKEEPING_NAME}, and there is none in {cwd}. Run it from the "
-                f"project folder, or pass `--project-file /path/to/project/{BOOKKEEPING_NAME}`."
-            )
-        return Project.at(cwd)
-    return find_project()
+    if _PROJECT not in ctx.meta:
+        project_file = ctx.params.get("project_file")
+        if project_file:
+            if not Path(project_file).is_file():
+                raise click.ClickException(
+                    f"`{_command_name(ctx)}` needs a project's {BOOKKEEPING_NAME}, and {project_file}, given with "
+                    "--project-file, does not exist. Check the path, or run the command from the project folder "
+                    "without --project-file."
+                )
+            ctx.meta[_PROJECT] = Project.at(Path(project_file).absolute().parent)
+        else:
+            ctx.meta[_PROJECT] = find_project(ctx.params.get("config_file"))
+    project = ctx.meta[_PROJECT]
+    if required and (project is None or not Path(project.bookkeeping_file).is_file()):
+        folder = project.folder if project is not None else Path.cwd()
+        raise click.ClickException(
+            f"`{_command_name(ctx)}` needs a project's {BOOKKEEPING_NAME}, and there is none in {folder}. Run it "
+            f"from the project folder, or pass `--project-file /path/to/project/{BOOKKEEPING_NAME}`."
+        )
+    return project
+
+
+def output_folder(ctx: click.Context) -> Path:
+    """Where a command's outputs go when no path is given: its project's folder, else the folder it runs in."""
+    project = command_project(ctx)
+    return Path(project.folder) if project is not None else Path.cwd()
 
 
 class ProjectCommand(click.Command):

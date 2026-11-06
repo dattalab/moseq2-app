@@ -2,12 +2,12 @@
 CLI for modeling the data using AR-HMM.
 
 Each command's settings are generated from its options class in
-``moseq2_model.options``; the command reads the ``model`` section of its
-project's ``config.yaml`` (``--config-file`` or the working folder's), resolves
-the settings and calls its step in ``moseq2_model.steps``. The sessions and their
-groups come from the project's ``moseq2-project.yaml`` and ``config.yaml``
-(``--project-file``, by default the working folder's project; a kappa-scan fit's
-settings file names its project).
+``moseq2_model.options``. A command runs on one project: ``--project-file``'s,
+else the project ``--config-file`` belongs to (a kappa-scan fit's settings file
+names its project), else the working folder's. It reads the ``model`` section of
+``--config-file`` or, without one, of the project's ``config.yaml``, resolves the
+settings and calls its step in ``moseq2_model.steps``, with the sessions and
+their groups from the project's ``moseq2-project.yaml`` and ``config.yaml``.
 """
 
 from dataclasses import replace
@@ -25,7 +25,7 @@ from moseq2_common.options import (
     explicit_values,
     project_file_option,
 )
-from moseq2_common.project import find_project, is_job_file
+from moseq2_common.project import is_job_file
 from moseq2_common.records import print_record_command
 from moseq2_model import steps
 from moseq2_model.options import (
@@ -80,9 +80,9 @@ def count_frames(ctx, input_file, **_):
                                      "options typed on the command line take precedence over it"),
 })
 @click.pass_context
-def learn_model(ctx, input_file, dest_file, project_file, config_file, **_):
+def learn_model(ctx, input_file, dest_file, config_file, **_):
     # Train the ARHMM using PC scores located in the INPUT_FILE, and saves the model to DEST_FILE
-    config = command_settings(config_file, LearnModelOptions, stage_classes=MODEL_STAGE)
+    config = command_settings(ctx, LearnModelOptions, stage_classes=MODEL_STAGE)
     opts = LearnModelOptions.resolve(config=config, explicit=explicit_values(ctx, LearnModelOptions))
     if opts.kappa is not None and (isinstance(opts.kappa, bool) or not isinstance(opts.kappa, (int, float))):
         where = "on the command line" if ctx.get_parameter_source("kappa") is ParameterSource.COMMANDLINE \
@@ -97,12 +97,11 @@ def learn_model(ctx, input_file, dest_file, project_file, config_file, **_):
             "--ncpus sets the CPUs each kappa-scan job requests on SLURM. A single fit "
             "uses the CPUs the job or machine gives it, and --ncpus does not change that."
         )
+    project = command_project(ctx)
     if is_job_file(config_file):
         # a kappa-scan fit: its settings file names the project, whose bookkeeping only the scan's submitter writes
-        project = find_project(config_file)
         steps.learn_model(input_file, dest_file, opts, index=project_index(project))
     else:
-        project = command_project(project_file, "moseq2-model learn-model", required=False)
         steps.learn_model(input_file, dest_file, opts, index=project_index(project), project=project)
 
 
@@ -114,11 +113,11 @@ def learn_model(ctx, input_file, dest_file, project_file, config_file, **_):
     "project_file": project_file_option(_PROJECT_FILE_HELP),
 })
 @click.pass_context
-def apply_model(ctx, model_file, pc_file, dest_file, project_file, **_):
+def apply_model(ctx, model_file, pc_file, dest_file, **_):
     # Apply the ARHMM located in MODEL_FILE to the PC scores in PC_FILE, and saves the results to DEST_FILE
-    config = command_settings(None, ApplyModelOptions, stage_classes=MODEL_STAGE)
+    config = command_settings(ctx, ApplyModelOptions, stage_classes=MODEL_STAGE)
     opts = ApplyModelOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyModelOptions))
-    project = command_project(project_file, "moseq2-model apply-model", required=False)
+    project = command_project(ctx)
     steps.apply_model(model_file, pc_file, dest_file, opts, index=project_index(project), project=project)
 
 
@@ -132,12 +131,12 @@ def apply_model(ctx, model_file, pc_file, dest_file, project_file, **_):
     "project_file": project_file_option(_PROJECT_FILE_HELP),
 })
 @click.pass_context
-def kappa_scan_fit_models(ctx, input_file, output_dir, project_file, **_):
+def kappa_scan_fit_models(ctx, input_file, output_dir, **_):
     # Scan through the kappa hyperparameter to find the kappa that best matches the changepoint duration distribution.
-    config = command_settings(None, KappaScanOptions, stage_classes=MODEL_STAGE)
+    config = command_settings(ctx, KappaScanOptions, stage_classes=MODEL_STAGE)
     opts = KappaScanOptions.resolve(config=config, explicit=explicit_values(ctx, KappaScanOptions))
     learn = LearnModelOptions.resolve(config=config)
-    project = command_project(project_file, "moseq2-model kappa-scan", required=False)
+    project = command_project(ctx)
     steps.kappa_scan(input_file, output_dir, replace(opts, out_script=join(output_dir, opts.out_script)),
                      index=project_index(project), learn=learn, project=project)
 

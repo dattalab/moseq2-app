@@ -87,11 +87,18 @@ def _settings(opts, leave_out=()):
     return {name: value for name, value in opts.as_dict().items() if name not in leave_out}
 
 
-def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions) -> FindRoiResult:
-    """Find the arena and background of ``input_file``; write the background and arena images."""
+def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
+             project: Project | None = None) -> FindRoiResult:
+    """Find the arena and background of ``input_file``; write the background and arena images.
+
+    They go where ``extract`` writes the recording's outputs: into ``output_dir`` when given, into its
+    session's folder in ``project``'s ``aggregate_results/``, or outside a project into ``proc/`` beside it.
+    """
     check_inputs("find-roi", {input_file: RECORDING_ADVICE})
-    record = start_record("find-roi", opts, [input_file])
+    record = start_record("find-roi", opts, [input_file, *_project_inputs(project)], project=project)
     settings = _settings(opts)
+    if output_dir is None:
+        output_dir = str(_output_folder(input_file, None, project))
     get_roi_wrapper(input_file, settings, output_dir)
     # the wrapper records in settings the folder it wrote to
     folder = settings.get("output_dir")

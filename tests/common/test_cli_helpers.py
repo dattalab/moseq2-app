@@ -41,11 +41,18 @@ def test_cli_defines_no_copy_of_a_shared_helper(pkg):
     assert found == []
 
 
+def _context(**params):
+    """A command's context holding ``params``, as click gives the command."""
+    ctx = click.Context(click.Command("train-pca"))
+    ctx.params = {"config_file": None, **params}
+    return ctx
+
+
 def test_command_settings_outside_a_project_are_empty_and_say_so(tmp_path, monkeypatch, capsys):
     from moseq2_pca.options import TrainPCAOptions
 
     monkeypatch.chdir(tmp_path)
-    assert options.command_settings(None, TrainPCAOptions) == {}
+    assert options.command_settings(_context(), TrainPCAOptions) == {}
     assert "runs outside a project" in capsys.readouterr().out
 
 
@@ -54,4 +61,4 @@ def test_command_settings_stop_the_command_on_a_missing_file(tmp_path):
 
     missing = tmp_path / "config.yaml"
     with pytest.raises(click.ClickException, match=str(missing)):
-        options.command_settings(missing, TrainPCAOptions)
+        options.command_settings(_context(config_file=missing), TrainPCAOptions)

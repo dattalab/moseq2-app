@@ -3,17 +3,18 @@ CLI for visualizing the results.
 
 Each pipeline command's settings are generated from its options class in
 ``moseq2_viz.options``; the command resolves the settings and calls its step in
-``moseq2_viz.steps``. ``make-crowd-movies`` reads the ``crowd_movies`` section
-of the ``config.yaml`` in the folder it runs in.
+``moseq2_viz.steps``.
 
-The commands work on a project's sessions: those its ``moseq2-project.yaml``
-lists, each with its group from the project's ``config.yaml``
-(``--project-file``, by default the one in the folder the command runs in).
-Without one they stop, saying where they looked.
+The commands work on one project (``--project-file``, by default the one in the
+folder the command runs in): its sessions, those its ``moseq2-project.yaml``
+lists, each with its group from its ``config.yaml``, and its settings, which
+for ``make-crowd-movies`` are the ``crowd_movies`` section of that
+``config.yaml``. Outputs given no path go into the project folder. Without a
+project the commands stop, saying where they looked; ``get-best-model`` alone
+runs outside one.
 """
 
 import os
-from pathlib import Path
 
 import click
 
@@ -24,9 +25,9 @@ from moseq2_common.options import (
     command_project,
     command_settings,
     explicit_values,
+    output_folder,
     project_file_option,
 )
-from moseq2_common.project import find_project
 from moseq2_common.records import print_record_command
 from moseq2_viz import steps
 from moseq2_viz.options import (
@@ -48,8 +49,8 @@ def cli():
 
 
 def _resolve(ctx, cls):
-    """``cls`` resolved from the typed options, and the config.yaml of the project the command runs in."""
-    config = command_settings(None, cls, stage_classes=CROWD_MOVIE_STAGE if cls is CrowdMovieOptions else (cls,))
+    """``cls`` resolved from the typed options, and the config.yaml of the project the command runs on."""
+    config = command_settings(ctx, cls, stage_classes=CROWD_MOVIE_STAGE if cls is CrowdMovieOptions else (cls,))
     return cls.resolve(config=config, explicit=explicit_values(ctx, cls))
 
 
@@ -61,9 +62,9 @@ def _project_file():
     return project_file_option(_PROJECT_FILE_HELP)
 
 
-def _sessions(ctx, project_file):
+def _sessions(ctx):
     """The sessions of the project the command runs on, as an index in memory."""
-    return session_index(command_project(project_file, f"moseq2-viz {ctx.info_name}", required=True))
+    return session_index(command_project(ctx, required=True))
 
 
 def _argument(name):
@@ -82,8 +83,8 @@ def _output_file(default, help=None):
                order=("key", "value", "group", "exact", "lowercase", "negative", "project_file"),
                others={"project_file": _project_file()})
 @click.pass_context
-def add_group(ctx, project_file, **_):
-    project = command_project(project_file, "moseq2-viz add-group", required=True)
+def add_group(ctx, **_):
+    project = command_project(ctx, required=True)
     steps.add_group(project, AddGroupOptions.resolve(explicit=explicit_values(ctx, AddGroupOptions)))
 
 
@@ -92,13 +93,17 @@ def add_group(ctx, project_file, **_):
     help="Get the model closest to model-free Changepoints, given the objective",
 )
 @click_options(BestModelOptions,
-               order=("model_dir", "cp_path", "output_file", "plot_all", "ext", "objective"),
+               order=("model_dir", "cp_path", "output_file", "plot_all", "ext", "objective", "project_file"),
                others={"model_dir": _argument("model-dir"), "cp_path": _argument("cp-path"),
                        "output_file": click.argument("output-file",
-                                                     type=click.Path(exists=False, resolve_path=True))})
+                                                     type=click.Path(exists=False, resolve_path=True)),
+                       "project_file": project_file_option(
+                           "The project's moseq2-project.yaml, which lists the models compared and the one picked "
+                           "as its current model; by default the project in the folder the command runs in")})
 @click.pass_context
 def get_best_fit_model(ctx, model_dir, cp_path, output_file, **_):
-    steps.get_best_model(model_dir, cp_path, output_file, _resolve(ctx, BestModelOptions), project=find_project())
+    steps.get_best_model(model_dir, cp_path, output_file, _resolve(ctx, BestModelOptions),
+                         project=command_project(ctx))
 
 
 @cli.command(
@@ -107,12 +112,15 @@ def get_best_fit_model(ctx, model_dir, cp_path, output_file, **_):
 )
 # no settings: the output file's extension picks the format
 @_argument("model-fit")
-@_output_file(Path.cwd() / "moseq_df.csv", "Filename to store dataframe")
+@click.option("--output-file", type=click.Path(), default=None, show_default=False,
+              help="Filename to store dataframe (default: moseq_df.csv in the project folder)")
 @_project_file()
 @click.pass_context
-def make_df(ctx, model_fit, output_file, project_file):
-    steps.make_df(model_fit, _sessions(ctx, project_file), output_file)
-    print(f"Dataframe successfully generated at:\n    {Path(output_file)}")
+def make_df(ctx, model_fit, output_file, **_):
+    sessions = _sessions(ctx)
+    output_file = output_file or str(output_folder(ctx) / "moseq_df.csv")
+    steps.make_df(model_fit, sessions, output_file)
+    print(f"Dataframe successfully generated at:\n    {output_file}")
 
 
 @cli.command(
@@ -127,12 +135,14 @@ def make_df(ctx, model_fit, output_file, project_file):
 ), others={
     "project_file": _project_file(),
     "model_path": _argument("model-path"),
-    "output_dir": click.option("--output-dir", "-o", type=click.Path(),
-                               default=os.path.join(os.getcwd(), "crowd_movies"), help="Path to store files"),
+    "output_dir": click.option("--output-dir", "-o", type=click.Path(), default=None, show_default=False,
+                               help="Path to store files (default: crowd_movies in the project folder)"),
 })
 @click.pass_context
-def make_crowd_movies(ctx, project_file, model_path, output_dir, **_):
-    steps.make_crowd_movies(_sessions(ctx, project_file), model_path, output_dir, _resolve(ctx, CrowdMovieOptions))
+def make_crowd_movies(ctx, model_path, output_dir, **_):
+    sessions = _sessions(ctx)
+    output_dir = output_dir or str(output_folder(ctx) / "crowd_movies")
+    steps.make_crowd_movies(sessions, model_path, output_dir, _resolve(ctx, CrowdMovieOptions))
     print(f"Crowd movies successfully generated in {output_dir}.")
 
 
@@ -145,8 +155,8 @@ def make_crowd_movies(ctx, project_file, model_path, output_dir, **_):
     "output_file": _output_file(os.path.join(os.getcwd(), "scalars")),
 })
 @click.pass_context
-def plot_scalar_summary(ctx, project_file, output_file, **_):
-    steps.plot_scalar_summary(_sessions(ctx, project_file), output_file, _resolve(ctx, ScalarSummaryOptions))
+def plot_scalar_summary(ctx, output_file, **_):
+    steps.plot_scalar_summary(_sessions(ctx), output_file, _resolve(ctx, ScalarSummaryOptions))
     print("Sucessfully plotted scalar summary")
 
 
@@ -158,8 +168,8 @@ def plot_scalar_summary(ctx, project_file, output_file, **_):
     "output_file": _output_file(os.path.join(os.getcwd(), "group_heat_map")),
 })
 @click.pass_context
-def plot_group_position_heatmaps(ctx, project_file, output_file, **_):
-    steps.plot_group_position_heatmaps(_sessions(ctx, project_file), output_file, _resolve(ctx, HeatmapOptions))
+def plot_group_position_heatmaps(ctx, output_file, **_):
+    steps.plot_group_position_heatmaps(_sessions(ctx), output_file, _resolve(ctx, HeatmapOptions))
     print("Sucessfully plotted mean group heatmaps")
 
 
@@ -172,8 +182,8 @@ def plot_group_position_heatmaps(ctx, project_file, output_file, **_):
     "output_file": _output_file(os.path.join(os.getcwd(), "session_heat_map")),
 })
 @click.pass_context
-def plot_verbose_position_heatmaps(ctx, project_file, output_file, **_):
-    steps.plot_verbose_position_heatmaps(_sessions(ctx, project_file), output_file, _resolve(ctx, HeatmapOptions))
+def plot_verbose_position_heatmaps(ctx, output_file, **_):
+    steps.plot_verbose_position_heatmaps(_sessions(ctx), output_file, _resolve(ctx, HeatmapOptions))
     print("Sucessfully plotted mean group heatmaps")
 
 
@@ -191,8 +201,8 @@ def plot_verbose_position_heatmaps(ctx, project_file, output_file, **_):
     "output_file": _output_file(os.path.join(os.getcwd(), "transitions"), "Filename to store plot"),
 })
 @click.pass_context
-def plot_transition_graph(ctx, project_file, model_fit, output_file, **_):
-    steps.plot_transition_graph(_sessions(ctx, project_file), model_fit, output_file,
+def plot_transition_graph(ctx, model_fit, output_file, **_):
+    steps.plot_transition_graph(_sessions(ctx), model_fit, output_file,
                                 _resolve(ctx, TransitionGraphOptions))
 
 
@@ -209,9 +219,9 @@ def plot_transition_graph(ctx, project_file, model_fit, output_file, **_):
     "output_file": _output_file(os.path.join(os.getcwd(), "syll_stat"), "Filename to store plot"),
 })
 @click.pass_context
-def plot_stats(ctx, project_file, model_fit, output_file, **_):
+def plot_stats(ctx, model_fit, output_file, **_):
     opts = _resolve(ctx, StatsPlotOptions)
-    steps.plot_stats(_sessions(ctx, project_file), model_fit, output_file, opts)
+    steps.plot_stats(_sessions(ctx), model_fit, output_file, opts)
     click.echo(f'Syllable {opts.stat} graph created successfully')
 
 

@@ -5,11 +5,14 @@ Each command's settings are generated from its options class in
 ``moseq2_pca.options``; the command reads ``--config-file``, resolves the
 settings and calls its step in ``moseq2_pca.steps``. Inside a project (the
 folder of ``--config-file``, or the working folder when it holds a
-``config.yaml``), each command records what it wrote in the project's
+``config.yaml``), each command writes into the project's ``_pca/`` unless
+``--output-dir`` is given, records what it wrote in the project's
 ``moseq2-project.yaml``, and ``apply-pca`` and ``compute-changepoints`` read the
 components and scores from there unless a path is given. Inside a project, the
 commands read the sessions ``moseq2-project.yaml`` lists (less ``exclude``), not
 ``--input-dir``, which only a folder of extractions outside a project uses.
+Outside a project, ``--input-dir`` and ``--output-dir`` default to the working
+folder and its ``_pca/``.
 """
 
 import os
@@ -19,8 +22,14 @@ import click
 from click.core import ParameterSource
 
 from moseq2_common.bookkeeping import load, resolve_path
-from moseq2_common.options import ProjectGroup, click_options, command_settings, explicit_values
-from moseq2_common.project import find_project
+from moseq2_common.options import (
+    ProjectGroup,
+    click_options,
+    command_project,
+    command_settings,
+    explicit_values,
+    output_folder,
+)
 from moseq2_common.records import print_record_command
 from moseq2_pca import steps
 from moseq2_pca.helpers.data import TrainedSettingsError
@@ -49,10 +58,12 @@ def _fill_gaps_is_not_an_option(ctx, param, value):
 def _paths(output_file):
     """The options that are not settings: the step's paths and the config file."""
     return {
-        'input_dir': click.option('--input-dir', '-i', type=click.Path(), default=os.getcwd(),
-                                  help='Directory to find extracted h5 files'),
-        'output_dir': click.option('--output-dir', '-o', default=join(os.getcwd(), '_pca'), type=click.Path(),
-                                   help='Directory to store PCA results'),
+        'input_dir': click.option('--input-dir', '-i', type=click.Path(), default=None, show_default=False,
+                                  help='Directory to find extracted h5 files outside a project (default: the '
+                                       'folder the command runs in)'),
+        'output_dir': click.option('--output-dir', '-o', default=None, show_default=False, type=click.Path(),
+                                   help='Directory to store PCA results (default: _pca in the project folder, '
+                                        'or in the folder the command runs in outside a project)'),
         'output_file': click.option('--output-file', default=output_file, type=str,
                                     help='Name of h5 file for storing pca results'),
         'config_file': click.option('--config-file', type=click.Path(), default=None,
@@ -75,13 +86,19 @@ CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_scores', 'pca_p
                       'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'verbose')
 
 
-def _project_or_input_dir(ctx, config_file, input_dir):
+def _project_or_input_dir(ctx, input_dir):
     """The project the command runs in (None outside one), saying so when a typed --input-dir goes unread."""
-    project = find_project(config_file)
+    project = command_project(ctx)
     if project is not None and ctx.get_parameter_source('input_dir') is ParameterSource.COMMANDLINE:
         click.echo(f'{ctx.info_name} runs in the project {project.folder}, so it reads the sessions '
                    f'{project.bookkeeping_file} lists, not --input-dir {input_dir}.')
     return project
+
+
+def _folders(ctx, input_dir, output_dir):
+    """``--input-dir`` and ``--output-dir``, or their defaults: the working folder, and ``_pca/`` in the
+    project folder (in the working folder outside a project)."""
+    return input_dir or os.getcwd(), output_dir or join(output_folder(ctx), '_pca')
 
 
 def recorded_paths(project) -> dict:
@@ -97,11 +114,12 @@ def recorded_paths(project) -> dict:
 @cli.command(name='train-pca', help='Train PCA on all extracted results (h5 files) in input directory')
 @click_options(TrainPCAOptions, order=TRAIN_PCA_ORDER, others=_paths('pca'))
 @click.pass_context
-def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
-    config = command_settings(config_file, TrainPCAOptions, stage_classes=PCA_STAGE)
+def train_pca(ctx, input_dir, output_dir, output_file, **_):
+    config = command_settings(ctx, TrainPCAOptions, stage_classes=PCA_STAGE)
     opts = TrainPCAOptions.resolve(config=config, explicit=explicit_values(ctx, TrainPCAOptions))
-    steps.train_pca(input_dir, output_dir, output_file, opts,
-                    project=_project_or_input_dir(ctx, config_file, input_dir))
+    project = _project_or_input_dir(ctx, input_dir)
+    input_dir, output_dir = _folders(ctx, input_dir, output_dir)
+    steps.train_pca(input_dir, output_dir, output_file, opts, project=project)
 
 
 @cli.command(name='apply-pca', help='Compute PCA Scores of extraction data given a pre-trained PCA')
@@ -112,10 +130,11 @@ def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
                               callback=_fill_gaps_is_not_an_option),
 })
 @click.pass_context
-def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **_):
-    config = command_settings(config_file, ApplyPCAOptions, stage_classes=PCA_STAGE)
+def apply_pca(ctx, input_dir, output_dir, output_file, pca_file, **_):
+    config = command_settings(ctx, ApplyPCAOptions, stage_classes=PCA_STAGE)
     opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
-    project = _project_or_input_dir(ctx, config_file, input_dir)
+    project = _project_or_input_dir(ctx, input_dir)
+    input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     try:
         steps.apply_pca(input_dir, output_dir, output_file, opts,
                         components_file=pca_file or recorded_paths(project).get('pca_file'), project=project)
@@ -131,10 +150,11 @@ def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **
                                     help='Path to PCA results'),
 })
 @click.pass_context
-def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, pca_file_scores, **_):
-    config = command_settings(config_file, ChangepointsOptions, stage_classes=PCA_STAGE)
+def compute_changepoints(ctx, input_dir, output_dir, output_file, pca_file_scores, **_):
+    config = command_settings(ctx, ChangepointsOptions, stage_classes=PCA_STAGE)
     opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
-    project = _project_or_input_dir(ctx, config_file, input_dir)
+    project = _project_or_input_dir(ctx, input_dir)
+    input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     recorded = recorded_paths(project)
     try:
         steps.compute_changepoints(input_dir, output_dir, output_file, opts,

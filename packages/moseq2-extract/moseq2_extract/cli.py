@@ -5,7 +5,10 @@ Each command's settings are generated from its options class in
 ``moseq2_extract.options``; the command reads the ``extract`` section of its
 project's ``config.yaml`` (``--config-file``, or the working folder's), resolves
 the settings and calls its step in ``moseq2_extract.steps`` (or
-``moseq2_extract.setup``).
+``moseq2_extract.setup``). ``find-roi`` and ``extract`` lay the arena tool's
+entry for the recording in the project's ``session_config.yaml`` over
+``config.yaml``, and write into the recording's session folder in the project's
+``aggregate_results/`` (``proc/`` beside the recording outside a project).
 """
 
 import os
@@ -13,7 +16,14 @@ import os
 import click
 from click.core import ParameterSource
 
-from moseq2_common.options import ConfigFileError, ProjectGroup, click_options, command_settings, explicit_values
+from moseq2_common.options import (
+    ConfigFileError,
+    ProjectGroup,
+    click_options,
+    command_project,
+    command_settings,
+    explicit_values,
+)
 from moseq2_common.project import find_project, is_job_file
 from moseq2_common.records import print_record_command
 from moseq2_extract import setup, steps
@@ -44,8 +54,10 @@ def _roi_others(argument):
     return {
         **argument,
         "config_file": click.option("--config-file", type=click.Path(), default=None),
-        "output_dir": click.option("--output-dir", default="proc",
-                                   help="Output directory to save the results h5 file"),
+        "output_dir": click.option("--output-dir", default=None, show_default=False,
+                                   help="Folder for the background and arena images (default: the recording's "
+                                        "session folder in the project's aggregate_results, or proc beside the "
+                                        "recording outside a project)"),
     }
 
 
@@ -88,6 +100,17 @@ def _project_config(config_file):
     return str(project.config_file) if project is not None else None
 
 
+def _entry(project, config_file, recording):
+    """The arena tool's settings for ``recording``, from its entry in the project's session_config.yaml;
+    none from a job settings file, which already holds them."""
+    if is_job_file(config_file):
+        return {}
+    try:
+        return recording_entry(project, recording)
+    except ConfigFileError as error:
+        raise click.ClickException(str(error)) from None
+
+
 @cli.command(
     name="find-roi",
     help="Finds the ROI (the arena) and background to subtract from frames when extracting.",
@@ -97,10 +120,12 @@ def _project_config(config_file):
 }))
 @click.pass_context
 def find_roi(ctx, input_file, output_dir, config_file, **_):
-    config = command_settings(config_file, RoiOptions, stage_classes=EXTRACT_STAGE)
+    config = command_settings(ctx, RoiOptions, stage_classes=EXTRACT_STAGE)
+    project = command_project(ctx)
     # a --bg-roi-depth-range typed sets --manual-set-depth-range (RoiOptions.resolve)
-    opts = RoiOptions.resolve(config=config, explicit=explicit_values(ctx, RoiOptions))
-    steps.find_roi(input_file, output_dir, opts)
+    opts = RoiOptions.resolve(config=config, entry=_entry(project, config_file, input_file),
+                              explicit=explicit_values(ctx, RoiOptions))
+    steps.find_roi(input_file, output_dir, opts, project=project)
 
 
 @cli.command(
@@ -121,17 +146,11 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
 })
 @click.pass_context
 def extract(ctx, input_file, output_dir, config_file, output_file, **_):
-    config = command_settings(config_file, ExtractOptions, stage_classes=EXTRACT_STAGE)
-    source = _project_config(config_file)
-    # a job settings file already holds the recording's entry
-    project = find_project(source) if source and not is_job_file(source) else None
-    try:
-        # the arena tool's settings from the recording's session_config.yaml entry, over config.yaml
-        entry = recording_entry(project, input_file)
-    except ConfigFileError as error:
-        raise click.ClickException(str(error)) from None
-    opts = ExtractOptions.resolve(config=config, entry=entry, explicit=explicit_values(ctx, ExtractOptions))
-    steps.extract(input_file, output_dir, opts, project=find_project(source) if source else None)
+    config = command_settings(ctx, ExtractOptions, stage_classes=EXTRACT_STAGE)
+    project = command_project(ctx)
+    opts = ExtractOptions.resolve(config=config, entry=_entry(project, config_file, input_file),
+                                  explicit=explicit_values(ctx, ExtractOptions))
+    steps.extract(input_file, output_dir, opts, project=project)
 
 
 #: ExtractOptions fields batch-extract hands the step in its options rather than as typed values.
@@ -173,7 +192,7 @@ def batch_extract(ctx, input_folder, config_file, **_):
             "Command not run. Please specified a config file using --config-file flag."
         )
         return
-    config = command_settings(config_file, BatchExtractOptions, stage_classes=EXTRACT_STAGE)
+    config = command_settings(ctx, BatchExtractOptions, stage_classes=EXTRACT_STAGE)
     opts = BatchExtractOptions.resolve(config=config, explicit=explicit_values(ctx, BatchExtractOptions))
     typed = _typed_extract_options(ctx)
     # --output-file names no file in a batch: each recording's is named from its arena mask
@@ -253,7 +272,7 @@ def aggregate_extract_results(ctx, input_dir, output_dir, **_):
             "lists the sessions in a project's moseq2-project.yaml. Run it in the project folder, the one holding "
             "config.yaml and the recordings."
         )
-    config = command_settings(str(project.config_file), AggregateOptions, stage_classes=EXTRACT_STAGE)
+    config = command_settings(ctx, AggregateOptions, stage_classes=EXTRACT_STAGE)
     steps.aggregate_results(project, AggregateOptions.resolve(config=config,
                                                               explicit=explicit_values(ctx, AggregateOptions)),
                             input_dir=input_dir, output_dir=output_dir)
