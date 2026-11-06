@@ -21,6 +21,7 @@ from moseq2_extract.io.video import load_movie_data, get_movie_info, write_frame
 from moseq2_extract.extract.flip_classifier import load_flip_classifier
 from moseq2_extract.util import mouse_threshold_filter, filter_warnings
 from moseq2_extract.helpers.data import (
+    recording_frame_rate,
     handle_extract_metadata,
     create_extract_h5,
     write_misc_metadata,
@@ -463,6 +464,8 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
             f"and that neither was cut short when copied, then extract the "
             f"recording again."
         )
+
+    config_data["fps"] = recording_frame_rate(recording, config_data["timestamps"], config_data["finfo"])
 
     status_dict["metadata"] = acquisition_metadata  # update status dict
 

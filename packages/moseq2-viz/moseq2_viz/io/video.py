@@ -3,6 +3,7 @@ Helper functions for handling crowd movie file writing and video metadata mainte
 """
 
 import warnings
+import h5py
 import numpy as np
 import os
 from os.path import join
@@ -10,12 +11,19 @@ from tqdm.auto import tqdm
 import multiprocessing as mp
 from functools import partial
 import moseq2_common.video
+from moseq2_common.timestamps import frame_rate
 from moseq2_viz.viz import make_crowd_matrix
 from cytoolz.itertoolz import peek, pluck, first
-from cytoolz.dicttoolz import valfilter, merge_with
+from cytoolz.dicttoolz import assoc, valfilter, merge_with
 from moseq2_viz.model.util import get_syllable_slices
 from cytoolz.curried import get_in, keyfilter, valmap
 from moseq2_common.yaml import write_yaml
+
+
+def _session_frame_rate(h5: str) -> float:
+    """The frame rate of the session extracted to ``h5``."""
+    with h5py.File(h5, "r") as f:
+        return frame_rate(f)
 
 
 def check_video_parameters(index: dict) -> dict:
@@ -31,10 +39,11 @@ def check_video_parameters(index: dict) -> dict:
     from moseq2_common.yaml import read_yaml
 
     # define constants
-    check_parameters = ["crop_size", "fps"]
+    check_parameters = ["crop_size"]
 
     get_yaml = get_in(["path", 1])
     ymls = list(map(get_yaml, index["files"].values()))
+    h5s = list(map(get_in(["path", 0]), index["files"].values()))
 
     # load yaml config files when needed
     dicts = map(read_yaml, ymls)
@@ -49,6 +58,8 @@ def check_video_parameters(index: dict) -> dict:
     params = map(keyfilter(lambda k: k in check_parameters), params)
     # turn lists (in the dict values) into tuples
     params = map(valmap(lambda x: tuple(x) if isinstance(x, list) else x), params)
+    # each session's frame rate is the recording's, kept in its extraction .h5
+    params = (assoc(p, "fps", _session_frame_rate(h5)) for p, h5 in zip(params, h5s))
 
     # get unique parameter values
     vid_parameters = merge_with(set, params)

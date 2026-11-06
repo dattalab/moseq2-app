@@ -64,10 +64,10 @@ TRAIN_PCA_ORDER = (*_INPUT_AND_DASK, 'gaussfilter_space', 'gaussfilter_time', 'm
                    'mask_height_threshold', 'min_height', 'max_height', 'tailfilter_size', 'tailfilter_shape',
                    'use_fft', 'train_on_subset', 'recon_pcs', 'rank', 'output_file', 'local_processes',
                    'overwrite_pca_train')
-APPLY_PCA_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_path', 'pca_file', 'fill_gaps', 'fps', 'verbose',
+APPLY_PCA_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_path', 'pca_file', 'fill_gaps', 'verbose',
                    'overwrite_pca_apply')
 CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_scores', 'pca_path',
-                      'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'fps', 'verbose')
+                      'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'verbose')
 
 
 def recorded_paths(project) -> dict:

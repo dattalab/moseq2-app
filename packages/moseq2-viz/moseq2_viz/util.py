@@ -109,6 +109,39 @@ def load_changepoint_distribution(cpfile):
     return np.concatenate(list(cp_dist))
 
 
+def changepoint_frame_rates(cpfile, uuids, model=None) -> list:
+    """
+    The frame rate of each session, as the changepoints file records it: the
+    ``fps`` attribute of the session's ``cps``, or the file's ``metadata/fps``.
+
+    Args:
+    cpfile (str): Path to changepoints h5 file.
+    uuids (list): the sessions' uuids.
+    model (str): the model whose sessions these are, for the error message.
+
+    Returns:
+    rates (list of float): frames per second, one per uuid.
+    """
+    rates = []
+    with h5py.File(cpfile, "r") as f:
+        shared = f["metadata/fps"][()] if "metadata/fps" in f else None
+        for uuid in uuids:
+            path = f"cps/{uuid}"
+            rate = f[path].attrs.get("fps") if path in f else None
+            if rate is None:
+                rate = shared
+            if rate is None:
+                labelled = f" which {model} labels," if model is not None else ""
+                raise ValueError(
+                    f"{cpfile} records no frame rate for session {uuid},{labelled} so its syllable "
+                    f"durations cannot be put in seconds. Compute the changepoints again, with the "
+                    f"notebook's changepoints cell or `moseq2-pca compute-changepoints` in the project "
+                    f"folder, which records each session's frame rate."
+                )
+            rates.append(float(rate))
+    return rates
+
+
 def parse_index(index: Union[str, dict]) -> tuple:
     """
     Load an index file, and use extraction UUIDs to sort index.

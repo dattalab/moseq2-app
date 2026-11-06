@@ -47,7 +47,7 @@ def project(tmp_path):
     data = read_yaml(str(config))
     # paths are not settings: config.yaml names no config file of its own
     assert "config_file" not in data["extract"]
-    data["extract"].update(cluster_type="slurm", fps=20, crop_size=[90, 90])
+    data["extract"].update(cluster_type="slurm", compress_threads=20, crop_size=[90, 90])
     write_yaml(data, str(config))
     return tmp_path, config
 
@@ -89,7 +89,7 @@ def test_notebook_slurm_jobs_read_the_config_file(project, jobs):
     assert len(commands) == 1
     assert "--config-file None" not in commands[0]
     assert len(received) == 1
-    assert received[0]["fps"] == 20
+    assert received[0]["compress_threads"] == 20
     assert tuple(received[0]["crop_size"]) == (90, 90)
 
 
@@ -98,13 +98,13 @@ def test_notebook_slurm_jobs_read_the_session_config(project, jobs):
     the tool sets from its own entry, and the others from the config file."""
     root, config = project
     session_config = root / "session_config.yaml"
-    write_yaml({f"{SESSION}/depth.avi": {"fps": 15, "crop_size": [110, 110]}}, str(session_config))
+    write_yaml({f"{SESSION}/depth.avi": {"compress_threads": 15, "crop_size": [110, 110]}}, str(session_config))
 
     commands, received = jobs(root, config)
 
     assert len(received) == 1
     assert tuple(received[0]["crop_size"]) == (110, 110)
-    assert received[0]["fps"] == 20
+    assert received[0]["compress_threads"] == 20
 
 
 def test_notebook_slurm_jobs_for_a_recording_missing_from_the_session_config(
@@ -119,7 +119,7 @@ def test_notebook_slurm_jobs_for_a_recording_missing_from_the_session_config(
     commands, received = jobs(root, config)
 
     assert len(received) == 1
-    assert received[0]["fps"] == 20
+    assert received[0]["compress_threads"] == 20
     assert tuple(received[0]["crop_size"]) == (90, 90)
 
 

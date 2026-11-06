@@ -101,7 +101,7 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
     In a project, the model picked becomes the project's current model.
     """
     best_model_info, figure = get_best_fit_model_wrapper(
-        model_dir, cp_path, output_file, opts.plot_all, opts.ext, opts.fps, opts.objective
+        model_dir, cp_path, output_file, opts.plot_all, opts.ext, opts.objective
     )
     best = best_model_info.get(f"best model - {opts.objective}")
     if project is not None and best:

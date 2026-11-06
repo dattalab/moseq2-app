@@ -41,7 +41,6 @@ class BestModelOptions(Options):
 
     plot_all: bool = option(False, "--plot-all", is_flag=True, help="Plot all included model results")
     ext: str = option("p", "--ext", type=str, help="Model extensions to look for in input directory")
-    fps: int = option(30, "--fps", type=int, help="Frames per second")
     objective: str = option("duration (mean match)", "--objective", type=str,
                             help="The objective finds the best model when comparing with model-free changepoints")
 

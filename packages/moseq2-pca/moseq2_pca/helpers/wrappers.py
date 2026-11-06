@@ -260,7 +260,7 @@ def apply_pca_wrapper(input_dir, config_data, output_dir, output_file):
             apply_pca_local(pca_components=pca_components, h5s=h5s, yamls=yamls,
                             use_fft=use_fft, clean_params=clean_params,
                             save_file=save_file, chunk_size=config_data['chunk_size'],
-                            mask_params=mask_params, fps=config_data['fps'],
+                            mask_params=mask_params,
                             missing_data=missing_data, h5_path=config_data['h5_path'],
                             h5_mask_path=config_data['h5_mask_path'], verbose=config_data['verbose'])
 
@@ -287,7 +287,7 @@ def apply_pca_wrapper(input_dir, config_data, output_dir, output_file):
                     apply_pca_dask(pca_components=pca_components, h5s=h5s, yamls=yamls,
                                    use_fft=use_fft, clean_params=clean_params,
                                    save_file=save_file, chunk_size=config_data['chunk_size'],
-                                   fps=config_data['fps'], client=client, missing_data=missing_data,
+                                   client=client, missing_data=missing_data,
                                    mask_params=mask_params, h5_path=config_data['h5_path'],
                                    h5_mask_path=config_data['h5_mask_path'], verbose=config_data['verbose'])
                 except:
@@ -357,7 +357,7 @@ def compute_changepoints_wrapper(input_dir, config_data, output_dir, output_file
             get_changepoints_dask(pca_components=pca_components, pca_scores=pca_file_scores,
                                   h5s=h5s, yamls=yamls, changepoint_params=changepoint_params,
                                   save_file=save_file, chunk_size=config_data['chunk_size'],
-                                  fps=config_data['fps'], client=client, missing_data=missing_data,
+                                  client=client, missing_data=missing_data,
                                   mask_params=mask_params, h5_path=config_data['h5_path'],
                                   h5_mask_path=config_data['h5_mask_path'], verbose=config_data['verbose'])
         except:

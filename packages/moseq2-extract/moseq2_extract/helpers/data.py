@@ -6,6 +6,7 @@ import tarfile
 import warnings
 import numpy as np
 from importlib.metadata import version
+from moseq2_common.timestamps import FRAME_RATE_PATH, rate_from_timestamps
 from moseq2_extract.io.video import load_timestamps_from_movie
 from os.path import exists, join, basename
 from moseq2_extract.util import (
@@ -168,6 +169,34 @@ def handle_extract_metadata(input_file, dirname, with_source=False):
     return acquisition_metadata, timestamps, tar
 
 
+def recording_frame_rate(recording, timestamps, finfo):
+    """
+    A recording's frame rate, in frames per second: from its timestamps (in
+    milliseconds), or the rate its video declares when the timestamps give none.
+
+    Args:
+    recording (str): the recording's path, for the error message.
+    timestamps (numpy.array): the time of every frame, in milliseconds, or None.
+    finfo (dict): the recording's video information (``get_movie_info``).
+
+    Returns:
+    fps (float): frames per second.
+    """
+    rate = rate_from_timestamps(timestamps, "milliseconds") if timestamps is not None else None
+    if rate is None:
+        rate = finfo.get("fps")
+    if not rate or not np.isfinite(rate) or rate <= 0:
+        first = ", ".join(f"{d:g}" for d in np.diff(np.asarray(timestamps if timestamps is not None else [],
+                                                               dtype="float64"))[:5])
+        raise ValueError(
+            f"Cannot tell the frame rate of {recording}: its timestamps give no frame period "
+            f"(the first differences are [{first}] milliseconds) and the video declares no frame "
+            f"rate. Check that the recording's timestamp file (depth_ts.txt or timestamps.csv) "
+            f"holds one increasing time per frame, then extract the recording again."
+        )
+    return float(rate)
+
+
 # extract h5 helper function
 def create_extract_h5(
     h5_file,
@@ -202,6 +231,10 @@ def create_extract_h5(
     """
 
     h5_file.create_dataset("metadata/uuid", data=status_dict["uuid"])
+    h5_file.create_dataset(FRAME_RATE_PATH, data=config_data["fps"])
+    h5_file[FRAME_RATE_PATH].attrs["description"] = (
+        "Frame rate of the recording in frames per second, from its timestamps or the video's own rate"
+    )
 
     # Creating scalar dataset
     for scalar in list(scalars_attrs.keys()):

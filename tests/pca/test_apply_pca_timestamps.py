@@ -2,9 +2,9 @@
 
 ``apply_pca_dask``, the path ``apply-pca`` takes with ``cluster_type: local``,
 reads each session's timestamps to know where dropped frames go. An extraction
-without a ``/timestamps`` dataset falls back to one frame every 1/fps
-seconds, counted from that session's own frames, so each session's scores
-keep its own length.
+without a ``/timestamps`` dataset falls back to one frame every 1 / its
+recorded frame rate (``/metadata/fps``), counted from that session's own
+frames, so each session's scores keep its own length.
 """
 
 from __future__ import annotations
@@ -28,11 +28,12 @@ def client():
 
 @pytest.fixture
 def sessions(tmp_path):
-    """Two extractions of different lengths, neither with timestamps."""
+    """Two extractions of different lengths at 30 fps, neither with timestamps."""
     h5s, yamls = [], []
     for uuid, length in LENGTHS.items():
         with h5py.File(tmp_path / f"{uuid}.h5", "w") as f:
             f["frames"] = np.random.default_rng(0).random((length, 4, 4))
+            f["metadata/fps"] = np.float32(30)
         write_yaml({"uuid": uuid}, str(tmp_path / f"{uuid}.yaml"))
         h5s.append(str(tmp_path / f"{uuid}.h5"))
         yamls.append(str(tmp_path / f"{uuid}.yaml"))

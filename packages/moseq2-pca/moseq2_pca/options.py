@@ -97,7 +97,6 @@ class ApplyPCAOptions(PCAInputOptions, DaskOptions):
     """``apply-pca``."""
 
     pca_path: str = option('/components', '--pca-path', type=str, help='Path to pca components in h5 file')
-    fps: int = option(30, '--fps', type=int, help='Frames per second (frame rate)')
     verbose: bool = option(False, '--verbose', '-v', is_flag=True, setting=False,
                            help='Print sessions as they are being loaded.')
     overwrite_pca_apply: bool = option(False, '--overwrite-pca-apply', type=bool,
@@ -119,7 +118,6 @@ class ChangepointsOptions(PCAInputOptions, DaskOptions):
                                "many frames are trimmed from each end of the changepoint curve (6 x sigma).")
     # -d is also --dask-cache-path's short flag, as in 1.5.0; click gives it to --dims
     dims: int = option(300, '-d', '--dims', type=int, help="Number of random projections to use")
-    fps: int = option(30, '--fps', type=int, help="Frames per second (frame rate)")
     verbose: bool = option(False, '--verbose', '-v', is_flag=True, setting=False,
                            help="Print sessions as they are being loaded.")
 

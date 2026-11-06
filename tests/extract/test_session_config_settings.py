@@ -223,24 +223,24 @@ def test_notebook_slurm_path_takes_frame_trim_from_config_yaml(project, slurm):
 
 
 def test_an_entry_key_the_tool_does_not_set_takes_config_yaml_and_is_named(project, local):
-    """An entry holding a setting the arena tool does not set (fps, frame_trim, typed in
+    """An entry holding a setting the arena tool does not set (compress_threads, frame_trim, typed in
     by hand) is read as it is, not rewritten: those settings come from config.yaml and
     one line names them; the tool's own settings in it still apply."""
     root, config, session_config = project
     entries = read_yaml(str(session_config))
-    entries["session_0/depth.dat"].update(fps=15, frame_trim=[5, 5], noise_tolerance=40)
+    entries["session_0/depth.dat"].update(compress_threads=15, frame_trim=[5, 5], noise_tolerance=40)
     write_yaml(entries, str(session_config))
     before = session_config.read_text()
 
     out = run("batch-extract", str(root), "--config-file", str(config), "--extensions", ".dat").output
 
     received = local[recording(root, "session_0")]["config"]
-    assert received["fps"] == read_yaml(str(config))["extract"]["fps"]
+    assert received["compress_threads"] == read_yaml(str(config))["extract"]["compress_threads"]
     assert tuple(received["frame_trim"]) == (100, 0)
     assert received["noise_tolerance"] == 40
     assert session_config.read_text() == before
     message = (
-        f"{session_config}'s entry for session_0/depth.dat sets `fps`, `frame_trim`, which the arena tool does "
+        f"{session_config}'s entry for session_0/depth.dat sets `compress_threads`, `frame_trim`, which the arena tool does "
         "not set, so extraction ignores them and takes them from config.yaml's extract section. Delete those "
         "lines from the entry to silence this message."
     )

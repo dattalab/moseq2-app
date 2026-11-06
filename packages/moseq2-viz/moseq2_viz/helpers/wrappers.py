@@ -12,6 +12,7 @@ from moseq2_viz.io.video import write_crowd_movies, write_crowd_movie_info_file
 from moseq2_viz.util import (
     parse_index,
     get_index_hits,
+    changepoint_frame_rates,
 )
 from moseq2_viz.model.trans_graph import (
     get_trans_graph_groups,
@@ -122,7 +123,6 @@ def get_best_fit_model_wrapper(
     output_file,
     plot_all=False,
     ext="p",
-    fps=30,
     objective="duration (mean match)",
 ):
     """
@@ -134,7 +134,6 @@ def get_best_fit_model_wrapper(
     output_file (str): Path to file to save figure to.
     plot_all (bool): boolean flag that plots all model changepoint distributions.
     ext (str): File extension to search for models with
-    fps (int): Frames per second
     objective (str): The objective for matching model-free changpoint and the model changepoint
 
     Returns:
@@ -149,10 +148,13 @@ def get_best_fit_model_wrapper(
 
     print(f"Found {len(models)} models in given input folder: {model_dir}")
 
-    # Load models into a single dict and compute their changepoints
+    # Load models into a single dict and compute their changepoints, each session's
+    # syllables timed at the frame rate the changepoints file records for it
     def _load_models(pth):
         mdl = parse_model_results(pth)
-        mdl["changepoints"] = labels_to_changepoints(mdl["labels"], fs=fps)
+        mdl["changepoints"] = labels_to_changepoints(
+            mdl["labels"], fs=changepoint_frame_rates(cp_file, mdl["keys"], model=pth)
+        )
         return mdl
 
     model_results = {name: _load_models(name) for name in models}
