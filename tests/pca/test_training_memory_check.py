@@ -47,10 +47,10 @@ def sessions(tmp_path):
     for i in range(SESSIONS):
         folder = tmp_path / "input" / f"session-{i}"
         folder.mkdir(parents=True)
-        with h5py.File(folder / "results_00.h5", "w") as f:
+        with h5py.File(folder / "results.h5", "w") as f:
             f["frames"] = np.zeros((FRAMES, 80, 80), dtype="uint8")
             f["timestamps"] = np.arange(FRAMES) * 33.3
-        with h5py.File(folder / "results_00.h5", "a") as f:
+        with h5py.File(folder / "results.h5", "a") as f:
             f["metadata/uuid"] = f"uuid-{i}"
     return tmp_path / "input"
 
@@ -201,7 +201,7 @@ def test_the_notebook_cell_gets_the_same_check(tmp_path, sessions, workers_have)
                         "dask_cache_path": str(tmp_path / "cache")}}, str(config_file))
     from configs import write_bookkeeping
 
-    write_bookkeeping(tmp_path, sorted(path.relative_to(tmp_path) for path in sessions.rglob("*.h5")))
+    write_bookkeeping(tmp_path, sorted(path.relative_to(tmp_path) for path in sessions.iterdir()))
     with pytest.warns(Warning) as record, pytest.raises(ReachedDask):
         train_pca_command(str(tmp_path), "pca")
     message = "\n".join(str(w.message) for w in record if "the dask workers have" in str(w.message))

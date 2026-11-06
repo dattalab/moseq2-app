@@ -135,17 +135,18 @@ def test_both_front_ends_hand_the_wrapper_the_same_settings(tmp_path, monkeypatc
         write_yaml(data, str(config))
         configs.append(config)
 
+    from configs import write_bookkeeping, write_session_labels
+
+    # each project lists the same session
+    for front_end in ("cli", "notebook"):
+        write_bookkeeping(tmp_path / front_end, ["../s0"])
+    write_session_labels(tmp_path, ["s0"])
     result = CliRunner().invoke(
         pca_cli.cli,
-        ["train-pca", "-i", str(tmp_path), "-o", str(tmp_path / "cli" / "_pca"),
-         "--config-file", str(configs[0])],
+        ["train-pca", "-o", str(tmp_path / "cli" / "_pca"), "--config-file", str(configs[0])],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
-    from configs import write_bookkeeping
-
-    # the notebook's project lists sessions in tmp_path, where the command line's -i points
-    write_bookkeeping(tmp_path / "notebook", ["../s0.h5"])
     train_pca_command(str(tmp_path / "notebook"), "pca")
 
     cli, notebook = received

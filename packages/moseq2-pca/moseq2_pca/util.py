@@ -20,6 +20,7 @@ import scipy.signal
 from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
+from moseq2_common.bookkeeping import recording_order
 from moseq2_common.frames import clean_frames as clean_frames_spatial, odd_kernel
 from moseq2_common.h5 import extraction_labels
 from moseq2_common.timestamps import frame_steps, timestamps_path
@@ -32,7 +33,9 @@ from os.path import join, exists, abspath, expanduser
 
 def recursive_find_h5s(root_dir=os.getcwd(), ext='.h5'):
     """
-    Recursively find the extractions under ``root_dir``: the ``.h5`` files holding frames and a session uuid.
+    Recursively find the extractions under ``root_dir``: the ``.h5`` files holding frames and a session uuid,
+    listed in the order the sessions were recorded (``moseq2_common.bookkeeping.recording_order``), as a
+    project lists them.
 
     Args:
     root_dir (str): path to base directory to begin recursive search in.
@@ -59,10 +62,32 @@ def recursive_find_h5s(root_dir=os.getcwd(), ext='.h5'):
         return {'uuid': uuid, 'metadata': metadata}
 
     found = [(h5, extraction(h5)) for h5 in glob(join(abspath(root_dir), '**', f'*{ext}'), recursive=True)]
-    found = [(h5, info) for h5, info in found if info is not None]
+    found = sorted(((h5, info) for h5, info in found if info is not None),
+                   key=lambda pair: recording_order(pair[1]['metadata'], pair[0]))
     h5s = [h5 for h5, _ in found]
     dicts = [info for _, info in found]
 
+    return h5s, dicts, list(h5s)
+
+
+def find_extractions(sessions):
+    """
+    The extractions a PCA step reads, as ``recursive_find_h5s`` returns them.
+
+    Args:
+    sessions (str or list): a folder to search (``recursive_find_h5s``), or the sessions' ``.h5`` files in the
+        order to read them (a project's, from ``moseq2_common.bookkeeping.session_index``)
+
+    Returns:
+    h5s (list), dicts (list), sources (list): as ``recursive_find_h5s``
+    """
+    if isinstance(sessions, (str, os.PathLike)):
+        return recursive_find_h5s(sessions)
+    h5s = [str(h5) for h5 in sessions]
+    dicts = []
+    for h5 in h5s:
+        uuid, metadata = extraction_labels(h5)
+        dicts.append({'uuid': uuid, 'metadata': metadata})
     return h5s, dicts, list(h5s)
 
 

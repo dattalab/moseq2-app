@@ -16,12 +16,16 @@ from click.testing import CliRunner
 
 import moseq2_pca.cli as pca_cli
 import moseq2_pca.steps as pca_steps
+from configs import write_bookkeeping, write_session_labels
 from moseq2_common.yaml import write_yaml
 
 
 @pytest.fixture
-def received(monkeypatch):
-    """What ``apply-pca`` hands its wrapper, instead of computing scores."""
+def received(monkeypatch, tmp_path):
+    """What ``apply-pca`` hands its wrapper, instead of computing scores, in a project (``tmp_path``) of one
+    session."""
+    write_bookkeeping(tmp_path, ["aggregate_results/session_0"])
+    write_session_labels(tmp_path, ["aggregate_results/session_0"])
     calls = []
 
     def record(input_dir, config, output_dir, output_file):

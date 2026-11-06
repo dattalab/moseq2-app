@@ -7,13 +7,16 @@ settings and calls its step in ``moseq2_pca.steps``. Inside a project (the
 folder of ``--config-file``, or the working folder when it holds a
 ``config.yaml``), each command records what it wrote in the project's
 ``moseq2-project.yaml``, and ``apply-pca`` and ``compute-changepoints`` read the
-components and scores from there unless a path is given.
+components and scores from there unless a path is given. Inside a project, the
+commands read the sessions ``moseq2-project.yaml`` lists (less ``exclude``), not
+``--input-dir``, which only a folder of extractions outside a project uses.
 """
 
 import os
 from os.path import join
 
 import click
+from click.core import ParameterSource
 
 from moseq2_common.bookkeeping import load, resolve_path
 from moseq2_common.options import ProjectGroup, click_options, command_settings, explicit_values
@@ -71,6 +74,15 @@ CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_scores', 'pca_p
                       'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'verbose')
 
 
+def _project_or_input_dir(ctx, config_file, input_dir):
+    """The project the command runs in (None outside one), saying so when a typed --input-dir goes unread."""
+    project = find_project(config_file)
+    if project is not None and ctx.get_parameter_source('input_dir') is ParameterSource.COMMANDLINE:
+        click.echo(f'{ctx.info_name} runs in the project {project.folder}, so it reads the sessions '
+                   f'{project.bookkeeping_file} lists, not --input-dir {input_dir}.')
+    return project
+
+
 def recorded_paths(project) -> dict:
     """The components, scores and changepoints files the project's bookkeeping file names (``pca_file``,
     ``pca_file_scores``, ``changepoint_file``); empty outside a project."""
@@ -87,7 +99,8 @@ def recorded_paths(project) -> dict:
 def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
     config = command_settings(config_file, TrainPCAOptions, stage_classes=PCA_STAGE)
     opts = TrainPCAOptions.resolve(config=config, explicit=explicit_values(ctx, TrainPCAOptions))
-    steps.train_pca(input_dir, output_dir, output_file, opts, project=find_project(config_file))
+    steps.train_pca(input_dir, output_dir, output_file, opts,
+                    project=_project_or_input_dir(ctx, config_file, input_dir))
 
 
 @cli.command(name='apply-pca', help='Compute PCA Scores of extraction data given a pre-trained PCA')
@@ -101,7 +114,7 @@ def train_pca(ctx, input_dir, output_dir, output_file, config_file, **_):
 def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **_):
     config = command_settings(config_file, ApplyPCAOptions, stage_classes=PCA_STAGE)
     opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
-    project = find_project(config_file)
+    project = _project_or_input_dir(ctx, config_file, input_dir)
     steps.apply_pca(input_dir, output_dir, output_file, opts,
                     components_file=pca_file or recorded_paths(project).get('pca_file'), project=project)
 
@@ -117,7 +130,7 @@ def apply_pca(ctx, input_dir, output_dir, output_file, config_file, pca_file, **
 def compute_changepoints(ctx, input_dir, output_dir, output_file, config_file, pca_file_scores, **_):
     config = command_settings(config_file, ChangepointsOptions, stage_classes=PCA_STAGE)
     opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
-    project = find_project(config_file)
+    project = _project_or_input_dir(ctx, config_file, input_dir)
     recorded = recorded_paths(project)
     steps.compute_changepoints(input_dir, output_dir, output_file, opts,
                                components_file=recorded.get('pca_file'),

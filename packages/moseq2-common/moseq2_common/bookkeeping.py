@@ -17,7 +17,7 @@ keeps working. Only the process running a step writes it, at the end of the
 step, through a temporary file renamed into place (``update``); a step run from
 a SLURM job's settings file never does.
 
-The viz and model steps take the sessions as an index in memory
+The PCA, model and viz steps take the sessions as an index in memory
 (``session_index``), the shape ``moseq2_viz.util.parse_index`` reads, built from
 this file and ``config.yaml``'s groups each time and never written. It leaves
 out the sessions ``config.yaml``'s ``exclude`` lists, so every step after
@@ -37,8 +37,8 @@ from moseq2_common.project import Project, check_session_names, exclude_note, re
 from moseq2_common.yaml import read_yaml, write_yaml
 
 __all__ = ["BOOKKEEPING_NAME", "SESSION_FILE", "Bookkeeping", "BookkeepingError", "Session", "load",
-           "project_index", "relative_path", "resolve_path", "session_h5", "session_index", "sessions_folder",
-           "update"]
+           "project_index", "recording_order", "relative_path", "resolve_path", "session_h5", "session_index",
+           "sessions_folder", "update"]
 
 BOOKKEEPING_NAME = "moseq2-project.yaml"
 #: A session's extraction file, in its folder; its preview movie and results yaml share the name.
@@ -169,6 +169,15 @@ def _metadata(h5: Path, fallback: str) -> dict:
     return metadata
 
 
+def recording_order(metadata: dict | None, name: str) -> tuple:
+    """The sort key that lists sessions in the order they were recorded: the acquisition ``StartTime`` to the
+    second (as 1.5.0's aggregated file names began with it), then ``SessionName``, then ``name`` (the
+    session's key, or its file when it has none). Every step lists sessions in this order; PCA's changepoints
+    depend on it, since they draw one random projection per session in turn."""
+    metadata = metadata or {}
+    return str(metadata.get("StartTime") or "")[:19], str(metadata.get("SessionName") or name), name
+
+
 def session_index(project: Project, *, exclude: bool = True) -> dict:
     """The project's sessions as an index in memory: 1.5.0's parsed-index shape, absolute paths.
 
@@ -203,9 +212,7 @@ def session_index(project: Project, *, exclude: bool = True) -> dict:
             "path": (str(h5), str(h5.with_suffix(".yaml"))),
             "key": key,
         })
-    # recording order: the start time to the second, as 1.5.0's aggregated file names began with it
-    entries.sort(key=lambda f: (str(f["metadata"].get("StartTime") or "")[:19],
-                                str(f["metadata"].get("SessionName")), f["key"]))
+    entries.sort(key=lambda f: recording_order(f["metadata"], f["key"]))
     scores = bookkeeping.pca.get("scores")
     index = {"files": entries, "pca_path": str(resolve_path(project, scores)) if scores else "",
              "bookkeeping_file": str(project.bookkeeping_file)}

@@ -6,6 +6,15 @@ into one options object and call these. A step needs no ``config.yaml``: from a
 script, pass the paths and an options object, such as
 ``train_pca("aggregate_results", "_pca", "pca", TrainPCAOptions(nworkers=4))``.
 
+The sessions: inside a project (``project``), a step reads the sessions the
+project's bookkeeping file lists (``moseq2_common.bookkeeping.session_index``),
+the same list the model and analysis steps use, leaving out the ones
+``config.yaml``'s ``exclude`` lists, and ``input_dir`` is not read. Outside a
+project, it reads every extraction it finds under ``input_dir``. Either way the
+sessions are read in the order they were recorded
+(``moseq2_common.bookkeeping.recording_order``); the changepoints depend on
+that order, since they draw one random projection per session in turn.
+
 Each step hands its work function (the ``*_wrapper`` in
 ``moseq2_pca.helpers.wrappers``) the options as a dict, with the files it reads:
 ``components_file`` (the trained components; ``<output_dir>/pca.h5`` when None)
@@ -30,12 +39,12 @@ from pathlib import Path
 
 import h5py
 
-from moseq2_common.bookkeeping import relative_path, update
+from moseq2_common.bookkeeping import BookkeepingError, relative_path, session_index, sessions_folder, update
 from moseq2_common.project import Project
 from moseq2_common.records import start_record, write_h5_record
 from moseq2_pca.helpers.wrappers import apply_pca_wrapper, compute_changepoints_wrapper, train_pca_wrapper
 from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
-from moseq2_pca.util import recursive_find_h5s
+from moseq2_pca.util import find_extractions
 
 
 @dataclass(frozen=True)
@@ -60,9 +69,23 @@ def _written(output_dir, output_file):
     return Path(join(abspath(output_dir), f'{output_file}.h5'))
 
 
-def _start(step, opts, input_dir, project, *files):
-    """The record of ``step``, its inputs every extraction under ``input_dir`` and ``files``."""
-    extractions = [{"path": h5, "uuid": info["uuid"]} for h5, info in zip(*recursive_find_h5s(input_dir)[:2])]
+def _sessions(input_dir, project):
+    """What a step reads: the project's sessions' ``.h5`` files, or ``input_dir`` outside a project."""
+    if project is None:
+        return input_dir
+    sessions_folder(project)  # stops when the project lists no sessions yet
+    files = session_index(project)["files"]
+    if not files:
+        raise BookkeepingError(
+            f"Every session in {project.bookkeeping_file} is listed under exclude in {project.config_file}, so "
+            f"there is nothing for PCA to read. Remove at least one session from exclude in {project.config_file}."
+        )
+    return [f["path"][0] for f in files]
+
+
+def _start(step, opts, sessions, project, *files):
+    """The record of ``step``, its inputs the extractions of ``sessions`` and ``files``."""
+    extractions = [{"path": h5, "uuid": info["uuid"]} for h5, info in zip(*find_extractions(sessions)[:2])]
     settings = [path for path in (project.config_file,) if path.is_file()] if project is not None else []
     return start_record(step, opts, [*settings, *[f for f in files if f], *extractions], project=project)
 
@@ -90,11 +113,13 @@ def _record(project, output, written):
     update(project, change)
 
 
-def train_pca(input_dir: str, output_dir: str, output_file: str, opts: TrainPCAOptions, *,
+def train_pca(input_dir: str | None, output_dir: str, output_file: str, opts: TrainPCAOptions, *,
               project: Project | None = None) -> TrainPCAResult:
-    """Train PCA on the extractions under ``input_dir``; write ``<output_dir>/<output_file>.h5``."""
-    record = _start("train-pca", opts, input_dir, project)
-    config_data = train_pca_wrapper(input_dir, opts.as_dict(), output_dir, output_file)
+    """Train PCA on the sessions (the project's, else the extractions under ``input_dir``); write
+    ``<output_dir>/<output_file>.h5``."""
+    sessions = _sessions(input_dir, project)
+    record = _start("train-pca", opts, sessions, project)
+    config_data = train_pca_wrapper(sessions, opts.as_dict(), output_dir, output_file)
     pca_file = config_data.get('pca_file')
     result = TrainPCAResult(components_file=Path(pca_file) if pca_file else None)
     stem = str(_written(output_dir, output_file).with_suffix(""))
@@ -105,12 +130,13 @@ def train_pca(input_dir: str, output_dir: str, output_file: str, opts: TrainPCAO
     return result
 
 
-def apply_pca(input_dir: str, output_dir: str, output_file: str, opts: ApplyPCAOptions, *,
+def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: ApplyPCAOptions, *,
               components_file: str | None = None, project: Project | None = None) -> ApplyPCAResult:
-    """Compute each extraction's PC scores with the components in ``components_file``; write
+    """Compute each session's PC scores with the components in ``components_file``; write
     ``<output_dir>/<output_file>.h5``."""
-    record = _start("apply-pca", opts, input_dir, project, components_file)
-    _, success = apply_pca_wrapper(input_dir, {**opts.as_dict(), 'pca_file': components_file},
+    sessions = _sessions(input_dir, project)
+    record = _start("apply-pca", opts, sessions, project, components_file)
+    _, success = apply_pca_wrapper(sessions, {**opts.as_dict(), 'pca_file': components_file},
                                    output_dir, output_file)
     result = ApplyPCAResult(scores_file=_written(output_dir, output_file) if success else None)
     _write_record(record, result.scores_file)
@@ -118,13 +144,14 @@ def apply_pca(input_dir: str, output_dir: str, output_file: str, opts: ApplyPCAO
     return result
 
 
-def compute_changepoints(input_dir: str, output_dir: str, output_file: str, opts: ChangepointsOptions, *,
+def compute_changepoints(input_dir: str | None, output_dir: str, output_file: str, opts: ChangepointsOptions, *,
                          components_file: str | None = None,
                          scores_file: str | None = None, project: Project | None = None) -> ChangepointsResult:
     """Compute the model-free changepoints; write ``<output_dir>/<output_file>.h5``."""
-    record = _start("compute-changepoints", opts, input_dir, project, components_file, scores_file)
+    sessions = _sessions(input_dir, project)
+    record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
     compute_changepoints_wrapper(
-        input_dir, {**opts.as_dict(), 'pca_file': components_file, 'pca_file_scores': scores_file},
+        sessions, {**opts.as_dict(), 'pca_file': components_file, 'pca_file_scores': scores_file},
         output_dir, output_file)
     result = ChangepointsResult(changepoints_file=_written(output_dir, output_file))
     stem = str(result.changepoints_file.with_suffix(""))
