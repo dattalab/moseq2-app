@@ -161,19 +161,26 @@ def test_a_project_with_every_session_excluded_stops_pca(project):
     assert not (project / "_pca" / "pca.h5").exists()
 
 
-def test_a_typed_input_dir_in_a_project_is_named_as_unread(project, monkeypatch):
-    import moseq2_pca.steps as steps
+def test_a_typed_input_dir_in_a_project_is_read_and_recorded_as_the_project_s_pca(project):
+    """A typed ``--input-dir`` wins over the project's sessions: the three steps read the extractions in that
+    folder, write into the project's ``_pca/`` and record their outputs in its ``moseq2-project.yaml``, each
+    output's record naming the extractions read."""
     from moseq2_pca.cli import cli
 
-    read = []
-    monkeypatch.setattr(steps, "train_pca_wrapper", lambda sessions, config, *_: read.append(sessions) or config)
     elsewhere = project.parent / "elsewhere"
+    write_sessions(elsewhere)
+    config = str(project / "config.yaml")
 
-    result = CliRunner().invoke(cli, ["train-pca", "-i", str(elsewhere), "--config-file",
-                                      str(project / "config.yaml")], catch_exceptions=False)
+    for command in ("train-pca", "apply-pca", "compute-changepoints"):
+        result = CliRunner().invoke(cli, [command, "-i", str(elsewhere), "--config-file", config],
+                                    catch_exceptions=False)
+        assert result.exit_code == 0, result.output
+        assert "not --input-dir" not in result.output
 
-    assert result.exit_code == 0, result.output
-    assert (f"train-pca runs in the project {project}, so it reads the sessions {project / 'moseq2-project.yaml'} "
-            f"lists, not --input-dir {elsewhere}.") in result.output
-    assert read[0] == [str(project / "aggregate_results" / folder / "results.h5")
-                                        for folder in ("c_recorded_first", "b_recorded_second", "a_recorded_last")]
+    pca = project / "_pca"
+    assert read_yaml(str(project / "moseq2-project.yaml"))["pca"] == {
+        "components": "_pca/pca.h5", "scores": "_pca/pca_scores.h5", "changepoints": "_pca/changepoints.h5"}
+    for output in ("pca.h5", "pca_scores.h5", "changepoints.h5"):
+        read = [item["path"] for item in read_record(pca / output)["inputs"] if "uuid" in item]
+        assert read == [str(elsewhere / folder / "results.h5")
+                        for folder in ("c_recorded_first", "b_recorded_second", "a_recorded_last")], output

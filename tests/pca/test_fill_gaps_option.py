@@ -42,7 +42,7 @@ def apply_pca(tmp_path, *args):
     h5py.File(tmp_path / "_pca" / "pca.h5", "w").close()  # the components it reads; the scores are stubbed
     return CliRunner().invoke(
         pca_cli.cli,
-        ["apply-pca", "-i", str(tmp_path), "-o", str(tmp_path / "_pca"), *args],
+        ["apply-pca", "-o", str(tmp_path / "_pca"), *args],
     )
 
 

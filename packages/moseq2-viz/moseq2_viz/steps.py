@@ -45,8 +45,8 @@ from typing import Any
 
 from moseq2_common.bookkeeping import SESSION_ADVICE, relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
-from moseq2_common.records import (atomic_outputs, check_inputs, read_record, record_text, sidecar_path,
-                                   start_record, unchanged, write_record)
+from moseq2_common.records import (InputError, atomic_outputs, check_inputs, read_record, record_text,
+                                   sidecar_path, start_record, unchanged, write_record)
 from moseq2_common.yaml import read_yaml
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
@@ -179,6 +179,12 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
     run as jobs, record nothing themselves), and the model picked becomes the current model.
     """
     _check("get-best-model", None, (model_dir, MODEL_ADVICE), (cp_path, CHANGEPOINTS_ADVICE))
+    if not models_in(model_dir, opts.ext):
+        raise InputError(
+            f"get-best-model found no models in {os.path.abspath(model_dir)}: it compares the files ending in "
+            f".{opts.ext.lstrip('.')} there, as moseq2-model kappa-scan and learn-model write them. Give the folder "
+            "holding the fitted models (the OUTPUT_DIR given to kappa-scan), or set --ext to their extension."
+        )
     record = _start("get-best-model", opts, None, model_dir, cp_path)
     found = {}
 

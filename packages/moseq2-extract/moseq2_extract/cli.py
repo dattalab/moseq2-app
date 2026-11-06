@@ -22,6 +22,7 @@ from moseq2_common.options import (
     click_options,
     command_project,
     command_settings,
+    described_argument,
     explicit_values,
 )
 from moseq2_common.project import find_project, is_job_file
@@ -59,6 +60,16 @@ def _roi_others(argument):
                                         "session folder in the project's aggregate_results, or proc beside the "
                                         "recording outside a project)"),
     }
+
+
+def _recording(command, what, example="depth.avi"):
+    """A command's ``INPUT_FILE``: a depth recording, ``what`` saying what the command does with it."""
+    return described_argument(
+        "input-file", type=click.Path(exists=True, resolve_path=False),
+        missing=f"the depth recording {what}: a .dat, .avi, .mkv or .tar.gz file, which in a project sits in its "
+                f"session's folder. Give its path, for example `moseq2-extract {command} session_1/{example}` "
+                "from the project folder.",
+    )
 
 
 _OUTPUT_FILE = click.option("-o", "--output-file", type=click.Path(), default=None, help="Path to output file")
@@ -116,7 +127,7 @@ def _entry(project, config_file, recording):
     help="Finds the ROI (the arena) and background to subtract from frames when extracting.",
 )
 @click_options(RoiOptions, order=FIND_ROI_ORDER, others=_roi_others({
-    "input_file": click.argument("input-file", type=click.Path(exists=True)),
+    "input_file": _recording("find-roi", "to find the arena in"),
 }))
 @click.pass_context
 def find_roi(ctx, input_file, output_dir, config_file, **_):
@@ -137,7 +148,7 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
     "precedence over both.",
 )
 @click_options(ExtractOptions, order=EXTRACT_ORDER, others={
-    **_roi_others({"input_file": click.argument("input-file", type=click.Path(exists=True, resolve_path=False))}),
+    **_roi_others({"input_file": _recording("extract", "to extract")}),
     "output_dir": click.option("--output-dir", default=None, show_default=False,
                                help="Folder for the recording's outputs, relative to the recording's folder (default: its "
                                     "session's folder in the project's aggregate_results, or proc beside the "
@@ -176,8 +187,12 @@ def _typed_extract_options(ctx):
     "queued job.",
 )
 @click_options(BatchExtractOptions, order=BATCH_EXTRACT_ORDER, others={
-    **_roi_others({"input_folder": click.argument("input-folder",
-                                                  type=click.Path(exists=True, resolve_path=False))}),
+    **_roi_others({"input_folder": described_argument(
+        "input-folder", type=click.Path(exists=True, resolve_path=False),
+        missing="the folder to search for depth recordings (.dat, .avi, .mkv or .tar.gz files, one per session "
+                "folder), usually the project folder. From the project folder, run "
+                "`moseq2-extract batch-extract .`.",
+    )}),
     "output_dir": click.option("--output-dir", default=None, show_default=False,
                                help="Folder holding each recording's session folder (default: the project's "
                                     "aggregate_results)"),
@@ -215,7 +230,7 @@ def batch_extract(ctx, input_folder, config_file, **_):
 )
 @click.argument(
     "config-file",
-    type=click.Path(exists=True, resolve_path=False),
+    type=click.Path(resolve_path=False),
     default="config.yaml",
 )
 @click.option(
@@ -225,7 +240,13 @@ def batch_extract(ctx, input_folder, config_file, **_):
     help="Output directory for downloaded flip flie",
 )
 def download_flip_file(config_file, output_dir):
-
+    if not os.path.isfile(config_file):
+        raise click.ClickException(
+            f"download-flip-file sets the flip classifier in a project's config.yaml, and there is no "
+            f"{os.path.abspath(config_file)}. Run it from the project folder, or name the project's config.yaml "
+            "as its argument: `moseq2-extract download-flip-file /path/to/project/config.yaml`. To start a "
+            "project here, write its config.yaml first with `moseq2-extract generate-config`."
+        )
     setup.download_flip_file(config_file, output_dir, None)
 
 
@@ -283,7 +304,12 @@ def aggregate_extract_results(ctx, input_dir, output_dir, **_):
     help="Loss less compresses a raw depth file (dat) into an avi file that is 8x smaller.",
 )
 @click_options(ConvertOptions, order=_AVI_ORDER, others={
-    "input_file": click.argument("input-file", type=click.Path(exists=True, resolve_path=False)),
+    "input_file": described_argument(
+        "input-file", type=click.Path(exists=True, resolve_path=False),
+        missing="the raw depth recording to compress, a depth.dat file, which in a project sits in its session's "
+                "folder. Give its path, for example `moseq2-extract convert-raw-to-avi session_1/depth.dat` from "
+                "the project folder.",
+    ),
     "output_file": _OUTPUT_FILE,
 })
 @click.pass_context
@@ -299,7 +325,7 @@ def convert_raw_to_avi(ctx, input_file, output_file, **_):
     help="Copies a segment of an input depth recording into a new video file.",
 )
 @click_options(CopySliceOptions, order=(*_AVI_ORDER, "copy_slice"), others={
-    "input_file": click.argument("input-file", type=click.Path(exists=True, resolve_path=False)),
+    "input_file": _recording("copy-slice", "to copy a segment of"),
     "output_file": _OUTPUT_FILE,
 })
 @click.pass_context

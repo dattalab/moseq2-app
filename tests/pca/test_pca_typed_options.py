@@ -40,7 +40,7 @@ def test_train_pca_rank(typed, expected, tmp_path, received):
 
     result = CliRunner().invoke(
         pca_cli.cli,
-        ["train-pca", "-i", str(tmp_path), "-o", str(tmp_path / "_pca"),
+        ["train-pca", "-o", str(tmp_path / "_pca"),
          "--config-file", str(config), *typed],
         catch_exceptions=False,
     )
@@ -67,7 +67,7 @@ def test_train_pca_zero_min_height_from_config(typed, expected, tmp_path, receiv
 
     result = CliRunner().invoke(
         pca_cli.cli,
-        ["train-pca", "-i", str(tmp_path), "-o", str(tmp_path / "_pca"),
+        ["train-pca", "-o", str(tmp_path / "_pca"),
          "--config-file", str(config), *typed],
         catch_exceptions=False,
     )
@@ -111,7 +111,7 @@ def test_compute_changepoints_falsy_config(
 
     result = CliRunner().invoke(
         pca_cli.cli,
-        ["compute-changepoints", "-i", str(tmp_path), "-o", str(tmp_path / "_pca"),
+        ["compute-changepoints", "-o", str(tmp_path / "_pca"),
          "--config-file", str(config), *typed],
         catch_exceptions=False,
     )

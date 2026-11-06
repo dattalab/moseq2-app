@@ -35,13 +35,13 @@ from pathlib import Path
 from uuid import uuid4
 
 from moseq2_common.bookkeeping import SESSION_FILE, Session, load, relative_path, update
-from moseq2_common.records import check_inputs, start_record, write_record
+from moseq2_common.records import InputError, check_inputs, start_record, write_record
 from moseq2_common.project import Project, find_project as find_project_of, session_key
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
-from moseq2_extract.recordings import (extracted_in, find_recordings, project_keys, session_outputs,
-                                       standalone_outputs)
+from moseq2_extract.recordings import (SESSIONS_FOLDER, extracted_in, find_recordings, project_keys,
+                                       session_outputs, standalone_outputs)
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
 _WRAPPER_ARGUMENTS = ("num_frames", "skip_completed")
@@ -255,10 +255,22 @@ def aggregate_results(project: Project, opts: AggregateOptions, *, input_dir: st
     Each recording found under ``input_dir`` (the project folder by default) whose ``results.h5``
     exists in its session folder (in ``output_dir``, the project's ``aggregate_results/`` by default)
     becomes a session, keyed by the recording, with the uuid its extraction carries. Nothing is copied.
-    Sessions listed before are kept, and nothing else in the file changes.
+    Sessions listed before are kept, and nothing else in the file changes. When no recording has a finished
+    extraction and the project lists no session yet, it stops before writing anything, saying where it looked.
     """
-    found = aggregate_extract_results_wrapper(str(input_dir or project.folder), output_dir, opts.mouse_threshold,
-                                              project=project)
+    folder = str(input_dir or project.folder)
+    found = aggregate_extract_results_wrapper(folder, output_dir, opts.mouse_threshold, project=project)
+    if not found and not load(project).sessions:
+        count = len(find_recordings(folder).recordings)
+        sessions_dir = output_dir or Path(project.folder) / SESSIONS_FOLDER
+        raise InputError(
+            f"aggregate-results found {count} recording{'' if count == 1 else 's'} under {abspath(folder)}, and "
+            f"none of them has a finished extraction to list: a recording is listed when its session folder in "
+            f"{abspath(sessions_dir)} holds its results.h5 (and its frames' mean depth is above mouse_threshold). "
+            f"Extract the recordings first (`moseq2-extract batch-extract {abspath(folder)}`, or the notebook's "
+            "extraction cell). If the recordings are in another folder, name it with --input-dir; if extraction "
+            "wrote the session folders elsewhere, name that folder with --output-dir."
+        )
     sessions = [Session(key=key, recording=key, folder=relative_path(project, folder), uuid=uuid)
                 for key, folder, uuid in found]
 

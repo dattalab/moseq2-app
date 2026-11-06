@@ -157,3 +157,44 @@ def test_components_without_settings_stop_apply_pca(project):
 
     with pytest.raises(ValueError, match="Train PCA again"):
         apply_pca_command(str(project), "pca_scores")
+
+
+def heads_up(project, setting, typed, configured):
+    return (f"train-pca trains with {setting} {typed}, typed on the command line, but the pca section of "
+            f"{project / 'config.yaml'} sets {configured}. apply-pca and compute-changepoints will stop until "
+            f"the two agree: set {setting} to {typed} in {project / 'config.yaml'}, or train again without "
+            "typing it.")
+
+
+def test_train_pca_says_when_a_typed_trained_setting_differs_from_config(project, monkeypatch):
+    """A typed setting wins for the run, so the components are trained with it; the later steps will stop on
+    the difference (W10), and ``train-pca`` says so before it starts."""
+    import moseq2_pca.steps as steps
+    from moseq2_pca.cli import cli
+
+    started = []
+    monkeypatch.setattr(steps, "train_pca_wrapper", lambda sessions, config, *_: started.append(config) or {})
+
+    result = CliRunner().invoke(cli, ["train-pca", "--max-height", "90", "--min-height", "5",
+                                      "--gaussfilter-space", "1.5", "1", "--config-file", str(project / "config.yaml")],
+                                catch_exceptions=False)
+
+    assert result.exit_code == 0, result.output
+    lines = result.output.splitlines()
+    assert heads_up(project, "max_height", "90", "100") in lines
+    assert heads_up(project, "gaussfilter_space", "[1.5, 1.0]", "[2.25, 1.5]") in lines
+    assert "min_height" not in result.output  # typed, and equal to config.yaml's
+    assert started[0]["max_height"] == 90
+
+
+def test_train_pca_gives_no_heads_up_without_a_typed_difference(project, monkeypatch):
+    import moseq2_pca.steps as steps
+    from moseq2_pca.cli import cli
+
+    monkeypatch.setattr(steps, "train_pca_wrapper", lambda *_: {})
+
+    result = CliRunner().invoke(cli, ["train-pca", "--chunk-size", "50", "--config-file",
+                                      str(project / "config.yaml")], catch_exceptions=False)
+
+    assert result.exit_code == 0, result.output
+    assert "will stop until" not in result.output

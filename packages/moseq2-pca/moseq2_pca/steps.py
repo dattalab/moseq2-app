@@ -6,14 +6,15 @@ into one options object and call these. A step needs no ``config.yaml``: from a
 script, pass the paths and an options object, such as
 ``train_pca("aggregate_results", "_pca", "pca", TrainPCAOptions(nworkers=4))``.
 
-The sessions: inside a project (``project``), a step reads the sessions the
-project's bookkeeping file lists (``moseq2_common.bookkeeping.session_index``),
+The sessions: a step given an ``input_dir`` reads every extraction it finds
+under that folder, inside a project or not. Given none, it reads the sessions
+the project's bookkeeping file lists (``moseq2_common.bookkeeping.session_index``),
 the same list the model and analysis steps use, leaving out the ones
-``config.yaml``'s ``exclude`` lists, and ``input_dir`` is not read. Outside a
-project, it reads every extraction it finds under ``input_dir``. Either way the
-sessions are read in the order they were recorded
-(``moseq2_common.bookkeeping.recording_order``); the changepoints depend on
-that order, since they draw one random projection per session in turn.
+``config.yaml``'s ``exclude`` lists. Either way the sessions are read in the
+order they were recorded (``moseq2_common.bookkeeping.recording_order``); the
+changepoints depend on that order, since they draw one random projection per
+session in turn. Inside a project, what a step writes is the project's PCA
+either way, and its record names the extractions it read.
 
 Each step hands its work function (the ``*_wrapper`` in
 ``moseq2_pca.helpers.wrappers``) the options as a dict, with the files it reads:
@@ -33,17 +34,20 @@ figures are written under temporary names, the record stored, and all renamed
 into place when the step completes (``moseq2_common.records.atomic_outputs``), so
 a step stopped partway leaves the previous output as it was.
 
-Before any work, a step stops on a session's extraction or a components file
-that does not exist, is empty or cannot be read
-(``moseq2_common.records.check_inputs``), and on an extraction whose frames and
-timestamps disagree in number (``moseq2_pca.util.check_frame_counts``).
+Before any work, a step stops on an ``input_dir`` that does not exist or holds
+no extraction, on a session's extraction or a components file that does not
+exist, is empty or cannot be read (``moseq2_common.records.check_inputs``), and
+on an extraction whose frames and timestamps disagree in number
+(``moseq2_pca.util.check_frame_counts``).
 
 The components carry the settings they were trained with (``TRAINED_SETTINGS``:
 the filters, the height range, FFT and missing-data PCA), as their ``.h5``'s
 ``/settings`` attribute. ``apply_pca`` and ``compute_changepoints`` prepare
 each session's frames with those values, and, inside a project, stop before any
 work when ``config.yaml``'s ``pca`` section sets one of them to another value
-(``check_trained_settings``).
+(``check_trained_settings``). ``trained_settings_heads_up`` names the settings
+typed for ``train-pca`` that differ from ``config.yaml``'s, which those checks
+will stop on.
 """
 
 from __future__ import annotations
@@ -59,7 +63,7 @@ from moseq2_common.bookkeeping import (SESSION_ADVICE, BookkeepingError, relativ
                                        update)
 from moseq2_common.options import read_config
 from moseq2_common.project import Project
-from moseq2_common.records import atomic_outputs, check_inputs, start_record, write_h5_record
+from moseq2_common.records import InputError, atomic_outputs, check_inputs, start_record, write_h5_record
 from moseq2_pca.helpers.data import TRAINED_SETTINGS, TrainedSettingsError, read_trained_settings
 from moseq2_pca.helpers.wrappers import apply_pca_wrapper, compute_changepoints_wrapper, train_pca_wrapper
 from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
@@ -128,6 +132,19 @@ def check_trained_settings(components_file, project: Project | None) -> None:
         raise TrainedSettingsError("\n".join(differ))
 
 
+def trained_settings_heads_up(typed: dict, configured: dict, config_file) -> list[str]:
+    """One line for each of ``TRAINED_SETTINGS`` typed for ``train-pca`` (``typed``) at another value than
+    ``config_file``'s ``pca`` section (``configured``) sets, saying that ``apply-pca`` and ``compute-changepoints``
+    will stop (``check_trained_settings``) until the two agree."""
+    return [
+        f"train-pca trains with {key} {_shown(typed[key])}, typed on the command line, but the pca section of "
+        f"{config_file} sets {_shown(configured[key])}. apply-pca and compute-changepoints will stop until the two "
+        f"agree: set {key} to {_shown(typed[key])} in {config_file}, or train again without typing it."
+        for key in TRAINED_SETTINGS
+        if key in typed and configured.get(key) is not None and not _same(key, typed[key], configured[key])
+    ]
+
+
 def _components(components_file, output_dir):
     """The components a step reads: ``components_file``, else ``<output_dir>/pca.h5``."""
     return components_file or join(abspath(output_dir), 'pca.h5')
@@ -144,12 +161,26 @@ COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's P
 #: ``compute-changepoints`` reads the components the project names, and has no --pca-file.
 CHANGEPOINTS_COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's PCA cell), or run this "
                                   "step in the project whose moseq2-project.yaml names the components.")
+#: Outside a project, a step looks for the components in its output folder.
+_NO_PROJECT = ("No project was found (no config.yaml in the working folder, and none given with --config-file), so "
+               "{step} looked for the components train-pca writes in its output folder. Run it from the project "
+               "folder, or name the project with --config-file /path/to/project/config.yaml, to use the components "
+               "its moseq2-project.yaml names; or {by_hand}.")
+NO_PROJECT_COMPONENTS_ADVICE = _NO_PROJECT.format(step="apply-pca",
+                                                  by_hand="pass the components file train-pca wrote with --pca-file")
+NO_PROJECT_CHANGEPOINTS_ADVICE = _NO_PROJECT.format(
+    step="compute-changepoints", by_hand="pass the folder holding the components train-pca wrote (pca.h5) with "
+                                         "--output-dir")
 
 
 def _sessions(input_dir, project):
-    """What a step reads: the project's sessions' ``.h5`` files, or ``input_dir`` outside a project."""
-    if project is None:
+    """What a step reads: the extractions under ``input_dir`` when one is given, else the project's sessions'
+    ``.h5`` files."""
+    if input_dir is not None:
         return input_dir
+    if project is None:
+        raise InputError("A PCA step needs a folder of extractions (input_dir) or a project to read the sessions "
+                         "of; it was given neither. Pass one of them.")
     sessions_folder(project)  # stops when the project lists no sessions yet
     files = session_index(project)["files"]
     if not files:
@@ -163,9 +194,28 @@ def _sessions(input_dir, project):
 def _check(step, sessions, *files):
     """Stop ``step`` before its work when a session's extraction or one of ``files`` (each with what to do about
     it) is unusable, or when an extraction's frames and timestamps disagree in number."""
+    if not isinstance(sessions, list):
+        _check_folder(step, sessions)
     h5s = sessions if isinstance(sessions, list) else find_extractions(sessions)[0]
+    if not h5s:
+        raise InputError(
+            f"{step} found no extractions in {abspath(sessions)}: it looks for the .h5 files extraction writes "
+            "(results.h5, holding frames and a session uuid) in that folder and every folder below it. Run it from "
+            "the project folder, or name the project with --config-file /path/to/project/config.yaml, to read the "
+            "sessions its moseq2-project.yaml lists; or pass the folder holding the extractions with --input-dir."
+        )
     check_inputs(step, {**{h5: SESSION_ADVICE for h5 in h5s}, **dict(files)})
     check_frame_counts(h5s)
+
+
+def _check_folder(step, folder):
+    """Stop ``step`` when the folder of extractions it was given does not exist."""
+    if not Path(folder).is_dir():
+        raise InputError(
+            f"{step} needs the folder of extractions {abspath(folder)}, which does not exist. Check the path given "
+            "with --input-dir, or run it from the project folder (or name the project with --config-file "
+            "/path/to/project/config.yaml) to read the sessions its moseq2-project.yaml lists."
+        )
 
 
 def _settings(opts, output_dir):
@@ -232,7 +282,7 @@ def _record(project, output, written):
 
 def train_pca(input_dir: str | None, output_dir: str, output_file: str, opts: TrainPCAOptions, *,
               project: Project | None = None) -> TrainPCAResult:
-    """Train PCA on the sessions (the project's, else the extractions under ``input_dir``); write
+    """Train PCA on the extractions under ``input_dir``, else on the project's sessions; write
     ``<output_dir>/<output_file>.h5``."""
     sessions = _sessions(input_dir, project)
     _check("train-pca", sessions)
@@ -253,7 +303,8 @@ def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Ap
     with the settings the components were trained with; write ``<output_dir>/<output_file>.h5``."""
     components = _components(components_file, output_dir)
     sessions = _sessions(input_dir, project)
-    _check("apply-pca", sessions, (components, COMPONENTS_ADVICE))
+    advice = NO_PROJECT_COMPONENTS_ADVICE if project is None and components_file is None else COMPONENTS_ADVICE
+    _check("apply-pca", sessions, (components, advice))
     check_trained_settings(components, project)
     written = _written(output_dir, output_file)
     if _keep_existing(written, opts.overwrite_pca_apply):
@@ -272,7 +323,9 @@ def compute_changepoints(input_dir: str | None, output_dir: str, output_file: st
     write ``<output_dir>/<output_file>.h5``."""
     components = _components(components_file, output_dir)
     sessions = _sessions(input_dir, project)
-    _check("compute-changepoints", sessions, (components, CHANGEPOINTS_COMPONENTS_ADVICE))
+    advice = NO_PROJECT_CHANGEPOINTS_ADVICE if project is None and components_file is None \
+        else CHANGEPOINTS_COMPONENTS_ADVICE
+    _check("compute-changepoints", sessions, (components, advice))
     check_trained_settings(components, project)
     record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
     settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'pca_file_scores': scores_file}
