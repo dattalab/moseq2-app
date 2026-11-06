@@ -124,8 +124,8 @@ def test_get_best_fit_model_takes_its_defaults_from_the_options_class(tmp_path, 
 
     @dataclasses.dataclass(frozen=True, kw_only=True)
     class Changed(gui.BestModelOptions):
-        fps: int = 25
         ext: str = "pkl"
+        objective: str = "jsd"
 
     calls = []
 
@@ -145,10 +145,10 @@ def test_get_best_fit_model_takes_its_defaults_from_the_options_class(tmp_path, 
     write_bookkeeping(tmp_path, changepoints="changepoints.h5")
 
     gui.get_best_fit_model(str(tmp_path), plot_all=True)
-    gui.get_best_fit_model(str(tmp_path), fps=30)
+    gui.get_best_fit_model(str(tmp_path), objective="duration (mean match)")
 
-    assert [(o.plot_all, o.fps, o.ext, o.objective) for o in calls] == [
-        (True, 25, "pkl", "duration (mean match)"), (False, 30, "pkl", "duration (mean match)")]
+    assert [(o.plot_all, o.ext, o.objective) for o in calls] == [
+        (True, "pkl", "jsd"), (False, "pkl", "duration (mean match)")]
 
 
 def test_steps_take_no_argument_no_caller_passes(steps, options):

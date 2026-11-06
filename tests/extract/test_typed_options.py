@@ -68,7 +68,7 @@ def project(tmp_path):
     """One recording, a config file and a session config that disagree with
     the defaults and with each other. ``crop_size`` and ``manual_set_depth_range``
     are settings the arena tool sets, so the entry's apply; ``frame_trim`` and
-    ``fps`` are not, so the config file's apply."""
+    ``compress_threads`` are not, so the config file's apply."""
     session = tmp_path / SESSION
     session.mkdir()
     (session / "depth.avi").touch()
@@ -80,7 +80,7 @@ def project(tmp_path):
             f"{SESSION}/depth.avi": {
                 "crop_size": [120, 120],
                 "frame_trim": [5, 5],
-                "fps": 15,
+                "compress_threads": 15,
                 "bg_roi_depth_range": [550, 650],
                 "manual_set_depth_range": False,
             }
@@ -94,7 +94,7 @@ def project(tmp_path):
                 "cluster_type": "local",
                 "crop_size": [90, 90],
                 "frame_trim": [0, 0],
-                "fps": 20,
+                "compress_threads": 20,
             },
         },
         str(config),
@@ -149,7 +149,7 @@ def test_batch_extract_typed_options_reach_each_recording(project, extracted):
     assert tuple(call["config"]["frame_trim"]) == (10, 10)
     assert tuple(call["config"]["crop_size"]) == (80, 80)
     # not typed, and not a setting the arena tool sets: the config file's value
-    assert call["config"]["fps"] == 20
+    assert call["config"]["compress_threads"] == 20
 
 
 def test_batch_extract_without_typed_options_uses_the_session_config_for_the_arena_tool_settings(
@@ -163,7 +163,7 @@ def test_batch_extract_without_typed_options_uses_the_session_config_for_the_are
     assert tuple(call["config"]["crop_size"]) == (120, 120)
     assert call["config"]["manual_set_depth_range"] is False
     assert tuple(call["config"]["frame_trim"]) == (0, 0)
-    assert call["config"]["fps"] == 20
+    assert call["config"]["compress_threads"] == 20
 
 
 def test_batch_extract_typed_depth_range_is_manual(project, extracted):
@@ -236,7 +236,7 @@ def test_slurm_batch_extract_typed_options_reach_each_recording(project, slurm_e
     assert tuple(call["config"]["frame_trim"]) == (10, 10)
     assert tuple(call["config"]["crop_size"]) == (80, 80)
     # not typed, and not a setting the arena tool sets: the config file's value
-    assert call["config"]["fps"] == 20
+    assert call["config"]["compress_threads"] == 20
 
 
 def test_slurm_batch_extract_without_typed_options_uses_the_session_config_for_the_arena_tool_settings(
@@ -249,7 +249,7 @@ def test_slurm_batch_extract_without_typed_options_uses_the_session_config_for_t
     assert tuple(call["config"]["crop_size"]) == (120, 120)
     assert call["config"]["manual_set_depth_range"] is False
     assert tuple(call["config"]["frame_trim"]) == (0, 0)
-    assert call["config"]["fps"] == 20
+    assert call["config"]["compress_threads"] == 20
 
 
 def test_slurm_batch_extract_typed_depth_range_is_manual(project, slurm_extracted):
@@ -267,7 +267,7 @@ def test_slurm_batch_extract_typed_options_without_a_session_config(
     and the typed options still apply over it."""
     root, config = project
     (root / "session_config.yaml").unlink()
-    write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "fps": 20}}, str(config))
+    write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "compress_threads": 20}}, str(config))
 
     call = slurm_extracted(
         root, config, "--num-frames", "50", "--crop-size", "80", "80"
@@ -276,7 +276,7 @@ def test_slurm_batch_extract_typed_options_without_a_session_config(
     assert call["num_frames"] == 50
     assert tuple(call["config"]["crop_size"]) == (80, 80)
     # not typed: the config file's value
-    assert call["config"]["fps"] == 20
+    assert call["config"]["compress_threads"] == 20
 
 
 def test_slurm_batch_extract_without_typed_options_or_session_config(
@@ -284,13 +284,13 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
 ):
     root, config = project
     (root / "session_config.yaml").unlink()
-    write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "fps": 20}}, str(config))
+    write_yaml({"extract": {"cluster_type": "local", "crop_size": [90, 90], "compress_threads": 20}}, str(config))
 
     call = slurm_extracted(root, config)[0]
 
     assert call["num_frames"] is None
     assert tuple(call["config"]["crop_size"]) == (90, 90)
-    assert call["config"]["fps"] == 20
+    assert call["config"]["compress_threads"] == 20
 
 
 def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, slurm_extracted):
@@ -321,7 +321,7 @@ def test_extract_file_uses_the_recordings_session_settings(project, received):
     assert settings["manual_set_depth_range"] is False
     # not settings the arena tool sets: the config file's values
     assert tuple(settings["frame_trim"]) == (0, 0)
-    assert settings["fps"] == 20
+    assert settings["compress_threads"] == 20
 
 
 def test_extract_file_typed_options_win_over_the_session_settings(project, received):
@@ -344,7 +344,7 @@ def test_extract_file_without_a_session_entry_uses_the_config_file(project, rece
 
     settings = received[0]
     assert tuple(settings["crop_size"]) == (90, 90)
-    assert settings["fps"] == 20
+    assert settings["compress_threads"] == 20
 
 
 @pytest.mark.parametrize("command", ["extract", "batch-extract"])

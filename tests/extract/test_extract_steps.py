@@ -228,12 +228,12 @@ def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monk
         return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
 
     monkeypatch.setattr(steps, "batch_extract", batch_extract)
-    invoke("batch-extract", root, "--config-file", config, "--bg-roi-depth-range", 600, 700, "--fps", 25,
+    invoke("batch-extract", root, "--config-file", config, "--bg-roi-depth-range", 600, 700, "--compress-threads", 25,
            "--noise-tolerance", 30, "--num-frames", 9, "--skip-completed", "--cluster-type", "local",
            "--output-dir", "out", "--output-file", "o.h5", "--max-depth", 2, "--ncpus", 2)
 
     assert seen["output_dir"] == "out"
-    assert seen["explicit"] == {"bg_roi_depth_range": (600.0, 700.0), "fps": 25, "noise_tolerance": 30}
+    assert seen["explicit"] == {"bg_roi_depth_range": (600.0, 700.0), "compress_threads": 25, "noise_tolerance": 30}
     assert (seen["opts"].num_frames, seen["opts"].skip_completed, seen["opts"].max_depth) == (9, True, 2)
 
 
@@ -265,13 +265,13 @@ def test_recording_settings_is_the_dict_extraction_hands_its_wrapper(steps):
     config.yaml's settings and the entry's arena settings, tuples as the options hold them."""
     from moseq2_extract.session_config import recording_options, recording_settings
 
-    config_data = {"bg_roi_depth_range": [600, 700], "noise_tolerance": 20, "fps": 30, "extra": 1}
-    entry = {"noise_tolerance": 15, "fps": 25, "only_in_entry": 2, "crop_size": [70, 70]}
+    config_data = {"bg_roi_depth_range": [600, 700], "noise_tolerance": 20, "compress_threads": 30, "extra": 1}
+    entry = {"noise_tolerance": 15, "compress_threads": 25, "only_in_entry": 2, "crop_size": [70, 70]}
 
     settings = recording_settings(config_data, entry)
 
     assert settings == steps._settings(recording_options(config_data, entry))
-    assert (settings["noise_tolerance"], settings["fps"]) == (15, 30)
+    assert (settings["noise_tolerance"], settings["compress_threads"]) == (15, 30)
     assert "only_in_entry" not in settings and "extra" not in settings
     assert settings["bg_roi_depth_range"] == (600, 700)
     assert settings["crop_size"] == (70, 70)

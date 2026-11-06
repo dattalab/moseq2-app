@@ -108,7 +108,6 @@ class ExtractOptions(RoiOptions, CleaningOptions):
                           help="Ffprobe stream selection variable. Default: DEPTH")
     threads: int = option(8, "--threads", type=int, help="Number of threads for decoding .avi and .mkv recordings")
     delete: bool = option(False, "--delete", is_flag=True, help="Delete raw file if encoding is sucessful")
-    fps: float = option(30, "--fps", type=float, help="Video FPS")
     chunk_size: int = option(3000, "-b", "--chunk-size", type=int, help="Chunk size")
     skip_completed: bool = option(False, "--skip-completed", is_flag=True,
                                   help="Will skip the extraction if it is already completed.")

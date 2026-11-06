@@ -616,15 +616,16 @@ def labels_to_changepoints(labels, fs=30):
 
     Args:
     labels (list of np.ndarray of ints): labels loaded from a model fit.
-    fs (float): sampling rate of camera.
+    fs (float or list of floats): sampling rate of camera, or one per element in labels.
 
     Returns:
     cp_dist (np.ndarray of floats): list of block durations per element in labels list.
     """
 
     cp_dist = []
+    rates = fs if isinstance(fs, (list, tuple, np.ndarray)) else [fs] * len(labels)
 
-    for lab in labels:
+    for lab, fs in zip(labels, rates):
         # get_transitions returns the change indices from np.where, which is
         # already one dimensional. Squeezing it only ever changed the one case
         # it could not survive: a session with a single transition became a

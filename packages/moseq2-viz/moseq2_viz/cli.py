@@ -91,7 +91,7 @@ def add_group(ctx, project_file, **_):
     help="Get the model closest to model-free Changepoints, given the objective",
 )
 @click_options(BestModelOptions,
-               order=("model_dir", "cp_path", "output_file", "plot_all", "ext", "fps", "objective"),
+               order=("model_dir", "cp_path", "output_file", "plot_all", "ext", "objective"),
                others={"model_dir": _argument("model-dir"), "cp_path": _argument("cp-path"),
                        "output_file": click.argument("output-file",
                                                      type=click.Path(exists=False, resolve_path=True))})

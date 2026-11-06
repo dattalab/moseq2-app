@@ -11,7 +11,7 @@ import dask.array as da
 from tqdm.auto import tqdm
 import dask.array.linalg as lng
 from dask.distributed import as_completed, progress
-from moseq2_common.timestamps import read_timestamps, timestamp_unit, timestamps_path
+from moseq2_common.timestamps import frame_rate, read_timestamps, timestamp_unit, timestamps_path
 from moseq2_common.yaml import read_yaml
 from moseq2_pca.util import (clean_frames, insert_nans, get_changepoints, get_rps,
                              frame_rate_from_timestamps)
@@ -101,17 +101,17 @@ def compute_explained_variance(s, nsamples, total_var):
 
     return explained_variance, explained_variance_ratio
 
-def get_timestamps(f, frames, fps=30):
+def get_timestamps(f, frames):
     """
     Read the timestamps from a given h5 file, in seconds.
 
     The unit comes from the timestamps dataset's ``unit`` attribute, which
-    extraction writes; a file without it is read as milliseconds.
+    extraction writes; a file without it is read as milliseconds. A file
+    without timestamps gets one frame every 1 / its recorded frame rate.
 
     Args:
     f (read-open h5py File): open "results_00.h5" h5py.File object in read-mode
     frames (numpy.ndarray): list of 2d frames contained in opened h5 File.
-    fps (int): frames per second, for a file without timestamps.
 
     Returns:
     timestamps (numpy.array): array of timestamps for inputted frames variable, in seconds
@@ -119,7 +119,7 @@ def get_timestamps(f, frames, fps=30):
 
     if timestamps_path(f) is None:
         print('WARNING: timestamps were not found. Using default frame series-ordering.')
-        return np.arange(frames.shape[0]) / fps
+        return np.arange(frames.shape[0]) / frame_rate(f)
     return read_timestamps(f, 'seconds')[0]
 
 
@@ -202,12 +202,12 @@ def _scores(frames, pca_components, mask, mask_params):
     return frames.dot(pca_components.T)
 
 
-def _write_scores(f_scores, f, h5, uuid, scores, fps, h5_path):
+def _write_scores(f_scores, f, h5, uuid, scores, h5_path):
     """
     Copy a session's metadata into the scores file, fill its dropped frames with NaN
     rows from its timestamps, and write its scores and score indices.
     """
-    timestamps = get_timestamps(f, f[h5_path], fps)
+    timestamps = get_timestamps(f, f[h5_path])
     unit = get_timestamp_unit(f)
     copy_metadatas_to_scores(f, f_scores, uuid)
 
@@ -327,7 +327,7 @@ def train_pca_dask(dask_array, clean_params, use_fft, rank, cluster_type, client
 
 
 def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
-                    save_file, chunk_size, mask_params, missing_data, fps=30,
+                    save_file, chunk_size, mask_params, missing_data,
                     h5_path='/frames', h5_mask_path='/frames_mask', verbose=False):
     """
     Project the input frame data by the transpose of the given PCs to obtain PCA Scores
@@ -343,7 +343,6 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
     chunk_size (int): size of chunks to process
     mask_params (dict): dictionary of masking parameters (if missing data)
     missing_data (bool): indicates whether to use mask arrays.
-    fps (int): frames per second
     h5_path (str): path to frames within selected h5 file (default: '/frames')
     h5_mask_path (str): path to masked frames within selected h5 file (default: '/frames_mask')
     verbose (bool): print session names as they are being loaded.
@@ -369,12 +368,12 @@ def apply_pca_local(pca_components, h5s, yamls, use_fft, clean_params,
                 frames = frames.reshape(-1, frames.shape[1] * frames.shape[2])
 
                 scores = _scores(frames, pca_components, mask, mask_params)
-                _write_scores(f_scores, f, h5, uuid, scores, fps, h5_path)
+                _write_scores(f_scores, f, h5, uuid, scores, h5_path)
 
 
 def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
                    save_file, chunk_size, mask_params, missing_data,
-                   client, fps=30, h5_path='/frames', h5_mask_path='/frames_mask', verbose=False):
+                   client, h5_path='/frames', h5_mask_path='/frames_mask', verbose=False):
     """
     Project input frame data by the transpose of the given PCs to obtain PCA Scores using distributed Dask cluster.
 
@@ -388,7 +387,6 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
     chunk_size (int): size of chunks to process
     mask_params (dict): dictionary of masking parameters (if missing data)
     missing_data (bool): indicates whether to use mask arrays.
-    fps (int): frames per second
     h5_path (str): path to frames within selected h5 file (default: '/frames')
     h5_mask_path (str): path to masked frames within selected h5 file (default: '/frames_mask')
     verbose (bool): print session names as they are being loaded.
@@ -447,14 +445,14 @@ def apply_pca_dask(pca_components, h5s, yamls, use_fft, clean_params,
 
                 with h5py.File(h5s_batch[file_idx], mode='r') as f:
                     _write_scores(f_scores, f, h5s_batch[file_idx], uuids_batch[file_idx],
-                                  result, fps, h5_path)
+                                  result, h5_path)
 
     # once complete, close open h5 file pointers
     [h5p.close() for h5p in h5_file_pointers]
 
 def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
                           save_file, chunk_size, mask_params, missing_data,
-                          client, fps=30, pca_scores=None, progress_bar=False,
+                          client, pca_scores=None, progress_bar=False,
                           h5_path='/frames', h5_mask_path='/frames_mask', verbose=False):
     """
     Compute model-free changepoint block durations using random projections.
@@ -469,7 +467,6 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
     mask_params (dict): dict of missing_data mask parameters.
     missing_data (bool): indicate whether to use mask_params
     client (dask Client): initialized Dask Client object
-    fps (int): frames per second
     pca_scores (numpy.array): computed principal component scores
     progress_bar (bool): display progress bar
     h5_path (str): path to frames within selected h5 file (default: '/frames')
@@ -481,6 +478,7 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
 
     futures = []
     uuids = []
+    rates = []
     h5_file_pointers = []
     nrps = changepoint_params.pop('rps')
 
@@ -489,8 +487,10 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
         h5p = h5py.File(h5, 'r')
 
         # Load timestamps, and stop here rather than inside the batch if they give no frame rate
-        timestamps = get_timestamps(h5p, h5p[h5_path], fps)
+        timestamps = get_timestamps(h5p, h5p[h5_path])
         frame_rate_from_timestamps(timestamps, f'{uuid} ({h5})', get_timestamp_unit(h5p))
+        # the recording's own frame rate times its changepoints
+        rate = frame_rate(h5p)
 
         if missing_data and pca_scores is None:
             raise RuntimeError("Need to compute PC scores to impute missing data")
@@ -526,13 +526,16 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
 
         futures.append(cps)
         uuids.append(uuid)
+        rates.append(rate)
         h5_file_pointers.append(h5p)
 
     # pin the batch size to the number of workers (assume each worker has enough RAM for one session)
     batch_size = len(client.scheduler_info()['workers'])
 
     with h5py.File(f'{save_file}.h5', 'w') as f_cps:
-        f_cps.create_dataset('metadata/fps', data=fps, dtype='float32')
+        # the frame rate the sessions share; each session's own is an attribute of its cps
+        if len(set(rates)) == 1:
+            f_cps.create_dataset('metadata/fps', data=rates[0], dtype='float32')
 
         batch_count = 0
 
@@ -541,6 +544,7 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
             # Running dask job
             futures_batch = client.compute(futures[i:i+batch_size])
             uuids_batch = uuids[i:i+batch_size]
+            rates_batch = rates[i:i+batch_size]
             keys = [tmp.key for tmp in futures_batch]
 
             batch_count += 1
@@ -551,8 +555,10 @@ def get_changepoints_dask(changepoint_params, pca_components, h5s, yamls,
                     # Writing changepoints to h5 file as batches complete
                     f_cps.create_dataset(f'cps_score/{uuids_batch[file_idx]}', data=result[1],
                                          dtype='float32', compression='gzip')
-                    f_cps.create_dataset(f'cps/{uuids_batch[file_idx]}', data=result[0] / fps,
-                                         dtype='float32', compression='gzip')
+                    cps = f_cps.create_dataset(f'cps/{uuids_batch[file_idx]}',
+                                               data=result[0] / rates_batch[file_idx],
+                                               dtype='float32', compression='gzip')
+                    cps.attrs['fps'] = np.float32(rates_batch[file_idx])
 
     # once complete, close open h5 file pointers
     [h5p.close() for h5p in h5_file_pointers]

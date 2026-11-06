@@ -11,6 +11,12 @@ works in seconds, the scalar table and the QC cell in milliseconds.
 ``frame_steps`` and ``dropped_frames`` find the frames the camera dropped, for
 PCA, which puts an empty row where each one was, and for the QC cell, which
 reports how many there were.
+
+A session's frame rate is data, like its timestamps: extraction writes it to
+``/metadata/fps``, from the recording's timestamps (``rate_from_timestamps``)
+or the rate the video declares, and ``frame_rate`` reads it back. An
+extraction written before ``/metadata/fps`` existed gives its rate from its
+timestamps.
 """
 
 from __future__ import annotations
@@ -27,7 +33,13 @@ __all__ = [
     "read_timestamps",
     "frame_steps",
     "dropped_frames",
+    "FRAME_RATE_PATH",
+    "rate_from_timestamps",
+    "frame_rate",
 ]
+
+#: Where an extraction keeps its recording's frame rate, in frames per second.
+FRAME_RATE_PATH = "/metadata/fps"
 
 #: How many of each value of a timestamps dataset's ``unit`` attribute make a
 #: second.
@@ -145,3 +157,53 @@ def dropped_frames(timestamps) -> int:
     """
     steps = frame_steps(timestamps)
     return int(np.sum(steps[steps > 1] - 1))
+
+
+def rate_from_timestamps(timestamps, unit: str) -> float | None:
+    """
+    The frames per second timestamps imply, from the median gap between them
+    (which dropped frames do not move), to the nearest whole frame per second.
+
+    Args:
+    timestamps (numpy.array): each frame's time.
+    unit (str): the timestamps' unit, a key of ``TIMESTAMP_UNITS``.
+
+    Returns:
+    rate (float or None): frames per second, or None when the timestamps give
+        no positive frame period (fewer than two, or not increasing).
+    """
+    gaps = np.diff(np.asarray(timestamps, dtype="float64"))
+    if len(gaps) == 0:
+        return None
+    period = np.median(gaps) / TIMESTAMP_UNITS[unit]
+    if not (np.isfinite(period) and period > 0):
+        return None
+    rate = float(np.round(1 / period))
+    return rate if rate > 0 else None
+
+
+def frame_rate(h5: h5py.File) -> float:
+    """
+    A session's frame rate, in frames per second, from its open extraction file:
+    ``/metadata/fps``, or for an extraction written before that existed, the
+    rate its timestamps imply.
+
+    Args:
+    h5 (h5py.File): the session's extraction results h5, open.
+
+    Returns:
+    fps (float): frames per second.
+    """
+    if FRAME_RATE_PATH in h5:
+        return float(h5[FRAME_RATE_PATH][()])
+    rate = None
+    if timestamps_path(h5) is not None:
+        rate = rate_from_timestamps(read_timestamps(h5, "seconds")[0], "seconds")
+    if rate is None:
+        has = "timestamps that give no frame period" if timestamps_path(h5) is not None else "no timestamps"
+        raise ValueError(
+            f"{h5.filename} records no frame rate: it has no {FRAME_RATE_PATH} and {has}. "
+            f"Check that this file is the extraction's own results h5 and is not damaged, "
+            f"or extract the session again, which records the recording's frame rate."
+        )
+    return rate

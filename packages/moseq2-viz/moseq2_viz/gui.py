@@ -21,7 +21,6 @@ def get_best_fit_model(
     output_file=None,
     *,
     plot_all=None,
-    fps=None,
     ext=None,
     objective=None,
 ):
@@ -33,10 +32,9 @@ def get_best_fit_model(
     project_folder (str): the project folder.
     output_file (str): fiename for the comparison plot; None for ``plots/model_vs_pc_changepoints`` in the project.
     plot_all (bool): flag that Indicates whether to plot all the models.
-    fps (int): Frames per second.
     ext (str): File extension to search for models with
     objective (str): The objective to compare the results between the models and the model free changepoint.
-    Each of the four left as None takes ``BestModelOptions``' default.
+    Each of the three left as None takes ``BestModelOptions``' default.
 
     Returns:
     best_fit_model (str): Path tp best fit model
@@ -57,7 +55,7 @@ def get_best_fit_model(
         output_file,
         BestModelOptions.resolve(explicit={
             name: value
-            for name, value in dict(plot_all=plot_all, ext=ext, fps=fps, objective=objective).items()
+            for name, value in dict(plot_all=plot_all, ext=ext, objective=objective).items()
             if value is not None
         }),
         project=project,

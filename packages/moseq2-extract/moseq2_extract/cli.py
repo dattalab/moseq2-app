@@ -59,7 +59,7 @@ _ROI_ORDER = (
     "bg_roi_index", "bg_roi_shape", "bg_roi_dilate",
 )
 _EXTRACTION_ORDER = (
-    "mapping", "threads", "delete", "fps", "chunk_size", "output_file", "skip_completed", "compress_threads",
+    "mapping", "threads", "delete", "chunk_size", "output_file", "skip_completed", "compress_threads",
     "compress_chunk_size", "compress", "frame_trim", "model_smoothing_clips", "angle_hampel_sig",
     "angle_hampel_span", "centroid_hampel_sig", "centroid_hampel_span", "pixel_format", "movie_dtype",
     "frame_dtype", "write_movie", "chunk_overlap", "temporal_filter_size", "spatial_filter_size",
