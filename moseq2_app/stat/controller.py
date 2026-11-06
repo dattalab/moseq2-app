@@ -371,9 +371,10 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             df, _ = merge_labels_with_scalars(self.sorted_index, self.model_path)
             self.df = df
 
-            # Get groups and matching session uuids
-            label_group, _ = get_trans_graph_groups(self.model_fit)
-            self.group = sorted(list(set(label_group)))
+            # Get groups and matching session uuids: the groups in config.yaml, or those a
+            # separate-transition model was fit with
+            label_group, _ = get_trans_graph_groups(self.model_fit, self.sorted_index, self.model_path)
+            self.group = sorted({g for g in label_group if g is not None})
 
             labels = relabel_by_usage(labels, count='usage')[0]
 

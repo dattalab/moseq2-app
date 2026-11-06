@@ -12,7 +12,7 @@ from os.path import exists
 from collections import defaultdict
 from cytoolz import valmap, get, merge, keyfilter
 from moseq2_common.scalars import DEPTH_FIELD_OF_VIEW, centroid_to_mm, velocities
-from moseq2_viz.model.util import get_transitions, prepare_model_dataframe
+from moseq2_viz.model.util import get_transitions, prepare_model_dataframe, report_group_changes
 from moseq2_common.h5 import h5_to_dict
 from moseq2_common.timestamps import read_timestamps
 from moseq2_viz.util import strided_app, h5_filepath_from_sorted, parse_index
@@ -368,10 +368,9 @@ def scalars_to_dataframe(index: dict, include_keys: list = ['SessionName', 'Subj
 
     has_model = False # indicator for whether users inputted a model_path to load syllable labels from
     model_uuids = None
-    model_type = ''
     if model_path is not None and exists(model_path):
+        report_group_changes(model_path, index)
         labels_df = prepare_model_dataframe(model_path, index['pca_path'], index=index).set_index('uuid')
-        model_type = labels_df['model_type'].unique()[0]
         has_model = True
         # loading the session uuids that the model was trained on
         model_uuids = labels_df.reset_index().uuid.unique()
@@ -427,19 +426,9 @@ def scalars_to_dataframe(index: dict, include_keys: list = ['SessionName', 'Subj
 
         # make sure we have labels for this UUID before merging
         if has_model and k in labels_df.index:
-            to_merge = labels_df.loc[k]
-            # only drop labels if model was a separate_trans model
-            if _tmp_df['group'].unique() !=  to_merge['group'].unique():
-                if 'SeparateTrans' in model_type:
-                    warnings.warn('Group labels from index.yaml and model results do not match! Setting group labels '
-                                  'to ones used in the model.')
-                    _tmp_df = _tmp_df.drop(columns=['group'])
-                else:
-                    print("Group name for UUID", k, "in the index.yaml file does not match the group name in the model file.")
-                    print("Overwriting group label with those from the index.yaml file.")
-                    to_merge = to_merge.drop(columns=['group'])
-            else:
-                to_merge = to_merge.drop(columns=['group'])
+            # each session in its group in config.yaml now; the sessions whose group changed since the fit
+            # are named once, above
+            to_merge = labels_df.loc[k].drop(columns=['group'])
 
             _tmp_df = pd.merge(to_merge, _tmp_df, on=['frame index'], how='outer')
             _tmp_df = _tmp_df.sort_values(by='syllable index').reset_index(drop=True)

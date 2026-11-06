@@ -1,10 +1,13 @@
 """Cell 12: how one syllable leads to the next, per group.
 
     normalize = 'bigram'
-    model_data = parse_model_results(str(analysis.model))
+    model_path = analysis.model
+    model_data = parse_model_results(model_path)
     model_data['labels'] = relabel_by_usage(model_data['labels'], count='usage')[0]
-    label_group, uuids = get_trans_graph_groups(model_data)
-    group = list(set(label_group))
+    index = session_index(analysis.project)
+    report_group_changes(model_data, index, model_path)
+    label_group, uuids = get_trans_graph_groups(model_data, index, model_path)
+    group = [g for g in set(label_group) if g is not None]
     trans_mats, usages = get_group_trans_mats(model_data['labels'], label_group, group,
                                               max_syllables, normalize=normalize)
     fig, ax = plt.subplots(1, len(group), figsize=(12, 8), sharex=False, sharey=True, squeeze=False)
@@ -16,6 +19,10 @@ Usage says how often a syllable happens; this says what it follows and
 what follows it. Two groups can use the same syllables equally often and
 string them together quite differently, and that is a result usage alone
 cannot show.
+
+Each session is in its group in config.yaml, and the sessions whose group
+changed since the fit are named; a model fit with a separate transition matrix
+per group keeps the groups it was fit with.
 
 One matrix per group, syllable by syllable, drawn side by side on a
 shared colour scale so the two are comparable by eye. ``normalize``
@@ -38,6 +45,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from moseq2_common.bookkeeping import session_index
 from moseq2_viz.model.trans_graph import (
     get_group_trans_mats,
     get_trans_graph_groups,
@@ -156,7 +164,7 @@ def test_row_normalisation_asks_a_different_question(analysis, labeled, transiti
     """
     model_data = parse_model_results(str(analysis.model))
     model_data["labels"] = relabel_by_usage(model_data["labels"], count="usage")[0]
-    label_group, _ = get_trans_graph_groups(model_data)
+    label_group, _ = get_trans_graph_groups(model_data, session_index(analysis.project), str(analysis.model))
 
     by_row, _ = get_group_trans_mats(
         model_data["labels"], label_group, transitions["group"], labeled, normalize="rows"

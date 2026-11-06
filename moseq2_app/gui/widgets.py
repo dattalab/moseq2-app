@@ -8,7 +8,8 @@ This module contains the widget components that comprise the group setting table
 import qgridnext as qgrid
 import ipywidgets as widgets
 from moseq2_common.bookkeeping import session_index
-from moseq2_common.project import Project, read_groups, write_groups
+from moseq2_common.options import read_config
+from moseq2_common.project import Project, read_exclude, read_groups, write_groups
 from moseq2_app.util import ClearOutputMixin, index_to_dataframe
 
 class GroupSettingWidgets(ClearOutputMixin):
@@ -16,7 +17,9 @@ class GroupSettingWidgets(ClearOutputMixin):
     def __init__(self, project_folder):
         """
         Initialize all the Group Setting widgets: a table of the project's sessions, their metadata and groups,
-        displayed using QGrid. Saving writes each session's group into the project's config.yaml (``groups``).
+        displayed using QGrid. Saving writes each session's group into the project's config.yaml (``groups``),
+        and the sessions ticked in the ``exclude`` column into its ``exclude``, which every step after
+        extraction leaves out.
 
         Args:
         project_folder (str): the project folder.
@@ -34,6 +37,10 @@ class GroupSettingWidgets(ClearOutputMixin):
             'group': {
                 'editable': True,
                 'toolTip': 'editable'
+            },
+            'exclude': {
+                'editable': True,
+                'toolTip': 'leave the session out of every step after extraction'
             }
         }
 
@@ -48,8 +55,11 @@ class GroupSettingWidgets(ClearOutputMixin):
 
         self.group_set = widgets.HBox([self.group_input, self.save_button, self.save_groups_button])
 
-        self.index_dict, self.df = index_to_dataframe(session_index(self.project))
-        self.qgrid_widget = qgrid.show_grid(self.df[['SessionName', 'SubjectName', 'group', 'uuid', 'filename']],
+        self.index_dict, self.df = index_to_dataframe(session_index(self.project, exclude=False))
+        excluded = set(read_exclude(self.project))
+        self.df['exclude'] = [key in excluded for key in self.df['key']]
+        self.qgrid_widget = qgrid.show_grid(self.df[['SessionName', 'SubjectName', 'group', 'exclude', 'uuid',
+                                                     'filename']],
                                             column_options=self.col_opts,
                                             column_definitions=self.col_defs,
                                             show_toolbar=False)
@@ -94,7 +104,11 @@ class GroupSettingWidgets(ClearOutputMixin):
         self.df.update(latest_df)
 
         groups = {**read_groups(self.project), **dict(zip(self.df['key'], self.df['group']))}
-        write_groups(self.project, groups)
+        shown = set(self.df['key'])
+        exclude = [key for key in read_exclude(self.project) if key not in shown]
+        exclude += [key for key, out in zip(self.df['key'], self.df['exclude']) if bool(out)]
+        had_exclude = 'exclude' in (read_config(self.project.config_file) or {})
+        write_groups(self.project, groups, exclude if exclude or had_exclude else None)
 
         self.save_groups_button.button_style = 'success'
         self.save_groups_button.icon = 'check'
