@@ -6,10 +6,11 @@ runs standalone: its outputs go where its arguments say, and one line says so
 (``standalone_note``).
 
 A job settings file, which ``batch-extract`` and ``kappa-scan`` write for each
-job they submit, is a settings file in ``config.yaml``'s sectioned shape with a
-``job:`` block naming the project folder (``write_job_settings``). It sits in a
-session's or the models' folder, so a step run from it takes its project from the
-block, never from where the file is.
+job they submit (``Options.to_yaml``, ``moseq2_common.slurm.job_settings_file``),
+is a settings file in ``config.yaml``'s sectioned shape with a ``job:`` block
+naming the project folder and the session or model. It sits in a session's or
+the models' folder, so a step run from it takes its project from the block,
+never from where the file is.
 
 Per-recording settings live in ``session_config.yaml`` (``SESSION_CONFIG_NAME``)
 in the project folder, found without a pointer in ``config.yaml``. Its entries
@@ -48,8 +49,7 @@ from moseq2_common.yaml import read_yaml, write_config
 __all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "OutdatedNotebookError", "Project",
            "check_not_old", "find_project", "is_job_file", "old_project_message", "outdated_names",
            "outdated_notebook_message", "check_session_names", "exclude_note", "read_exclude", "read_groups",
-           "session_key", "standalone_note", "write_groups",
-           "write_job_settings"]
+           "session_key", "standalone_note", "write_groups"]
 
 CONFIG_NAME = "config.yaml"
 #: The file holding each recording's arena-tool settings, in the project folder.
@@ -222,24 +222,6 @@ def standalone_note(cwd: str | os.PathLike) -> str:
     """The line a command prints when it finds no project."""
     return (f"No config.yaml in {cwd} and none given with --config-file, so this runs outside a project: "
             "outputs go where the arguments say and no moseq2-project.yaml is updated.")
-
-
-def write_job_settings(path: str | os.PathLike, section: str, settings: Mapping, *,
-                       project: Project | None) -> Path:
-    """Write one job's settings to ``path``, in config.yaml's shape, with the ``job:`` block.
-
-    ``settings`` go in ``section``; a ``camera_type`` among them goes to the top
-    level, where config.yaml holds it. The block names ``project``'s folder, or
-    holds ``project: null`` for a job submitted outside a project.
-    """
-    settings = dict(settings)
-    data = {}
-    if "camera_type" in settings:
-        data["camera_type"] = settings.pop("camera_type")
-    data[section] = settings
-    data["job"] = {"project": str(Path(project.folder).absolute()) if project is not None else None}
-    write_config(data, str(path))
-    return Path(path)
 
 
 def read_groups(project: Project) -> dict[str, str]:

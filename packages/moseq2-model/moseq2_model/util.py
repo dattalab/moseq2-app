@@ -14,11 +14,12 @@ from copy import deepcopy
 from cytoolz import first
 from collections import OrderedDict
 from moseq2_common.h5 import h5_to_dict
-from moseq2_common.slurm import sbatch_command
-from moseq2_common.project import write_job_settings
+from moseq2_common.bookkeeping import relative_path
+from moseq2_common.slurm import command_line, job_settings_file, sbatch_command
 from moseq2_model.options import LearnModelOptions
 from moseq2_model.train.models import ARHMM
 from os.path import basename, getctime, join
+from pathlib import Path
 
 
 def load_pcs(filename, var_name="features", load_groups=False, npcs=10):
@@ -505,16 +506,16 @@ def count_frames(data_dict=None, input_file=None, var_name="scores"):
 
 
 def create_command_strings(
-    input_file, output_dir, config_data, kappas, settings_name, model_name_format="model-{:03d}-{}.p",
-    learn=None, project=None,
+    input_file, output_dir, config_data, kappas, model_name_format="model-{:03d}-{}.p", learn=None, project=None,
 ):
     """
-    Write each kappa's learn-model settings to a file in ``output_dir`` and return the commands that fit them.
+    Write each kappa's learn-model settings to a job settings file in ``output_dir`` and return the commands that fit them.
 
     Each fit's settings are every learn-model setting ``config_data`` holds, the
-    rest from ``learn``, with that fit's kappa, written to
-    ``settings_name.format(i, kappa)`` in config.yaml's shape with a ``job:``
-    block naming ``project``; its command runs ``learn-model --config-file`` on
+    rest from ``learn``, with that fit's kappa, written beside its model
+    (``moseq2_common.slurm.job_settings_file``: ``model-000-1000-job.yaml`` for
+    ``model-000-1000.p``) in config.yaml's shape, with a ``job:`` block naming
+    ``project`` and the model; its command runs ``learn-model --config-file`` on
     that file.
 
     Args:
@@ -522,7 +523,6 @@ def create_command_strings(
     output_dir (str): Path to directory to save models and their settings files in.
     config_data (dict): Configuration parameters dict.
     kappas (list): List of kappa values for model training commands.
-    settings_name (str): File name format string of each fit's settings file, given the model's number and kappa.
     model_name_format (str): Filename string format string.
     learn (LearnModelOptions): the learn-model settings ``config_data`` does not hold; None for their defaults.
     project (moseq2_common.project.Project): the project the settings files name; None outside a project.
@@ -535,14 +535,13 @@ def create_command_strings(
     commands = []
     for i, k in enumerate(kappas):
         k = int(k)
-        settings_file = join(output_dir, settings_name.format(i, k))
+        model_file = join(output_dir, model_name_format.format(i, k))
         given = {**(learn.settings() if learn is not None else {}), **config_data}
         settings = LearnModelOptions.resolve(config=given, explicit={"kappa": float(k)})
-        write_job_settings(settings_file, "model", settings.settings(), project=project)
-        cmd = (
-            f"moseq2-model learn-model {input_file} {join(output_dir, model_name_format.format(i, k))}"
-            f" --config-file {settings_file}"
-        )
+        job = {"project": str(Path(project.folder).absolute()) if project is not None else None,
+               "model": relative_path(project, model_file) if project is not None else os.path.abspath(model_file)}
+        settings_file = settings.to_yaml(job_settings_file(output_dir, Path(model_file).stem), job=job)
+        cmd = command_line("moseq2-model", "learn-model", input_file, model_file, "--config-file", settings_file)
 
         # On SLURM, each fit is its own job
         if config_data["cluster_type"] == "slurm":

@@ -25,6 +25,7 @@ from click.testing import CliRunner
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from commands import split_command
+from moseq2_common.slurm import job_settings_file
 from moseq2_common.yaml import read_yaml, write_yaml
 
 from configs import read_settings
@@ -117,7 +118,7 @@ def slurm(monkeypatch):
         for line in filter(str.strip, script.splitlines()):
             command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
             run("extract", *split_command(command))
-        written = {name: read_settings(root / "aggregate_results" / name / "config.yaml") for name in SESSIONS}
+        written = {name: read_settings(job_settings_file(root / "aggregate_results" / name, "extract")) for name in SESSIONS}
         return calls, written
 
     return go

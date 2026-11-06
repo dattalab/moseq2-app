@@ -331,15 +331,14 @@ def apply_model_wrapper(model_file, pc_file, dest_file, config_data):
     save_dict(filename=dest_file, obj_to_save=applied_model_data)
 
 
-def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, settings_name, learn=None, project=None):
+def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, learn=None, project=None):
     """
     Wrapper function to output multiple model training commands for a range of kappa values.
 
     Args:
     input_file (str): Path to PC Scores
     config_data (dict): Dictionary containing model training parameters
-    output_dir (str): Path to output directory to save trained models and their settings files
-    settings_name (str): File name format string of each fit's settings file, given the model's number and kappa
+    output_dir (str): Path to output directory to save trained models and their job settings files
     learn (LearnModelOptions): the learn-model settings the scan does not declare; None for their defaults
     project (moseq2_common.project.Project): the project each settings file's ``job:`` block names
 
@@ -361,8 +360,8 @@ def kappa_scan_fit_models_wrapper(input_file, config_data, output_dir, settings_
     kappas = get_scan_range_kappas(data_dict, config_data)
 
     # Get model training command strings
-    command_string = create_command_strings(input_file, output_dir, config_data, kappas, settings_name,
-                                            learn=learn, project=project)
+    command_string = create_command_strings(input_file, output_dir, config_data, kappas, learn=learn,
+                                            project=project)
 
     # Ensure output directory exists
     os.makedirs(dirname(config_data["out_script"]), exist_ok=True)
