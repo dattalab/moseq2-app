@@ -507,6 +507,7 @@ def count_frames(data_dict=None, input_file=None, var_name="scores"):
 
 def create_command_strings(
     input_file, output_dir, config_data, kappas, model_name_format="model-{:03d}-{}.p", learn=None, project=None,
+    exclude=None,
 ):
     """
     Write each kappa's learn-model settings to a job settings file in ``output_dir`` and return the commands that fit them.
@@ -516,7 +517,8 @@ def create_command_strings(
     (``moseq2_common.slurm.job_settings_file``: ``model-000-1000-job.yaml`` for
     ``model-000-1000.p``) in config.yaml's shape, with a ``job:`` block naming
     ``project`` and the model; its command runs ``learn-model --config-file`` on
-    that file.
+    that file, with ``--exclude`` for each session of ``exclude`` (``--no-exclude``
+    for an empty list) when the scan was given one.
 
     Args:
     input_file (str): Path to PC Scores
@@ -526,6 +528,7 @@ def create_command_strings(
     model_name_format (str): Filename string format string.
     learn (LearnModelOptions): the learn-model settings ``config_data`` does not hold; None for their defaults.
     project (moseq2_common.project.Project): the project the settings files name; None outside a project.
+    exclude (list): the sessions to leave out given to the scan; None for config.yaml's exclude, read by each fit.
 
     Returns:
     command_string (str): CLI learn-model command strings separated by newline characters
@@ -541,7 +544,10 @@ def create_command_strings(
         job = {"project": str(Path(project.folder).absolute()) if project is not None else None,
                "model": relative_path(project, model_file) if project is not None else os.path.abspath(model_file)}
         settings_file = settings.to_yaml(job_settings_file(output_dir, Path(model_file).stem), job=job)
-        cmd = command_line("moseq2-model", "learn-model", input_file, model_file, "--config-file", settings_file)
+        left_out = [] if exclude is None else ["--no-exclude"] if not exclude else \
+            [part for key in exclude for part in ("--exclude", key)]
+        cmd = command_line("moseq2-model", "learn-model", input_file, model_file, "--config-file", settings_file,
+                           *left_out)
 
         # On SLURM, each fit is its own job
         if config_data["cluster_type"] == "slurm":

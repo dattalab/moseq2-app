@@ -13,7 +13,9 @@ components and scores from there unless a path is given. A typed
 or not; without one, a command reads the sessions the project's
 ``moseq2-project.yaml`` lists (less ``exclude``), or, outside a project, the
 extractions in the working folder. Outside a project, ``--output-dir`` defaults
-to the working folder's ``_pca/``.
+to the working folder's ``_pca/``. ``--exclude`` and ``--no-exclude`` replace
+``config.yaml``'s ``exclude`` for one run, also for a typed ``--input-dir``.
+``clip-scores`` reads the project's PC scores when its ``PCA_FILE`` is left out.
 
 A command with nothing to read stops before any work, naming where it looked
 and the ways out (``moseq2_pca.steps``). ``train-pca`` names each trained
@@ -30,10 +32,13 @@ from moseq2_common.options import (
     ProjectGroup,
     click_options,
     command_project,
+    PROJECT_SCORES,
     command_settings,
-    described_argument,
+    exclude_options,
     explicit_values,
     output_folder,
+    project_argument,
+    typed_exclude,
 )
 from moseq2_common.records import print_record_command
 from moseq2_pca import steps
@@ -74,6 +79,7 @@ def _paths(output_file):
                                     help='Name of h5 file for storing pca results'),
         'config_file': click.option('--config-file', type=click.Path(), default=None,
                                     help="Path to configuration file"),
+        **exclude_options(),
     }
 
 
@@ -88,11 +94,11 @@ TRAIN_PCA_ORDER = (*_INPUT_AND_DASK, 'gaussfilter_space', 'gaussfilter_time', 'm
                    'medfilter_time', 'missing_data', 'missing_data_iters', 'mask_threshold',
                    'mask_height_threshold', 'min_height', 'max_height', 'tailfilter_size', 'tailfilter_shape',
                    'use_fft', 'train_on_subset', 'recon_pcs', 'rank', 'output_file', 'local_processes',
-                   'overwrite_pca_train')
+                   'overwrite_pca_train', 'exclude', 'no_exclude')
 APPLY_PCA_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_path', 'pca_file', 'fill_gaps', 'verbose',
-                   'overwrite_pca_apply')
-CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file_scores', 'pca_path',
-                      'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'verbose')
+                   'overwrite_pca_apply', 'exclude', 'no_exclude')
+CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file', 'pca_file_scores', 'pca_path',
+                      'neighbors', 'threshold', 'klags', 'sigma', 'dims', 'verbose', 'exclude', 'no_exclude')
 
 
 def _folders(ctx, input_dir, output_dir):
@@ -133,7 +139,7 @@ def train_pca(ctx, input_dir, output_dir, output_file, **_):
     config_file = ctx.params.get('config_file') or (project.config_file if project is not None else None)
     for line in steps.trained_settings_heads_up({key: getattr(opts, key) for key in typed}, config, config_file):
         click.echo(line)
-    steps.train_pca(input_dir, output_dir, output_file, opts, project=project)
+    steps.train_pca(input_dir, output_dir, output_file, opts, project=project, exclude=typed_exclude(ctx))
 
 
 @cli.command(name='apply-pca', help='Compute PCA Scores of extraction data given a pre-trained PCA')
@@ -150,7 +156,8 @@ def apply_pca(ctx, input_dir, output_dir, output_file, pca_file, **_):
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     try:
         steps.apply_pca(input_dir, output_dir, output_file, opts,
-                        components_file=pca_file or recorded_paths(project).get('pca_file'), project=project)
+                        components_file=pca_file or recorded_paths(project).get('pca_file'), project=project,
+                        exclude=typed_exclude(ctx))
     except TrainedSettingsError as error:
         raise click.ClickException(str(error)) from None
 
@@ -159,30 +166,34 @@ def apply_pca(ctx, input_dir, output_dir, output_file, pca_file, **_):
              help='Compute the Model-Free Syllable Changepoints based on the PCA/PCA_Scores')
 @click_options(ChangepointsOptions, order=CHANGEPOINTS_ORDER, others={
     **_paths('changepoints'),
+    'pca_file': click.option('--pca-file', type=click.Path(), default=None, show_default=False,
+                             help='The PCA components file train-pca wrote (default: the components '
+                                  'moseq2-project.yaml names, or pca.h5 in the output folder outside a project)'),
     'pca_file_scores': click.option('--pca-file-scores', type=click.Path(), default=None,
                                     help='Path to PCA results'),
 })
 @click.pass_context
-def compute_changepoints(ctx, input_dir, output_dir, output_file, pca_file_scores, **_):
+def compute_changepoints(ctx, input_dir, output_dir, output_file, pca_file, pca_file_scores, **_):
     config = command_settings(ctx, ChangepointsOptions, stage_classes=PCA_STAGE)
     opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     recorded = recorded_paths(project)
     try:
         steps.compute_changepoints(input_dir, output_dir, output_file, opts,
-                                   components_file=recorded.get('pca_file'),
-                                   scores_file=pca_file_scores or recorded.get('pca_file_scores'), project=project)
+                                   components_file=pca_file or recorded.get('pca_file'),
+                                   scores_file=pca_file_scores or recorded.get('pca_file_scores'), project=project,
+                                   exclude=typed_exclude(ctx))
     except TrainedSettingsError as error:
         raise click.ClickException(str(error)) from None
 
 
 @cli.command('clip-scores', help='Clip specified number of frames from PCA scores at the beginning or end')
 @click_options(ClipScoresOptions, order=('pca_file', 'clip_samples', 'from_end'), others={
-    'pca_file': described_argument('pca_file', type=click.Path(exists=True, resolve_path=True),
-                                   missing=f'the PC scores file to clip, {SCORES_FILE}.'),
-    'clip_samples': described_argument('clip_samples', type=int,
-                                       missing="the number of frames to clip from the start of each session's "
-                                               "scores (from the end with --from-end)."),
+    'pca_file': project_argument('pca_file', type=click.Path(exists=True, resolve_path=True),
+                                 missing=f'the PC scores file to clip, {SCORES_FILE}.', default=PROJECT_SCORES),
+    'clip_samples': project_argument('clip_samples', type=int,
+                                     missing="the number of frames to clip from the start of each session's "
+                                             "scores (from the end with --from-end)."),
 })
 @click.pass_context
 def clip_scores(ctx, pca_file, clip_samples, **_):

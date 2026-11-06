@@ -12,7 +12,9 @@ output is older when an input its record holds is no longer that file
 (``moseq2_common.records.unchanged``: an input the pipeline wrote now carries
 the record of another run; any other input differs in size or content), when a
 recorded input is gone, or, for PCA outputs and fitted models, when a listed
-session ``config.yaml`` does not exclude is not among its recorded inputs. No
+session ``config.yaml`` does not exclude is not among its recorded inputs. An
+output computed with a session ``config.yaml``'s ``exclude`` now leaves out is
+named too. No
 file time is read, so a project copied elsewhere shows nothing older. This is a
 message only: no step reads it, or a record, to decide what to run. Every later
 cell takes the project folder and reads the bookkeeping file when it needs a
@@ -67,7 +69,8 @@ def stale_outputs(project: Project) -> list[str]:
     """A line for each output the bookkeeping file names that is older than its inputs: an input that is no
     longer the file the output's record holds (``unchanged``), an input that no longer exists, and, for a
     PCA output or a fitted model, a listed session ``config.yaml`` does not exclude that is not among its
-    inputs (aggregated after it was computed). The settings files are not inputs in this sense; a changed
+    inputs (aggregated after it was computed); and, for any output, a session it was computed with that
+    ``config.yaml``'s ``exclude`` now leaves out. The settings files are not inputs in this sense; a changed
     setting takes effect when a step is run again. An input the pipeline wrote is compared by the run its record
     names, any other by size and content, never by time."""
     bookkeeping = load(project)
@@ -110,6 +113,8 @@ def stale_outputs(project: Project) -> list[str]:
             else:
                 lines.append(f"{stored} was computed before {name} was written again{when}; run {step} again "
                              "to use it.")
+        lines += [f"{stored} was computed with {sessions[h5]}, which exclude in config.yaml now leaves out; run "
+                  f"{step} again to leave it out." for h5 in sorted(read) if sessions.get(h5) in excluded]
         if all_sessions and read & set(sessions):
             lines += [f"{stored} was computed before {sessions[h5]} was added to the project; run {step} again "
                       "to include it." for h5 in included if h5 not in read]

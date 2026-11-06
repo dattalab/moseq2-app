@@ -9,6 +9,8 @@ the settings and calls its step in ``moseq2_extract.steps`` (or
 entry for the recording in the project's ``session_config.yaml`` over
 ``config.yaml``, and write into the recording's session folder in the project's
 ``aggregate_results/`` (``proc/`` beside the recording outside a project).
+``batch-extract`` searches the project folder when its ``INPUT_FOLDER`` is left
+out.
 """
 
 import os
@@ -17,6 +19,7 @@ import click
 from click.core import ParameterSource
 
 from moseq2_common.options import (
+    PROJECT_FOLDER,
     ConfigFileError,
     ProjectGroup,
     click_options,
@@ -24,6 +27,7 @@ from moseq2_common.options import (
     command_settings,
     described_argument,
     explicit_values,
+    project_argument,
 )
 from moseq2_common.project import find_project, is_job_file
 from moseq2_common.records import print_record_command
@@ -187,11 +191,10 @@ def _typed_extract_options(ctx):
     "queued job.",
 )
 @click_options(BatchExtractOptions, order=BATCH_EXTRACT_ORDER, others={
-    **_roi_others({"input_folder": described_argument(
-        "input-folder", type=click.Path(exists=True, resolve_path=False),
+    **_roi_others({"input_folder": project_argument(
+        "input-folder", type=click.Path(exists=True, resolve_path=False), default=PROJECT_FOLDER,
         missing="the folder to search for depth recordings (.dat, .avi, .mkv or .tar.gz files, one per session "
-                "folder), usually the project folder. From the project folder, run "
-                "`moseq2-extract batch-extract .`.",
+                "folder), usually the project folder.",
     )}),
     "output_dir": click.option("--output-dir", default=None, show_default=False,
                                help="Folder holding each recording's session folder (default: the project's "
@@ -236,8 +239,9 @@ def batch_extract(ctx, input_folder, config_file, **_):
 @click.option(
     "--output-dir",
     type=click.Path(),
-    default=os.getcwd(),
-    help="Output directory for downloaded flip flie",
+    default=None,
+    show_default=False,
+    help="Output directory for downloaded flip file (default: the folder the command runs in)",
 )
 def download_flip_file(config_file, output_dir):
     if not os.path.isfile(config_file):
@@ -247,7 +251,7 @@ def download_flip_file(config_file, output_dir):
             "as its argument: `moseq2-extract download-flip-file /path/to/project/config.yaml`. To start a "
             "project here, write its config.yaml first with `moseq2-extract generate-config`."
         )
-    setup.download_flip_file(config_file, output_dir, None)
+    setup.download_flip_file(config_file, output_dir or os.getcwd(), None)
 
 
 @cli.command(

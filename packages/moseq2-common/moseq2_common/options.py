@@ -24,7 +24,12 @@ help text live together. From that class:
   (``moseq2_common.project.check_not_old``).
 - ``described_argument`` is a required command-line argument that, when left
   out, says what it is and where it usually is in a project, instead of click's
-  bare "Missing argument".
+  bare "Missing argument". ``project_argument`` is one that, left out in a
+  project, is the project's file (``ProjectDefault``: its PC scores, its current
+  model, a folder in it); outside a project it is required.
+- ``exclude_options`` are ``--exclude KEY`` and ``--no-exclude``, the sessions
+  a step after extraction leaves out for one run in place of ``config.yaml``'s
+  ``exclude``; ``typed_exclude`` reads them.
 
 ``config.yaml`` has one section per stage, named by each class's ``SECTION``
 (``extract``, ``pca``, ``model``, ``crowd_movies``), and ``camera_type`` at its
@@ -65,12 +70,21 @@ __all__ = [
     "explicit_values",
     "command_project",
     "described_argument",
+    "exclude_options",
     "option",
     "output_folder",
+    "project_argument",
     "project_file_option",
+    "ProjectDefault",
+    "PROJECT_CHANGEPOINTS",
+    "PROJECT_FOLDER",
+    "PROJECT_MODEL",
+    "PROJECT_SCORES",
+    "in_project",
     "read_config",
     "read_settings",
     "setting_fields",
+    "typed_exclude",
 ]
 
 _KEY = "moseq2_option"
@@ -473,6 +487,212 @@ def described_argument(name: str, *, missing: str, **kwargs) -> Callable[[F], F]
     return click.argument(name, cls=DescribedArgument, missing=missing, **kwargs)
 
 
+@dataclasses.dataclass(frozen=True)
+class ProjectDefault:
+    """What a ``project_argument`` left out is in a project.
+
+    ``what`` names it in messages and help ("the project's PC scores"); ``find(project, params)`` returns its
+    path, or None when the project holds none yet (``params`` are the command's other values, such as the
+    model an applied model is named after); ``make`` is the sentence saying how to make it.
+    """
+
+    what: str
+    find: Callable[[Any, Mapping], Any]
+    make: str = ""
+
+
+def _recorded_pca(output: str):
+    def find(project, params):
+        from moseq2_common.bookkeeping import load, resolve_path
+
+        stored = load(project).pca.get(output)
+        return resolve_path(project, stored) if stored else None
+    return find
+
+
+def _current_model(project, params):
+    from moseq2_common.bookkeeping import load, resolve_path
+
+    stored = load(project).models.get("current")
+    return resolve_path(project, stored) if stored else None
+
+
+#: The PC scores, changepoints and current model the project's ``moseq2-project.yaml`` names, and its folder.
+PROJECT_SCORES = ProjectDefault(
+    "the project's PC scores", _recorded_pca("scores"),
+    "Compute them with `moseq2-pca apply-pca` in the project folder (or the notebook's PCA cells).")
+PROJECT_CHANGEPOINTS = ProjectDefault(
+    "the project's changepoints", _recorded_pca("changepoints"),
+    "Compute them with `moseq2-pca compute-changepoints` in the project folder (or the notebook's changepoints "
+    "cell).")
+PROJECT_MODEL = ProjectDefault(
+    "the project's current model", _current_model,
+    "Fit one with `moseq2-model learn-model`, or pick one from a kappa scan with `moseq2-viz get-best-model`, in "
+    "the project folder (or the notebook's modeling cells).")
+PROJECT_FOLDER = ProjectDefault("the project folder", lambda project, params: Path(project.folder))
+
+
+def in_project(*parts: str, make: str = "") -> ProjectDefault:
+    """A path in the project folder, such as ``models/model.p``."""
+    return ProjectDefault(f"{'/'.join(parts)} in the project folder",
+                          lambda project, params: Path(project.folder, *parts), make)
+
+
+#: click's marker for a value not given, in the versions that have one.
+_UNSET = getattr(getattr(click, "_utils", None), "UNSET", None)
+
+
+def _left_out(value) -> bool:
+    return value is None or (_UNSET is not None and value is _UNSET)
+
+
+class ProjectArgument(DescribedArgument):
+    """A command-line argument that may be left out in a project, where it is ``project_default``.
+
+    Parsing only collects the values typed; ``fill_project_arguments`` settles which argument each is, fills
+    the ones left out from the project, and converts them all, when the command runs. An argument with no
+    ``project_default`` is required, and is given before any left out after it: in
+    ``clip-scores [PCA_FILE] CLIP_SAMPLES``, one value is ``CLIP_SAMPLES``.
+    """
+
+    def __init__(self, *args, missing: str, project_default: ProjectDefault | None = None, **kwargs):
+        # required (shown without brackets in the usage line) only when it has no project default
+        super().__init__(*args, missing=missing, required=project_default is None, **kwargs)
+        self.project_default = project_default
+
+    def process_value(self, ctx: click.Context, value: Any) -> Any:
+        # the value as typed: fill_project_arguments settles its place, checks it is there and converts it
+        return None if _left_out(value) else value
+
+    @property
+    def shown_name(self) -> str:
+        return (self.metavar or self.name).upper()
+
+    def missing_message(self, ctx: click.Context) -> str:
+        message = f"`{_command_name(ctx)}` needs {self.shown_name}, {self.missing}"
+        if self.project_default is not None:
+            message += (f" It can be left out when run from a project folder, to use "
+                        f"{self.project_default.what}.")
+        return message
+
+
+def project_argument(name: str, *, missing: str, default: ProjectDefault | None = None,
+                     **kwargs) -> Callable[[F], F]:
+    """A ``described_argument`` that, left out in a project, is ``default`` (``ProjectDefault``).
+
+    Outside a project it is required, and its message says it can be left out when run from a project folder.
+    The command must be a ``ProjectCommand``, which fills it when it runs. Every positional argument of a
+    command that has one is a ``project_argument`` (with no ``default`` when it has none).
+    """
+    return click.argument(name, cls=ProjectArgument, missing=missing, project_default=default, **kwargs)
+
+
+def _project_arguments(command: click.Command) -> list[ProjectArgument]:
+    return [param for param in command.params if isinstance(param, ProjectArgument)]
+
+
+def fill_project_arguments(ctx: click.Context) -> None:
+    """Settle the values typed for a command's ``project_argument``s, fill the ones left out from its project,
+    and convert them.
+
+    The values typed go, in order, to the arguments with no project default and to as many of the others,
+    leftmost first, as the values allow. A required argument with no value stops the command
+    (``ProjectArgument.missing_message``), and so does one left out outside a project, or in a project that
+    does not hold its file yet, or holds it at a path that does not exist.
+    """
+    arguments = _project_arguments(ctx.command)
+    if not arguments:
+        return
+    typed = [ctx.params.get(argument.name) for argument in arguments]
+    typed = [value for value in typed if not _left_out(value)]
+    required = [argument for argument in arguments if argument.project_default is None]
+    filled = max(0, len(typed) - len(required))
+    given = []
+    for argument in arguments:
+        if argument.project_default is None:
+            given.append(argument)
+        elif filled:
+            given.append(argument)
+            filled -= 1
+    values = dict(zip((argument.name for argument in given), typed))
+    for argument in arguments:  # the first one missing, in order, before any default is worked out
+        if argument.name not in values and (argument.project_default is None or command_project(ctx) is None):
+            raise click.UsageError(argument.missing_message(ctx), ctx=ctx)
+    converted = {}
+    for argument in arguments:
+        if argument.name in values:
+            converted[argument.name] = argument.type_cast_value(ctx, values[argument.name])
+    for argument in arguments:
+        if argument.name not in values:
+            converted[argument.name] = _from_project(ctx, argument, {**ctx.params, **converted})
+    ctx.params.update(converted)
+
+
+def _from_project(ctx: click.Context, argument: ProjectArgument, params: Mapping) -> Any:
+    """``argument``'s value when left out: its project default, converted; the command stops when there is
+    none to use."""
+    from moseq2_common.bookkeeping import BOOKKEEPING_NAME
+
+    project = command_project(ctx)
+    if project is None:
+        raise click.UsageError(argument.missing_message(ctx), ctx=ctx)
+    default = argument.project_default
+    name = argument.shown_name
+    path = default.find(project, params)
+    make = f"{default.make} " if default.make else ""
+    if path is None:
+        raise click.ClickException(
+            f"`{_command_name(ctx)}` was run without {name}, so it uses {default.what}, and "
+            f"{Path(project.folder) / BOOKKEEPING_NAME} names none yet. {make}Or give {name} on the command line."
+        )
+    try:
+        return argument.type_cast_value(ctx, str(path))
+    except click.BadParameter:
+        raise click.ClickException(
+            f"`{_command_name(ctx)}` was run without {name}, so it uses {default.what}, {path}, which does not "
+            f"exist. {make}Or give {name} on the command line."
+        ) from None
+
+
+def project_defaults_help(command: click.Command) -> str | None:
+    """The help paragraph naming what each of ``command``'s arguments is when left out in a project."""
+    defaults = [f"{argument.shown_name} ({argument.project_default.what})"
+                for argument in _project_arguments(command) if argument.project_default is not None]
+    if not defaults:
+        return None
+    return f"In a project these can be left out: {', '.join(defaults)}."
+
+
+EXCLUDE_HELP = ("A session to leave out of this run, named by its recording's path in the project, as "
+                "moseq2-project.yaml lists it (for example cohort1/mouse_1/depth.avi); repeat it for each "
+                "session. The sessions given replace config.yaml's exclude for this run (default: config.yaml's "
+                "exclude)")
+NO_EXCLUDE_HELP = "Leave no session out of this run, whatever config.yaml's exclude lists"
+
+
+def exclude_options() -> dict[str, Callable[[F], F]]:
+    """``--exclude KEY`` (repeatable) and ``--no-exclude``, for ``click_options``' ``others``; ``typed_exclude``
+    reads them."""
+    return {
+        "exclude": click.option("--exclude", multiple=True, metavar="KEY", show_default=False, help=EXCLUDE_HELP),
+        "no_exclude": click.option("--no-exclude", is_flag=True, default=False, show_default=False,
+                                   help=NO_EXCLUDE_HELP),
+    }
+
+
+def typed_exclude(ctx: click.Context) -> list[str] | None:
+    """The sessions to leave out typed for this run: ``--exclude``'s keys, ``[]`` for ``--no-exclude``, or None
+    (``config.yaml``'s ``exclude``) when neither was typed. Typing both stops the command."""
+    keys = list(ctx.params.get("exclude") or ())
+    if ctx.params.get("no_exclude"):
+        if keys:
+            raise click.UsageError(
+                f"Both --no-exclude and --exclude ({', '.join(keys)}) were given. --exclude names the sessions to "
+                "leave out of this run, and --no-exclude leaves none out: pick one.", ctx=ctx)
+        return []
+    return keys or None
+
+
 def command_project(ctx: click.Context, *, required: bool = False):
     """The one project a command runs on, or None outside a project.
 
@@ -533,9 +753,19 @@ class ProjectCommand(click.Command):
     Its options are parsed first, so ``--help`` answers anywhere. The folders
     checked are the working folder, the folder of a ``--project-file`` given,
     and the project ``--config-file`` (or the ``config-file`` argument) belongs
-    to (``find_project``). A step's input check (``moseq2_common.records.StepInputError``)
+    to (``find_project``). Its ``project_argument``s are then settled and filled
+    from the project (``fill_project_arguments``), and its help names what each is
+    when left out. A step's input check (``moseq2_common.records.StepInputError``)
     prints as a message, not a traceback.
     """
+
+    def format_help_text(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        super().format_help_text(ctx, formatter)
+        defaults = project_defaults_help(self)
+        if defaults:
+            formatter.write_paragraph()
+            with formatter.indentation():
+                formatter.write_text(defaults)
 
     def invoke(self, ctx: click.Context) -> Any:
         from moseq2_common.project import OldProjectError, check_not_old, find_project
@@ -555,6 +785,7 @@ class ProjectCommand(click.Command):
         from moseq2_common.records import StepInputError
 
         try:
+            fill_project_arguments(ctx)
             return super().invoke(ctx)
         except StepInputError as error:  # a step's input check: a message, not a traceback
             raise click.ClickException(str(error)) from None

@@ -158,7 +158,10 @@ def test_steps_take_no_argument_no_caller_passes(steps, options):
     import inspect
 
     assert "sessions" not in inspect.signature(steps.make_crowd_movies).parameters
-    assert list(inspect.signature(steps.make_df).parameters) == ["model_fit", "index", "output_file"]
+    parameters = inspect.signature(steps.make_df).parameters.values()
+    assert [p.name for p in parameters if p.kind is not p.KEYWORD_ONLY] == ["model_fit", "index", "output_file"]
+    # the sessions the run uses, as on every step after extraction
+    assert [p.name for p in parameters if p.kind is p.KEYWORD_ONLY] == ["exclude", "groups"]
     assert not hasattr(options, "MakeDfOptions")
 
 
