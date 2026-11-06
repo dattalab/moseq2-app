@@ -62,8 +62,13 @@ def test_update_config_leaves_the_file_alone_when_a_value_cannot_be_saved(tmp_pa
 
 
 def test_syllable_labels_are_written_in_the_shared_format(tmp_path):
+    from moseq2_app.labels import LABELS_FOR, labels_for
+
     path = tmp_path / "syll_info.yaml"
+    model = tmp_path / "model.p"
+    model.write_bytes(b"a model")
     labeller = SimpleNamespace(
+        model_path=str(model),
         syll_info={
             0: {"label": "rear", "desc": "saut é", "crowd_movie_path": SPACED, "group_info": {"a": 1}},
             1: {"label": "", "desc": "", "crowd_movie_path": "", "group_info": {}},
@@ -77,6 +82,7 @@ def test_syllable_labels_are_written_in_the_shared_format(tmp_path):
         0: {"label": "rear", "desc": "saut é", "crowd_movie_path": SPACED},
         1: {"label": "", "desc": "", "crowd_movie_path": ""},
         7: {"label": "groom", "desc": "", "crowd_movie_path": ""},
+        LABELS_FOR: labels_for(model),
     }
     assert path.read_text() == dump_yaml(expected)
     assert read_yaml(path) == expected
