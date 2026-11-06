@@ -224,7 +224,7 @@ class ArenaMaskWidget:
 
         folder = self.session_data.path
         settings = self.recording_config(folder)
-        validate_flip_classifier(settings)
+        validate_flip_classifier(settings, self.sessions[folder])
         settings = check_filter_sizes(settings)
 
         # TODO: compute mask only if not already done

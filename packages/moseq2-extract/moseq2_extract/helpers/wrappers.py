@@ -215,12 +215,20 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
 
 
 class FlipClassifierError(StepInputError, ValueError):
-    """The flip classifier ``flip_classifier`` names cannot be read, or was trained for another crop size or
-    other cleaning settings than extraction's."""
+    """The flip classifier ``flip_classifier`` names cannot be read, or was trained for another crop size than
+    extraction's."""
 
 
 class FlipClassifierMissingError(StepInputError, FileNotFoundError):
     """The flip classifier ``flip_classifier`` names does not exist."""
+
+
+class FlipClassifierCleaningWarning(Warning):
+    """
+    A recording is extracted with a flip classifier trained on frames cleaned
+    otherwise. A subclass of Warning rather than UserWarning, so the notebook's
+    filter_warnings does not hide it.
+    """
 
 
 class NoFlipClassifierWarning(Warning):
@@ -274,40 +282,61 @@ def _cleaning(values):
     return {k: list(v) if isinstance(v, tuple) else v for k, v in opts.as_dict().items()}
 
 
-def _check_trained_cleaning(flip_classifier, trained, config_data):
-    """Stop when extraction cleans frames otherwise than the classifier's training did (``trained``, a list)."""
+def _joined(values):
+    """``values`` as a list in prose: ``a``, ``a and b``, ``a, b and c``."""
+    return values[0] if len(values) == 1 else ", ".join(values[:-1]) + " and " + values[-1]
+
+
+def _check_trained_cleaning(flip_classifier, trained, config_data, recording=None):
+    """Warn when extraction cleans frames otherwise than every way the classifier's training did (``trained``,
+    a list of cleaning settings).
+
+    The warning names the recording, each setting that differs from any trained set, its value now and its
+    value in each trained set, and what to do. Extraction goes on with the classifier.
+    """
     now = _cleaning(config_data)
-    differences = []
-    for stored in trained:
-        then = _cleaning(stored)
-        differ = [name for name in CLEANING_FIELDS if then[name] != now[name]]
-        if not differ:
-            return
-        differences.append((differ, then))
-    differ, then = min(differences, key=lambda item: len(item[0]))
-    listed = "; ".join(f"{name} {_shown(then[name])} in training, {_shown(now[name])} in this extraction"
-                       for name in differ)
-    raise FlipClassifierError(
-        f"The flip classifier {flip_classifier} was trained on frames cleaned with other settings than this "
-        f"extraction uses: {listed}. A classifier sees frames as they were cleaned in training, so it would "
-        f"orient these mice less reliably. Set {', '.join(differ)} back to the training values in config.yaml's "
-        "extract section (or in the recording's arena-tool settings), or train the classifier again in the "
-        "Flip-Classifier-Training notebook with the current settings."
+    sets = [_cleaning(stored) for stored in trained]
+    if any(all(then[name] == now[name] for name in CLEANING_FIELDS) for then in sets):
+        return
+    differ = [name for name in CLEANING_FIELDS if any(then[name] != now[name] for then in sets)]
+    listed = "; ".join(
+        f"{name} is {_shown(now[name])} now, {_joined([_shown(then[name]) for then in sets])} in training"
+        for name in differ
+    )
+    session = f"the recording {recording}" if recording else "this recording"
+    if len(sets) == 1:
+        trained_on = f"was trained on frames cleaned with other settings than {session} is extracted with"
+    else:
+        trained_on = (f"was trained on frames cleaned in {len(sets)} ways, and {session} is extracted with none "
+                      "of them")
+    values = "their training values" if len(sets) == 1 else "the values of one of those ways"
+    warnings.warn(
+        f"The flip classifier {flip_classifier} {trained_on}: {listed}. Extraction still uses the classifier, "
+        "but it may orient this recording's mice less reliably. To clean as in training, set "
+        f"{_joined(differ)} back to {values} in config.yaml's extract section or in this recording's entry in "
+        "session_config.yaml (the arena tool's Save writes it); or train the flip classifier again in the "
+        "Flip-Classifier-Training notebook with the current settings.",
+        FlipClassifierCleaningWarning,
+        stacklevel=3,
     )
 
 
-def validate_flip_classifier(config_data):
+def validate_flip_classifier(config_data, recording=None):
     """
     Check the flip classifier before extraction: it exists, it can be read, and it was trained for this crop size
     and, when it says so, these cleaning settings.
 
     The crop size is checked against the classifier's feature count (the published classifiers) or the crop size
     it was trained on (``moseq2_extract.extract.flip_classifier.training_settings``, carried by a classifier the
-    Flip-Classifier-Training notebook trained, with its cleaning settings). Each problem raises before any work,
-    naming the classifier and both values.
+    Flip-Classifier-Training notebook trained, with its cleaning settings). A missing or unreadable classifier, or
+    another crop size, raises before any work, naming the classifier and both values. Cleaning settings equal to
+    none of the sets the classifier was trained with give one ``FlipClassifierCleaningWarning`` naming the
+    recording, and extraction goes on with the classifier; a classifier that carries no cleaning settings (the
+    published ones) is not checked for them.
 
     Args:
     config_data (dict): extraction configuration containing 'flip_classifier', 'crop_size' and the cleaning settings
+    recording (str): the recording being extracted, which the cleaning warning names; None for "this recording".
     """
     flip_classifier = config_data.get("flip_classifier")
     if not flip_classifier:
@@ -368,7 +397,7 @@ def validate_flip_classifier(config_data):
         )
 
     if trained.get("cleaning"):
-        _check_trained_cleaning(flip_classifier, trained["cleaning"], config_data)
+        _check_trained_cleaning(flip_classifier, trained["cleaning"], config_data, recording)
 
 
 def floor_depth_and_background(bground_im, roi, config_data, output_dir):
@@ -452,7 +481,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         print("Skipping...")
         return
 
-    validate_flip_classifier(config_data)
+    validate_flip_classifier(config_data, input_file)
     warn_without_flip_classifier(input_file, config_data)
 
     # get the basic metadata
