@@ -27,6 +27,7 @@ import pytest
 from click.testing import CliRunner
 from dask.distributed import Client
 
+from moseq2_common.records import read_record
 from moseq2_common.yaml import write_yaml
 
 RATE = 15
@@ -95,7 +96,8 @@ def test_extraction_records_the_recordings_own_frame_rate(recording_at_15_fps):
 
     with h5py.File(output_dir / "results.h5", "r") as f:
         assert f["metadata/fps"][()] == RATE
-        assert "fps" not in f["metadata/extraction/parameters"]
+        assert "metadata/extraction/parameters" not in f
+    assert "fps" not in read_record(output_dir / "results.h5")["options"]
     assert get_video_info(str(output_dir / "results.mp4"))["fps"] == RATE
 
 
@@ -119,8 +121,8 @@ def session_at_15_fps(tmp_path):
         f["timestamps"] = timestamps * 1000
         f["timestamps"].attrs["unit"] = "milliseconds"
         f["metadata/fps"] = np.float32(RATE)
-    write_yaml({"uuid": "s"}, str(tmp_path / "s.yaml"))
-    return str(h5), str(tmp_path / "s.yaml")
+        f["metadata/uuid"] = "s"
+    return str(h5), str(h5)
 
 
 def test_pca_places_dropped_frames_at_the_recordings_own_rate(tmp_path, session_at_15_fps, client):
