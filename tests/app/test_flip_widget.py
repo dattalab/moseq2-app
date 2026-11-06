@@ -34,6 +34,7 @@ def session(tmp_path, monkeypatch):
     with h5py.File(path, "w") as f:
         f["frames"] = frames
         f["scalars/angle"] = np.zeros(NFRAMES)
+        f["metadata/fps"] = 30.0
         f.create_group("metadata/extraction")
     monkeypatch.setattr(widget, "get_flips", lambda values, **kw: np.ones(len(values), dtype=bool))
     return SimpleNamespace(sessions={"session": path}), path, frames

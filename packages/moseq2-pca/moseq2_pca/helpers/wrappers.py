@@ -278,9 +278,11 @@ def apply_pca_wrapper(input_dir, config_data, output_dir, output_file):
                                    client=client, missing_data=missing_data,
                                    mask_params=mask_params, h5_path=config_data['h5_path'],
                                    h5_mask_path=config_data['h5_mask_path'], verbose=config_data['verbose'])
-                except:
-                    # Clearing all data from Dask client in case of interrupted PCA
+                except BaseException:
+                    # Clearing all data from Dask client in case of interrupted PCA; the scores were not all
+                    # written, so the step stops rather than keep them
                     click.echo('Operation interrupted. Closing Dask Client.')
+                    raise
                 finally:
                     # After Success or failure: Shutting down Dask client and clearing any residual data
                     close_dask(client, cluster, config_data['timeout'])
@@ -348,9 +350,11 @@ def compute_changepoints_wrapper(input_dir, config_data, output_dir, output_file
                                   client=client, missing_data=missing_data,
                                   mask_params=mask_params, h5_path=config_data['h5_path'],
                                   h5_mask_path=config_data['h5_mask_path'], verbose=config_data['verbose'])
-        except:
+        except BaseException:
+            # the changepoints were not all written, so the step stops rather than keep them
             click.echo('Operation interrupted. Closing Dask Client.')
             close_dask(client, cluster, config_data['timeout'])
+            raise
 
         # After Success: Shutting down Dask client and clearing any residual data
         close_dask(client, cluster, config_data['timeout'])

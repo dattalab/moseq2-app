@@ -9,6 +9,7 @@ from tqdm import tqdm
 import numpy as np
 from pathlib import Path
 from moseq2_common.records import RECORD_ATTRIBUTE, fingerprint, record_text
+from moseq2_common.timestamps import frame_rate
 from moseq2_common.yaml import read_yaml
 from collections import defaultdict
 from moseq2_extract.extract.proc import get_flips
@@ -377,7 +378,7 @@ class FlipClassifierWidget:
         self.mark_saved()
             
     def apply_flip_classifier(self, clf_path, chunk_size=4000, chunk_overlap=0,
-                              smoothing=51, frame_path='frames', fps=30,
+                              smoothing=51, frame_path='frames', fps=None,
                               write_movie=False, verbose=True):
         """
         Apply a trained flip classifier on previously extracted data to flip the mice to the correct orientation.
@@ -386,6 +387,7 @@ class FlipClassifierWidget:
         chunk_size (int): size of frame chunks to process in batches.
         chunk_overlap (int): number of frames to overlap between chunks to improve classification precision between chunks.
         smoothing (int): kernel size of the applied median filter on the flip classifier results
+        fps (float): the flipped preview movie's frame rate; None for each session's own (``/metadata/fps``).
         verbose (bool): displays the tqdm progress bars for each session.
         """
         video_pipe = None
@@ -408,6 +410,7 @@ class FlipClassifierWidget:
 
                     output_movie = path.replace('.h5', '_flipped.mp4')
                     session_movie = write_movie
+                    movie_fps = fps if fps is not None or not write_movie else frame_rate(f)
     
                     frames = f[frame_path]
                     frame_batches = list(gen_batch_sequence(len(frames), chunk_size, chunk_overlap))
@@ -448,7 +451,7 @@ class FlipClassifierWidget:
                                                                   close_pipe=False,
                                                                   depth_min=0,
                                                                   depth_max=100,
-                                                                  fps=fps,
+                                                                  fps=movie_fps,
                                                                   progress_bar=verbose)
                             except AttributeError as e:
                                 # the movie is only a preview; the remaining frames still need correcting

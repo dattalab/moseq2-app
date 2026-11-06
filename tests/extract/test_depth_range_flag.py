@@ -35,7 +35,7 @@ def run(*args):
 @pytest.mark.parametrize("command", ["find-roi", "extract"])
 def test_a_typed_range_is_used_as_given(command, tmp_path, received):
     recording = tmp_path / "depth.avi"
-    recording.touch()
+    recording.write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     run(command, str(recording), "--bg-roi-depth-range", "600", "800")
     assert received[0]["manual_set_depth_range"] is True
     assert tuple(received[0]["bg_roi_depth_range"]) == (600, 800)
@@ -44,14 +44,14 @@ def test_a_typed_range_is_used_as_given(command, tmp_path, received):
 @pytest.mark.parametrize("command", ["find-roi", "extract"])
 def test_without_a_typed_range_the_range_is_detected(command, tmp_path, received):
     recording = tmp_path / "depth.avi"
-    recording.touch()
+    recording.write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     run(command, str(recording))
     assert received[0]["manual_set_depth_range"] is False
 
 
 def test_a_range_from_the_config_file_follows_the_flag(tmp_path, received):
     recording = tmp_path / "depth.avi"
-    recording.touch()
+    recording.write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
     config = tmp_path / "config.yaml"
     write_yaml({"extract": {"bg_roi_depth_range": [550, 650]}}, str(config))
     run("find-roi", str(recording), "--config-file", str(config))

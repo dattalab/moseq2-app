@@ -15,7 +15,11 @@ labels.
 
 Each output carries the record of the run (``moseq2_common.records``): the model
 and the kappa scan's script in a ``.yaml`` beside them (``model.p``: ``model.yaml``), an applied model in
-its ``.h5``'s ``/provenance`` attribute.
+its ``.h5``'s ``/provenance`` attribute. A model is written under a temporary name and renamed into place
+when complete; an applied model is written, with its record, the same way.
+
+Before any work, a step stops on a scores file or a model file that does not exist, is empty or cannot
+be read (``moseq2_common.records.check_inputs``).
 
 Inside a project (``project``), ``learn_model`` records the model in the
 project's bookkeeping file as fitted and current, and ``apply_model`` records
@@ -33,7 +37,7 @@ from pathlib import Path
 from moseq2_model.helpers.wrappers import apply_model_wrapper, kappa_scan_fit_models_wrapper, learn_model_wrapper
 from moseq2_common.bookkeeping import relative_path, update
 from moseq2_common.project import Project
-from moseq2_common.records import start_record, write_record
+from moseq2_common.records import atomic_outputs, check_inputs, start_record, write_record
 from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
 
 @dataclass(frozen=True)
@@ -66,6 +70,19 @@ def _start(step, opts, project, *files):
     return start_record(step, opts, [*settings, *[f for f in files if f]], project=project)
 
 
+#: What to do about each kind of file a modeling step reads, when it is unusable.
+SCORES_ADVICE = ("Compute the PC scores again (moseq2-pca apply-pca, or the notebook's scores cell), or give the "
+                 "scores file it wrote.")
+MODEL_ADVICE = ("Fit the model again (moseq2-model learn-model, or the notebook's modeling cell), or give the "
+                "path of a model file that exists.")
+
+
+def _check(step, *files):
+    """Stop ``step`` before its work when one of ``files`` (each with what to do about it) does not exist, is
+    empty or cannot be read."""
+    check_inputs(step, dict(files))
+
+
 def _sessions(index):
     """The extraction files the sessions of ``index`` name."""
     if not isinstance(index, dict):
@@ -77,6 +94,7 @@ def _sessions(index):
 def learn_model(input_file: str, dest_file: str, opts: LearnModelOptions, *,
                 index: dict | None = None, project: Project | None = None) -> LearnModelResult:
     """Fit an AR-HMM to the PC scores in ``input_file``; write the model to ``dest_file``."""
+    _check("learn-model", (input_file, SCORES_ADVICE))
     record = _start("learn-model", opts, project, input_file, *_sessions(index))
     figure = learn_model_wrapper(input_file, dest_file, _settings(opts, {'index': index}))
     result = LearnModelResult(model_file=Path(realpath(dest_file)), figure_file=Path(figure) if figure else None)
@@ -109,6 +127,7 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
     ``project`` and the model. A fit run from it records nothing in ``moseq2-project.yaml``; the scan's
     models enter it when ``get-best-model`` compares them.
     """
+    _check("kappa-scan", (input_file, SCORES_ADVICE))
     record = _start("kappa-scan", opts, project, input_file)
     commands = kappa_scan_fit_models_wrapper(input_file, _settings(opts, {'index': index}), output_dir,
                                              learn=learn, project=project)
@@ -121,10 +140,15 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
 def apply_model(model_file: str, pc_file: str, dest_file: str, opts: ApplyModelOptions, *,
                 index: dict | None = None, project: Project | None = None) -> ApplyModelResult:
     """Label the PC scores in ``pc_file`` with the model in ``model_file``; write them to ``dest_file``."""
+    _check("apply-model", (model_file, MODEL_ADVICE), (pc_file, SCORES_ADVICE))
     record = _start("apply-model", opts, project, model_file, pc_file, *_sessions(index))
-    apply_model_wrapper(model_file, pc_file, dest_file, _settings(opts, {'index': index}))
     result = ApplyModelResult(applied_file=Path(dest_file))
-    write_record(result.applied_file, record.finish({"files": [str(result.applied_file)]}))
+    # the labels and their record are written under temporary names and renamed into place together
+    stem, extension = result.applied_file.with_suffix(""), result.applied_file.suffix
+    with atomic_outputs(stem, (extension, ".yaml")) as temporary:
+        partial = Path(f"{temporary}{extension}")
+        apply_model_wrapper(model_file, pc_file, str(partial), _settings(opts, {'index': index}))
+        write_record(partial, record.finish({"files": [str(result.applied_file)]}))
     if project is not None:
         applied = relative_path(project, result.applied_file)
 

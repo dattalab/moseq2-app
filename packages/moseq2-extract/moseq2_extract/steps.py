@@ -20,6 +20,10 @@ Inside a project, a recording's outputs go into its session's folder in
 the uuid ``moseq2-project.yaml`` gave the session; outside one, ``extract``
 writes into ``proc/`` beside the recording. ``aggregate_results`` lists the
 extracted sessions in ``moseq2-project.yaml``.
+
+Before any work, ``find-roi`` and ``extract`` stop on a recording that does not
+exist, is empty or cannot be read (``moseq2_common.records.check_inputs``), and
+extraction on a recording whose frames and timestamps disagree in number.
 """
 
 from __future__ import annotations
@@ -31,7 +35,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from moseq2_common.bookkeeping import SESSION_FILE, Session, load, relative_path, update
-from moseq2_common.records import start_record, write_record
+from moseq2_common.records import check_inputs, start_record, write_record
 from moseq2_common.project import Project, find_project as find_project_of, session_key
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
@@ -73,6 +77,11 @@ class AggregateResult:
     sessions: list
 
 
+#: What to do about a recording that is missing, empty or unreadable.
+RECORDING_ADVICE = ("Check that it is the recording you meant and that it was copied completely, or copy it again "
+                    "from where it was recorded.")
+
+
 def _settings(opts, leave_out=()):
     """The dict a wrapper takes: the options, but ``leave_out``."""
     return {name: value for name, value in opts.as_dict().items() if name not in leave_out}
@@ -80,6 +89,7 @@ def _settings(opts, leave_out=()):
 
 def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions) -> FindRoiResult:
     """Find the arena and background of ``input_file``; write the background and arena images."""
+    check_inputs("find-roi", {input_file: RECORDING_ADVICE})
     record = start_record("find-roi", opts, [input_file])
     settings = _settings(opts)
     get_roi_wrapper(input_file, settings, output_dir)
@@ -128,6 +138,7 @@ def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
     ``aggregate_results/`` (``session_outputs``), or outside a project into ``proc/`` beside it.
     In a project, a session ``moseq2-project.yaml`` lists keeps its uuid.
     """
+    check_inputs("extract", {input_file: RECORDING_ADVICE})
     record = start_record("extract", opts, _project_inputs(project), project=project)
     settings = _settings(opts, leave_out=_WRAPPER_ARGUMENTS)
     folder = _output_folder(input_file, output_dir, project)

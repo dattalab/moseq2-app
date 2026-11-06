@@ -130,7 +130,7 @@ def test_a_one_run_switch_in_config_is_ignored_naming_its_flag(tmp_path, monkeyp
     monkeypatch.setattr(model_steps, "learn_model", lambda input_file, dest_file, opts, **kwargs: fits.append(opts))
     config = sectioned(tmp_path / "config.yaml", model={"verbose": True, "nlags": 2})
     scores = tmp_path / "pca_scores.h5"
-    scores.write_bytes(b"")
+    scores.write_bytes(b"\0")  # a placeholder: an empty input stops a step
 
     result = CliRunner().invoke(cli, ["learn-model", str(scores), str(tmp_path / "model.p"),
                                       "--config-file", str(config)])

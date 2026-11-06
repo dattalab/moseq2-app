@@ -131,11 +131,14 @@ def stub_pca_work(monkeypatch):
     """The PCA work functions replaced by ones that write an empty output (the components with the settings
     they were trained with) and record what they were given.
 
-    Each call is recorded as (step, the options dict it was handed, the file it wrote).
+    Each call is recorded as (step, the options dict it was handed, the file it wrote, under the temporary
+    name the step renames into place). The project already holds PCA outputs, and a step asks before it
+    overwrites one: the answer is yes.
     """
     import moseq2_pca.steps as pca_steps
 
     calls = []
+    monkeypatch.setattr("builtins.input", lambda *args: "y")
 
     def written(output_dir, output_file):
         path = Path(output_dir) / f"{output_file}.h5"
@@ -234,8 +237,9 @@ def test_pca_trained_under_another_name_is_found_by_apply(front_end, project_cop
 
     (_, _, trained), (step, settings, _) = calls
     assert step == "apply_pca"
-    assert trained == project_copy / "_pca" / "mouse_pca.h5"
-    assert Path(settings["pca_file"]) == trained
+    assert trained.name == ".mouse_pca.partial.h5"
+    assert Path(settings["pca_file"]) == project_copy / "_pca" / "mouse_pca.h5"
+    assert Path(settings["pca_file"]).is_file()
 
 
 @pytest.mark.parametrize("front_end", ["cli", "notebook"])

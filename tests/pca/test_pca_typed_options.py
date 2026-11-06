@@ -4,6 +4,7 @@ names the extract side). An option not typed takes the config file's value."""
 
 from __future__ import annotations
 
+import h5py
 import pytest
 from click.testing import CliRunner
 
@@ -105,6 +106,8 @@ def test_compute_changepoints_falsy_config(
 ):
     config = tmp_path / "config.yaml"
     write_yaml({"pca": config_values}, str(config))
+    (tmp_path / "_pca").mkdir()
+    h5py.File(tmp_path / "_pca" / "pca.h5", "w").close()  # the components it reads; the work is stubbed
 
     result = CliRunner().invoke(
         pca_cli.cli,

@@ -20,6 +20,7 @@ from __future__ import annotations
 import shlex
 from pathlib import Path
 
+import h5py
 import pytest
 from click.testing import CliRunner
 
@@ -59,7 +60,7 @@ def project(tmp_path):
     for name in ("session 1", "session_2"):
         session = folder / name
         session.mkdir(parents=True)
-        (session / "depth.avi").touch()
+        (session / "depth.avi").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
         (session / "metadata.json").write_text("{}")
     config = folder / "config.yaml"
     _run(extract_cli.cli, "generate-config", "-o", config)
@@ -206,6 +207,7 @@ def test_get_best_model_registers_kappa_scan_models(tmp_path, monkeypatch):
     monkeypatch.setattr(viz_steps, "get_best_fit_model_wrapper",
                         lambda *args: ({"best model - duration (mean match)": best}, None))
 
+    h5py.File(tmp_path / "changepoints.h5", "w").close()  # a placeholder: the comparison is stubbed
     viz_steps.get_best_model(str(models), str(tmp_path / "changepoints.h5"), None, BestModelOptions(),
                              project=project)
 

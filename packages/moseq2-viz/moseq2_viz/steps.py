@@ -19,7 +19,14 @@ records the model it picks as the project's current model in its
 Every other step writes the record of its run (``moseq2_common.records``) as
 a ``.yaml`` beside its output (``sidecar_path``): ``<figure>.yaml`` for a figure
 named without ``.png``/``.pdf``, ``moseq_df.yaml`` for ``moseq_df.csv``,
-``crowd_movies.yaml`` for the crowd-movie folder.
+``crowd_movies.yaml`` for the crowd-movie folder. Figures and dataframes are
+written with their record under temporary names and renamed into place when
+complete (``atomic_outputs``); a crowd-movie folder's record is removed before
+its movies are rendered and written when they are all done.
+
+Before any work, a step stops on a model file, a changepoints file or a
+session's extraction that does not exist, is empty or cannot be read
+(``moseq2_common.records.check_inputs``).
 
 Crowd movies are a cache: the syllable labeler reuses a folder of them only
 while its record shows they were rendered from the same model (by its
@@ -38,7 +45,8 @@ from typing import Any
 
 from moseq2_common.bookkeeping import relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
-from moseq2_common.records import fingerprint, read_record, record_text, start_record, write_record
+from moseq2_common.records import (atomic_outputs, check_inputs, fingerprint, read_record, record_text,
+                                   sidecar_path, start_record, write_record)
 from moseq2_common.yaml import read_yaml
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
@@ -130,6 +138,34 @@ def _finish(record, output, files):
     write_record(output, record.finish({"files": [str(f) for f in files if Path(f).exists()]}))
 
 
+def _figures_written(record, output_file, write, suffix=""):
+    """Run ``write(stem)``, which writes the figure ``<stem><suffix>.png`` and ``.pdf``, under a temporary stem;
+    write ``record`` beside them and rename all three to ``output_file``'s name when complete
+    (``atomic_outputs``)."""
+    final = Path(f"{output_file}{suffix}")
+    with atomic_outputs(output_file, (f"{suffix}.png", f"{suffix}.pdf", f"{suffix}.yaml")) as temporary:
+        write(str(temporary))
+        partial = Path(f"{temporary}{suffix}")
+        written = [final.with_name(f"{final.name}{ext}") for ext in (".png", ".pdf")
+                   if partial.with_name(f"{partial.name}{ext}").exists()]
+        write_record(partial, record.finish({"files": [str(f) for f in written]}))
+
+
+#: What to do about each kind of file an analysis step reads, when it is unusable.
+MODEL_ADVICE = ("Fit the model again (moseq2-model learn-model, or the notebook's modeling cell), or give the "
+                "path of a model file that exists.")
+SESSION_ADVICE = ("Extract that session again (moseq2-extract extract, or the notebook's extraction cell), then "
+                  "run this step again.")
+CHANGEPOINTS_ADVICE = ("Compute the changepoints again (moseq2-pca compute-changepoints, or the notebook's "
+                       "changepoints cell), or give the changepoints file it wrote.")
+
+
+def _check(step, index, *files):
+    """Stop ``step`` before its work when one of ``files`` (each with what to do about it) or a session's
+    extraction ``index`` names does not exist, is empty or cannot be read."""
+    check_inputs(step, {**dict(files), **{h5: SESSION_ADVICE for h5 in _sessions(index)[0]}})
+
+
 def add_group(project: Project, opts: AddGroupOptions) -> AddGroupResult:
     """Set the group of the project's sessions whose metadata matches; write ``config.yaml``'s ``groups``."""
     changed = add_group_wrapper(session_index(project, exclude=False), opts.as_dict())
@@ -144,13 +180,22 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
     In a project, every model compared is listed among the project's fitted models (a kappa scan's fits,
     run as jobs, record nothing themselves), and the model picked becomes the current model.
     """
+    _check("get-best-model", None, (model_dir, MODEL_ADVICE), (cp_path, CHANGEPOINTS_ADVICE))
     record = _start("get-best-model", opts, None, model_dir, cp_path)
-    best_model_info, figure = get_best_fit_model_wrapper(
-        model_dir, cp_path, output_file, opts.plot_all, opts.ext, opts.objective
-    )
-    if output_file is not None:
-        record.note("best_model", best_model_info.get(f"best model - {opts.objective}"))
-        _finish(record, output_file, _figures(output_file))
+    found = {}
+
+    def compare(stem):
+        found["info"], found["figure"] = get_best_fit_model_wrapper(
+            model_dir, cp_path, stem, opts.plot_all, opts.ext, opts.objective
+        )
+        if stem is not None:
+            record.note("best_model", found["info"].get(f"best model - {opts.objective}"))
+
+    if output_file is None:
+        compare(None)
+    else:
+        _figures_written(record, output_file, compare)
+    best_model_info, figure = found["info"], found["figure"]
     best = best_model_info.get(f"best model - {opts.objective}")
     if project is not None and best:
         compared = [relative_path(project, model) for model in sorted(models_in(model_dir, opts.ext))]
@@ -174,17 +219,23 @@ def make_df(model_fit: str, index: dict | str, output_file: str | Path) -> MakeD
     extension = output_file.suffix[1:]
     if extension not in ["csv", "parquet"]:
         raise ValueError(f"Extension {extension} is not supported. Please use .csv or .parquet.")
+    _check("make-df", index, (model_fit, MODEL_ADVICE))
     record = _start("make-df", None, index, model_fit)
-    make_df_wrapper(model_fit, index, output_file, extension)
     result = MakeDfResult(dataframe_file=output_file,
                           stats_file=output_file.with_name(f"{output_file.stem}_stats.{extension}"))
-    _finish(record, output_file, [result.dataframe_file, result.stats_file])
+    with atomic_outputs(output_file.with_suffix(""), (f".{extension}", f"_stats.{extension}", ".yaml")) as temporary:
+        partial = Path(f"{temporary}.{extension}")
+        make_df_wrapper(model_fit, index, partial, extension)
+        write_record(partial, record.finish({"files": [str(result.dataframe_file), str(result.stats_file)]}))
     return result
 
 
 def make_crowd_movies(index: dict | str, model_path: str, output_dir: str, opts: CrowdMovieOptions) -> CrowdMoviesResult:
     """Write a crowd movie for each syllable into ``output_dir``."""
+    _check("make-crowd-movies", index, (model_path, MODEL_ADVICE))
     record = _start("make-crowd-movies", opts, index, model_path)
+    # movies rendered partway never carry a record, so the labeler renders them again
+    sidecar_path(output_dir).unlink(missing_ok=True)
     result = CrowdMoviesResult(movies=make_crowd_movies_wrapper(index, model_path, output_dir, opts.as_dict()))
     _finish(record, output_dir, [movie for movies in result.movies.values() for movie in movies]
             if isinstance(result.movies, dict) else [])
@@ -245,40 +296,45 @@ def rerender_message(output_dir: str, reasons: list[str]) -> str:
 
 def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:
     """Plot each group's scalar summary to ``<output_file>_summary``."""
+    _check("plot-scalar-summary", index)
     record = _start("plot-scalar-summary", opts, index)
-    plot_scalar_summary_wrapper(index, output_file, colors=opts.colors)
-    _finish(record, f"{output_file}_summary", _figures(output_file, "_summary"))
+    _figures_written(record, output_file,
+                     lambda stem: plot_scalar_summary_wrapper(index, stem, colors=opts.colors), "_summary")
     return FiguresResult(figure_files=_figures(output_file, "_summary"))
 
 
 def plot_group_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
     """Plot each group's mean position heatmap to ``output_file``."""
+    _check("plot-group-position-heatmaps", index)
     record = _start("plot-group-position-heatmaps", opts, index)
-    plot_mean_group_position_pdf_wrapper(index, output_file, normalize=opts.normalize)
-    _finish(record, output_file, _figures(output_file))
+    _figures_written(record, output_file,
+                     lambda stem: plot_mean_group_position_pdf_wrapper(index, stem, normalize=opts.normalize))
     return FiguresResult(figure_files=_figures(output_file))
 
 
 def plot_verbose_position_heatmaps(index: dict | str, output_file: str, opts: HeatmapOptions) -> FiguresResult:
     """Plot each session's position heatmap to ``output_file``."""
+    _check("plot-verbose-position-heatmaps", index)
     record = _start("plot-verbose-position-heatmaps", opts, index)
-    plot_verbose_pdfs_wrapper(index, output_file, normalize=opts.normalize)
-    _finish(record, output_file, _figures(output_file))
+    _figures_written(record, output_file,
+                     lambda stem: plot_verbose_pdfs_wrapper(index, stem, normalize=opts.normalize))
     return FiguresResult(figure_files=_figures(output_file))
 
 
 def plot_transition_graph(index: dict | str, model_fit: str, output_file: str,
                           opts: TransitionGraphOptions) -> FiguresResult:
     """Plot each group's transition graph to ``output_file``."""
+    _check("plot-transition-graph", None, (model_fit, MODEL_ADVICE))  # it reads the model's labels only
     record = _start("plot-transition-graph", opts, index, model_fit)
-    plot_transition_graph_wrapper(index, model_fit, output_file, opts.as_dict())
-    _finish(record, output_file, _figures(output_file))
+    _figures_written(record, output_file,
+                     lambda stem: plot_transition_graph_wrapper(index, model_fit, stem, opts.as_dict()))
     return FiguresResult(figure_files=_figures(output_file))
 
 
 def plot_stats(index: dict | str, model_fit: str, output_file: str, opts: StatsPlotOptions) -> FiguresResult:
     """Plot a syllable statistic for each group to ``output_file``."""
+    _check("plot-stats", index, (model_fit, MODEL_ADVICE))
     record = _start("plot-stats", opts, index, model_fit)
-    plot_syllable_stat_wrapper(model_fit, index, output_file, **opts.as_dict())
-    _finish(record, output_file, _figures(output_file))
+    _figures_written(record, output_file,
+                     lambda stem: plot_syllable_stat_wrapper(model_fit, index, stem, **opts.as_dict()))
     return FiguresResult(figure_files=_figures(output_file))

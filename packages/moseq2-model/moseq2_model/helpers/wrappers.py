@@ -8,8 +8,10 @@ import glob
 import click
 import numpy as np
 from collections import OrderedDict
+from pathlib import Path
 from copy import deepcopy
 from cytoolz import valmap
+from moseq2_common.records import atomic_output
 from moseq2_model.train.util import (
     ModelNaNError,
     train_model,
@@ -70,6 +72,13 @@ def prepare_output_file(dest_file):
             f"write to the folder {dirname(dest_file)}. Choose a path in a folder you "
             "can write to, or change that folder's permissions, and run again."
         )
+
+
+def partial_name(dest_file):
+    """The temporary name a model or applied-model file is written under: ``.<name>.partial`` with its
+    extension, which tells ``save_dict`` the format."""
+    dest = Path(dest_file)
+    return dest.with_name(f".{dest.stem}.partial{dest.suffix}")
 
 
 def learn_model_wrapper(input_file, dest_file, config_data):
@@ -241,8 +250,10 @@ def learn_model_wrapper(input_file, dest_file, config_data):
         "pc_score_path": os.path.abspath(input_file),
     }
 
-    # Save model
-    save_dict(filename=dest_file, obj_to_save=export_dict)
+    # Save model, under a temporary name renamed into place when it is written, so a save stopped partway
+    # leaves the previous model as it was
+    with atomic_output(dest_file, partial_name(dest_file)) as partial:
+        save_dict(filename=str(partial), obj_to_save=export_dict)
 
     if interrupt:
         raise KeyboardInterrupt()
