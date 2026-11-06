@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from moseq2_common.bookkeeping import recording_order
 from moseq2_common.frames import clean_frames as clean_frames_spatial, odd_kernel
 from moseq2_common.h5 import extraction_labels
+from moseq2_common.records import StepInputError
 from moseq2_common.timestamps import frame_steps, timestamps_path
 from moseq2_common.yaml import write_yaml
 from tqdm.auto import tqdm
@@ -355,6 +356,10 @@ CROP_SIZE_SOURCES = (
 )
 
 
+class FrameCountError(StepInputError, ValueError):
+    """A session's extraction holds a different number of frames and timestamps."""
+
+
 def check_frame_counts(h5s, h5_path='/frames'):
     """
     Stop before PCA when a session's extraction holds a different number of
@@ -374,7 +379,7 @@ def check_frame_counts(h5s, h5_path='/frames'):
                 continue
             n_frames, n_timestamps = len(f[h5_path]), len(f[path])
         if n_frames != n_timestamps:
-            raise ValueError(
+            raise FrameCountError(
                 f'The extraction {h5} holds {n_frames} frames ({h5_path}) and {n_timestamps} timestamps '
                 f'({path}). Each frame needs one timestamp, so its dropped frames cannot be placed and its '
                 f'timing is unknown. Extract that session again, then run this step again.'

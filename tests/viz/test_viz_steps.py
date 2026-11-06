@@ -158,3 +158,26 @@ def test_steps_take_no_argument_no_caller_passes(steps, options):
     assert "sessions" not in inspect.signature(steps.make_crowd_movies).parameters
     assert list(inspect.signature(steps.make_df).parameters) == ["model_fit", "index", "output_file"]
     assert not hasattr(options, "MakeDfOptions")
+
+
+#: Each plot command and the name its figures get when no --output-file is given.
+PLOT_NAMES = {"plot-scalar-summary": "scalars", "plot-group-position-heatmaps": "group_heat_map",
+              "plot-verbose-position-heatmaps": "session_heat_map", "plot-transition-graph": "transitions",
+              "plot-stats": "syll_stat"}
+
+
+@pytest.mark.parametrize("command", PLOT_NAMES)
+def test_a_plot_without_an_output_file_lands_in_the_projects_plots(command, files, tmp_path, monkeypatch, steps):
+    """Run from another folder with --project-file, a plot goes to the project's ``plots/`` folder, decided when
+    the command runs; it used to go to the folder moseq2-viz was imported in."""
+    step, _, arguments = COMMANDS[command]
+    written = []
+    monkeypatch.setattr(steps, step, lambda *args, **kwargs: written.append(args[-2]))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    result = CliRunner().invoke(viz_cli.cli, [command, *(str(files / a) for a in arguments),
+                                              "--project-file", str(files / "moseq2-project.yaml")],
+                                catch_exceptions=False)
+    assert result.exit_code == 0, result.output
+    assert written == [str(files / "plots" / PLOT_NAMES[command])]

@@ -495,7 +495,7 @@ class ProjectCommand(click.Command):
     Its options are parsed first, so ``--help`` answers anywhere. The folders
     checked are the working folder, the folder of a ``--project-file`` given,
     and the project ``--config-file`` (or the ``config-file`` argument) belongs
-    to (``find_project``). A step's input check (``moseq2_common.records.InputError``)
+    to (``find_project``). A step's input check (``moseq2_common.records.StepInputError``)
     prints as a message, not a traceback.
     """
 
@@ -514,11 +514,11 @@ class ProjectCommand(click.Command):
                 check_not_old(folder)
         except OldProjectError as error:
             raise click.ClickException(str(error)) from None
-        from moseq2_common.records import InputError
+        from moseq2_common.records import StepInputError
 
         try:
             return super().invoke(ctx)
-        except InputError as error:  # a step's input check: a message, not a traceback
+        except StepInputError as error:  # a step's input check: a message, not a traceback
             raise click.ClickException(str(error)) from None
 
 

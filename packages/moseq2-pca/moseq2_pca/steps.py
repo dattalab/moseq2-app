@@ -55,7 +55,8 @@ from pathlib import Path
 import click
 import h5py
 
-from moseq2_common.bookkeeping import BookkeepingError, relative_path, session_index, sessions_folder, update
+from moseq2_common.bookkeeping import (SESSION_ADVICE, BookkeepingError, relative_path, session_index, sessions_folder,
+                                       update)
 from moseq2_common.options import read_config
 from moseq2_common.project import Project
 from moseq2_common.records import atomic_outputs, check_inputs, start_record, write_h5_record
@@ -137,11 +138,12 @@ def _written(output_dir, output_file):
     return Path(join(abspath(output_dir), f'{output_file}.h5'))
 
 
-#: What to do about each kind of file a PCA step reads, when it is unusable.
-SESSION_ADVICE = ("Extract that session again (moseq2-extract extract, or the notebook's extraction cell), then "
-                  "run this step again.")
+#: What to do about the components a PCA step reads, when they are unusable (a session's: ``SESSION_ADVICE``).
 COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's PCA cell), or give the components "
                      "file it wrote with --pca-file.")
+#: ``compute-changepoints`` reads the components the project names, and has no --pca-file.
+CHANGEPOINTS_COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's PCA cell), or run this "
+                                  "step in the project whose moseq2-project.yaml names the components.")
 
 
 def _sessions(input_dir, project):
@@ -164,6 +166,14 @@ def _check(step, sessions, *files):
     h5s = sessions if isinstance(sessions, list) else find_extractions(sessions)[0]
     check_inputs(step, {**{h5: SESSION_ADVICE for h5 in h5s}, **dict(files)})
     check_frame_counts(h5s)
+
+
+def _settings(opts, output_dir):
+    """What a wrapper runs with: ``opts``, with Dask spilling into ``output_dir`` when no ``dask_cache_path``
+    is set."""
+    settings = opts.as_dict()
+    settings['dask_cache_path'] = settings.get('dask_cache_path') or abspath(output_dir)
+    return settings
 
 
 def _keep_existing(written, overwrite):
@@ -230,7 +240,7 @@ def train_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Tr
     if _keep_existing(written, opts.overwrite_pca_train):
         return TrainPCAResult(components_file=None)
     record = _start("train-pca", opts, sessions, project)
-    settings = {**opts.as_dict(), 'overwrite_pca_train': True}
+    settings = {**_settings(opts, output_dir), 'overwrite_pca_train': True}
     components = _write(record, written, TRAIN_FIGURES, lambda name: bool(
         train_pca_wrapper(sessions, settings, output_dir, name).get('pca_file')))
     _record(project, "components", components)
@@ -249,7 +259,7 @@ def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: Ap
     if _keep_existing(written, opts.overwrite_pca_apply):
         return ApplyPCAResult(scores_file=None)
     record = _start("apply-pca", opts, sessions, project, components_file)
-    settings = {**opts.as_dict(), 'pca_file': components_file, 'overwrite_pca_apply': True}
+    settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'overwrite_pca_apply': True}
     scores = _write(record, written, (), lambda name: apply_pca_wrapper(sessions, settings, output_dir, name)[1])
     _record(project, "scores", scores)
     return ApplyPCAResult(scores_file=scores)
@@ -262,10 +272,10 @@ def compute_changepoints(input_dir: str | None, output_dir: str, output_file: st
     write ``<output_dir>/<output_file>.h5``."""
     components = _components(components_file, output_dir)
     sessions = _sessions(input_dir, project)
-    _check("compute-changepoints", sessions, (components, COMPONENTS_ADVICE))
+    _check("compute-changepoints", sessions, (components, CHANGEPOINTS_COMPONENTS_ADVICE))
     check_trained_settings(components, project)
     record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
-    settings = {**opts.as_dict(), 'pca_file': components_file, 'pca_file_scores': scores_file}
+    settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'pca_file_scores': scores_file}
 
     def work(name):
         compute_changepoints_wrapper(sessions, settings, output_dir, name)

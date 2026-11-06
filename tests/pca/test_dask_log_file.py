@@ -158,7 +158,11 @@ def test_logging_is_restored_afterwards(tmp_path, sessions, busy_port, monkeypat
     """After the command, distributed's loggers have the handlers they had before."""
     names = ("distributed", "distributed.client", "distributed.gc", "dask", "tornado", "bokeh")
     before = {n: (list(logging.getLogger(n).handlers), logging.getLogger(n).propagate) for n in names}
-    monkeypatch.setattr(wrappers, "train_pca_dask", lambda **kwargs: log_like_distributed())
+    def trained(**kwargs):
+        log_like_distributed()
+        return {"components": np.zeros((4, 64)), "explained_variance_ratio": np.full(4, 0.25)}
+
+    monkeypatch.setattr(wrappers, "train_pca_dask", trained)
     wrappers.train_pca_wrapper(str(sessions), defaults(train_pca, tmp_path, busy_port),
                                str(tmp_path / "_pca"), "pca")
     after = {n: (list(logging.getLogger(n).handlers), logging.getLogger(n).propagate) for n in names}

@@ -29,7 +29,7 @@ from moseq2_extract.recordings import find_recordings, outputs_in, project_keys,
 from moseq2_common.project import session_key
 from dataclasses import fields
 from moseq2_common.frames import CleaningOptions, select_strel
-from moseq2_common.records import atomic_output, start_record, write_h5_record
+from moseq2_common.records import StepInputError, atomic_output, start_record, write_h5_record
 from moseq2_extract.util import (
     gen_batch_sequence,
     scalar_attributes,
@@ -214,6 +214,15 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
     return roi, bground_im, first_frame
 
 
+class FlipClassifierError(StepInputError, ValueError):
+    """The flip classifier ``flip_classifier`` names cannot be read, or was trained for another crop size or
+    other cleaning settings than extraction's."""
+
+
+class FlipClassifierMissingError(StepInputError, FileNotFoundError):
+    """The flip classifier ``flip_classifier`` names does not exist."""
+
+
 class NoFlipClassifierWarning(Warning):
     """
     A recording is extracted without a flip classifier. A subclass of Warning
@@ -278,7 +287,7 @@ def _check_trained_cleaning(flip_classifier, trained, config_data):
     differ, then = min(differences, key=lambda item: len(item[0]))
     listed = "; ".join(f"{name} {_shown(then[name])} in training, {_shown(now[name])} in this extraction"
                        for name in differ)
-    raise ValueError(
+    raise FlipClassifierError(
         f"The flip classifier {flip_classifier} was trained on frames cleaned with other settings than this "
         f"extraction uses: {listed}. A classifier sees frames as they were cleaned in training, so it would "
         f"orient these mice less reliably. Set {', '.join(differ)} back to the training values in config.yaml's "
@@ -305,7 +314,7 @@ def validate_flip_classifier(config_data):
         return
 
     if not exists(flip_classifier):
-        raise FileNotFoundError(
+        raise FlipClassifierMissingError(
             f"The flip classifier {flip_classifier} (flip_classifier in config.yaml's extract section, or "
             "--flip-classifier) does not exist. Correct the path; download a classifier with `moseq2-extract "
             "download-flip-file config.yaml`, which writes its path into config.yaml; or set flip_classifier to "
@@ -317,7 +326,7 @@ def validate_flip_classifier(config_data):
     try:
         clf = load_flip_classifier(flip_classifier)
     except Exception as error:
-        raise ValueError(
+        raise FlipClassifierError(
             f"The flip classifier {flip_classifier} could not be read ({type(error).__name__}: {error}). Check "
             "that flip_classifier names a classifier file: one downloaded with `moseq2-extract download-flip-file "
             "config.yaml` (an .npz), or one saved by the Flip-Classifier-Training notebook."
@@ -328,7 +337,7 @@ def validate_flip_classifier(config_data):
     if n_features is None and trained.get("crop_size") is not None:
         trained_crop = tuple(trained["crop_size"])
         if trained_crop != crop_size:
-            raise ValueError(
+            raise FlipClassifierError(
                 f"The flip classifier {flip_classifier} was trained on frames cropped to {trained_crop}, but "
                 f"crop_size is {crop_size}. Set crop_size to {trained_crop} in config.yaml (in the arena tool, its "
                 f"crop size box), or train the classifier again on extractions made with crop_size {crop_size}."
@@ -336,7 +345,7 @@ def validate_flip_classifier(config_data):
     elif n_features is not None and crop_size[0] * crop_size[1] != n_features:
         actual_features = crop_size[0] * crop_size[1]
         expected_crop = int(math.sqrt(n_features))
-        raise ValueError(
+        raise FlipClassifierError(
             f"\nFlip classifier / crop size mismatch!\n\n"
             f"  Your crop_size is {crop_size} ({actual_features} pixels per frame),\n"
             f"  but the flip classifier at\n"

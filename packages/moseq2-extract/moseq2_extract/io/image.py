@@ -8,6 +8,7 @@ import json
 import numpy as np
 import tifffile
 from os.path import join, dirname, exists
+from moseq2_common.records import atomic_output, partial_name
 
 
 def read_tiff_files(input_dir):
@@ -40,7 +41,7 @@ def write_image(
     filename, image, scale=True, scale_factor=None, frame_dtype="uint16", compress=0
 ):
     """
-    Save image data.
+    Save image data, under a temporary name renamed to ``filename`` when complete.
 
     Args:
     filename (str): path to output file
@@ -86,9 +87,10 @@ def write_image(
     else:
         compression = {}
 
-    tifffile.imwrite(
-        file, image.astype(frame_dtype), metadata=metadata, **compression
-    )
+    with atomic_output(file, partial_name(file)) as partial:
+        tifffile.imwrite(
+            partial, image.astype(frame_dtype), metadata=metadata, **compression
+        )
 
 
 def read_image(filename, scale=True, scale_key="scale_factor"):

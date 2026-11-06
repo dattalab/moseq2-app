@@ -14,7 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from moseq2_common.bookkeeping import load, resolve_path, session_h5
 from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
 from moseq2_common.options import read_settings
-from moseq2_common.records import read_record
+from moseq2_common.records import atomic_output, partial_name, read_record
 from moseq2_common.project import find_project
 from moseq2_extract.extract.flip_classifier import TRAINING_SETTINGS_ATTRIBUTE
 from moseq2_extract.extract.proc import clean_frames
@@ -220,7 +220,8 @@ def create_training_dataset(data_index_path: str, cleaning) -> Path:
 
     flipped = np.concatenate((flipped, flipped, flipped), axis=0)
 
-    np.savez(out_path, frames=frames, flipped=flipped)
+    with atomic_output(out_path, partial_name(out_path)) as partial:
+        np.savez(partial, frames=frames, flipped=flipped)
     return out_path
 
 
@@ -303,5 +304,7 @@ def save_classifier(clf_pipeline, out_path: str, settings: Mapping | None = None
     """Save the classifier to ``out_path``, carrying ``settings`` (``training_settings``) when given."""
     if settings is not None:
         setattr(clf_pipeline, TRAINING_SETTINGS_ATTRIBUTE, dict(settings))
-    joblib.dump(clf_pipeline, out_path)
+    # joblib picks the compression from the extension, which the temporary name keeps
+    with atomic_output(out_path, partial_name(out_path)) as partial:
+        joblib.dump(clf_pipeline, partial)
     print(f"Classifier saved to {out_path}")

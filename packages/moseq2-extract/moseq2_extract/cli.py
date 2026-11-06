@@ -187,11 +187,11 @@ def _typed_extract_options(ctx):
 def batch_extract(ctx, input_folder, config_file, **_):
     config_file = _project_config(config_file)
     if not config_file:
-        # Add message to tell the users to specify a config file
-        print(
-            "Command not run. Please specified a config file using --config-file flag."
+        raise click.ClickException(
+            f"batch-extract needs a project's config.yaml, and there is none in {os.getcwd()}. Run it from the "
+            "project folder, pass --config-file /path/to/project/config.yaml, or write a config.yaml here first "
+            "with `moseq2-extract generate-config`."
         )
-        return
     config = command_settings(ctx, BatchExtractOptions, stage_classes=EXTRACT_STAGE)
     opts = BatchExtractOptions.resolve(config=config, explicit=explicit_values(ctx, BatchExtractOptions))
     typed = _typed_extract_options(ctx)

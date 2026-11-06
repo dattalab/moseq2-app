@@ -150,7 +150,10 @@ def test_both_front_ends_hand_the_wrapper_the_same_settings(tmp_path, monkeypatc
     train_pca_command(str(tmp_path / "notebook"), "pca")
 
     cli, notebook = received
-    fields = list(options.TrainPCAOptions().as_dict())
+    # each spills into its own project's _pca/
+    assert cli.pop("dask_cache_path") == str(tmp_path / "cli" / "_pca")
+    assert notebook.pop("dask_cache_path") == str(tmp_path / "notebook" / "_pca")
+    fields = [k for k in options.TrainPCAOptions().as_dict() if k != "dask_cache_path"]
     assert {k: cli[k] for k in fields} == {k: notebook[k] for k in fields}
 
 
@@ -185,3 +188,27 @@ def test_pca_steps_run_from_a_script_without_a_config_file(tmp_path, extracted, 
     assert scores.scores_file.is_file()
     assert changepoints.changepoints_file.is_file()
     assert list(tmp_path.rglob("config.yaml")) == []
+
+
+def test_the_dask_cache_defaults_to_the_projects_pca_folder(tmp_path, monkeypatch, steps):
+    """Run from another folder on a project's config.yaml, Dask spills into the project's ``_pca/``, decided when
+    the step runs; it used to spill into ``_pca/`` in the folder moseq2-pca was imported in."""
+    from moseq2_extract.gui import generate_config_command
+
+    from configs import write_bookkeeping, write_session_labels
+
+    received = []
+    monkeypatch.setattr(steps, "train_pca_wrapper",
+                        lambda input_dir, config_data, *_: received.append(dict(config_data)) or config_data)
+    project = tmp_path / "project"
+    project.mkdir()
+    generate_config_command(str(project / "config.yaml"), camera_type="k2")
+    write_bookkeeping(project, ["aggregate_results/s0"])
+    write_session_labels(project, ["aggregate_results/s0"])
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    result = CliRunner().invoke(pca_cli.cli, ["train-pca", "--config-file", str(project / "config.yaml")],
+                                catch_exceptions=False)
+    assert result.exit_code == 0, result.output
+    assert received[0]["dask_cache_path"] == str(project / "_pca")

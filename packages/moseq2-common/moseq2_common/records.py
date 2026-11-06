@@ -34,13 +34,15 @@ and the recording's arena entry, and ``read_record`` serves display and checks.
 record of an output, a session's folder or a session key.
 
 Outputs and their record are written together through a temporary name renamed
-into place (``atomic_output``, or ``atomic_outputs`` for the files a writer names
+into place (``atomic_output``, with ``partial_name`` for a writer that tells the
+format from the extension, or ``atomic_outputs`` for the files a writer names
 from one stem), so an interrupted step leaves the previous output and record as
 they were.
 
 Each step checks the files it reads before any work (``check_inputs``): one that
 does not exist, is empty or cannot be read stops it with a message naming the
-step, the file and what to do (``InputError``).
+step, the file and what to do (``InputError``). Every such check, here or in a
+package, raises a ``StepInputError``, which the command line prints as a message.
 """
 
 from __future__ import annotations
@@ -63,9 +65,9 @@ import numpy as np
 
 from moseq2_common.yaml import dump_block_yaml, read_yaml
 
-__all__ = ["RECORD_ATTRIBUTE", "InputError", "Record", "atomic_output", "atomic_outputs", "check_inputs",
-           "fingerprint", "find_record", "print_record_command", "read_record", "record_text", "sidecar_path",
-           "start_record", "write_h5_record", "write_record", "write_sidecar"]
+__all__ = ["RECORD_ATTRIBUTE", "InputError", "Record", "StepInputError", "atomic_output", "atomic_outputs",
+           "check_inputs", "fingerprint", "find_record", "partial_name", "print_record_command", "read_record",
+           "record_text", "sidecar_path", "start_record", "write_h5_record", "write_record", "write_sidecar"]
 
 #: The attribute of an ``.h5`` output holding its record.
 RECORD_ATTRIBUTE = "provenance"
@@ -327,6 +329,13 @@ def write_record(output: str | os.PathLike, record: Mapping) -> Path:
     return write_sidecar(output, record)
 
 
+def partial_name(path: str | os.PathLike) -> Path:
+    """The temporary name of ``path`` that keeps its extension (``.<stem>.partial<suffix>``), for
+    ``atomic_output`` around a writer that tells the format from the extension."""
+    path = Path(path)
+    return path.with_name(f".{path.stem}.partial{path.suffix}")
+
+
 @contextlib.contextmanager
 def atomic_output(path: str | os.PathLike, temporary: str | os.PathLike | None = None) -> Iterator[Path]:
     """Yield a temporary name beside ``path`` to write to; rename it to ``path`` when the block completes.
@@ -365,7 +374,15 @@ def atomic_outputs(stem: str | os.PathLike, suffixes: Sequence[str]) -> Iterator
 # ------------------------------------------------------------------ checking inputs
 
 
-class InputError(ValueError):
+class StepInputError(Exception):
+    """A step's inputs or settings are not usable, found by a check at the top of the step before any work.
+
+    Its message names what was found and says what to do; a ``ProjectCommand`` prints it as a message,
+    not a traceback. The packages' checks subclass it (with ``ValueError``, as they raised before).
+    """
+
+
+class InputError(StepInputError, ValueError):
     """A file a step needs that does not exist, is empty or cannot be read."""
 
 

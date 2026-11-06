@@ -49,7 +49,7 @@ CAMERA_PRESETS: dict[str, dict[str, dict]] = {
 _CAMERA_TYPE = {"azure": "azure", "kinect": "auto"}
 
 #: Settings left out of a generated file: ``dask_cache_path``'s default is the folder
-#: moseq2-pca was imported in, which a file would pin to wherever it was generated.
+#: each PCA step writes to, decided when the step runs.
 _NOT_GENERATED = ("dask_cache_path",)
 
 

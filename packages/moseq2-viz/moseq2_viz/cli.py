@@ -14,7 +14,6 @@ project the commands stop, saying where they looked; ``get-best-model`` alone
 runs outside one.
 """
 
-import os
 
 import click
 
@@ -71,8 +70,16 @@ def _argument(name):
     return click.argument(name, type=click.Path(exists=True, resolve_path=True))
 
 
-def _output_file(default, help=None):
-    return click.option("--output-file", type=click.Path(), default=default, help=help)
+def _output_file(name):
+    """A plot's ``--output-file``; without it, the figure is ``plots/<name>`` in the project (``_plot_file``)."""
+    return click.option("--output-file", type=click.Path(), default=None, show_default=False,
+                        help=f"Path of the figure, without its extension (default: plots/{name} in the project "
+                             "folder)")
+
+
+def _plot_file(ctx, output_file, name):
+    """``--output-file``, or ``plots/<name>`` in the command's project, decided when the command runs."""
+    return output_file or str(output_folder(ctx) / "plots" / name)
 
 
 @cli.command(
@@ -152,11 +159,12 @@ def make_crowd_movies(ctx, model_path, output_dir, **_):
 )
 @click_options(ScalarSummaryOptions, order=("output_file", "colors", "project_file"), others={
     "project_file": _project_file(),
-    "output_file": _output_file(os.path.join(os.getcwd(), "scalars")),
+    "output_file": _output_file("scalars"),
 })
 @click.pass_context
 def plot_scalar_summary(ctx, output_file, **_):
-    steps.plot_scalar_summary(_sessions(ctx), output_file, _resolve(ctx, ScalarSummaryOptions))
+    steps.plot_scalar_summary(_sessions(ctx), _plot_file(ctx, output_file, "scalars"),
+                              _resolve(ctx, ScalarSummaryOptions))
     print("Sucessfully plotted scalar summary")
 
 
@@ -165,11 +173,12 @@ def plot_scalar_summary(ctx, output_file, **_):
 )
 @click_options(HeatmapOptions, order=("output_file", "normalize", "project_file"), others={
     "project_file": _project_file(),
-    "output_file": _output_file(os.path.join(os.getcwd(), "group_heat_map")),
+    "output_file": _output_file("group_heat_map"),
 })
 @click.pass_context
 def plot_group_position_heatmaps(ctx, output_file, **_):
-    steps.plot_group_position_heatmaps(_sessions(ctx), output_file, _resolve(ctx, HeatmapOptions))
+    steps.plot_group_position_heatmaps(_sessions(ctx), _plot_file(ctx, output_file, "group_heat_map"),
+                                       _resolve(ctx, HeatmapOptions))
     print("Sucessfully plotted mean group heatmaps")
 
 
@@ -179,11 +188,12 @@ def plot_group_position_heatmaps(ctx, output_file, **_):
 )
 @click_options(HeatmapOptions, order=("output_file", "normalize", "project_file"), others={
     "project_file": _project_file(),
-    "output_file": _output_file(os.path.join(os.getcwd(), "session_heat_map")),
+    "output_file": _output_file("session_heat_map"),
 })
 @click.pass_context
 def plot_verbose_position_heatmaps(ctx, output_file, **_):
-    steps.plot_verbose_position_heatmaps(_sessions(ctx), output_file, _resolve(ctx, HeatmapOptions))
+    steps.plot_verbose_position_heatmaps(_sessions(ctx), _plot_file(ctx, output_file, "session_heat_map"),
+                                         _resolve(ctx, HeatmapOptions))
     print("Sucessfully plotted mean group heatmaps")
 
 
@@ -198,11 +208,11 @@ def plot_verbose_position_heatmaps(ctx, output_file, **_):
 ), others={
     "project_file": _project_file(),
     "model_fit": _argument("model-fit"),
-    "output_file": _output_file(os.path.join(os.getcwd(), "transitions"), "Filename to store plot"),
+    "output_file": _output_file("transitions"),
 })
 @click.pass_context
 def plot_transition_graph(ctx, model_fit, output_file, **_):
-    steps.plot_transition_graph(_sessions(ctx), model_fit, output_file,
+    steps.plot_transition_graph(_sessions(ctx), model_fit, _plot_file(ctx, output_file, "transitions"),
                                 _resolve(ctx, TransitionGraphOptions))
 
 
@@ -216,12 +226,12 @@ def plot_transition_graph(ctx, model_fit, output_file, **_):
 ), others={
     "project_file": _project_file(),
     "model_fit": _argument("model-fit"),
-    "output_file": _output_file(os.path.join(os.getcwd(), "syll_stat"), "Filename to store plot"),
+    "output_file": _output_file("syll_stat"),
 })
 @click.pass_context
 def plot_stats(ctx, model_fit, output_file, **_):
     opts = _resolve(ctx, StatsPlotOptions)
-    steps.plot_stats(_sessions(ctx), model_fit, output_file, opts)
+    steps.plot_stats(_sessions(ctx), model_fit, _plot_file(ctx, output_file, "syll_stat"), opts)
     click.echo(f'Syllable {opts.stat} graph created successfully')
 
 

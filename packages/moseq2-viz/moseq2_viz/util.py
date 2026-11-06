@@ -179,7 +179,11 @@ def parse_index(index: Union[str, dict]) -> tuple:
         )
 
     if index["pca_path"] is None:
-        raise Exception("Please add pac_score path to moseq2-index.yaml")
+        raise ValueError(
+            "The index given has no pca_path, the PCA scores file holding its sessions' scores. Set pca_path "
+            "to the scores file apply-pca wrote, or pass a project's sessions "
+            "(moseq2_common.bookkeeping.session_index), which name the project's scores."
+        )
     uuid_sorted = {
         "files": sorted_index,
         "pca_path": (
