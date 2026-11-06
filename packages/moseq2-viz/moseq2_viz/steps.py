@@ -34,6 +34,7 @@ from moseq2_common.records import start_record, write_record
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
     get_best_fit_model_wrapper,
+    models_in,
     make_crowd_movies_wrapper,
     make_df_wrapper,
     plot_mean_group_position_pdf_wrapper,
@@ -125,7 +126,8 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
                    opts: BestModelOptions, *, project: Project | None = None) -> BestModelResult:
     """Pick the model in ``model_dir`` closest to the changepoints in ``cp_path``; plot the comparison.
 
-    In a project, the model picked becomes the project's current model.
+    In a project, every model compared is listed among the project's fitted models (a kappa scan's fits,
+    run as jobs, record nothing themselves), and the model picked becomes the current model.
     """
     record = _start("get-best-model", opts, None, model_dir, cp_path)
     best_model_info, figure = get_best_fit_model_wrapper(
@@ -136,12 +138,14 @@ def get_best_model(model_dir: str, cp_path: str, output_file: str | None,
         _finish(record, output_file, _figures(output_file))
     best = best_model_info.get(f"best model - {opts.objective}")
     if project is not None and best:
+        compared = [relative_path(project, model) for model in sorted(models_in(model_dir, opts.ext))]
         model = relative_path(project, best)
 
         def change(bookkeeping):
             fitted = bookkeeping.models.setdefault("fitted", [])
-            if model not in fitted:
-                fitted.append(model)
+            for name in [*compared, model]:
+                if name not in fitted:
+                    fitted.append(name)
             bookkeeping.models["current"] = model
 
         update(project, change)

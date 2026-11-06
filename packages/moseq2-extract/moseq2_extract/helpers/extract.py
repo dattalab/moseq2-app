@@ -3,9 +3,8 @@ Extraction-helper utility functions.
 """
 
 import numpy as np
-from moseq2_common.project import write_job_settings
-from moseq2_common.slurm import sbatch_command
-from os.path import exists, join, abspath
+from moseq2_common.slurm import command_line, job_settings_file, sbatch_command
+from os.path import join, abspath
 from os import makedirs, system
 from tqdm.auto import tqdm
 from moseq2_extract.extract.extract import extract_chunk
@@ -315,31 +314,29 @@ def run_slurm_extract(
     input_dir,
     to_extract,
     config_data,
-    skip_extracted=False,
     num_frames=None,
     cli_options=None,
-    project=None,
     output_dirs=None,
+    jobs=None,
 ):
     """
-    Write one sbatch command per session to extract it on a SLURM cluster, and submit them if run_cmd is set.
+    Write one sbatch command per recording to extract it on a SLURM cluster, and submit them if run_cmd is set.
 
-    Each session is extracted with the settings ``recordings_options`` resolves: the arena tool's settings from its
-    entry in the project's session_config.yaml, every other setting from the config file, and the options typed on
-    the command line over both. Each session gets a config.yaml of its own in its session folder whenever the
-    project has a session_config.yaml or an option is typed: those settings, resolved, in config.yaml's ``extract``
-    section, with a ``job:`` block naming ``project`` (``moseq2_common.project.write_job_settings``).
+    Each recording is extracted with the settings ``recordings_options`` resolves: the arena tool's settings from
+    its entry in the project's session_config.yaml, every other setting from the config file, and the options typed
+    on the command line over both. They are written, with the recording's ``job:`` block, to its job settings file
+    in its session folder (``moseq2_common.slurm.job_settings_file(folder, "extract")``), which its command passes to
+    ``--config-file``, so a later edit to the config file does not change a queued job.
 
     Args:
     input_dir (str): directory the sessions were found in; extract_out_script is written there.
-    to_extract (list): list of paths to files to extract
+    to_extract (list): the recordings to submit.
     config_data (dict): batch-extract parameters, including config_file and the SLURM settings.
-    skip_extracted (bool): Whether to skip already extracted session.
     num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
     cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
-    project (moseq2_common.project.Project): the project each session's job file names; None outside a project.
     output_dirs (dict): each recording's session folder, where its job file goes; with
         ``config_data["output_dir"]`` set, the job is given its folder with ``--output-dir``.
+    jobs (dict): each recording's ``job:`` block (the project, the session and its uuid).
     """
 
     assert (
@@ -349,44 +346,26 @@ def run_slurm_extract(
     input_dir = abspath(input_dir)
 
     resolved = recordings_options(config_data["config_file"], to_extract, cli_options)
-    # each session reads a config.yaml written to its output directory when its
-    # parameters can differ from the config file's
-    session_config_files = (project is not None and project.session_config_file.exists()) or bool(cli_options)
-
-    if session_config_files:
-        for depth_file in to_extract:
-            output_dir = output_dirs[depth_file]
-
-            # ensure output_dir exists
-            if not exists(output_dir):
-                makedirs(output_dir)
-
-            # the recording's settings: the arena tool's from its session config entry,
-            # the rest from the config file, typed options over both. It holds the entry
-            # already, so the job's extract does not lay the entry over it again.
-            write_job_settings(join(output_dir, "config.yaml"), "extract",
-                               resolved[depth_file].settings(), project=project)
 
     # Construct sbatch command for slurm
     commands = ""
     for depth_file in to_extract:
         output_dir = output_dirs[depth_file]
+        makedirs(output_dir, exist_ok=True)
 
-        # skip session if skip_extracted is true and the session is already extracted
-        if skip_extracted and exists(join(output_dir, "results.h5")):
-            continue
-
-        # set up config file
-        if session_config_files:
-            config_file = join(output_dir, "config.yaml")
-        else:
-            config_file = config_data["config_file"]
+        # the recording's settings: the arena tool's from its session config entry, the rest from the
+        # config file, typed options over both. It holds the entry already, so the job's extract does
+        # not lay the entry over it again.
+        config_file = resolved[depth_file].to_yaml(job_settings_file(output_dir, "extract"), job=jobs[depth_file])
 
         # construct command
-        frames = f" --num-frames {num_frames}" if num_frames is not None else ""
-        folder = f" --output-dir {output_dir}" if config_data.get("output_dir") else ""
+        words = ["moseq2-extract", "extract", "--config-file", config_file]
+        if num_frames is not None:
+            words += ["--num-frames", num_frames]
+        if config_data.get("output_dir"):
+            words += ["--output-dir", output_dir]
         commands += sbatch_command(
-            f"moseq2-extract extract --config-file {config_file}{frames}{folder} {depth_file}; ",
+            command_line(*words, depth_file) + "; ",
             ncpus=config_data["ncpus"] if config_data["ncpus"] > 0 else 1,
             memory=config_data["memory"],
             partition=config_data["partition"],

@@ -21,15 +21,15 @@ SESSIONS = {"s0": 120, "s1": 140, "s2": 160}
 
 #: The script the kappa-scan step writes for the declared defaults with cluster_type slurm, ncpus 0, three
 #: models and a prefix, on the scores below (420 frames), with the paths relative to the working folder.
-#: Each command passes its fit's settings file to --config-file.
+#: Each command passes its fit's job settings file, beside its model, to --config-file.
 SCAN_SCRIPT = (
-    'set -e\n'
-    'sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
-    'models/model-000-1.p --config-file models/model-000-1-settings.yaml"\n'
-    'sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
-    'models/model-001-100.p --config-file models/model-001-100-settings.yaml"\n'
-    'sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap "module load x; moseq2-model learn-model pca_scores.h5 '
-    'models/model-002-10000.p --config-file models/model-002-10000-settings.yaml"'
+    "set -e\n"
+    "sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap 'module load x; moseq2-model learn-model pca_scores.h5 "
+    "models/model-000-1.p --config-file models/model-000-1-job.yaml'\n"
+    "sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap 'module load x; moseq2-model learn-model pca_scores.h5 "
+    "models/model-001-100.p --config-file models/model-001-100-job.yaml'\n"
+    "sbatch -c 8 --mem=15GB -p short -t 06:00:00 --wrap 'module load x; moseq2-model learn-model pca_scores.h5 "
+    "models/model-002-10000.p --config-file models/model-002-10000-job.yaml'"
 )
 
 
@@ -138,8 +138,10 @@ def test_kappa_scan_commands_are_unchanged(tmp_path, scores, steps, options, mon
     assert result.script.read_text().splitlines() == SCAN_SCRIPT.splitlines()
     assert result.commands == SCAN_SCRIPT
     for i, kappa in enumerate((1, 100, 10000)):
-        settings = read_yaml(str(tmp_path / "models" / steps.KAPPA_SCAN_SETTINGS_NAME.format(i, kappa)))
-        assert settings == {"model": options.LearnModelOptions(kappa=float(kappa)).settings(), "job": {"project": None}}
+        model = tmp_path / "models" / f"model-{i:03d}-{kappa}.p"
+        settings = read_yaml(str(tmp_path / "models" / f"model-{i:03d}-{kappa}-job.yaml"))
+        assert settings == {"model": options.LearnModelOptions(kappa=float(kappa)).settings(),
+                            "job": {"project": None, "model": str(model)}}
 
 
 def test_learn_model_reads_config_file(tmp_path, scores, steps, monkeypatch):

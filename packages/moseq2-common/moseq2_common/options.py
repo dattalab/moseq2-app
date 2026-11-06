@@ -46,7 +46,7 @@ import click
 from click.core import ParameterSource
 from ruamel.yaml import YAMLError
 
-from moseq2_common.yaml import read_yaml
+from moseq2_common.yaml import read_yaml, write_config
 
 __all__ = [
     "SECTIONS",
@@ -153,6 +153,27 @@ class Options:
     def settings(self) -> dict:
         """The fields a settings file holds: every field but the ``setting=False`` switches."""
         return {name: value for name, value in self.as_dict().items() if name in setting_fields(type(self))}
+
+    def to_yaml(self, path: str | os.PathLike, *, job: Mapping) -> Path:
+        """Write these options to ``path`` as a SLURM job's settings file, and return its path.
+
+        The file is in ``config.yaml``'s shape: ``settings()`` in the class's
+        section (``camera_type`` at the top level, where config.yaml holds it),
+        and ``job`` as the top-level ``job:`` block, which names the project
+        (``moseq2_common.project.find_project`` reads it) and the session or
+        model. It is written whole, through a temporary file renamed into place.
+        """
+        settings = self.settings()
+        data = {}
+        if "camera_type" in settings:
+            data["camera_type"] = settings.pop("camera_type")
+        data[self.SECTION] = settings
+        data["job"] = dict(job)
+        path = Path(path)
+        temporary = path.with_name(f".{path.name}.tmp")
+        write_config(data, str(temporary))
+        os.replace(temporary, path)
+        return path
 
 
 def setting_fields(cls: type[Options]) -> tuple[str, ...]:

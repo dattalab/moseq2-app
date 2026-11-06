@@ -28,6 +28,7 @@ import moseq2_extract.steps as extract_steps
 from cells import code_cell
 from moseq2_common.project import Project
 from commands import split_command
+from moseq2_common.slurm import job_settings_file
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_app.util import update_config
@@ -324,7 +325,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
     extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
 
     for key in GROUPED:
-        assert read_yaml(str(session_folder(grouped, key) / "config.yaml"))["extract"]["noise_tolerance"] == tolerance[key], key
+        assert read_yaml(str(job_settings_file(session_folder(grouped, key), "extract")))["extract"]["noise_tolerance"] == tolerance[key], key
     script = (grouped / "extract_out.sh").read_text()
     for line in filter(str.strip, script.splitlines()):
         command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]

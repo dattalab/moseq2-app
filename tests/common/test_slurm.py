@@ -3,7 +3,8 @@
 ``batch-extract`` and ``kappa-scan`` each declared the same seven SLURM options
 and built the same ``sbatch`` line in their own words. ``SlurmOptions`` holds
 the seven, with one ``--get-cmd`` default for both, and ``sbatch_command``
-writes the line both commands write.
+writes the line both commands write, the job's command quoted as ``--wrap``'s
+one argument.
 """
 
 from __future__ import annotations
@@ -22,16 +23,16 @@ from moseq2_common.yaml import read_yaml
 def test_sbatch_command_matches_batch_extracts_line():
     assert sbatch_command("moseq2-extract extract --config-file c.yaml d.dat; ", ncpus=1,
                           memory="5GB", partition="short", wall_time="3:00:00", prefix="") == (
-        'sbatch -c 1 --mem=5GB -p short -t 3:00:00 '
-        '--wrap "moseq2-extract extract --config-file c.yaml d.dat; "'
+        "sbatch -c 1 --mem=5GB -p short -t 3:00:00 "
+        "--wrap 'moseq2-extract extract --config-file c.yaml d.dat; '"
     )
 
 
 def test_sbatch_command_matches_kappa_scans_line():
     assert sbatch_command("moseq2-model learn-model s.h5 m.p --kappa 10", ncpus=8, memory="5GB",
                           partition="short", wall_time="3:00:00", prefix="module load x; ") == (
-        'sbatch -c 8 --mem=5GB -p short -t 3:00:00 '
-        '--wrap "module load x; moseq2-model learn-model s.h5 m.p --kappa 10"'
+        "sbatch -c 8 --mem=5GB -p short -t 3:00:00 "
+        "--wrap 'module load x; moseq2-model learn-model s.h5 m.p --kappa 10'"
     )
 
 

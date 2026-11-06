@@ -117,6 +117,13 @@ def add_group_wrapper(index, config_data):
     return changed
 
 
+def models_in(model_dir, ext="p"):
+    """The model files in ``model_dir``: those ending ``.ext``."""
+    if not ext.startswith("."):
+        ext = "." + ext
+    return glob(join(model_dir, f"*{ext}"), recursive=True)
+
+
 def get_best_fit_model_wrapper(
     model_dir,
     cp_file,
@@ -141,10 +148,7 @@ def get_best_fit_model_wrapper(
     fig (pyplot.figure): figure of model and model-free changepoint comparison.
     """
 
-    # Get models
-    if not ext.startswith("."):
-        ext = "." + ext
-    models = glob(join(model_dir, f"*{ext}"), recursive=True)
+    models = models_in(model_dir, ext)
 
     print(f"Found {len(models)} models in given input folder: {model_dir}")
 

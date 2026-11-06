@@ -123,8 +123,9 @@ def apply_model(ctx, model_file, pc_file, dest_file, project_file, **_):
 
 
 @cli.command(name="kappa-scan", help="Batch train multiple models to scan over different kappa values. Each "
-             "model's learn-model settings are written to a file beside it, which its command passes to "
-             "learn-model --config-file.")
+             "model's learn-model settings are written to a file beside it (model-000-1000-job.yaml for "
+             "model-000-1000.p), which its command passes to learn-model --config-file. The models enter "
+             "the project's moseq2-project.yaml when get-best-model compares them.")
 @click_options(KappaScanOptions, order=KAPPA_SCAN_ORDER, others={
     "input_file": click.argument("input_file", type=click.Path(exists=True)),
     "output_dir": click.argument("output_dir", type=click.Path(exists=False)),

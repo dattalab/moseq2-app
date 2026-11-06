@@ -306,7 +306,7 @@ def test_a_depth_range_passed_explicitly_is_used_as_given():
 # --------------------------------------------------------------------------
 
 def test_a_job_file_names_its_project(project):
-    """A kappa scan's per-fit settings file belongs to the project, not to models/."""
+    """A kappa scan's per-fit job settings file belongs to the project, not to models/."""
     from moseq2_common.project import find_project
     from moseq2_model.gui import learn_model_command
 
@@ -322,7 +322,7 @@ def test_a_job_file_names_its_project(project):
 
     learn_model_command(str(project))
 
-    job_files = sorted((project / "models").glob("model-*-settings.yaml"))
+    job_files = sorted((project / "models").glob("model-*-job.yaml"))
     assert len(job_files) == 2
     for job_file in job_files:
         found = find_project(str(job_file))

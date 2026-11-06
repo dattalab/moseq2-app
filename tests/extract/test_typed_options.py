@@ -21,6 +21,7 @@ from click.testing import CliRunner
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from commands import split_command
+from moseq2_common.slurm import job_settings_file
 from moseq2_common.yaml import read_yaml, write_yaml
 
 
@@ -294,11 +295,11 @@ def test_slurm_batch_extract_without_typed_options_or_session_config(
 
 
 def test_slurm_job_config_holds_the_entry_and_names_no_session_config(project, slurm_extracted):
-    """Each job's config.yaml already holds the recording's entry, so the job's
+    """Each job's settings file already holds the recording's entry, so the job's
     ``extract`` does not lay the project's session_config.yaml over the typed options again."""
     root, config = project
     slurm_extracted(root, config, "--crop-size", "80", "80")
-    job_file = read_yaml(str(root / "aggregate_results" / SESSION / "config.yaml"))
+    job_file = read_yaml(str(job_settings_file(root / "aggregate_results" / SESSION, "extract")))
     job_config = job_file["extract"]
 
     assert "session_config_path" not in job_file

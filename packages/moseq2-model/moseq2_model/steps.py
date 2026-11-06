@@ -20,7 +20,8 @@ its ``.h5``'s ``/provenance`` attribute.
 Inside a project (``project``), ``learn_model`` records the model in the
 project's bookkeeping file as fitted and current, and ``apply_model`` records
 the applied model. A fit run from a kappa scan's job settings file is given no
-``project`` and records nothing; its model enters the bookkeeping file later.
+``project`` and records nothing; its model enters the bookkeeping file when ``get-best-model`` compares
+it (``moseq2_viz.steps.get_best_model``).
 """
 
 from __future__ import annotations
@@ -34,13 +35,6 @@ from moseq2_common.bookkeeping import relative_path, update
 from moseq2_common.project import Project
 from moseq2_common.records import start_record, write_record
 from moseq2_model.options import ApplyModelOptions, KappaScanOptions, LearnModelOptions
-
-#: The file name of each kappa-scan fit's settings, in the scan's output folder beside its model, given the
-#: model's number and kappa (``model-000-1000-settings.yaml``). The fit's command runs
-#: ``learn-model --config-file`` on it, so the fit gets every learn-model option the scan was given. The file
-#: is in config.yaml's shape, its settings in the ``model`` section, with a ``job:`` block naming the project.
-KAPPA_SCAN_SETTINGS_NAME = "model-{:03d}-{}-settings.yaml"
-
 
 @dataclass(frozen=True)
 class LearnModelResult:
@@ -107,14 +101,17 @@ def kappa_scan(input_file: str, output_dir: str, opts: KappaScanOptions, *, inde
                learn: LearnModelOptions | None = None, project: Project | None = None) -> KappaScanResult:
     """Write ``opts.out_script``, one ``learn-model`` command per kappa, each saving its model in ``output_dir``.
 
-    Each fit's learn-model settings go to a ``KAPPA_SCAN_SETTINGS_NAME`` file in ``output_dir``, which its
-    command passes to ``--config-file``: the scan's fitting options and, from ``learn``, the learn-model
-    settings the scan does not declare (``checkpoint_freq``, ``use_checkpoint``, ``default_group``). Its
-    ``job:`` block names ``project``.
+    Each fit's learn-model settings go to its job settings file beside its model
+    (``moseq2_common.slurm.job_settings_file``: ``model-000-1000-job.yaml`` for ``model-000-1000.p``), which
+    its command passes to ``--config-file``: the scan's fitting options and, from ``learn``, the learn-model
+    settings the scan does not declare (``checkpoint_freq``, ``use_checkpoint``, ``default_group``). The
+    file is in config.yaml's shape, its settings in the ``model`` section, with a ``job:`` block naming
+    ``project`` and the model. A fit run from it records nothing in ``moseq2-project.yaml``; the scan's
+    models enter it when ``get-best-model`` compares them.
     """
     record = _start("kappa-scan", opts, project, input_file)
     commands = kappa_scan_fit_models_wrapper(input_file, _settings(opts, {'index': index}), output_dir,
-                                             KAPPA_SCAN_SETTINGS_NAME, learn=learn, project=project)
+                                             learn=learn, project=project)
     result = KappaScanResult(script=Path(opts.out_script), commands=commands)
     if result.script.is_file():
         write_record(result.script, record.finish({"files": [str(result.script)]}))

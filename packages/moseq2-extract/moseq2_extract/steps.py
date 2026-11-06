@@ -28,8 +28,9 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from os.path import abspath
 from pathlib import Path
+from uuid import uuid4
 
-from moseq2_common.bookkeeping import Session, load, relative_path, update
+from moseq2_common.bookkeeping import SESSION_FILE, Session, load, relative_path, update
 from moseq2_common.records import start_record, write_record
 from moseq2_common.project import Project, find_project as find_project_of, session_key
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
@@ -161,7 +162,12 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
     output_dir: the folder holding the session folders; None for the project's ``aggregate_results/``.
     explicit: options typed on the command line, applied over each recording's settings.
     select: picks the recordings to extract from those found (the notebook's prompt).
-    project: the project each SLURM job's settings file names (``moseq2_common.project.write_job_settings``).
+    project: the project the recordings are sessions of; with SLURM, each job's settings file names it.
+
+    With ``opts.cluster_type`` slurm, each recording ``opts.skip_completed`` does not leave out gets a job: its
+    session is given its uuid in ``moseq2-project.yaml`` and its settings are written to a job settings file
+    in its session folder (``moseq2_common.slurm.job_settings_file``), before ``opts.extract_out_script``
+    is written and, with ``opts.run_cmd``, submitted.
     """
     project = project if project is not None else find_project_of(config_file)
     search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth,
@@ -186,14 +192,42 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
                                   failures=failures, script=None)
 
     record = start_record("batch-extract", opts, [config_file, *to_extract], project=project)
-    job = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": output_dir}
-    run_slurm_extract(input_dir, to_extract, job, opts.skip_completed, num_frames=opts.num_frames,
-                      cli_options=dict(explicit) if explicit else None, project=project, output_dirs=folders)
+    if opts.skip_completed:
+        to_extract = [r for r in to_extract if not (Path(folders[r]) / SESSION_FILE).is_file()]
+    batch = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": output_dir}
+    run_slurm_extract(input_dir, to_extract, batch, num_frames=opts.num_frames,
+                      cli_options=dict(explicit) if explicit else None, output_dirs=folders,
+                      jobs=_submit(project, to_extract, folders))
     # run_slurm_extract records where it wrote the script
-    script = Path(job["extract_out_script"])
+    script = Path(batch["extract_out_script"])
     if script.is_file():
         write_record(script, record.finish({"files": {"script": str(script), "session_folders": sorted(folders.values())}}))
     return BatchExtractResult(found=list(search.recordings), extracted=[], failures=[], script=script)
+
+
+def _submit(project, recordings, folders):
+    """Give each recording's session its uuid in ``moseq2-project.yaml`` before its job is submitted; return
+    each recording's ``job:`` block (the project, the session and that uuid).
+
+    A session the file lists keeps its uuid; a new one gets a new uuid. Its extraction, run by the job, takes
+    the uuid from the file, and ``aggregate-results`` lists the session once its ``results.h5`` exists.
+    """
+    folder = str(Path(project.folder).absolute())
+    listed = load(project).sessions
+    sessions = {}
+    for recording in recordings:
+        key = session_key(project, recording)
+        uuid = listed[key].uuid if key in listed and listed[key].uuid else str(uuid4())
+        sessions[recording] = Session(key=key, recording=key, folder=relative_path(project, folders[recording]),
+                                      uuid=uuid)
+
+    def add(bookkeeping):
+        for session in sessions.values():
+            bookkeeping.sessions[session.key] = session
+
+    if sessions:
+        update(project, add)
+    return {recording: {"project": folder, "session": s.key, "uuid": s.uuid} for recording, s in sessions.items()}
 
 
 def aggregate_results(project: Project, opts: AggregateOptions, *, input_dir: str | None = None,

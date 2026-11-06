@@ -151,7 +151,10 @@ def _typed_extract_options(ctx):
 
 @cli.command(
     name="batch-extract",
-    help="Batch processes " "all the raw depth recordings located in the input folder.",
+    help="Batch processes all the raw depth recordings located in the input folder. With --cluster-type "
+    "slurm, each recording's settings are written to extract-job.yaml in its session folder, which its "
+    "job's command passes to extract --config-file, so a later edit to config.yaml does not change a "
+    "queued job.",
 )
 @click_options(BatchExtractOptions, order=BATCH_EXTRACT_ORDER, others={
     **_roi_others({"input_folder": click.argument("input-folder",

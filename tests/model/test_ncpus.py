@@ -69,13 +69,11 @@ def test_the_scan_requests_ncpus_from_slurm_and_does_not_pass_it_on(tmp_path):
                   e_step=False, hold_out=False, max_states=20, ncpus=4, cluster_type="slurm",
                   memory="5GB", partition="short", wall_time="3:00:00", prefix="")
     models = str(tmp_path / "models")
-    command = create_command_strings("pca_scores.h5", models, config, [100],
-                                     model_steps.KAPPA_SCAN_SETTINGS_NAME).splitlines()[-1]
+    command = create_command_strings("pca_scores.h5", models, config, [100]).splitlines()[-1]
     assert command.startswith("sbatch -c 4 ")
     assert "--ncpus" not in command
 
-    command = create_command_strings("pca_scores.h5", models, {**config, "ncpus": 0}, [100],
-                                     model_steps.KAPPA_SCAN_SETTINGS_NAME).splitlines()[-1]
+    command = create_command_strings("pca_scores.h5", models, {**config, "ncpus": 0}, [100]).splitlines()[-1]
     assert command.startswith("sbatch -c 8 ")
 
 
