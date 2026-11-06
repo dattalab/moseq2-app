@@ -74,8 +74,7 @@ def test_the_recording_is_reported_with_the_files_behind_it(capsys, files):
 
     for field in REPORTED:
         assert field in printed
-    for path in entry["path"]:
-        assert path in printed
+    assert entry["path"][0] in printed
 
 
 def test_a_fragment_shared_by_several_recordings_reports_all_of_them(capsys, files):

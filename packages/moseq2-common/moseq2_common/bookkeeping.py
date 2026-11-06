@@ -199,7 +199,8 @@ def session_index(project: Project, *, exclude: bool = True) -> dict:
             "uuid": session.uuid,
             "group": groups.get(key, DEFAULT_GROUP),
             "metadata": _metadata(h5, key),
-            "path": (str(h5),),
+            # 1.5.0's (h5, yaml) pair, the shape the viz and model readers take; nothing reads the second
+            "path": (str(h5), str(h5.with_suffix(".yaml"))),
             "key": key,
         })
     # recording order: the start time to the second, as 1.5.0's aggregated file names began with it
