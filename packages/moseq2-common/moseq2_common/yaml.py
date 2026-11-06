@@ -27,7 +27,7 @@ import numpy as np
 from ruamel.yaml import YAML
 from ruamel.yaml.representer import RepresenterError
 
-__all__ = ["UnwritableValueError", "dump_yaml", "read_yaml", "write_config", "write_yaml"]
+__all__ = ["UnwritableValueError", "dump_block_yaml", "dump_yaml", "read_yaml", "write_config", "write_yaml"]
 
 _ADVICE = (
     "If you set this value, change it to text, a number, true/false, a list or a "
@@ -243,3 +243,25 @@ def write_config(data, path):
     text = _serialize(shaped, path, "file", parser=_config_parser)
     with open(path, "w") as handle:
         handle.write(text)
+
+
+def _blocks(value):
+    """``value`` with every mapping in it a ``_Block``, in its own order."""
+    if type(value) is dict:
+        return _Block((key, _blocks(item)) for key, item in value.items())
+    if type(value) is list:
+        return [_blocks(item) for item in value]
+    return value
+
+
+def _wide_config_parser():
+    """``_config_parser``, never breaking a line, so a long path stays on the line that names it."""
+    parser = _config_parser()
+    parser.width = 4096
+    return parser
+
+
+def dump_block_yaml(data):
+    """Serialize ``data`` to a YAML string for reading: every mapping in block style, one ``name: value``
+    line each, in the order ``data`` holds them, and no line broken."""
+    return _serialize(_blocks(_plain(data)), None, "string", parser=_wide_config_parser)

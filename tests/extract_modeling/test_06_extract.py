@@ -45,6 +45,7 @@ import pytest
 from video import index_is_at_the_front, probe
 
 from moseq2_extract.gui import extract_found_sessions
+from moseq2_common.records import read_record
 from moseq2_common.yaml import read_yaml
 
 from test_03_config import plain
@@ -60,7 +61,6 @@ OUTPUTS = (
     "first_frame.tiff",
     "results.h5",
     "results.mp4",
-    "results.yaml",
     "roi_00.tiff",
 )
 
@@ -391,13 +391,14 @@ def test_a_frame_without_a_mouse_has_no_measurements(extracted):
 
 
 def test_each_recording_reports_itself_finished(extracted):
-    """14. How the next run, and cell 2's progress report, know this is done."""
+    """14. How the next run, and cell 2's progress report, know this is done: ``results.h5`` exists under
+    its final name, with the extraction's record, and nothing is left under a temporary name."""
     for name in RECORDINGS:
-        results = plain(read_yaml(str(proc(extracted, name) / "results.yaml")))
-        assert results["complete"] is True
-        assert results["skip"] is False
-        with h5py.File(proc(extracted, name) / "results.h5") as f:
-            assert results["uuid"] == f["metadata/uuid"][()].decode()
+        folder = proc(extracted, name)
+        record = read_record(folder / "results.h5")
+        assert record["step"] == "extract"
+        assert record["ended"]
+        assert not list(folder.glob(".*partial*"))
 
 
 def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
@@ -406,18 +407,17 @@ def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
     ``extract_command`` reads the project's ``session_config.yaml`` and takes
     the settings the arena widget sets from the entry belonging to the
     recording, so what a user settled on in the widget is literally what the
-    extraction ran with. The h5 records that set, which is where the two are
-    compared.
+    extraction ran with. The extraction's record holds that set, which is where
+    the two are compared; a depth range the extraction detected (the entry not
+    setting ``manual_set_depth_range``) is the detected one.
     """
     saved = plain(read_yaml(str(arena)))
     for name in RECORDINGS:
-        with h5py.File(proc(extracted, name) / "results.h5") as f:
-            used = {
-                key: plain(value[()].tolist() if value.shape else value[()])
-                for key, value in f["metadata/extraction/parameters"].items()
-            }
+        used = plain(read_record(proc(extracted, name) / "results.h5")["options"])
         for key, value in saved[f"{name}/depth.avi"].items():
             if key in NOT_COMPARABLE or key not in used:
+                continue
+            if key == "bg_roi_depth_range" and not used["manual_set_depth_range"]:
                 continue
             recorded = used[key]
             if isinstance(recorded, bytes):

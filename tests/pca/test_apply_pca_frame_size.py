@@ -37,7 +37,8 @@ def make_sessions(root, shapes):
         with h5py.File(h5, "w") as f:
             f["frames"] = np.zeros((5, *shape), dtype="uint8")
             f["timestamps"] = np.arange(5) * 33.3
-        write_yaml({"uuid": uuid}, str(folder / "results_00.yaml"))
+        with h5py.File(folder / "results_00.h5", "a") as f:
+            f["metadata/uuid"] = uuid
         paths[uuid] = str(h5)
     return paths
 

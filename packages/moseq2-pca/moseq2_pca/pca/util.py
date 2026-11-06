@@ -12,7 +12,6 @@ from tqdm.auto import tqdm
 import dask.array.linalg as lng
 from dask.distributed import as_completed, progress
 from moseq2_common.timestamps import frame_rate, read_timestamps, timestamp_unit, timestamps_path
-from moseq2_common.yaml import read_yaml
 from moseq2_pca.util import (clean_frames, insert_nans, get_changepoints, get_rps,
                              frame_rate_from_timestamps)
 
@@ -151,9 +150,12 @@ def copy_metadatas_to_scores(f, f_scores, uuid):
         f.copy('/metadata/extraction', f_scores, name=metadata_name)
 
 
-def _session_uuid(h5, yml, verbose):
-    """The uuid a session's yaml records, printing the h5 path when verbose."""
-    uuid = read_yaml(yml)['uuid']
+def _session_uuid(h5, source, verbose):
+    """The uuid a session's extraction carries (``metadata/uuid`` in ``source``, its ``.h5``), printing the
+    h5 path when verbose."""
+    with h5py.File(source, 'r') as f:
+        uuid = f['metadata/uuid'][()]
+    uuid = uuid.decode() if isinstance(uuid, bytes) else str(uuid)
     if verbose:
         print('Loading', h5)
     return uuid

@@ -217,11 +217,72 @@ def detect_avi_file(finfo):
 
     return detected
 
+#: The settings each camera's recordings are read with.
+CAMERA_DEFAULTS = {
+    'kinect': {
+        'bg_roi_weights': (1, .1, 1),
+        'pixel_format': 'gray16le',
+        'movie_dtype': '<u2'
+    },
+    'azure': {
+        'bg_roi_weights': (10, 0.1, 1),
+        'pixel_format': 'gray16be',
+        'movie_dtype': '>u2'
+    },
+    'realsense': {
+        'bg_roi_weights': (10, 0.1, 1),
+        'pixel_format': 'gray16le',
+        'movie_dtype': '<u2',
+    },
+}
+
+
+def camera_for(config_data, input_file=None):
+    """
+    The camera whose settings ``input_file`` is read with: the one camera_type names, or, when it
+    is ``auto``, the one told from the file; ``azure`` for any ``.mkv`` that camera_type calls a
+    Kinect v2; None when camera_type names no known camera.
+
+    Args:
+    config_data (dict): the recording's settings (``camera_type``, ``finfo`` when read already).
+    input_file (str or tarfile.TarFile): the recording.
+
+    Returns:
+    camera (str or None): a key of ``CAMERA_DEFAULTS``, or None.
+    """
+    stated = config_data.get('camera_type')
+    camera_type = 'kinect' if stated == 'k2' else stated
+    is_mkv = isinstance(input_file, (str, os.PathLike)) and str(input_file).endswith('.mkv')
+
+    if type(input_file) is tarfile.TarFile:
+        return 'kinect'
+    if camera_type == 'auto' and input_file is not None:
+        if input_file.endswith('.dat'):
+            return 'kinect'
+        if input_file.endswith('.mkv'):
+            return 'azure'
+        if input_file.endswith('.avi'):
+            finfo = config_data.get('finfo')
+            if finfo is None:
+                finfo = get_movie_info(input_file,
+                                       mapping=config_data.get('mapping', 0),
+                                       threads=config_data.get('threads', 8)
+                                       )
+            return detect_avi_file(finfo)
+        warnings.warn('Extension not recognized, trying default Kinect v2 parameters.')
+        return 'kinect'
+    if camera_type == 'kinect' and is_mkv:
+        return 'azure'
+    if camera_type in CAMERA_DEFAULTS:
+        return camera_type
+    return None
+
+
 def detect_and_set_camera_parameters(config_data, input_file=None):
     """
     Set bg_roi_weights, pixel_format and movie_dtype to the values for the camera named by
-    camera_type, or, when it is ``auto``, for the camera told from the file. A camera_type
-    that names no known camera (None included) changes nothing and warns.
+    camera_type, or, when it is ``auto``, for the camera told from the file (``camera_for``). A
+    camera_type that names no known camera (None included) changes nothing and warns.
 
     Only a setting still at the generic default (the Kinect v2's value, which a generated
     config holds) or missing is replaced; a value the user changed is kept. ``k2`` is the
@@ -239,61 +300,19 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
     Returns:
     config_data (dict): updated dictionary with bg-roi-weights to use for extraction.
     """
-
-    # Auto-setting background weights
     stated = config_data.get('camera_type')
-    camera_type = 'kinect' if stated == 'k2' else stated
-    finfo = config_data.get('finfo')
-    is_mkv = isinstance(input_file, (str, os.PathLike)) and str(input_file).endswith('.mkv')
+    camera = camera_for(config_data, input_file)
+    if camera is None:
+        warnings.warn('Warning, make sure the following parameters are set to best handle your camera type: '
+                      '"bg_roi_weights", "pixel_format", "movie_dtype"')
+        return config_data
 
-    default_parameters = {
-        'kinect': {
-            'bg_roi_weights': (1, .1, 1),
-            'pixel_format': 'gray16le',
-            'movie_dtype': '<u2'
-        },
-        'azure': {
-            'bg_roi_weights': (10, 0.1, 1),
-            'pixel_format': 'gray16be',
-            'movie_dtype': '>u2'
-        },
-        'realsense': {
-            'bg_roi_weights': (10, 0.1, 1),
-            'pixel_format': 'gray16le',
-            'movie_dtype': '<u2',
-        },
-    }
-
-    if type(input_file) is tarfile.TarFile:
-        detected = 'kinect'
-    elif camera_type == 'auto' and input_file is not None:
-        if input_file.endswith('.dat'):
-            detected = 'kinect'
-        elif input_file.endswith('.mkv'):
-            detected = 'azure'
-        elif input_file.endswith('.avi'):
-            if finfo is None:
-                finfo = get_movie_info(input_file,
-                                       mapping=config_data.get('mapping', 0),
-                                       threads=config_data.get('threads', 8)
-                                       )
-            detected = detect_avi_file(finfo)
-        else:
-            warnings.warn('Extension not recognized, trying default Kinect v2 parameters.')
-            detected = 'kinect'
-
-        _fill_camera_defaults(config_data, default_parameters[detected], default_parameters['kinect'])
-    elif camera_type == 'kinect' and is_mkv:
-        _fill_camera_defaults(config_data, default_parameters['azure'], default_parameters['kinect'])
-        used = ', '.join(f'{key} {_setting_text(config_data[key])}' for key in default_parameters['azure'])
+    _fill_camera_defaults(config_data, CAMERA_DEFAULTS[camera], CAMERA_DEFAULTS['kinect'])
+    if camera == 'azure' and stated in ('k2', 'kinect') and type(input_file) is not tarfile.TarFile:
+        used = ', '.join(f'{key} {_setting_text(config_data[key])}' for key in CAMERA_DEFAULTS['azure'])
         print(f'{input_file} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras '
               f'write, but config.yaml says camera_type: {stated} (the Kinect v2). Used the Azure '
               f'settings for it: {used}. Set camera_type: azure in config.yaml.')
-    elif camera_type in default_parameters:
-        _fill_camera_defaults(config_data, default_parameters[camera_type], default_parameters['kinect'])
-    else:
-        warnings.warn('Warning, make sure the following parameters are set to best handle your camera type: '
-                      '"bg_roi_weights", "pixel_format", "movie_dtype"')
 
     return config_data
 

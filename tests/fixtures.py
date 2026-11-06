@@ -104,7 +104,9 @@ def project_1_6_from_bundle(bundle, dest):
     since the bundle holds no recordings), the PCA files and the model. Each
     session's aggregated files are moved into its own folder in
     ``aggregate_results/`` under the names extraction gives them (``results.h5``,
-    ``results.yaml``, ``results.mp4``), as a 1.6 project holds them. The
+    ``results.mp4``), as a 1.6 project holds them; 1.5.0's ``.yaml`` beside each
+    is dropped, since a 1.6 extraction writes none (its ``.h5`` holds its
+    uuid, its acquisition metadata and, from 1.6, its record). The
     ``crowd_movies`` section is left empty: 1.5.0 made its crowd movies with
     their own defaults and read none of them from ``config.yaml``, whose
     ``gaussfilter_space`` and the like were PCA's. The index and progress file
@@ -139,9 +141,10 @@ def project_1_6_from_bundle(bundle, dest):
         h5 = dest / Path(entry["path"][0])
         folder = Path("aggregate_results") / session_folder_name(key, keys)
         (dest / folder).mkdir(parents=True, exist_ok=True)
-        for suffix in (".h5", ".yaml", ".mp4"):
+        for suffix in (".h5", ".mp4"):
             if h5.with_suffix(suffix).is_file():
                 shutil.move(str(h5.with_suffix(suffix)), str(dest / folder / f"results{suffix}"))
+        h5.with_suffix(".yaml").unlink(missing_ok=True)
         sessions[key] = {"recording": key, "folder": folder.as_posix(), "uuid": str(entry["uuid"])}
         groups[key] = str(entry["group"])
     config["groups"] = groups

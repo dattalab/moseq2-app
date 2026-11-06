@@ -13,58 +13,32 @@ from functools import partial
 import moseq2_common.video
 from moseq2_common.timestamps import frame_rate
 from moseq2_viz.viz import make_crowd_matrix
-from cytoolz.itertoolz import peek, pluck, first
-from cytoolz.dicttoolz import assoc, valfilter, merge_with
+from cytoolz.itertoolz import first
+from cytoolz.dicttoolz import valfilter
 from moseq2_viz.model.util import get_syllable_slices
-from cytoolz.curried import get_in, keyfilter, valmap
+from cytoolz.curried import valmap
 from moseq2_common.yaml import write_yaml
-
-
-def _session_frame_rate(h5: str) -> float:
-    """The frame rate of the session extracted to ``h5``."""
-    with h5py.File(h5, "r") as f:
-        return frame_rate(f)
 
 
 def check_video_parameters(index: dict) -> dict:
     """
-    Verify extraction parameters that should be consistent across sessions. If not, the function raises a RuntimeError.
+    The frame size and frame rate the sessions' extractions share, read from each session's ``.h5``: the
+    size of its frames, and the recording's frame rate the extraction stores
+    (``moseq2_common.timestamps.frame_rate``). Raises a RuntimeError when the sessions differ.
 
     Args:
-    index (dict): dictionary of extraction parameters.
+    index (dict): the sessions, as the sorted index holds them.
 
     Returns:
-    vid_parameters (dict): a dictionary with a subset of the used extraction parameters.
+    vid_parameters (dict): ``crop_size``, ``fps``, and ``resolution`` (None).
     """
-    from moseq2_common.yaml import read_yaml
+    found = {"crop_size": set(), "fps": set()}
+    for entry in index["files"].values():
+        with h5py.File(entry["path"][0], "r") as f:
+            found["crop_size"].add(tuple(f["frames"].shape[1:]))
+            found["fps"].add(frame_rate(f))
 
-    # define constants
-    check_parameters = ["crop_size"]
-
-    get_yaml = get_in(["path", 1])
-    ymls = list(map(get_yaml, index["files"].values()))
-    h5s = list(map(get_in(["path", 0]), index["files"].values()))
-
-    # load yaml config files when needed
-    dicts = map(read_yaml, ymls)
-    # get the parameters key within each dict
-    params = pluck("parameters", dicts)
-
-    first_entry, params = peek(params)
-    if "resolution" in first_entry:
-        check_parameters += ["resolution"]
-
-    # filter for only keys in check_parameters
-    params = map(keyfilter(lambda k: k in check_parameters), params)
-    # turn lists (in the dict values) into tuples
-    params = map(valmap(lambda x: tuple(x) if isinstance(x, list) else x), params)
-    # each session's frame rate is the recording's, kept in its extraction .h5
-    params = (assoc(p, "fps", _session_frame_rate(h5)) for p, h5 in zip(params, h5s))
-
-    # get unique parameter values
-    vid_parameters = merge_with(set, params)
-
-    incorrect_parameters = valfilter(lambda x: len(x) > 1, vid_parameters)
+    incorrect_parameters = valfilter(lambda x: len(x) > 1, found)
 
     # if there are multiple values for a parameter, raise error
     if incorrect_parameters:
@@ -73,17 +47,8 @@ def check_video_parameters(index: dict) -> dict:
             + f"across extractions: {list(incorrect_parameters)}"
         )
 
-    # grab the first value in the set
-    vid_parameters = valmap(first, vid_parameters)
-
-    # update resolution
-    if "resolution" in vid_parameters:
-        vid_parameters["resolution"] = tuple(
-            x + 100 for x in vid_parameters["resolution"]
-        )
-    else:
-        vid_parameters["resolution"] = None
-
+    vid_parameters = valmap(first, found)
+    vid_parameters["resolution"] = None
     return vid_parameters
 
 

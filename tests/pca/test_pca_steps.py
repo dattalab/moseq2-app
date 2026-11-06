@@ -163,7 +163,8 @@ def extracted(tmp_path):
         with h5py.File(folder / "results_00.h5", "w") as f:
             f["frames"] = rng.integers(0, 60, (200, 80, 80)).astype("uint8")
             f["timestamps"] = np.arange(200) * 33.3
-        write_yaml({"uuid": f"uuid-{i}"}, str(folder / "results_00.yaml"))
+        with h5py.File(folder / "results_00.h5", "a") as f:
+            f["metadata/uuid"] = f"uuid-{i}"
     return tmp_path / "aggregate_results"
 
 

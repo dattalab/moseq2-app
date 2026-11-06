@@ -15,7 +15,7 @@ import pytest
 from dask.distributed import Client
 
 from moseq2_pca.pca.util import apply_pca_dask
-from moseq2_pca.util import write_yaml
+
 
 LENGTHS = {"short": 5, "long": 9}
 
@@ -34,9 +34,9 @@ def sessions(tmp_path):
         with h5py.File(tmp_path / f"{uuid}.h5", "w") as f:
             f["frames"] = np.random.default_rng(0).random((length, 4, 4))
             f["metadata/fps"] = np.float32(30)
-        write_yaml({"uuid": uuid}, str(tmp_path / f"{uuid}.yaml"))
+            f["metadata/uuid"] = uuid
         h5s.append(str(tmp_path / f"{uuid}.h5"))
-        yamls.append(str(tmp_path / f"{uuid}.yaml"))
+        yamls.append(str(tmp_path / f"{uuid}.h5"))
     return h5s, yamls
 
 

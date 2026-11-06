@@ -10,8 +10,7 @@ import h5py
 import warnings
 import numpy as np
 import urllib.request
-from copy import deepcopy
-from moseq2_common.yaml import read_yaml, write_config, write_yaml
+from moseq2_common.yaml import read_yaml, write_config
 from tqdm.auto import tqdm
 from moseq2_extract.io.image import write_image
 from moseq2_extract.helpers.extract import process_extract_batches
@@ -29,6 +28,7 @@ from moseq2_extract.helpers.data import (
 from moseq2_extract.recordings import find_recordings, outputs_in, project_keys, session_outputs
 from moseq2_common.project import session_key
 from moseq2_common.frames import select_strel
+from moseq2_common.records import atomic_output, start_record, write_h5_record
 from moseq2_extract.util import (
     gen_batch_sequence,
     scalar_attributes,
@@ -37,6 +37,7 @@ from moseq2_extract.util import (
     graduate_dilated_wall_area,
     get_bucket_center,
     _floor_depth,
+    camera_for,
     detect_and_set_camera_parameters,
     get_frame_range_indices,
     check_filter_sizes,
@@ -355,14 +356,17 @@ def floor_depth_and_background(bground_im, roi, config_data, output_dir):
     return bground_im
 
 
-def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None):
+def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None, record=None):
     """
     Extract depth videos.
 
-    The session's files go into ``output_dir`` under fixed names (``results.h5``, ``results.mp4``,
-    ``results.yaml`` and the images), whichever arena mask is used, so extracting again replaces them.
-    The ``.h5`` is written under a temporary name and renamed when the extraction is complete, so a
-    recording is extracted when its ``results.h5`` exists.
+    The session's files go into ``output_dir`` under fixed names (``results.h5``, ``results.mp4`` and
+    the images), whichever arena mask is used, so extracting again replaces them. The ``.h5`` holds the
+    extraction's record (``moseq2_common.records``) as its ``/provenance`` attribute: the options after
+    detection (the camera, the depth range, the floor depth), the recording and the files read beside it.
+    The ``.h5`` and the movie are written under temporary names and renamed when the extraction is
+    complete, so a recording is extracted when its ``results.h5`` exists, and an extraction stopped
+    partway leaves the previous one as it was.
 
     Args:
     input_file (str): path to depth file
@@ -371,6 +375,8 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     num_frames (int): number of frames to extract.
     skip (bool): indicates whether to skip file if already extracted
     uuid (str): the session's uuid, when it has one already; None draws a new one.
+    record (moseq2_common.records.Record): the extraction step's record, started by the step; None starts
+        one here with ``config_data`` as its options.
 
     Returns:
     output_dir (str): path to directory containing extraction, or None if the file was skipped as already extracted
@@ -385,10 +391,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     roi_index = config_data["bg_roi_index"]
     if isinstance(roi_index, list):
         roi_index = roi_index[0]
-    status_filename = str(outputs.h5.with_suffix(".yaml"))
-    movie_filename = str(outputs.movie)
     results_filename = str(outputs.h5)
-    partial_filename = join(output_dir, f".{outputs.h5.name}.partial")
 
     # A recording already extracted is skipped before anything about it is
     # checked: the checks below guard an extraction that is about to run.
@@ -408,13 +411,9 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         if k not in ("get_cmd", "run_cmd", "extensions")
     }
 
-    status_dict = {
-        "complete": False,
-        "skip": False,
-        "uuid": str(uuid) if uuid else str(uuid4()),
-        "metadata": "",
-        "parameters": deepcopy(config_data),
-    }
+    uuid = str(uuid) if uuid else str(uuid4())
+    if record is None:
+        record = start_record("extract", config_data, [])
 
     # save input directory path
     in_dirname = dirname(input_file)
@@ -467,7 +466,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
 
     config_data["fps"] = recording_frame_rate(recording, config_data["timestamps"], config_data["finfo"])
 
-    status_dict["metadata"] = acquisition_metadata  # update status dict
+    describe_recording(record, recording, input_file, config_data, timestamp_source)
 
     # Getting number of frames to extract
     if num_frames is None:
@@ -503,8 +502,6 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
 
     config_data["bg_roi_index"] = roi_index
 
-    write_yaml(status_dict, status_filename)
-
     # Compute ROIs
     roi, bground_im, first_frame = get_roi_wrapper(
         input_file, config_data, output_dir=output_dir
@@ -522,28 +519,45 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         "frame_batches": frame_batches,
     }
 
-    # farm out the batches and write to an hdf5 file, renamed to its final name when complete
-    with h5py.File(partial_filename, "w") as f:
-        # Write scalars, roi, acquisition metadata, etc. to h5 file
-        create_extract_h5(
-            **extraction_data,
-            h5_file=f,
-            acquisition_metadata=acquisition_metadata,
-            config_data=config_data,
-            status_dict=status_dict,
-            scalars_attrs=scalars_attrs,
-        )
+    record.ran_with({"bg_roi_depth_range": config_data["bg_roi_depth_range"],
+                     "camera_type": camera_for(config_data, input_file) or config_data.get("camera_type"),
+                     "true_depth": float(config_data["true_depth"]),
+                     **{key: config_data[key] for key in ("bg_roi_weights", "pixel_format", "movie_dtype")
+                        if key in config_data}})
 
-        # Write crop-rotated results to h5 file and write video preview mp4 file
-        process_extract_batches(
-            **extraction_data,
-            h5_file=f,
-            input_file=input_file,
-            config_data=config_data,
-            scalars=scalars,
-            output_mov_path=movie_filename,
-        )
-        write_misc_metadata(f, dirname(recording))
+    # farm out the batches and write the h5 file and the preview movie, renamed to their final names
+    # when complete
+    movie = outputs.folder / f".{outputs.movie.stem}.partial{outputs.movie.suffix}"
+    with atomic_output(results_filename) as partial_h5, atomic_output(outputs.movie, movie) as partial_movie:
+        with h5py.File(partial_h5, "w") as f:
+            # Write scalars, roi, acquisition metadata, etc. to h5 file
+            create_extract_h5(
+                **extraction_data,
+                h5_file=f,
+                acquisition_metadata=acquisition_metadata,
+                config_data=config_data,
+                uuid=uuid,
+                scalars_attrs=scalars_attrs,
+            )
+
+            # Write crop-rotated results to h5 file and write video preview mp4 file
+            process_extract_batches(
+                **extraction_data,
+                h5_file=f,
+                input_file=input_file,
+                config_data=config_data,
+                scalars=scalars,
+                output_mov_path=str(partial_movie),
+            )
+            write_misc_metadata(f, dirname(recording))
+            write_h5_record(f, record.finish({
+                **{name: f[name] for name in ("frames", "frames_mask", "timestamps") if name in f},
+                "files": {"h5": results_filename, "movie": str(outputs.movie),
+                          "images": sorted(str(p) for p in outputs.folder.glob("*.tiff"))},
+            }))
+    # the arena masks find-roi wrote here, with its records beside them, are now the extraction's
+    for stale in outputs.folder.glob("roi_*.yaml"):
+        stale.unlink()
 
     print()
 
@@ -562,14 +576,33 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         print("Error converting raw video to avi format, continuing anyway...")
         print(e)
 
-    status_dict["complete"] = True
-    if status_dict["parameters"].get("true_depth") is None:
-        # config_data.get('true_depth') is numpy.float64 and yaml.safe_dump can't represent the object
-        status_dict["parameters"]["true_depth"] = float(config_data.get("true_depth"))
-    write_yaml(status_dict, status_filename)
-    os.replace(partial_filename, results_filename)
-
     return output_dir
+
+
+def describe_recording(record, recording, input_file, config_data, timestamp_source):
+    """Add the recording and the files read beside it to the extraction's ``record``, with what describes
+    the recording's data, and note a missing ``metadata.json``."""
+    finfo = config_data.get("finfo") or {}
+    facts = {"path": recording,
+             "frame_count": finfo.get("nframes"),
+             "resolution": list(finfo["dims"]) if finfo.get("dims") is not None else None,
+             "frame_rate": config_data.get("fps", finfo.get("fps")),
+             "camera": camera_for(config_data, input_file)}
+    inputs = [facts]
+    if isinstance(timestamp_source, str) and exists(timestamp_source):
+        timestamps = config_data.get("timestamps")
+        inputs.append({"path": timestamp_source,
+                       "timestamp_count": len(timestamps) if timestamps is not None else 0})
+    folder = dirname(abspath(recording))
+    metadata_file = join(folder, "metadata.json")
+    if exists(metadata_file):
+        inputs.append(metadata_file)
+    elif config_data.get("tar") is None:
+        record.note("metadata_json", f"{folder} has no metadata.json: SessionName is the folder's name "
+                                     "and SubjectName is empty")
+    if config_data.get("flip_classifier"):
+        inputs.append(config_data["flip_classifier"])
+    record.add_inputs(inputs)
 
 
 @filter_warnings

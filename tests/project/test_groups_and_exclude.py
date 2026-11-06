@@ -205,8 +205,9 @@ def test_add_group_without_value_matches_its_default(project):
     for i, (key, _, _, _) in enumerate(SESSIONS):
         folder = project / "aggregate_results" / f"s{i}"
         folder.mkdir(parents=True)
-        write_yaml({"metadata": {"SubjectName": "Mouse" if i == 0 else "rat", "SessionName": f"s{i}"}},
-                   str(folder / "results.yaml"))
+        with h5py.File(folder / "results.h5", "w") as f:
+            f["metadata/acquisition/SubjectName"] = "Mouse" if i == 0 else "rat"
+            f["metadata/acquisition/SessionName"] = f"s{i}"
 
     result = CliRunner().invoke(cli, ["add-group", "-k", "SubjectName", "-g", "chosen", "-e",
                                       "--project-file", str(project / "moseq2-project.yaml")],

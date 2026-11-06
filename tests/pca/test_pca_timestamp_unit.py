@@ -22,7 +22,7 @@ from dask.distributed import Client
 
 import moseq2_extract.cli as extract_cli
 from moseq2_pca.pca.util import apply_pca_dask, get_timestamps
-from moseq2_pca.util import frame_rate_from_timestamps, write_yaml
+from moseq2_pca.util import frame_rate_from_timestamps
 
 from fixtures import fetch_azure_mkv
 
@@ -43,8 +43,8 @@ def session(tmp_path, uuid, timestamps, unit=None):
         f["timestamps"] = timestamps
         if unit is not None:
             f["timestamps"].attrs["unit"] = unit
-    write_yaml({"uuid": uuid}, str(tmp_path / f"{uuid}.yaml"))
-    return str(h5), str(tmp_path / f"{uuid}.yaml")
+        f["metadata/uuid"] = uuid
+    return str(h5), str(h5)
 
 
 def apply(tmp_path, client, h5, yml):

@@ -64,7 +64,7 @@ def jobs(monkeypatch):
     monkeypatch.setattr(
         extract_steps,
         "extract_wrapper",
-        lambda f, out, config, num_frames=None, skip=False, uuid=None: received.append(config),
+        lambda f, out, config, num_frames=None, skip=False, uuid=None, record=None: received.append(config),
     )
 
     def go(root, config):

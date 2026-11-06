@@ -15,6 +15,7 @@ from click.core import ParameterSource
 
 from moseq2_common.options import ConfigFileError, ProjectGroup, click_options, command_settings, explicit_values
 from moseq2_common.project import find_project, is_job_file
+from moseq2_common.records import print_record_command
 from moseq2_extract import setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
@@ -286,6 +287,9 @@ def copy_slice(ctx, input_file, output_file, **_):
         input_file, output_file, opts.copy_slice, opts.chunk_size, opts.fps, opts.delete, opts.threads,
         opts.mapping
     )
+
+
+cli.add_command(print_record_command())
 
 
 if __name__ == "__main__":

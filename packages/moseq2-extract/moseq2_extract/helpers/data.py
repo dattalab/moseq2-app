@@ -13,8 +13,6 @@ from moseq2_extract.util import (
     load_timestamps,
     load_metadata,
     load_textdata,
-    dict_to_h5,
-    click_param_annot,
 )
 
 
@@ -202,7 +200,7 @@ def create_extract_h5(
     h5_file,
     acquisition_metadata,
     config_data,
-    status_dict,
+    uuid,
     scalars_attrs,
     nframes,
     roi,
@@ -219,7 +217,7 @@ def create_extract_h5(
     h5_file (h5py.File object): opened h5 file object to write to.
     acquisition_metadata (dict): Dictionary containing extracted session acquisition metadata.
     config_data (dict): dictionary object containing all required extraction parameters. (auto generated)
-    status_dict (dict): dictionary that helps indicate if the session has been extracted fully.
+    uuid (str): the session's uuid.
     scalars_attrs (dict): dict of computed scalar attributes and descriptions to save.
     nframes (int): number of frames being recorded
     roi (np.ndarray): Computed 2D ROI Image.
@@ -230,7 +228,7 @@ def create_extract_h5(
 
     """
 
-    h5_file.create_dataset("metadata/uuid", data=status_dict["uuid"])
+    h5_file.create_dataset("metadata/uuid", data=uuid)
     h5_file.create_dataset(FRAME_RATE_PATH, data=config_data["fps"])
     h5_file[FRAME_RATE_PATH].attrs["description"] = (
         "Frame rate of the recording in frames per second, from its timestamps or the video's own rate"
@@ -346,16 +344,6 @@ def create_extract_h5(
     h5_file["metadata/extraction/extract_version"].attrs[
         "description"
     ] = "Version of moseq2-extract"
-
-    # Extraction Parameters
-    from moseq2_extract.cli import extract
-
-    dict_to_h5(
-        h5_file,
-        status_dict["parameters"],
-        "metadata/extraction/parameters",
-        click_param_annot(extract),
-    )
 
     # Acquisition Metadata
     for key, value in acquisition_metadata.items():

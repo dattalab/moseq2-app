@@ -13,8 +13,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestClassifier
 from moseq2_common.bookkeeping import load, resolve_path, session_h5
 from moseq2_common.frames import CleaningOptions, cleaning_arguments, odd_kernel
-from moseq2_common.h5 import h5_to_dict
 from moseq2_common.options import read_settings
+from moseq2_common.records import read_record
 from moseq2_common.project import find_project
 from moseq2_extract.extract.proc import clean_frames
 from moseq2_extract.options import EXTRACT_STAGE
@@ -74,11 +74,12 @@ def _recordings_by_file(project):
 
 
 def _stored_cleaning(h5):
-    """The cleaning settings extraction stored in the session's ``.h5``, or None when it stored none."""
-    with h5py.File(h5, "r") as f:
-        if "metadata/extraction/parameters" not in f:
-            return None
-        stored = h5_to_dict(f, "metadata/extraction/parameters")
+    """The cleaning settings the session's extraction record holds, or None when the ``.h5`` has no record.
+    Read to check the settings training uses, never to train with."""
+    try:
+        stored = read_record(h5).get("options") or {}
+    except FileNotFoundError:
+        return None
     return {f.name: stored[f.name] for f in fields(CleaningOptions) if f.name in stored}
 
 

@@ -10,8 +10,10 @@ resolve their settings into one options object and call these. A step needs no
 
 Each step hands its work function (``get_roi_wrapper``, ``extract_wrapper``,
 ``aggregate_extract_results_wrapper`` in ``moseq2_extract.helpers.wrappers``)
-the options as a dict, and extraction records that dict among the extraction's
-parameters (``metadata/extraction/parameters`` in the results ``.h5``).
+the options as a dict. Each output carries the record of the run that wrote it
+(``moseq2_common.records``): extraction's is the ``/provenance`` attribute of the
+session's ``results.h5``, holding the options after detection; ``find-roi``'s
+and a SLURM batch's script's are a ``.yaml`` beside them (``sidecar_path``).
 
 Inside a project, a recording's outputs go into its session's folder in
 ``aggregate_results/`` (``moseq2_extract.recordings.session_outputs``) and keep
@@ -28,6 +30,7 @@ from os.path import abspath
 from pathlib import Path
 
 from moseq2_common.bookkeeping import Session, load, relative_path, update
+from moseq2_common.records import start_record, write_record
 from moseq2_common.project import Project, find_project as find_project_of, session_key
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
@@ -76,13 +79,26 @@ def _settings(opts, leave_out=()):
 
 def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions) -> FindRoiResult:
     """Find the arena and background of ``input_file``; write the background and arena images."""
+    record = start_record("find-roi", opts, [input_file])
     settings = _settings(opts)
     get_roi_wrapper(input_file, settings, output_dir)
     # the wrapper records in settings the folder it wrote to
     folder = settings.get("output_dir")
     indices = opts.bg_roi_index if isinstance(opts.bg_roi_index, (list, tuple)) else [opts.bg_roi_index]
     written = [Path(folder) / f"roi_{idx:02d}.tiff" for idx in indices] if folder else []
-    return FindRoiResult(roi_files=[path for path in written if path.is_file()])
+    result = FindRoiResult(roi_files=[path for path in written if path.is_file()])
+    record.ran_with({"bg_roi_depth_range": settings["bg_roi_depth_range"]})
+    finished = record.finish({"files": sorted(str(p) for p in Path(folder).glob("*.tiff")) if folder else []})
+    for roi_file in result.roi_files:
+        write_record(roi_file, finished)
+    return result
+
+
+def _project_inputs(project):
+    """The project's settings files, which every step in it reads."""
+    if project is None:
+        return []
+    return [path for path in (project.config_file, project.session_config_file) if Path(path).is_file()]
 
 
 def _output_folder(input_file, output_dir, project, keys=None):
@@ -111,10 +127,11 @@ def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
     ``aggregate_results/`` (``session_outputs``), or outside a project into ``proc/`` beside it.
     In a project, a session ``moseq2-project.yaml`` lists keeps its uuid.
     """
+    record = start_record("extract", opts, _project_inputs(project), project=project)
     settings = _settings(opts, leave_out=_WRAPPER_ARGUMENTS)
     folder = _output_folder(input_file, output_dir, project)
     written = extract_wrapper(input_file, str(folder), settings, num_frames=opts.num_frames,
-                              skip=opts.skip_completed, uuid=_session_uuid(input_file, project))
+                              skip=opts.skip_completed, uuid=_session_uuid(input_file, project), record=record)
     if written is None:
         return ExtractResult(h5_file=None)
     return ExtractResult(h5_file=Path(written) / "results.h5")
@@ -168,12 +185,15 @@ def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str
                                   extracted=[Path(p) for p in to_extract if p not in failed],
                                   failures=failures, script=None)
 
+    record = start_record("batch-extract", opts, [config_file, *to_extract], project=project)
     job = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": output_dir}
     run_slurm_extract(input_dir, to_extract, job, opts.skip_completed, num_frames=opts.num_frames,
                       cli_options=dict(explicit) if explicit else None, project=project, output_dirs=folders)
     # run_slurm_extract records where it wrote the script
-    return BatchExtractResult(found=list(search.recordings), extracted=[], failures=[],
-                              script=Path(job["extract_out_script"]))
+    script = Path(job["extract_out_script"])
+    if script.is_file():
+        write_record(script, record.finish({"files": {"script": str(script), "session_folders": sorted(folders.values())}}))
+    return BatchExtractResult(found=list(search.recordings), extracted=[], failures=[], script=script)
 
 
 def aggregate_results(project: Project, opts: AggregateOptions, *, input_dir: str | None = None,

@@ -9,9 +9,8 @@ from copy import deepcopy
 from os.path import exists
 from moseq2_app.util import bcolors
 from sklearn.covariance import EllipticEnvelope
-from moseq2_common.h5 import h5_to_dict
+from moseq2_common.h5 import extraction_labels, h5_to_dict
 from moseq2_common.timestamps import dropped_frames, read_timestamps
-from moseq2_common.yaml import read_yaml
 
 
 def count_nan_rows(scalar_df):
@@ -90,17 +89,14 @@ def get_scalar_df(path_dict):
             continue
         # Get relevant extraction paths
         h5path = v[:-4] + '.h5'
-        yamlpath = v[:-4] + '.yaml'
 
-        if not exists(yamlpath):
-            print(f'No valid yaml path for session: {k}')
+        if not exists(h5path):
+            print(f'No extraction for session {k}: {h5path} does not exist.')
             continue
-        stat_dict = read_yaml(yamlpath)
-
-        metadata = stat_dict['metadata']
+        uuid, metadata = extraction_labels(h5path)
 
         tmp = h5_to_dict(h5path, path='scalars')
-        tmp = {**tmp, 'uuid': stat_dict['uuid'], 'group': 'default'}
+        tmp = {**tmp, 'uuid': uuid, 'group': 'default'}
         for mk in ['SessionName', 'SubjectName']:
             mv = metadata[mk]
             tmp[mk] = mv[0] if isinstance(mv, list) else mv
@@ -141,17 +137,15 @@ def make_session_status_dicts(paths):
         if not v.endswith('.mp4'):
             continue
 
-        # get yaml metadata
-        yamlpath = v[:-4] + '.yaml'
         h5path = v[:-4] + '.h5'
 
-        if not exists(yamlpath):
-            print(f'No valid yaml path for session: {k}')
+        if not exists(h5path):
+            print(f'No extraction for session {k}: {h5path} does not exist.')
             continue
 
-        stat_dict = read_yaml(yamlpath)
-        status_dicts[stat_dict['uuid']] = deepcopy(flags)
-        status_dicts[stat_dict['uuid']]['metadata'] = stat_dict['metadata']
+        uuid, metadata = extraction_labels(h5path)
+        status_dicts[uuid] = deepcopy(flags)
+        status_dicts[uuid]['metadata'] = metadata
 
         # Count dropped frames as PCA fills them, as a share of the frames the
         # recording would have had without them.
@@ -166,7 +160,7 @@ def make_session_status_dicts(paths):
             raise ValueError(f'{h5path}: {e}') from e
         share = dropped / max(len(timestamps) + dropped, 1)
         if share >= 0.05:
-            status_dicts[stat_dict['uuid']]['dropped_frames'] = share
+            status_dicts[uuid]['dropped_frames'] = share
 
     return status_dicts
 

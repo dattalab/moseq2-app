@@ -39,7 +39,7 @@ def received(monkeypatch):
     """The settings each extraction hands ``extract_wrapper``, by recording, instead of extracting."""
     calls = {}
 
-    def record(input_file, output_dir, config, num_frames=None, skip=False, uuid=None):
+    def record(input_file, output_dir, config, num_frames=None, skip=False, uuid=None, record=None):
         calls[input_file] = config
         return output_dir
 

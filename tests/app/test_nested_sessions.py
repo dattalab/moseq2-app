@@ -289,7 +289,7 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
     received = {}
     monkeypatch.setattr(
         "moseq2_extract.steps.extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None: received.update(
+        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None, record=None: received.update(
             {input_file: config["noise_tolerance"]}
         ),
     )
@@ -313,7 +313,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
     monkeypatch.setattr(
         extract_steps,
         "extract_wrapper",
-        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None: received.update(
+        lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None, record=None: received.update(
             {input_file: config["noise_tolerance"]}
         ),
     )

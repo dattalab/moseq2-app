@@ -2,8 +2,8 @@
 
 Every package writes YAML through ``moseq2_common.yaml``. Before that module
 existed, extract, pca, viz and app each carried their own copy of one writer,
-and a user's existing files, configs, indexes, session results, the PCA
-parameter yaml and crowd-movie info, are in that writer's format, and so is the
+and a user's existing files, configs, indexes, the PCA parameter yaml and
+crowd-movie info, are in that writer's format, and so is the
 bookkeeping file, ``moseq2-project.yaml``. These tests
 hold each file the notebook chain writes to it.
 
@@ -91,11 +91,6 @@ def test_session_config_is_written_as_before(arena, tmp_path):
     assert_written_as_before(arena, tmp_path)
 
 
-def test_results_yaml_is_written_as_before(extracted, tmp_path):
-    results = sorted((Path(extracted) / "aggregate_results").glob("*/results.yaml"))
-    assert results, f"no results.yaml in a session folder under {extracted}"
-    for path in results:
-        assert_written_as_before(path, tmp_path)
 
 
 def test_bookkeeping_file_is_written_as_the_other_files_are(bookkeeping_as_aggregated, aggregated, model,

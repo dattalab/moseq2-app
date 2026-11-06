@@ -29,7 +29,7 @@ import os
 import h5py
 import numpy as np
 
-__all__ = ["h5_to_dict", "read_dataset"]
+__all__ = ["extraction_labels", "h5_to_dict", "read_dataset"]
 
 
 def read_dataset(dataset: h5py.Dataset):
@@ -89,3 +89,27 @@ def h5_to_dict(h5file: str | os.PathLike | h5py.File | h5py.Group, path: str = "
         f"h5_to_dict was given {h5file!r} (a {type(h5file).__name__}); pass the path "
         "of an .h5 file or an open h5py.File or h5py.Group."
     )
+
+
+def _label(value):
+    """An acquisition value as metadata.json held it: text as ``str``, arrays as lists, unset as None."""
+    if isinstance(value, h5py.Empty):
+        return None
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    if isinstance(value, np.ndarray):
+        return [_label(v) for v in value.tolist()]
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def extraction_labels(h5file: str | os.PathLike) -> tuple[str | None, dict]:
+    """An extraction's session uuid (``metadata/uuid``) and acquisition metadata (``metadata/acquisition``,
+    the recording's metadata.json as extraction read it), from its ``.h5``."""
+    with h5py.File(h5file, "r") as f:
+        uuid = _label(read_dataset(f["metadata/uuid"])) if "metadata/uuid" in f else None
+        group = f["metadata/acquisition"] if "metadata/acquisition" in f else {}
+        metadata = {name: _label(read_dataset(node)) for name, node in group.items()
+                    if isinstance(node, h5py.Dataset)}
+    return (str(uuid) if uuid is not None else None), metadata

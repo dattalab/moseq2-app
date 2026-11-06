@@ -26,6 +26,7 @@ from moseq2_common.options import (
     project_file_option,
 )
 from moseq2_common.project import find_project, is_job_file
+from moseq2_common.records import print_record_command
 from moseq2_model import steps
 from moseq2_model.options import (
     MODEL_STAGE,
@@ -138,6 +139,9 @@ def kappa_scan_fit_models(ctx, input_file, output_dir, project_file, **_):
     project = command_project(project_file, "moseq2-model kappa-scan", required=False)
     steps.kappa_scan(input_file, output_dir, replace(opts, out_script=join(output_dir, opts.out_script)),
                      index=project_index(project), learn=learn, project=project)
+
+
+cli.add_command(print_record_command())
 
 
 if __name__ == "__main__":

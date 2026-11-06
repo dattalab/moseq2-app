@@ -51,7 +51,8 @@ def sessions(tmp_path):
         with h5py.File(folder / "results_00.h5", "w") as f:
             f["frames"] = np.random.default_rng(0).integers(0, 50, (20, 8, 8)).astype("uint8")
             f["timestamps"] = np.arange(20) * 33.3
-        write_yaml({"uuid": uuid}, str(folder / "results_00.yaml"))
+        with h5py.File(folder / "results_00.h5", "a") as f:
+            f["metadata/uuid"] = uuid
     return tmp_path / "input"
 
 
