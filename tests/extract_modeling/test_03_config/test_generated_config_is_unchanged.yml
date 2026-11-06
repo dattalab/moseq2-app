@@ -28,6 +28,7 @@ crowd_movies:
   session_names: []
   sort: true
   specific_syllable: null
+exclude: []
 extract:
   angle_hampel_sig: 3
   angle_hampel_span: 0
