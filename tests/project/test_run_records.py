@@ -3,11 +3,16 @@
 A record names the step, the front end and, for a command, what was typed; the
 start and end times; the versions of the moseq2 packages and of the libraries
 results depend on; the options that ran, after every detection; each input,
-with its paths, size, modification time and fingerprint; and the outputs' array
-shapes. An ``.h5`` output holds it as its ``/provenance`` attribute, any other
+with its paths, its fingerprint (size and a hash of its content) and, for a
+file the pipeline wrote, the run that wrote it; and the outputs' array shapes. An ``.h5`` output holds it as its ``/provenance`` attribute, any other
 output in a ``.yaml`` beside it. A fact that cannot be gathered reads
 ``unknown: <reason>`` and never stops the run, and nothing in a record names the
 user or the machine beyond what its paths contain.
+
+No check reads a file's modification time. A file the pipeline wrote is the run
+its record names (its start and end times); a raw recording, which nothing
+rewrites, is its size and the hash of its first and last MB. A project copied
+with new file times is the same project.
 
 The extraction record replaces the session's ``results.yaml`` and the ``.h5``'s
 ``metadata/extraction/parameters``: an extraction is complete when its
@@ -231,3 +236,52 @@ def test_a_fact_that_cannot_be_gathered_is_unknown(tmp_path, monkeypatch):
     data = read_yaml(str(written))
     assert str(data["git"]).startswith("unknown: "), data["git"]
     assert data["versions"]["moseq2-extract"]
+
+
+# ------------------------------------------------------------ what identifies a file
+
+
+def test_a_fingerprint_holds_no_file_time(tmp_path):
+    """Two copies of a file with different modification times have the same fingerprint."""
+    from moseq2_common.records import fingerprint
+
+    first = tmp_path / "depth.avi"
+    first.write_bytes(os.urandom(3 * 1024 ** 2))
+    second = tmp_path / "copy.avi"
+    shutil.copyfile(first, second)
+    os.utime(second, (1e9, 1e9))
+    assert fingerprint(first) == fingerprint(second)
+    assert set(fingerprint(first)) == {"size", "sha256", "hashed"}
+
+
+def test_a_written_input_is_named_by_its_run(tmp_path):
+    """An input the pipeline wrote is recorded with the run its own record names, and is unchanged while it
+    carries that record, whatever its file time; written again, it is another run."""
+    from moseq2_common.records import run_of, start_record, unchanged, write_record
+
+    model = tmp_path / "model.p"
+    model.write_bytes(b"a model")
+    write_record(model, start_record("learn-model", {}, []).finish({}))
+    fitted = run_of(model)
+    assert set(fitted) == {"step", "started", "ended"} and fitted["step"] == "learn-model"
+
+    entry = start_record("make-df", {}, [model]).finish({})["inputs"][0]
+    assert entry["run"] == fitted
+    os.utime(model, (1e9, 1e9))
+    assert unchanged(entry, model)
+
+    write_record(model, start_record("learn-model", {}, []).finish({}))
+    assert run_of(model) != fitted
+    assert not unchanged(entry, model)
+
+
+def test_a_yaml_output_keeps_its_record_beside_it(tmp_path):
+    """A ``.yaml`` output's record is ``<stem>.record.yaml``, and ``read_record`` finds it there."""
+    from moseq2_common.records import read_record, sidecar_path, start_record, write_record
+
+    labels = tmp_path / "syll_info.yaml"
+    labels.write_text("0: {label: rear}\n")
+    assert sidecar_path(labels) == tmp_path / "syll_info.record.yaml"
+    write_record(labels, start_record("save-syllable-labels", {}, []).finish({}))
+    assert read_record(labels)["step"] == "save-syllable-labels"
+    assert read_yaml(str(labels)) == {0: {"label": "rear"}}

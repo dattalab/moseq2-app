@@ -5,10 +5,11 @@ project holds and names every output older than what it was built from: PC
 scores computed before one of their sessions was re-extracted, a model fit
 before the scores were computed again, an output computed from a file that no
 longer exists, and PCA outputs or a model computed before a session was added
-to the project. It finds them by comparing the inputs an output's record holds,
-and their fingerprints, with the project's sessions and the inputs as they are
-now. The message is for display; no step reads it or a record to decide what to
-run.
+to the project. It finds them by comparing the inputs an output's record holds
+with the project's sessions and the inputs as they are now: an input the
+pipeline wrote by the run its record names, any other by its size and content,
+never by a file time. The message is for display; no step reads it or a record
+to decide what to run.
 
 Each step checks its inputs before any work (``moseq2_common.records.check_inputs``
 and the step's own checks): a file it needs that does not exist, is empty or
@@ -39,7 +40,10 @@ SESSIONS = (
 
 
 def write_session(path, uuid, key, start, *, frames=200, timestamps=None, seed=0):
-    """A small extraction file: random 80 x 80 frames, 30 Hz timestamps."""
+    """A small extraction file: random 80 x 80 frames, 30 Hz timestamps, and the record of the extraction
+    that wrote it."""
+    from moseq2_common.records import start_record, write_h5_record
+
     rng = np.random.default_rng(seed)
     path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(path, "w") as f:
@@ -49,6 +53,7 @@ def write_session(path, uuid, key, start, *, frames=200, timestamps=None, seed=0
         f["metadata/uuid"] = uuid
         f["metadata/acquisition/SessionName"] = key.split("/")[1]
         f["metadata/acquisition/StartTime"] = start
+        write_h5_record(f, start_record("extract", {}, []).finish({}))
 
 
 @pytest.fixture
@@ -123,13 +128,58 @@ def test_progress_names_pca_scores_older_than_a_reextraction(project):
     write_session(h5, uuid, key, start, seed=7)
     with open(project / "config.yaml", "a") as f:
         f.write("# edited\n")
-    when = __import__("datetime").datetime.fromtimestamp(h5.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+    when = extracted_on(h5)
 
     shown = progress(Project.at(project))
     assert (f"_pca/pca_scores.h5 was computed before {key} was re-extracted ({when}); run apply-pca again "
             "to include it.") in shown, shown
     assert f"before {SESSIONS[0][0]}" not in shown, shown
     assert "config.yaml was" not in shown and shown.count("again") == 1, shown
+
+
+def extracted_on(h5):
+    """When the extraction that wrote ``h5`` ended, as the display gives it."""
+    from datetime import datetime
+
+    from moseq2_common.records import run_of
+
+    return datetime.fromisoformat(run_of(h5)["ended"]).strftime("%Y-%m-%d %H:%M")
+
+
+def test_a_reextraction_with_the_same_frames_is_named(project):
+    """Re-extracting a session writes it again even when its frames come out the same: the scores were
+    computed from the earlier run, and the display names it."""
+    from moseq2_app.project import progress
+    from moseq2_common.project import Project
+
+    scores_recorded_from_sessions(project)
+    key, folder, uuid, start = SESSIONS[0]
+    h5 = project / "aggregate_results" / folder / "results.h5"
+    write_session(h5, uuid, key, start, seed=0)
+
+    shown = progress(Project.at(project))
+    assert (f"_pca/pca_scores.h5 was computed before {key} was re-extracted ({extracted_on(h5)}); run "
+            "apply-pca again to include it.") in shown, shown
+
+
+def test_a_project_copied_with_new_file_times_is_not_out_of_date(project, tmp_path):
+    """Copied with ``shutil.copytree`` and every file time moved a day on, nothing is named."""
+    from moseq2_app.project import progress
+    from moseq2_common.project import Project
+
+    scores = scores_recorded_from_sessions(project)
+    model_recorded_from(project, scores, SESSIONS)
+    assert "again" not in progress(Project.at(project))
+
+    moved = tmp_path / "moved"
+    shutil.copytree(project, moved)
+    for folder, _, names in os.walk(moved):
+        for name in names:
+            path = os.path.join(folder, name)
+            stat = os.stat(path)
+            os.utime(path, (stat.st_atime + 86400, stat.st_mtime + 86400))
+    shown = progress(Project.at(moved))
+    assert "again" not in shown and "no longer exists" not in shown, shown
 
 
 def test_the_project_cell_prints_the_progress(project, capsys):

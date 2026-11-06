@@ -145,9 +145,12 @@ def _frame_timestamps(filename, index, fingerprint):
 
 
 def _fingerprint(filename):
-    """What makes a cached timestamp list stale."""
-    stat = os.stat(filename)
-    return stat.st_size, stat.st_mtime_ns
+    """What makes a cached timestamp list stale: the recording's size and the hash of its first and last MB
+    (``moseq2_common.records.fingerprint``), which identify a raw recording without its file time."""
+    from moseq2_common.records import fingerprint
+
+    found = fingerprint(filename)
+    return found["size"], found["sha256"]
 
 
 def get_video_info(filename, mapping="DEPTH", threads=8, count_frames=False, **kwargs):

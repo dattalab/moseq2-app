@@ -3,22 +3,29 @@
 Rendering a crowd movie for every syllable is the longest step of the Analysis
 notebook, so a second run of the labeling cell reuses the movies on disk. It
 reuses them only while what they were rendered from still holds: the model
-(by its fingerprint), the ``crowd_movies`` settings and the sessions. The
+(the run its record names), the ``crowd_movies`` settings and the sessions. The
 crowd-movie folder's record (``crowd_movies.yaml``, beside the folder) says
 what that was; when any of the three has changed, the cell renders the movies
 again and says why.
 
 Syllable labels are keyed by usage-sorted syllable number, so they describe one
-fit of one model. ``syll_info.yaml`` records the fingerprint of the model it
-labels, and a labeler opened on a model that is not that one, or is newer than
-the labels, says so and asks: wipe the labels and continue, or stop so the
-person can keep the old labels themselves.
+fit of one model. Saving them is a step with its own record,
+``syll_info.record.yaml`` beside ``syll_info.yaml``, naming the model, the run
+that fit it, and the save time; ``syll_info.yaml`` holds the labels only. A
+labeler opened on a model fit again since, or on another model, says so and
+asks: wipe the labels and continue, or stop so the person can keep the old
+labels themselves.
+
+Nothing here reads a file's modification time: a project copied elsewhere with
+new file times keeps its movies and its labels, and its progress display names
+nothing as out of date.
 """
 
 from __future__ import annotations
 
 import os
 import shutil
+from datetime import datetime
 
 import ipywidgets as widgets
 import pytest
@@ -26,13 +33,9 @@ import pytest
 import moseq2_app.steps as app_steps
 from moseq2_app.main import label_syllables
 from moseq2_app.util import current_analysis, update_config
-from moseq2_common.records import fingerprint
 from moseq2_common.yaml import read_yaml, write_yaml
 
 from widgets import capture_display
-
-#: What ``syll_info.yaml`` holds the labelled model's path and fingerprint under.
-LABELS_FOR = "labels_for"
 
 #: Few syllables, so a re-render is quick; the movies the labeled fixture made cover them.
 FEW = {"max_syllables": 2, "n_explained": 99}
@@ -60,9 +63,45 @@ def renders(monkeypatch):
     return calls
 
 
-def _newer(path, seconds=120):
-    stat = os.stat(path)
-    os.utime(path, (stat.st_atime + seconds, stat.st_mtime + seconds))
+def fit_again(analysis):
+    """What fitting the model again leaves behind, as far as any check can tell: the model carrying the
+    record of a new learn-model run, its inputs the project's settings and every session's extraction."""
+    from moseq2_common.bookkeeping import load, session_h5
+    from moseq2_common.records import start_record, write_record
+
+    project = analysis.project
+    sessions = [session_h5(project, s) for s in load(project).sessions.values()]
+    record = start_record("learn-model", {}, [project.config_file, *sessions], project=project)
+    write_record(analysis.model, record.finish({"files": [str(analysis.model)]}))
+
+
+def refit_unlabelled(analysis):
+    """The model fit again and its old labels deleted, as after wiping them: the start of a labeling."""
+    analysis.syll_info.unlink(missing_ok=True)
+    labels_record(analysis).unlink(missing_ok=True)
+    fit_again(analysis)
+
+
+def fit_date(model):
+    """When the run that wrote ``model`` ended, as the labeler's message gives it."""
+    from moseq2_common.records import run_of
+
+    return datetime.fromisoformat(run_of(model)["ended"]).strftime("%Y-%m-%d %H:%M")
+
+
+def labels_record(analysis):
+    return analysis.syll_info.with_name("syll_info.record.yaml")
+
+
+def copied_with_new_times(analysis, destination):
+    """``analysis``'s project copied to ``destination`` with every file's time moved a day on."""
+    shutil.copytree(analysis.project.folder, destination)
+    for folder, _, names in os.walk(destination):
+        for name in names:
+            path = os.path.join(folder, name)
+            stat = os.stat(path)
+            os.utime(path, (stat.st_atime + 86400, stat.st_mtime + 86400))
+    return current_analysis(str(destination))
 
 
 def test_crowd_movies_are_reused_while_nothing_they_were_made_from_changed(copy, renders, capsys):
@@ -75,7 +114,7 @@ def test_crowd_movies_are_reused_while_nothing_they_were_made_from_changed(copy,
 def test_crowd_movies_rerender_when_the_model_changes(copy, renders, capsys):
     # labels made for the earlier model stop the labeler first (the last test); here there are none
     copy.syll_info.unlink()
-    _newer(copy.model)
+    fit_again(copy)
 
     label_syllables(str(copy.project.folder), **FEW)
 
@@ -109,15 +148,45 @@ def test_crowd_movies_rerender_when_the_sessions_change(copy, renders, capsys):
     assert "the sessions changed" in capsys.readouterr().out
 
 
-def test_the_labels_name_the_model_they_label(copy):
+def test_saving_labels_writes_a_record_naming_the_model_run(copy):
+    """Saving the labels writes ``syll_info.record.yaml`` beside them: the save step, its time, and the
+    model it labels with the run that fit it. ``syll_info.yaml`` holds the labels only."""
+    from moseq2_common.records import read_record, run_of
+
+    refit_unlabelled(copy)
     label_syllables(str(copy.project.folder), **FEW)
 
-    from moseq2_app.labels import read_syllable_labels
+    assert "labels_for" not in read_yaml(str(copy.syll_info))
+    assert labels_record(copy).is_file()
+    record = read_record(copy.syll_info)
+    assert record == read_yaml(str(labels_record(copy)))
+    assert record["step"] == "save-syllable-labels"
+    assert record["started"] and record["ended"]
+    [model] = record["inputs"]
+    assert model["path"] == str(copy.model)
+    assert model["relative_path"] == copy.model.relative_to(copy.project.folder).as_posix()
+    assert model["run"] == run_of(copy.model)
 
-    stored = read_yaml(str(copy.syll_info))[LABELS_FOR]
-    assert stored["path"] == str(copy.model)
-    assert stored["fingerprint"] == fingerprint(copy.model)
-    assert LABELS_FOR not in read_syllable_labels(str(copy.syll_info))
+
+def test_a_copied_project_with_new_file_times_is_not_out_of_date(copy, tmp_path, renders, capsys, monkeypatch):
+    """Copied with ``shutil.copytree`` and every file time changed, the project keeps its crowd movies and
+    its labels, and its progress display names nothing to run again."""
+    from moseq2_app.project import progress
+
+    refit_unlabelled(copy)
+    label_syllables(str(copy.project.folder), **FEW)
+    renders.clear()
+    capsys.readouterr()
+
+    moved = copied_with_new_times(copy, tmp_path / "moved")
+    display = capture_display(monkeypatch)
+    label_syllables(str(moved.project.folder), **FEW)
+
+    printed = capsys.readouterr().out
+    assert renders == [], printed
+    assert display.of_type(widgets.Dropdown), "the labeler did not open on the copied labels"
+    assert "again" not in printed and "were made for" not in printed, printed
+    assert "again" not in progress(moved.project)
 
 
 def _choice(display):
@@ -125,22 +194,24 @@ def _choice(display):
     return {w.description: w for w in display.of_type(widgets.VBox)[-1].children[1].children}
 
 
-def test_labels_for_another_model_are_not_attached_silently(copy, monkeypatch):
+def test_labels_for_a_model_fit_again_are_not_attached_silently(copy, monkeypatch):
     folder = str(copy.project.folder)
+    refit_unlabelled(copy)
     label_syllables(folder, **FEW)
+    labelled_on = fit_date(copy.model)
     labels = read_yaml(str(copy.syll_info))
     labels[0]["label"] = "rear"
     write_yaml(labels, str(copy.syll_info))
     kept = copy.syll_info.read_bytes()
-    _newer(copy.model)
+    fit_again(copy)
 
     display = capture_display(monkeypatch)
     label_syllables(folder, **FEW)
 
-    assert display.of_type(widgets.Dropdown) == [], "the labeler opened on labels made for another model"
+    assert display.of_type(widgets.Dropdown) == [], "the labeler opened on labels made for another fit"
     shown = display.of_type(widgets.VBox)[-1].children[0].value
-    assert f"The labels in {copy.syll_info} were made for {copy.model}" in shown
-    assert f"{copy.model} is newer than the labels" in shown
+    assert (f"The labels in {copy.syll_info} were made for {copy.model} as fit on {labelled_on}, and "
+            f"{copy.model} was fit again on {fit_date(copy.model)}.") in shown, shown
     choice = _choice(display)
     assert sorted(choice) == ["Stop", "Wipe labels and continue"]
 
@@ -153,8 +224,9 @@ def test_labels_for_another_model_are_not_attached_silently(copy, monkeypatch):
     _choice(display)["Wipe labels and continue"].click()
 
     from moseq2_app.labels import read_syllable_labels
+    from moseq2_common.records import read_record, run_of
 
     dropdown = display.one(widgets.Dropdown)
     assert list(dropdown.options)[0] == "0 - "
     assert read_syllable_labels(str(copy.syll_info))[0]["label"] == ""
-    assert read_yaml(str(copy.syll_info))[LABELS_FOR]["fingerprint"] == fingerprint(copy.model)
+    assert read_record(copy.syll_info)["inputs"][0]["run"] == run_of(copy.model)

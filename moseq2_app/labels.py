@@ -1,79 +1,133 @@
-"""Label files, and the file each one labels.
+"""Label files, the step that saves them, and what each one labels.
 
 Syllable labels (``syll_info.yaml``) are keyed by usage-sorted syllable number, so
 they describe one fit of one model; the Flip-Classifier-Training notebook's saved
 frame ranges (``flip-training-frame-ranges.p``) describe one state of each
-session's frames. Each label file records what it labels under ``labels_for``:
-the labelled file's path and its fingerprint (``moseq2_common.records.fingerprint``),
-one entry for ``syll_info.yaml``'s model and one per labelled session for the
-frame ranges.
+session's frames. A label file holds the labels only.
 
-A tool opening labels whose labelled file no longer has that fingerprint, or is
-newer than the labels, does not attach them: it says so (``stale_labels_message``)
-and offers two choices, to wipe the labels and continue, or to stop so the person
-can copy the labels somewhere first. The pipeline keeps no old label file. Labels
-that record nothing under ``labels_for`` have nothing to check against and are
-opened as they are.
+Saving labels is a step with its own record (``save_record``), written beside the
+labels file (``moseq2_common.records.sidecar_path``: ``syll_info.record.yaml``,
+``flip-training-frame-ranges.yaml``). It carries the save time and, as its inputs,
+what the labels label with the run that wrote it (``moseq2_common.records.run_of``):
+the model for syllable labels, each labelled session's extraction for the frame
+ranges.
+
+Labels are stale when the file they label now carries the record of another run:
+a model fit again, a session extracted again or flipped by a flip classifier, or
+another model altogether (``stale``). A tool opening stale labels does not attach
+them: it says so (``stale_labels_message``) and offers two choices, to wipe the
+labels and continue, or to stop so the person can copy the labels somewhere
+first. The pipeline keeps no old label file. Labels with no record beside them
+have nothing to check against and are opened as they are. Nothing here reads a
+file's modification time.
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
-from datetime import datetime
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 
-from moseq2_common.records import fingerprint
+from moseq2_common.project import Project
+from moseq2_common.records import read_record, run_of, sidecar_path, start_record, unchanged, write_record, written_on
 from moseq2_common.yaml import read_yaml
 
-__all__ = ["LABELS_FOR", "WIPE", "STOP", "labels_for", "read_syllable_labels", "stale", "stale_labels_message",
-           "stopped_message"]
+__all__ = ["FLIP_LABELS_STEP", "SYLLABLE_LABELS_STEP", "WIPE", "STOP", "index_project", "labelled_in",
+           "read_syllable_labels", "remove_labels", "save_record", "stale", "stale_labels_message",
+           "stale_syllable_labels", "stopped_message"]
 
-#: The key a label file records what it labels under.
-LABELS_FOR = "labels_for"
+#: The steps that save labels, as their records name them.
+SYLLABLE_LABELS_STEP = "save-syllable-labels"
+FLIP_LABELS_STEP = "save-flip-labels"
 
 #: The two choices offered for stale labels, as their buttons read.
 WIPE = "Wipe labels and continue"
 STOP = "Stop"
 
 
-def labels_for(path: str | os.PathLike) -> dict:
-    """What a label file records about the file it labels: its path and its fingerprint."""
-    return {"path": os.path.abspath(path), "fingerprint": fingerprint(path)}
+def index_project(index) -> Project | None:
+    """The project a session index (``moseq2_common.bookkeeping.session_index``) was read from, or None."""
+    if isinstance(index, Mapping) and index.get("bookkeeping_file"):
+        return Project.at(Path(index["bookkeeping_file"]).parent)
+    return None
+
+
+def save_record(labels_file: str | os.PathLike, step: str, labelled: Sequence, project: Project | None = None) -> Path:
+    """Write the record of saving ``labels_file`` beside it: ``labelled``, the files the labels label (paths,
+    or mappings holding ``path`` and facts such as ``session``), as its inputs. Returns the record's file."""
+    record = start_record(step, {}, labelled, project=project)
+    return write_record(labels_file, record.finish({"files": [str(labels_file)]}))
+
+
+def labelled_in(labels_file: str | os.PathLike) -> list[dict]:
+    """The files the record beside ``labels_file`` names as labelled; empty when it has no record."""
+    try:
+        record = read_record(labels_file)
+    except FileNotFoundError:
+        return []
+    return [entry for entry in record.get("inputs") or [] if isinstance(entry, Mapping)]
+
+
+def remove_labels(labels_file: str | os.PathLike) -> None:
+    """Delete ``labels_file`` and its record."""
+    record = sidecar_path(labels_file)  # before the file goes: a missing file's sidecar is named otherwise
+    Path(labels_file).unlink(missing_ok=True)
+    record.unlink(missing_ok=True)
 
 
 def read_syllable_labels(path: str | os.PathLike) -> dict:
-    """The syllable labels in ``path`` (``syll_info.yaml``), by syllable number, without ``labels_for``."""
-    labels = dict(read_yaml(str(path)) or {})
-    labels.pop(LABELS_FOR, None)
-    return labels
+    """The syllable labels in ``path`` (``syll_info.yaml``), by syllable number."""
+    return dict(read_yaml(str(path)) or {})
 
 
-def _when(stored: Mapping) -> str:
-    modified = (stored.get("fingerprint") or {}).get("modified")
-    return str(modified)[:19].replace("T", " ") if modified else "an unrecorded time"
+def _relative(path, project: Project) -> str:
+    """``path`` relative to ``project``'s folder, as a record's ``relative_path`` holds it."""
+    return Path(os.path.relpath(os.path.abspath(path), Path(project.folder).resolve())).as_posix()
 
 
-def stale(stored: Mapping | None, path: str | os.PathLike, different: str) -> tuple[str, str, str, str] | None:
-    """``(labelled, when, current, reason)`` when labels made for ``stored`` (a ``labels_for`` entry) do not
-    fit ``path`` now, else None. ``different`` is the reason given when ``path`` is not newer than the labels
-    but is not what they were made for (``is a different model``)."""
-    if not stored or stored.get("fingerprint") == fingerprint(path):
+def stale(entry: Mapping, path: str | os.PathLike, verb: str, different: str | None = None) -> str | None:
+    """Why labels saved for ``entry`` (an input of their record) do not fit ``path`` now, as a clause of
+    ``stale_labels_message``; None when they do.
+
+    ``verb`` says how the labelled file was written (``fit``, ``extracted``). ``different`` is the reason to
+    give instead when ``path`` is not the file ``entry`` names (``is a different model``).
+    """
+    if different is None and unchanged(entry, path):
         return None
-    recorded = (stored.get("fingerprint") or {}).get("modified")
-    try:
-        newer = recorded is None or os.stat(path).st_mtime > datetime.fromisoformat(recorded).timestamp()
-    except (TypeError, ValueError):
-        newer = False
-    reason = "is newer than the labels" if newer else different
-    return str(stored.get("path", "another file")), _when(stored), os.path.abspath(path), reason
+    then = entry.get("run") or {}
+    labelled = entry.get("path", "another file")
+    made = f"{labelled} as {verb} on {written_on(then['ended'])}" if then.get("ended") else str(labelled)
+    if different is not None:
+        return f"{made}, and {path} {different}"
+    now = run_of(path)
+    if now is None or not now.get("ended"):
+        reason = "has changed since, and carries no record of the run that wrote it"
+    elif (now.get("flip_corrected") and now.get("flip_corrected") != then.get("flip_corrected")
+          and (now.get("started"), now.get("ended")) == (then.get("started"), then.get("ended"))):
+        reason = f"was flipped by a flip classifier on {written_on(now['flip_corrected'])}"
+    else:
+        reason = f"was {verb} again on {written_on(now['ended'])}"
+    return f"{made}, and {path} {reason}"
 
 
-def stale_labels_message(labels: str | os.PathLike, found: list[tuple[str, str, str, str]]) -> str:
+def stale_syllable_labels(labels_file: str | os.PathLike, model_path: str | os.PathLike,
+                          project: Project | None = None) -> str | None:
+    """Why the syllable labels in ``labels_file`` do not fit ``model_path`` now (``stale``), or None."""
+    entries = labelled_in(labels_file)
+    if not entries:
+        return None
+    entry = entries[0]
+    if project is not None and entry.get("relative_path"):
+        same = entry["relative_path"] == _relative(model_path, project)
+    else:
+        same = entry.get("path") == os.path.abspath(model_path)
+    return stale(entry, os.path.abspath(model_path), "fit", None if same else "is a different model")
+
+
+def stale_labels_message(labels: str | os.PathLike, found: list[str]) -> str:
     """The message for labels in ``labels`` that do not fit what they label (``stale`` results)."""
-    made_for = "; for ".join(f"{labelled} ({when}), and {current} {reason}" for labelled, when, current, reason
-                             in found)
-    return (f"The labels in {labels} were made for {made_for}. Wipe the labels and continue, or stop and copy "
-            f"{labels} somewhere safe first.")
+    return (f"The labels in {labels} were made for {'; for '.join(found)}. Wipe the labels and continue, or stop "
+            f"and copy {labels} somewhere safe first.")
 
 
 def stopped_message(labels: str | os.PathLike) -> str:
