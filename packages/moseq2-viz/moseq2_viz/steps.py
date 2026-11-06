@@ -20,17 +20,26 @@ Every other step writes the record of its run (``moseq2_common.records``) as
 a ``.yaml`` beside its output (``sidecar_path``): ``<figure>.yaml`` for a figure
 named without ``.png``/``.pdf``, ``moseq_df.yaml`` for ``moseq_df.csv``,
 ``crowd_movies.yaml`` for the crowd-movie folder.
+
+Crowd movies are a cache: the syllable labeler reuses a folder of them only
+while its record shows they were rendered from the same model (by its
+fingerprint), with the same ``crowd_movies`` settings and from the same sessions
+(``crowd_movies_out_of_date``), and otherwise renders them again and says why
+(``rerender_message``). The record is read to check, never to render with.
 """
 
 from __future__ import annotations
 
+import io
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from moseq2_common.bookkeeping import relative_path, session_index, update
 from moseq2_common.project import Project, read_groups, write_groups
-from moseq2_common.records import start_record, write_record
+from moseq2_common.records import fingerprint, read_record, record_text, start_record, write_record
+from moseq2_common.yaml import read_yaml
 from moseq2_viz.helpers.wrappers import (
     add_group_wrapper,
     get_best_fit_model_wrapper,
@@ -94,16 +103,22 @@ def _figures(output_file, suffix=""):
     return [Path(f"{output_file}{suffix}.png"), Path(f"{output_file}{suffix}.pdf")]
 
 
-def _start(step, opts, index, *files) -> Any:
-    """The record of ``step``: its inputs ``files``, the sessions ``index`` names and the project's
-    settings, when ``index`` is a project's sessions."""
+def _sessions(index) -> tuple[list[str], Project | None]:
+    """The extraction files of the sessions ``index`` names, and the project it was read from."""
     sessions, project = [], None
     if isinstance(index, dict):
         entries = index.get("files", [])
         sessions = [entry["path"][0] for entry in (entries.values() if isinstance(entries, dict) else entries)]
         if index.get("bookkeeping_file"):
             project = Project.at(Path(index["bookkeeping_file"]).parent)
-    elif isinstance(index, (str, Path)):
+    return sessions, project
+
+
+def _start(step, opts, index, *files) -> Any:
+    """The record of ``step``: its inputs ``files``, the sessions ``index`` names and the project's
+    settings, when ``index`` is a project's sessions."""
+    sessions, project = _sessions(index)
+    if isinstance(index, (str, Path)):
         files = (index, *files)
     settings = [project.config_file] if project is not None and project.config_file.is_file() else []
     return start_record(step, opts if opts is not None else {}, [*settings, *[f for f in files if f], *sessions],
@@ -174,6 +189,58 @@ def make_crowd_movies(index: dict | str, model_path: str, output_dir: str, opts:
     _finish(record, output_dir, [movie for movies in result.movies.values() for movie in movies]
             if isinstance(result.movies, dict) else [])
     return result
+
+
+#: Crowd-movie settings that say how the movies are rendered or which syllables get one, not what a movie
+#: shows; the labeler checks for a movie of each syllable it offers on its own.
+_NOT_COMPARED = ("processes", "progress_bar", "max_syllable", "specific_syllable")
+
+
+def _as_recorded(values: dict) -> dict:
+    """``values`` as a record holds them once read back (tuples as lists)."""
+    return read_yaml(io.StringIO(record_text(values))) or {}
+
+
+def crowd_movies_out_of_date(output_dir: str, model_path: str, index: dict, opts: CrowdMovieOptions) -> list[str]:
+    """Why the crowd movies in ``output_dir`` cannot be shown for ``model_path``, the sessions of ``index`` and
+    ``opts``; an empty list when they can.
+
+    The folder's record (``crowd_movies.yaml`` beside it) names what the movies were rendered from: the model
+    with its fingerprint, the settings and the sessions. Files are matched by their path in the project, so a
+    project copied elsewhere with its file times keeps its movies.
+    """
+    try:
+        record = read_record(output_dir)
+    except FileNotFoundError:
+        return ["there is no record of what they were rendered from"]
+    sessions, project = _sessions(index)
+
+    def where(path):
+        if project is None:
+            return os.path.abspath(path)
+        return Path(os.path.relpath(os.path.abspath(path), Path(project.folder).resolve())).as_posix()
+
+    inputs = {entry.get("relative_path") or entry.get("path"): entry for entry in record.get("inputs") or []
+              if isinstance(entry, dict)}
+    reasons = []
+    model = inputs.get(where(model_path))
+    if model is None or model.get("fingerprint") != fingerprint(model_path):
+        reasons.append("the model changed since they were made")
+    recorded, current = record.get("options") or {}, _as_recorded(opts.as_dict())
+    changed = sorted(name for name in set(recorded) | set(current)
+                     if name not in _NOT_COMPARED and recorded.get(name) != current.get(name))
+    if changed:
+        reasons.append(f"the crowd_movies settings changed: {', '.join(changed)}")
+    config = [where(project.config_file)] if project is not None else []
+    rendered_from = set(inputs) - {where(model_path), *config}
+    if rendered_from != {where(session) for session in sessions}:
+        reasons.append("the sessions changed")
+    return reasons
+
+
+def rerender_message(output_dir: str, reasons: list[str]) -> str:
+    """What the labeler prints before rendering the crowd movies in ``output_dir`` again, for ``reasons``."""
+    return f"Rendering the crowd movies in {str(output_dir).rstrip(os.sep + '/')} again: {'; '.join(reasons)}."
 
 
 def plot_scalar_summary(index: dict | str, output_file: str, opts: ScalarSummaryOptions) -> FiguresResult:

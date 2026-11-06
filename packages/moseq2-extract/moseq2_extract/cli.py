@@ -53,7 +53,7 @@ _OUTPUT_FILE = click.option("-o", "--output-file", type=click.Path(), default=No
 
 # The help order of each command, as 1.5.0 lists its options.
 _ROI_ORDER = (
-    "progress_bar", "config_file", "recompute_bg", "use_plane_bground", "output_dir", "noise_tolerance",
+    "progress_bar", "config_file", "use_plane_bground", "output_dir", "noise_tolerance",
     "erode_iterations", "bg_roi_erode", "dilate_iterations", "bg_sort_roi_by_position_max_rois",
     "bg_sort_roi_by_position", "bg_roi_fill_holes", "bg_roi_gradient_kernel", "bg_roi_gradient_threshold",
     "bg_roi_gradient_filter", "bg_roi_depth_range", "manual_set_depth_range", "camera_type", "bg_roi_weights",

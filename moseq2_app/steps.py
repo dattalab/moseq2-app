@@ -21,6 +21,17 @@ from moseq2_viz import steps as viz_steps
 from moseq2_viz.options import CrowdMovieOptions
 
 
+def syllable_movie_options(opts: CrowdMovieOptions, syllables: Sequence[int]) -> CrowdMovieOptions:
+    """``opts`` set to render ``syllables``: one syllable, or the first n syllables (``range(n)``)."""
+    syllables = list(syllables)
+    if len(syllables) == 1:
+        return replace(opts, specific_syllable=syllables[0])
+    if syllables == list(range(len(syllables))):
+        return replace(opts, max_syllable=len(syllables), specific_syllable=None)
+    raise ValueError(f"Crowd movies are rendered for one syllable or for the first n syllables, "
+                     f"and {syllables} is neither. Pass one syllable, or range(n).")
+
+
 def render_syllable_movies(model_path: str, index: dict, crowd_movie_dir: str, opts: CrowdMovieOptions, *,
                            syllables: Sequence[int]) -> dict:
     """
@@ -39,15 +50,8 @@ def render_syllable_movies(model_path: str, index: dict, crowd_movie_dir: str, o
     Returns:
     (dict): the movies written, ``{"all": [...]}`` or one list per group or session.
     """
-    syllables = list(syllables)
-    if len(syllables) == 1:
-        opts = replace(opts, specific_syllable=syllables[0])
-    elif syllables == list(range(len(syllables))):
-        opts = replace(opts, max_syllable=len(syllables), specific_syllable=None)
-    else:
-        raise ValueError(f"Crowd movies are rendered for one syllable or for the first n syllables, "
-                         f"and {syllables} is neither. Pass one syllable, or range(n).")
-    return viz_steps.make_crowd_movies(index, model_path, crowd_movie_dir, opts).movies
+    return viz_steps.make_crowd_movies(index, model_path, crowd_movie_dir,
+                                       syllable_movie_options(opts, syllables)).movies
 
 
 @dataclass(frozen=True)

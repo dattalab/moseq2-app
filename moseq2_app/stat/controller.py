@@ -13,7 +13,7 @@ from ipywidgets import interactive_output
 from moseq2_viz.info.util import transition_entropy
 from moseq2_app.util import merge_labels_with_scalars
 from moseq2_viz.util import get_sorted_index
-from moseq2_common.yaml import read_yaml
+from moseq2_app.labels import read_syllable_labels
 from moseq2_viz.model.stat import run_kruskal, run_pairwise_stats
 from moseq2_viz.model.util import (parse_model_results, relabel_by_usage, normalize_usages,
                                    sort_syllables_by_stat, sort_syllables_by_stat_difference)
@@ -46,7 +46,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         self.df = None
 
         # Load Syllable Info
-        self.syll_info = read_yaml(self.info_path)
+        self.syll_info = read_syllable_labels(self.info_path)
 
         # Load all the data
         self.interactive_stat_helper()
@@ -107,7 +107,7 @@ class InteractiveSyllableStats(SyllableStatWidgets):
         Computes and saves the all the relevant syllable information to be displayed.
         """
         # Read syllable information dict
-        syll_info = read_yaml(self.info_path)
+        syll_info = read_syllable_labels(self.info_path)
 
         # Getting number of syllables included in the info dict
         max_sylls = len(self.syll_info)
@@ -350,7 +350,7 @@ class InteractiveTransitionGraph(TransitionGraphWidgets):
             warnings.simplefilter('ignore')
 
             # Load Syllable Info
-            self.syll_info = read_yaml(self.info_path)
+            self.syll_info = read_syllable_labels(self.info_path)
 
             # Get labels and optionally relabel them by usage sorting
             labels = self.model_fit['labels']

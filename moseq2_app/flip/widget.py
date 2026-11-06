@@ -1,4 +1,5 @@
 import io
+import html
 import h5py
 import pickle
 import warnings
@@ -14,6 +15,7 @@ from moseq2_extract.extract.proc import get_flips
 from moseq2_extract.util import gen_batch_sequence
 from moseq2_common.video import write_frames_preview
 from moseq2_app.flip.train import SAVE_AND_RETRAIN
+from moseq2_app.labels import STOP, WIPE, labels_for, stale, stale_labels_message, stopped_message
 
 
 # Workaround for HoloViews/Bokeh _buffers parameter issue
@@ -104,6 +106,13 @@ class FlipClassifierWidget:
         self.save_button = pn.widgets.Button(name='Save Labels', button_type='success')
         self.curr_total_label = pn.pane.Markdown(f'Current Total Selected Frames: {self.curr_total_selected_frames}')
 
+        # saved labels made for frames that have changed since, until the person wipes them or stops
+        self.stale_labels = None
+        self.labels_check = pn.pane.HTML('')
+        self.wipe_button = pn.widgets.Button(name=WIPE, button_type='danger')
+        self.stop_button = pn.widgets.Button(name=STOP)
+        self.labels_box = pn.Column(self.labels_check, pn.Row(self.wipe_button, self.stop_button), visible=False)
+
         self.facing_info = pn.pane.Markdown('To finish selection, click on direction the animal is facing', visible=False)
         self.facing_row = pn.Row(self.face_left_button, self.face_right_button)
         self.range_box = pn.Column(
@@ -121,6 +130,7 @@ class FlipClassifierWidget:
         self.frame_advancer_row = pn.Row(self.backward_button, self.forward_button)
 
         self.widgets = pn.Column(
+            self.labels_box,
             self.session_select_dropdown,
             self.frame_num_slider,
             self.start_button,
@@ -140,6 +150,8 @@ class FlipClassifierWidget:
         self.face_right_button.on_click(lambda event: self.facing_range_callback(event, False))
         self.delete_selection_button.on_click(self.on_delete_selection_clicked)
         self.save_button.on_click(lambda event: self.save_frame_ranges())
+        self.wipe_button.on_click(lambda event: self.wipe_labels())
+        self.stop_button.on_click(lambda event: self.stop_on_labels())
 
         self.forward_button.on_click(self.advance_frame)
         self.backward_button.on_click(self.rewind_frame)
@@ -161,7 +173,21 @@ class FlipClassifierWidget:
         if not path.exists():
             return
         with open(path, 'rb') as f:
-            saved_paths, saved_ranges = pickle.load(f)
+            saved = pickle.load(f)
+        saved_paths, saved_ranges = saved[:2]
+
+        # ranges label the frames as they were; an extraction rewritten since (re-extracted, or flipped by
+        # a classifier) is not what they label
+        made_for = saved[2] if len(saved) > 2 else {}
+        found = [stale(made_for.get(session), self.sessions[session], 'is a different extraction')
+                 for session in made_for if session in self.sessions]
+        found = [one for one in found if one is not None]
+        if found:
+            self.stale_labels = stale_labels_message(path, found)
+            self.labels_check.object = f'<p style="color: red;">{html.escape(self.stale_labels)}</p>'
+            self.labels_box.visible = True
+            self.save_button.disabled = True
+            return
 
         missing = {}
         for session, ranges in saved_ranges.items():
@@ -188,6 +214,19 @@ class FlipClassifierWidget:
             )
             self.mark_unsaved()
 
+    def wipe_labels(self):
+        """Delete the saved labels made for other frames, and label from nothing."""
+        Path(self.training_data_path).unlink(missing_ok=True)
+        self.stale_labels = None
+        self.labels_box.visible = False
+        self.save_button.disabled = False
+
+    def stop_on_labels(self):
+        """Leave the saved labels as they are, for the person to copy before labeling again."""
+        self.labels_check.object = (f'<p style="color: red;">{html.escape(self.stale_labels)}</p>'
+                                    f'<p>{html.escape(stopped_message(self.training_data_path))}</p>')
+        self.wipe_button.disabled = self.stop_button.disabled = True
+
     def mark_unsaved(self):
         self.unsaved = True
         self.status.object = (
@@ -211,7 +250,7 @@ class FlipClassifierWidget:
         if not self.unsaved or not path.exists():
             return
         with open(path, 'rb') as f:
-            _, saved = pickle.load(f)
+            _, saved = pickle.load(f)[:2]
         saved_ranges = [r for ranges in saved.values() for _, r in ranges]
         if not saved_ranges:
             return
@@ -325,9 +364,16 @@ class FlipClassifierWidget:
         return pn.Row(self.widgets, self.frame_display)
 
     def save_frame_ranges(self):
-        """Write the ranges the widget shows to ``training_data_path``, replacing what it held."""
+        """Write the ranges the widget shows to ``training_data_path``, replacing what it held, with the
+        fingerprint of each labeled session's extraction (``moseq2_app.labels``)."""
+        if self.stale_labels is not None:
+            raise ValueError(f'{self.stale_labels} Nothing was saved: choose {WIPE} or {STOP} in the labeling '
+                             'widget above.')
+        ranges = dict(self.selected_frame_ranges_dict)
+        made_for = {session: labels_for(self.sessions[session]) for session, labeled in ranges.items()
+                    if labeled and session in self.sessions}
         with open(self.training_data_path, 'wb') as f:
-            pickle.dump((self.sessions, dict(self.selected_frame_ranges_dict)), f)
+            pickle.dump((self.sessions, ranges, made_for), f)
         self.mark_saved()
             
     def apply_flip_classifier(self, clf_path, chunk_size=4000, chunk_overlap=0,

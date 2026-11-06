@@ -36,7 +36,8 @@ SAVE_AND_RETRAIN = (
 
 
 def _load_frame_ranges(data_index_path: Path):
-    """The saved frame ranges: ({session: .h5 path}, {session: [(left, frames), ...]})."""
+    """The saved frame ranges: ({session: .h5 path}, {session: [(left, frames), ...]}). The file's third item,
+    what the labels were made for (``moseq2_app.labels``), is the labeling widget's to check."""
     if not data_index_path.exists():
         raise FileNotFoundError(
             f"No saved flip labels at {data_index_path}: the file does not exist. "
@@ -44,7 +45,7 @@ def _load_frame_ranges(data_index_path: Path):
             f"{SAVE_AND_RETRAIN}."
         )
     with open(data_index_path, "rb") as f:
-        return pickle.load(f)
+        return tuple(pickle.load(f)[:2])
 
 
 def _plain(value):

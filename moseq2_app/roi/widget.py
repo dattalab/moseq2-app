@@ -245,8 +245,8 @@ class ArenaMaskWidget:
             folder = self.session_data.path
         # get full path
         file = self.sessions[folder]
-        # compute background, cached where extraction reads it
-        bground = get_bground_im_file(file, frame_stride=1000, output_dir=self._output_dir(folder))
+        # extraction's own background, at its stride; written to the session folder to look at, never read back
+        bground = get_bground_im_file(file, output_dir=self._output_dir(folder))
         # save for recall later
         self.backgrounds[folder] = bground
 
@@ -254,7 +254,7 @@ class ArenaMaskWidget:
 
     def _output_dir(self, folder):
         """The recording's session folder in the project's aggregate_results, where its extraction writes
-        and the background the tool computes is kept for it."""
+        and the images the tool computes are written to look at."""
         output_dir = session_outputs(self.project, folder).folder
         output_dir.mkdir(parents=True, exist_ok=True)
         return str(output_dir)

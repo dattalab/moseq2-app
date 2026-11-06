@@ -178,7 +178,7 @@ def test_the_preview_stops_on_a_flip_classifier_that_does_not_fit_the_crop_size(
 
 def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monkeypatch, raw_sessions):
     """ "Compute arena mask" finds the arena with config.yaml's settings outside the tool's,
-    and caches the background in the folder extraction writes to, the recording's session folder."""
+    and writes the background into the folder extraction writes to, the recording's session folder."""
     saved, widget = _save_then_change_config(
         project, raw_sessions, {"bg_roi_erode": [3, 3], "bg_roi_fill_holes": False}
     )
@@ -197,3 +197,26 @@ def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monke
     assert received["dilate_iterations"] == 2
     assert output_dir == str(project / "aggregate_results" / "saline_example_0")
     assert (project / "aggregate_results" / "saline_example_0" / "bground.tiff").exists()
+
+
+def test_background_is_the_same_whether_the_arena_tool_ran_first(project, tmp_path):
+    """X12: extraction computes the background it subtracts itself, sampling the recording at
+    the one stride the arena tool shares, and never reads one back from the session folder. A
+    recording whose arena the tool found first is extracted against the background a recording
+    the tool never opened gets."""
+    import h5py
+    import numpy as np
+
+    untouched = tmp_path / "untouched"
+    shutil.copytree(project, untouched)
+    widget = open_arena_tool(project)
+    click(buttons_of(widget.view)["Compute arena mask"])
+
+    backgrounds = {}
+    for root in (project, untouched):
+        extract_command(str(root / "saline_example_0" / "depth.avi"), None, str(root / "config.yaml"),
+                        num_frames=50)
+        with h5py.File(root / "aggregate_results" / "saline_example_0" / "results.h5", "r") as f:
+            backgrounds[root] = f["metadata/extraction/background"][()]
+
+    np.testing.assert_array_equal(backgrounds[project], backgrounds[untouched])

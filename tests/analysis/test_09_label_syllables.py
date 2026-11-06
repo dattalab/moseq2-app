@@ -33,6 +33,7 @@ import ipywidgets as widgets
 import numpy as np
 import pytest
 
+from moseq2_app.labels import read_syllable_labels
 from moseq2_app.main import label_syllables
 from moseq2_app.util import current_analysis
 from moseq2_viz.model.util import parse_model_results
@@ -54,8 +55,8 @@ FIGURE = "syllable_needed_explained_variance"
 
 @pytest.fixture(scope="module")
 def syll_info(analysis, labeled):
-    """The label file the cell writes and the labeller reads back."""
-    return read_yaml(str(analysis.syll_info))
+    """The label file the cell writes and the labeller reads back, by syllable."""
+    return read_syllable_labels(str(analysis.syll_info))
 
 
 @pytest.fixture(scope="module")
@@ -409,12 +410,12 @@ def relabelled(tmp_path_factory, analysis_project, labeled):
             display.clear()
             label_syllables(str(paths.project.folder), **{**LABELLING, "max_syllables": count})
             dropdown = display.of_type(widgets.Dropdown)[-1]
-            seen[name] = read_yaml(str(paths.syll_info)), list(dropdown.options)
+            seen[name] = read_syllable_labels(str(paths.syll_info)), list(dropdown.options)
 
         name, save = _labeller_controls(display)
         name.value = "renamed"
         save.click()
-        seen["saved"] = read_yaml(str(paths.syll_info))
+        seen["saved"] = read_syllable_labels(str(paths.syll_info))
 
     return typed, lower, seen, paths
 

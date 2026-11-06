@@ -15,8 +15,8 @@ from copy import deepcopy
 from tqdm.auto import tqdm
 import moseq2_extract.io.video
 import moseq2_extract.extract.roi
-from os.path import exists, join, dirname
-from moseq2_extract.io.image import read_image, write_image
+from os.path import join
+from moseq2_extract.io.image import write_image
 from moseq2_common.scalars import centroid_to_mm, depth_camera_geometry, velocities
 from moseq2_extract.util import strided_app
 from moseq2_extract.extract.flip_classifier import (
@@ -96,56 +96,55 @@ def get_largest_cc(frames, progress_bar=False):
     return foreground_obj
 
 
-def get_bground_im_file(frames_file, frame_stride=500, med_scale=5, output_dir=None, **kwargs):
+#: The frame stride the background median samples the recording at, in extraction and in the arena tool alike.
+BACKGROUND_STRIDE = 500
+
+
+def get_bground_im_file(frames_file, frame_stride=BACKGROUND_STRIDE, med_scale=5, output_dir=None, **kwargs):
     """
-    Load or compute background from file.
+    Compute the background image of a recording: each pixel's median over frames sampled every ``frame_stride``.
+
+    The background is computed on every call and never read back from a file. With ``output_dir``, it is
+    also written there as ``bground.tiff``, an image to look at.
 
     Args:
     frames_file (str): path to the depth video
     frame_stride (int): stride size between frames for median bground calculation
     med_scale (int): kernel size for median blur for background images.
+    output_dir (str): folder to write ``bground.tiff`` into; None to write nothing.
     kwargs (dict): extra keyword arguments
 
     Returns:
     bground (numpy.ndarray): background image
     """
 
-    if output_dir is None:
-        bground_path = join(dirname(frames_file), 'proc', 'bground.tiff')
-    else:
-        bground_path = join(output_dir, 'bground.tiff')
-
     if type(frames_file) is not tarfile.TarFile:
         kwargs = deepcopy(kwargs)
     finfo = kwargs.pop('finfo', None)
+    if finfo is None:
+        finfo = moseq2_extract.io.video.get_movie_info(frames_file, **kwargs)
 
-    # Compute background image if it doesn't exist. Otherwise, load from file
-    if not exists(bground_path) or kwargs.get('recompute_bg', False):
-        if finfo is None:
-            finfo = moseq2_extract.io.video.get_movie_info(frames_file, **kwargs)
+    frame_idx = np.arange(0, finfo['nframes'], frame_stride)
+    frame_store = []
+    for i, frame in enumerate(frame_idx):
+        frs = moseq2_extract.io.video.load_movie_data(frames_file,
+                                                      [int(frame)],
+                                                      frame_size=finfo['dims'],
+                                                      finfo=finfo,
+                                                      **kwargs).squeeze()
+        frame_store.append(cv2.medianBlur(frs, med_scale))
 
-        frame_idx = np.arange(0, finfo['nframes'], frame_stride)
-        frame_store = []
-        for i, frame in enumerate(frame_idx):
-            frs = moseq2_extract.io.video.load_movie_data(frames_file,
-                                                          [int(frame)], 
-                                                          frame_size=finfo['dims'], 
-                                                          finfo=finfo, 
-                                                          **kwargs).squeeze()
-            frame_store.append(cv2.medianBlur(frs, med_scale))
+    # A depth of 0 is the camera's "no reading": each pixel's median is over the frames
+    # that observed it, and a pixel no sampled frame observed stays at 0.
+    frame_store = np.asarray(frame_store, dtype='float64')
+    frame_store[frame_store == 0] = np.nan
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        bground = np.nan_to_num(np.nanmedian(frame_store, axis=0), nan=0)
 
-        # A depth of 0 is the camera's "no reading": each pixel's median is over the frames
-        # that observed it, and a pixel no sampled frame observed stays at 0.
-        frame_store = np.asarray(frame_store, dtype='float64')
-        frame_store[frame_store == 0] = np.nan
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', RuntimeWarning)
-            bground = np.nan_to_num(np.nanmedian(frame_store, axis=0), nan=0)
+    if output_dir is not None:
+        write_image(join(output_dir, 'bground.tiff'), bground, scale=True)
 
-        write_image(bground_path, bground, scale=True)
-    else:
-        bground = read_image(bground_path, scale=True)
-        
     return bground
 
 
