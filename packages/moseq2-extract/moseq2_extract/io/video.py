@@ -64,10 +64,11 @@ def read_frames_raw(
     frames (list or range): frames to extract
     frame_dims (tuple): wxh of frames in pixels
     bit_depth (int): bits per pixel (default: 16)
-    movie_dtype (str): numpy dtype to read the raw frames as.
+    movie_dtype (str): numpy dtype the file stores its samples as, byte order included.
 
     Returns:
-    chunk (numpy ndarray): nframes x h x w
+    chunk (numpy ndarray): nframes x h x w, in the machine's own byte order whatever
+        the file stores, since OpenCV 5.0 and earlier read a big-endian array byte-swapped
     """
 
     vid_info = get_raw_info(filename, frame_size=frame_size, bit_depth=bit_depth)
@@ -100,7 +101,7 @@ def read_frames_raw(
                 file=f, dtype=np.dtype(movie_dtype), count=read_points
             ).reshape(dims)
 
-    return chunk
+    return chunk.astype(chunk.dtype.newbyteorder("="), copy=False)
 
 
 
