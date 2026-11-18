@@ -25,7 +25,7 @@ from moseq2_extract.helpers.data import handle_extract_metadata
 from moseq2_extract.io.video import load_timestamps_from_movie
 from moseq2_extract.util import load_timestamps
 
-from fixtures import fetch_azure_mkv
+from azure_arena import write_azure_arena_mkv
 
 
 def extract(recording, *args):
@@ -51,10 +51,10 @@ def kinect_recording(tmp_path, raw_sessions):
 
 @pytest.fixture
 def azure_recording(tmp_path):
-    """A copy of the synthetic Azure recording, with no depth_ts.txt beside it."""
+    """A synthetic Azure recording of a mouse in an arena, with no depth_ts.txt beside it."""
     session = tmp_path / "azure"
     session.mkdir()
-    shutil.copy(Path(fetch_azure_mkv()) / "depth.mkv", session / "depth.mkv")
+    write_azure_arena_mkv(session / "depth.mkv")
     (session / "metadata.json").write_text("{}")
     return session
 

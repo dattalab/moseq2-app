@@ -64,10 +64,11 @@ def read_frames_raw(
     frames (list or range): frames to extract
     frame_dims (tuple): wxh of frames in pixels
     bit_depth (int): bits per pixel (default: 16)
-    movie_dtype (str): numpy dtype to read the raw frames as.
+    movie_dtype (str): numpy dtype the file stores its samples as, byte order included.
 
     Returns:
-    chunk (numpy ndarray): nframes x h x w
+    chunk (numpy ndarray): nframes x h x w, in the machine's own byte order whatever
+        the file stores, since OpenCV 5.0 and earlier read a big-endian array byte-swapped
     """
 
     vid_info = get_raw_info(filename, frame_size=frame_size, bit_depth=bit_depth)
@@ -100,7 +101,7 @@ def read_frames_raw(
                 file=f, dtype=np.dtype(movie_dtype), count=read_points
             ).reshape(dims)
 
-    return chunk
+    return chunk.astype(chunk.dtype.newbyteorder("="), copy=False)
 
 
 
@@ -360,13 +361,19 @@ def read_frames(
     used to locate anything, so a recording at any rate returns the frames
     that were asked for.
 
+    The array is in the machine's own byte order whatever ``movie_dtype``
+    says. The Azure settings name ``>u2``, and OpenCV 5.0 and earlier read an
+    array's bytes in the machine's order whatever byte order numpy records
+    for it, so a big-endian array reaches ``cv2.medianBlur`` byte-swapped: a
+    596 mm floor becomes 21506.
+
     Args:
     filename (str): filename to get frames from
     frames (list or numpy.ndarray): list of frames to grab
     threads (int): number of threads to use for decode
     fps (int): frame rate of camera
     pixel_format (str): pixel format to return the frames in
-    movie_dtype (str): numpy dtype of the returned array
+    movie_dtype (str): numpy dtype of the returned array; its byte order is not used
     frame_size (tuple): wxh frame size in pixels, if the frames are to be resized
     slices (int): unused, kept so a config splatted in as keywords still fits
     slicecrc (int): unused, kept so a config splatted in as keywords still fits
@@ -418,7 +425,7 @@ def read_frames(
             f"and {len(frames)} were requested"
         )
 
-    return np.asarray(video, dtype=movie_dtype)
+    return np.asarray(video, dtype=np.dtype(movie_dtype).newbyteorder("="))
 
 
 def read_mkv(

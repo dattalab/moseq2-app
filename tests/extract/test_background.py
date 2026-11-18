@@ -13,6 +13,8 @@ import numpy as np
 
 from moseq2_extract.extract.proc import get_bground_im_file
 
+from azure_arena import FLOOR_DEPTH, HEIGHT, NFRAMES, WIDTH, write_azure_arena_mkv
+
 FLOOR = 700
 
 
@@ -36,3 +38,17 @@ def test_a_pixel_no_frame_observed_stays_at_zero(tmp_path):
     result = background(tmp_path, frames)
     assert result[0, 0] == 0
     assert (result[1:, 1:] == FLOOR).all()
+
+
+def test_an_azure_recording_s_background_is_its_floor(tmp_path):
+    """An Azure ``.mkv`` read with the Azure settings gives the floor the camera saw.
+
+    Those settings name ``>u2``. OpenCV 5.0 and earlier read a big-endian
+    frame's bytes in the machine's order, so a 596 mm floor that reached
+    ``cv2.medianBlur`` big-endian came back as 21506.
+    """
+    write_azure_arena_mkv(tmp_path / "depth.mkv")
+    finfo = {"nframes": NFRAMES, "dims": (WIDTH, HEIGHT)}
+    result = get_bground_im_file(str(tmp_path / "depth.mkv"), output_dir=str(tmp_path), finfo=finfo,
+                                 pixel_format="gray16be", movie_dtype=">u2")
+    assert abs(result[HEIGHT // 2, WIDTH // 2] - FLOOR_DEPTH) <= 3

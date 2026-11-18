@@ -38,7 +38,8 @@ from moseq2_common.yaml import write_yaml
 from moseq2_extract.util import read_yaml
 
 from cells import code_cell
-from fixtures import fetch_azure_mkv, fetch_raw_sessions
+from azure_arena import write_azure_arena_mkv
+from fixtures import fetch_raw_sessions
 
 NOTEBOOK = "MoSeq2-Extract-Modeling-Notebook.ipynb"
 ARENA_CELL = 5
@@ -63,7 +64,7 @@ def project_as_145_left_it(root, camera_type, recording="azure-mkv"):
     session = root / "session_1"
     session.mkdir(parents=True)
     if recording == "azure-mkv":
-        shutil.copy(Path(fetch_azure_mkv()) / "depth.mkv", session / "depth.mkv")
+        write_azure_arena_mkv(session / "depth.mkv")
         (session / "metadata.json").write_text(
             json.dumps({"SessionName": "session_1", "SubjectName": "m1", "StartTime": ""})
         )

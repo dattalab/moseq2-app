@@ -11,8 +11,6 @@ whose seconds read as milliseconds give about 30,000.
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
 
 import h5py
 import numpy as np
@@ -24,7 +22,7 @@ import moseq2_extract.cli as extract_cli
 from moseq2_pca.pca.util import apply_pca_dask, get_timestamps
 from moseq2_pca.util import frame_rate_from_timestamps, write_yaml
 
-from fixtures import fetch_azure_mkv
+from azure_arena import write_azure_arena_mkv
 
 N = 300
 SECONDS = np.arange(N) / 30
@@ -80,7 +78,7 @@ def test_an_unknown_unit_stops_with_the_file_and_the_unit(tmp_path):
 @pytest.fixture(scope="module")
 def azure_extraction(tmp_path_factory):
     session_dir = tmp_path_factory.mktemp("azure")
-    shutil.copy(Path(fetch_azure_mkv()) / "depth.mkv", session_dir / "depth.mkv")
+    write_azure_arena_mkv(session_dir / "depth.mkv")
     (session_dir / "metadata.json").write_text("{}")
     result = CliRunner().invoke(
         extract_cli.cli,

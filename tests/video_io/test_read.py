@@ -8,11 +8,12 @@ track; the third holds several tracks and stores depth big-endian.
 
 from __future__ import annotations
 
+import tarfile
 from pathlib import Path
 
 import numpy as np
 import pytest
-from moseq2_extract.io.video import read_frames, read_mkv
+from moseq2_extract.io.video import read_frames, read_frames_raw, read_mkv
 
 
 def depth_avi(raw_sessions):
@@ -75,6 +76,44 @@ def test_read_mkv_reads_the_big_endian_depth_samples(azure_mkv):
     """
     frames = read_mkv(str(azure_mkv / "depth.mkv"), range(0, 10))
     assert frames[3, 2, 5] == 3205
+
+
+def test_read_mkv_returns_the_machine_s_byte_order_with_the_azure_settings(azure_mkv):
+    """The Azure settings ask for ``gray16be`` and ``>u2``; the array is native all the same.
+
+    OpenCV 5.0 and earlier read an array's bytes in the machine's order
+    whatever byte order numpy records for it, so a big-endian frame reaches
+    ``cv2.medianBlur`` byte-swapped.
+    """
+    frames = read_mkv(str(azure_mkv / "depth.mkv"), range(0, 10), pixel_format="gray16be", movie_dtype=">u2")
+    assert frames.dtype.isnative
+    assert frames[3, 2, 5] == 3205
+
+
+def big_endian_dat(path):
+    """Three 8 x 6 frames whose samples are ``frame * 1000 + row * 100 + column``, stored big-endian."""
+    frame, row, column = np.mgrid[0:3, 0:6, 0:8]
+    samples = (frame * 1000 + row * 100 + column).astype(">u2")
+    samples.tofile(path)
+    return samples
+
+
+def test_read_frames_raw_returns_the_machine_s_byte_order_for_a_big_endian_dat(tmp_path):
+    """``movie_dtype`` says how the file stores its samples; the array is native whatever it says."""
+    written = big_endian_dat(tmp_path / "depth.dat")
+    frames = read_frames_raw(str(tmp_path / "depth.dat"), range(0, 3), frame_size=(8, 6), movie_dtype=">u2")
+    assert frames.dtype.isnative
+    np.testing.assert_array_equal(frames, written)
+
+
+def test_read_frames_raw_returns_the_machine_s_byte_order_from_a_tarball(tmp_path):
+    written = big_endian_dat(tmp_path / "depth.dat")
+    with tarfile.open(tmp_path / "session.tar.gz", "w:gz") as tar:
+        tar.add(tmp_path / "depth.dat", arcname="depth.dat")
+    with tarfile.open(tmp_path / "session.tar.gz", "r:gz") as tar:
+        frames = read_frames_raw(tar, range(1, 3), frame_size=(8, 6), movie_dtype=">u2")
+    assert frames.dtype.isnative
+    np.testing.assert_array_equal(frames, written[1:3])
 
 
 def test_read_mkv_does_not_return_the_colour_stream(azure_mkv):
