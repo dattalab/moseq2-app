@@ -19,16 +19,14 @@ requests, has no short flag. No moseq2-extract command defines a flag twice.
 
 from __future__ import annotations
 
-import shutil
 import warnings
-from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
 
-from fixtures import fetch_azure_mkv
+from azure_arena import write_azure_arena_mkv
 
 
 # ---------------------------------------------------------------- frame count
@@ -36,10 +34,10 @@ from fixtures import fetch_azure_mkv
 
 @pytest.fixture
 def azure_recording(tmp_path):
-    """A copy of the synthetic Azure recording (60 frames), no depth_ts.txt beside it."""
+    """A synthetic Azure recording of a mouse in an arena (60 frames), no depth_ts.txt beside it."""
     session = tmp_path / "azure"
     session.mkdir()
-    shutil.copy(Path(fetch_azure_mkv()) / "depth.mkv", session / "depth.mkv")
+    write_azure_arena_mkv(session / "depth.mkv")
     (session / "metadata.json").write_text("{}")
     return session
 

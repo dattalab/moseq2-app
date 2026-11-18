@@ -77,6 +77,18 @@ def test_read_mkv_reads_the_big_endian_depth_samples(azure_mkv):
     assert frames[3, 2, 5] == 3205
 
 
+def test_read_mkv_returns_the_machine_s_byte_order_with_the_azure_settings(azure_mkv):
+    """The Azure settings ask for ``gray16be`` and ``>u2``; the array is native all the same.
+
+    OpenCV 5.0 and earlier read an array's bytes in the machine's order
+    whatever byte order numpy records for it, so a big-endian frame reaches
+    ``cv2.medianBlur`` byte-swapped.
+    """
+    frames = read_mkv(str(azure_mkv / "depth.mkv"), range(0, 10), pixel_format="gray16be", movie_dtype=">u2")
+    assert frames.dtype.isnative
+    assert frames[3, 2, 5] == 3205
+
+
 def test_read_mkv_does_not_return_the_colour_stream(azure_mkv):
     """COLOR is stream 0 and flat; DEPTH is stream 1 and is not.
 

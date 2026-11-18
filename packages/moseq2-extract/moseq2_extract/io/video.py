@@ -360,13 +360,19 @@ def read_frames(
     used to locate anything, so a recording at any rate returns the frames
     that were asked for.
 
+    The array is in the machine's own byte order whatever ``movie_dtype``
+    says. The Azure settings name ``>u2``, and OpenCV 5.0 and earlier read an
+    array's bytes in the machine's order whatever byte order numpy records
+    for it, so a big-endian array reaches ``cv2.medianBlur`` byte-swapped: a
+    596 mm floor becomes 21506.
+
     Args:
     filename (str): filename to get frames from
     frames (list or numpy.ndarray): list of frames to grab
     threads (int): number of threads to use for decode
     fps (int): frame rate of camera
     pixel_format (str): pixel format to return the frames in
-    movie_dtype (str): numpy dtype of the returned array
+    movie_dtype (str): numpy dtype of the returned array; its byte order is not used
     frame_size (tuple): wxh frame size in pixels, if the frames are to be resized
     slices (int): unused, kept so a config splatted in as keywords still fits
     slicecrc (int): unused, kept so a config splatted in as keywords still fits
@@ -418,7 +424,7 @@ def read_frames(
             f"and {len(frames)} were requested"
         )
 
-    return np.asarray(video, dtype=movie_dtype)
+    return np.asarray(video, dtype=np.dtype(movie_dtype).newbyteorder("="))
 
 
 def read_mkv(
