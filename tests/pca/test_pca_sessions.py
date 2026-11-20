@@ -5,8 +5,9 @@ notebook's PCA functions) take their sessions from ``moseq2-project.yaml``
 through ``moseq2_common.bookkeeping.session_index``, the list the model and
 analysis steps use: the sessions ``config.yaml``'s ``exclude`` lists are left
 out, and the rest are listed in the order they were recorded (``StartTime``),
-then by name. Outside a project, the steps scan their input folder and list
-what they find in the same order.
+then by name. Outside a project, the command line scans its input folder
+(``moseq2_pca.project.folder_sessions``) and lists what it finds in the same
+order.
 
 The order matters beyond tidiness: ``compute-changepoints`` draws one random
 projection per session from numpy's global generator, in listing order, so a
@@ -138,13 +139,15 @@ def test_a_project_s_sessions_are_read_in_recording_order(project, run):
 
 
 def test_outside_a_project_the_scanned_sessions_are_read_in_recording_order(tmp_path, monkeypatch):
+    from moseq2_pca import project as project_steps
     from moseq2_pca import steps
     from moseq2_pca.options import TrainPCAOptions
 
     monkeypatch.setattr(util, "get_env_cpu_and_mem", lambda: (2e9, 2))
     write_sessions(tmp_path / "extracted")
 
-    steps.train_pca(str(tmp_path / "extracted"), str(tmp_path / "_pca"), "pca", TrainPCAOptions(
+    scanned = project_steps.folder_sessions("train-pca", str(tmp_path / "extracted"), None)
+    steps.train_pca(scanned.pairs, str(tmp_path / "_pca"), "pca", TrainPCAOptions(
         cluster_type="local", nworkers=1, overwrite_pca_train=True, dask_cache_path=str(tmp_path / "cache")))
 
     assert trained_on(tmp_path / "_pca") == IN_RECORDING_ORDER

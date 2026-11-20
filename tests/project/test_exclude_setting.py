@@ -274,9 +274,9 @@ def _sessions_read(calls):
 def test_train_pca_step_takes_exclude(project, pca_wrapper):
     from moseq2_common.project import Project
     from moseq2_pca.options import TrainPCAOptions
-    from moseq2_pca.steps import train_pca
+    from moseq2_pca.project import train_pca
 
-    train_pca(None, str(project / "_pca"), "pca", TrainPCAOptions(), project=Project.at(project), exclude=[CAT])
+    train_pca(Project.at(project), None, str(project / "_pca"), "pca", TrainPCAOptions(), exclude=[CAT])
 
     assert _sessions_read(pca_wrapper) == ["uuid-a", "uuid-b"]
 

@@ -206,11 +206,22 @@ def test_apply_model_uses_the_project_it_is_pointed_at(project, elsewhere, model
 
 @pytest.fixture
 def pca(monkeypatch):
+    """The PCA steps stood in for: in the project layer (``project.<step>``), and outside a project the
+    naming of the extractions in the folder (``folder_sessions``, recorded under ``"folder"``) and the file
+    layer (``steps.<step>``, recorded under ``"<step> on files"``)."""
     import moseq2_pca.cli as cli
+    import moseq2_pca.project as project_steps
 
     calls = {}
     for name in ("train_pca", "apply_pca", "compute_changepoints"):
-        monkeypatch.setattr(cli.steps, name, _called(calls, name))
+        monkeypatch.setattr(project_steps, name, _called(calls, name))
+        monkeypatch.setattr(cli.steps, name, _called(calls, f"{name} on files"))
+
+    def folder_sessions(step, input_dir, project, exclude=None):
+        calls["folder"] = ((step, input_dir, project, exclude), {})
+        return project_steps.PCASessions([], [])
+
+    monkeypatch.setattr(project_steps, "folder_sessions", folder_sessions)
     return cli.cli, calls
 
 
@@ -222,10 +233,10 @@ def test_pca_commands_write_into_the_project_their_config_file_is_in(command, pr
     cli, calls = pca
     result = run(cli, command, "--config-file", project / "config.yaml", cwd=elsewhere)
 
-    (_, output_dir, _, opts), kwargs = calls[PCA_COMMANDS[command]]
+    (in_project, _, output_dir, _, opts), kwargs = calls[PCA_COMMANDS[command]]
     assert opts.chunk_size == PCA_CHUNK_SIZE
     assert Path(output_dir) == project / "_pca"
-    assert _project_of(kwargs) == project
+    assert Path(in_project.folder) == project
     assert STANDALONE not in result.output
     assert list(elsewhere.iterdir()) == []
 
@@ -236,10 +247,12 @@ def test_pca_commands_outside_a_project_default_to_the_folder_they_run_in(comman
     cli, calls = pca
     result = run(cli, command, cwd=elsewhere)
 
-    (input_dir, output_dir, _, _), kwargs = calls[PCA_COMMANDS[command]]
+    (_, output_dir, _, _), _ = calls[f"{PCA_COMMANDS[command]} on files"]
+    (_, input_dir, in_project, _), _ = calls["folder"]
     assert Path(output_dir) == elsewhere / "_pca"
     assert Path(input_dir) == elsewhere
-    assert _project_of(kwargs) is None
+    assert in_project is None
+    assert PCA_COMMANDS[command] not in calls
     assert STANDALONE in result.output
 
 

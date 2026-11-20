@@ -287,7 +287,7 @@ def test_a_frame_count_that_disagrees_with_the_timestamps_stops_before_work(proj
     """A session whose extraction holds 200 frames and 199 timestamps cannot have its dropped frames placed;
     train-pca stops before it starts its work, naming the file and both counts."""
     from moseq2_common.project import Project
-    from moseq2_pca import steps
+    from moseq2_pca import project as project_steps
     from moseq2_pca.options import TrainPCAOptions
 
     key, folder, uuid, start = SESSIONS[1]
@@ -295,8 +295,8 @@ def test_a_frame_count_that_disagrees_with_the_timestamps_stops_before_work(proj
     write_session(h5, uuid, key, start, timestamps=199)
     no_dask(monkeypatch)
     with pytest.raises(ValueError) as error:
-        steps.train_pca(None, str(project / "_pca"), "pca", TrainPCAOptions(cluster_type="local", nworkers=1),
-                        project=Project.at(project))
+        project_steps.train_pca(Project.at(project), None, str(project / "_pca"), "pca",
+                                TrainPCAOptions(cluster_type="local", nworkers=1))
     assert str(error.value) == (
         f"The extraction {h5} holds 200 frames (/frames) and 199 timestamps (/timestamps). Each frame needs "
         "one timestamp, so its dropped frames cannot be placed and its timing is unknown. Extract that "
@@ -353,14 +353,14 @@ def test_an_empty_input_file_stops_before_work(tmp_path):
 
 def test_an_empty_session_extraction_stops_pca_before_work(project, monkeypatch):
     from moseq2_common.project import Project
-    from moseq2_pca import steps
+    from moseq2_pca import project as project_steps
     from moseq2_pca.options import TrainPCAOptions
 
     h5 = project / "aggregate_results" / SESSIONS[0][1] / "results.h5"
     h5.write_bytes(b"")
     no_dask(monkeypatch)
     with pytest.raises(ValueError) as error:
-        steps.train_pca(None, str(project / "_pca"), "pca", TrainPCAOptions(), project=Project.at(project))
+        project_steps.train_pca(Project.at(project), None, str(project / "_pca"), "pca", TrainPCAOptions())
     assert str(error.value) == (
         f"train-pca needs {h5}, which is empty. Extract that session again (moseq2-extract extract, or the "
         "notebook's extraction cell), then run this step again; or, to leave the session out, list its "
@@ -370,7 +370,7 @@ def test_an_empty_session_extraction_stops_pca_before_work(project, monkeypatch)
 
 def test_an_unreadable_components_file_stops_apply_pca_before_work(project, monkeypatch):
     from moseq2_common.project import Project
-    from moseq2_pca import steps
+    from moseq2_pca import project as project_steps
     from moseq2_pca.options import ApplyPCAOptions
 
     components = project / "_pca" / "pca.h5"
@@ -378,8 +378,8 @@ def test_an_unreadable_components_file_stops_apply_pca_before_work(project, monk
     components.write_bytes(b"not an h5 file")
     no_dask(monkeypatch)
     with pytest.raises(ValueError) as error:
-        steps.apply_pca(None, str(project / "_pca"), "pca_scores", ApplyPCAOptions(),
-                        components_file=str(components), project=Project.at(project))
+        project_steps.apply_pca(Project.at(project), None, str(project / "_pca"), "pca_scores", ApplyPCAOptions(),
+                                components_file=str(components))
     message = str(error.value)
     assert message.startswith(f"apply-pca needs {components}, which could not be read: "), message
     assert message.endswith(

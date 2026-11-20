@@ -1,10 +1,12 @@
-"""Each PCA step is one function in ``moseq2_pca.steps``, called by both front ends.
+"""Each PCA step is one function in ``moseq2_pca.project``, called by both front ends.
 
 ``train-pca``, ``apply-pca`` and ``compute-changepoints`` on the command line and
 ``train_pca_command``, ``apply_pca_command`` and ``compute_changepoints_command``
 in the notebook resolve their settings into one options object and hand it to
-the same step, which runs the work. A step also runs from a script, on its
-options class's defaults, with no ``config.yaml`` at all.
+the same step, which runs the work (outside a project, the command line hands
+it to the step's file layer in ``moseq2_pca.steps``). A step's file layer also
+runs from a script, on its options class's defaults, with no ``config.yaml`` at
+all.
 
 A ``--config-file`` that does not exist stops the command, naming the file,
 before anything is written (1.5.0 created an empty one and ran on defaults).
@@ -49,17 +51,33 @@ def step_classes(options):
 
 @pytest.fixture
 def called(monkeypatch, steps, options):
-    """Each step replaced by a recorder of its arguments."""
+    """Each step replaced by a recorder of its arguments: in the project layer, which a command in a project and
+    the notebook call, and in the file layer, which a command outside a project calls on the extractions it
+    names in its folder (``folder_sessions``, stood in for by one naming none)."""
+    import moseq2_pca.project as project_steps
+
     calls = {name: [] for name in step_classes(options)}
 
-    def recorder(name):
-        def record(input_dir, output_dir, output_file, opts, **kwargs):
+    def result(name):
+        return getattr(steps, RESULTS[name])(**RESULT_FIELDS[name])
+
+    def in_project(name):
+        def record(project, input_dir, output_dir, output_file, opts, **kwargs):
             calls[name].append(opts)
-            return getattr(steps, RESULTS[name])(**RESULT_FIELDS[name])
+            return result(name)
+        return record
+
+    def on_files(name):
+        def record(sessions, output_dir, output_file, opts, **kwargs):
+            calls[name].append(opts)
+            return result(name)
         return record
 
     for name in calls:
-        monkeypatch.setattr(steps, name, recorder(name))
+        monkeypatch.setattr(project_steps, name, in_project(name))
+        monkeypatch.setattr(steps, name, on_files(name))
+    monkeypatch.setattr(project_steps, "folder_sessions",
+                        lambda step, input_dir, project, exclude=None: project_steps.PCASessions([], []))
     return calls
 
 
@@ -177,11 +195,13 @@ def test_pca_steps_run_from_a_script_without_a_config_file(tmp_path, extracted, 
     out = str(tmp_path / "_pca")
     cache = str(tmp_path / "cache")
 
-    trained = steps.train_pca(str(extracted), out, "pca", options.TrainPCAOptions(
+    sessions = [(f"session-{i}", str(extracted / f"session-{i}" / "results_00.h5")) for i in range(2)]
+
+    trained = steps.train_pca(sessions, out, "pca", options.TrainPCAOptions(
         cluster_type="local", nworkers=1, overwrite_pca_train=True, dask_cache_path=cache))
-    scores = steps.apply_pca(str(extracted), out, "pca_scores", options.ApplyPCAOptions(
+    scores = steps.apply_pca(sessions, out, "pca_scores", options.ApplyPCAOptions(
         cluster_type="nodask", overwrite_pca_apply=True, dask_cache_path=cache))
-    changepoints = steps.compute_changepoints(str(extracted), out, "changepoints", options.ChangepointsOptions(
+    changepoints = steps.compute_changepoints(sessions, out, "changepoints", options.ChangepointsOptions(
         nworkers=1, dask_cache_path=cache))
 
     assert trained.components_file.is_file()
