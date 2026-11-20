@@ -2,32 +2,42 @@
 CLI for PCA and model-free changepoint analysis.
 
 Each command's settings are generated from its options class in
-``moseq2_pca.options``; the command reads ``--config-file``, resolves the
-settings and calls its step in ``moseq2_pca.steps``. Inside a project (the
-folder of ``--config-file``, or the working folder when it holds a
-``config.yaml``), each command writes into the project's ``_pca/`` unless
+``moseq2_pca.options``; the command reads ``--config-file`` and resolves the
+settings. Inside a project (the folder of ``--config-file``, or the working
+folder when it holds a ``config.yaml``), ``train-pca``, ``apply-pca`` and
+``compute-changepoints`` call their step in the project layer,
+``moseq2_pca.project``: each writes into the project's ``_pca/`` unless
 ``--output-dir`` is given, records what it wrote in the project's
 ``moseq2-project.yaml``, and ``apply-pca`` and ``compute-changepoints`` read the
 components and scores from there unless a path is given. A typed
 ``--input-dir`` is the folder of extractions the command reads, inside a project
 or not; without one, a command reads the sessions the project's
 ``moseq2-project.yaml`` lists (less ``exclude``), or, outside a project, the
-extractions in the working folder. Outside a project, ``--output-dir`` defaults
-to the working folder's ``_pca/``. ``--exclude`` and ``--no-exclude`` replace
+extractions in the working folder. ``--exclude`` and ``--no-exclude`` replace
 ``config.yaml``'s ``exclude`` for one run, also for a typed ``--input-dir``.
-``clip-scores`` reads the project's PC scores when its ``PCA_FILE`` is left out.
 
-A command with nothing to read stops before any work, naming where it looked
-and the ways out (``moseq2_pca.steps``). ``train-pca`` names each trained
-setting typed at another value than ``config.yaml``'s, on which ``apply-pca``
-and ``compute-changepoints`` will stop.
+Outside a project, ``--output-dir`` defaults to the working folder's ``_pca/``,
+and a command names the extractions in its folder as the project that owns
+them does, or by their path when none does
+(``moseq2_pca.project.folder_sessions``), leaves out the ones ``--exclude``
+names, and calls its step in the file layer, ``moseq2_pca.steps``, with that
+list. ``clip-scores`` reads the project's PC scores when its ``PCA_FILE`` is left
+out.
+
+A step that would write over an output that already exists, with its
+``--overwrite-pca-*`` option off, asks first whether to overwrite it, before
+anything else the step prints (``moseq2_common.interface.answered``). A command
+with nothing to read stops before any work, naming where it looked and the ways
+out. ``train-pca`` names each trained setting typed at another value than
+``config.yaml``'s, on which ``apply-pca`` and ``compute-changepoints`` will stop.
 """
 
 import os
 from os.path import join
 
 import click
-from moseq2_common.bookkeeping import BookkeepingError, load, resolve_path, sessions_folder
+from moseq2_common.bookkeeping import BookkeepingError, sessions_folder
+from moseq2_common.interface import answered
 from moseq2_common.options import (
     ProjectGroup,
     click_options,
@@ -41,7 +51,7 @@ from moseq2_common.options import (
     typed_exclude,
 )
 from moseq2_common.records import print_record_command
-from moseq2_pca import steps
+from moseq2_pca import project as project_steps, steps
 from moseq2_pca.helpers.data import TrainedSettingsError
 from moseq2_pca.helpers.wrappers import clip_scores_wrapper
 from moseq2_pca.options import PCA_STAGE, ApplyPCAOptions, ChangepointsOptions, ClipScoresOptions, TrainPCAOptions
@@ -118,14 +128,27 @@ def _folders(ctx, input_dir, output_dir):
     return project, input_dir or None, output_dir or join(output_folder(ctx), '_pca')
 
 
-def recorded_paths(project) -> dict:
-    """The components, scores and changepoints files the project's bookkeeping file names (``pca_file``,
-    ``pca_file_scores``, ``changepoint_file``); empty outside a project."""
-    if project is None:
-        return {}
-    stored = load(project).pca
-    names = {'components': 'pca_file', 'scores': 'pca_file_scores', 'changepoints': 'changepoint_file'}
-    return {names[output]: str(resolve_path(project, path)) for output, path in stored.items() if output in names}
+#: The option that lets each step write over an existing output without asking (None: it always does).
+_OVERWRITE = {'train_pca': 'overwrite_pca_train', 'apply_pca': 'overwrite_pca_apply', 'compute_changepoints': None}
+
+
+def _without_project(step, input_dir, output_dir, output_file, opts, *, exclude=None, components_file=None,
+                     scores_file=None, replace_existing=None):
+    """Run ``step`` (``train_pca``, ``apply_pca``, ``compute_changepoints``) outside any project on the extractions
+    under ``input_dir``, named as their owning project names them or by their path, less the sessions ``exclude``
+    names; its result, None when an existing output was kept. An existing output with overwrite off is decided
+    first (``replace_existing``; None raises ``OverwriteNeeded``)."""
+    command = step.replace('_', '-')
+    option = _OVERWRITE[step]
+    if option is not None and steps.keep_existing(steps.output_path(output_dir, output_file), getattr(opts, option),
+                                                  replace_existing, step=step, option=option):
+        return None
+    sessions = project_steps.folder_sessions(command, input_dir, None, exclude)
+    files = {'train_pca': {}, 'apply_pca': {'components_file': components_file},
+             'compute_changepoints': {'components_file': components_file, 'scores_file': scores_file}}[step]
+    record = project_steps.start_record(command, opts, sessions, *files.values(), project=None)
+    decided = {} if option is None else {'replace_existing': True}
+    return getattr(steps, step)(sessions.pairs, output_dir, output_file, opts, **files, record=record, **decided)
 
 
 @cli.command(name='train-pca', help='Train PCA on all extracted results (h5 files) in input directory')
@@ -137,9 +160,14 @@ def train_pca(ctx, input_dir, output_dir, output_file, **_):
     opts = TrainPCAOptions.resolve(config=config, explicit=typed)
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     config_file = ctx.params.get('config_file') or (project.config_file if project is not None else None)
-    for line in steps.trained_settings_heads_up({key: getattr(opts, key) for key in typed}, config, config_file):
+    for line in project_steps.trained_settings_heads_up({key: getattr(opts, key) for key in typed}, config,
+                                                        config_file):
         click.echo(line)
-    steps.train_pca(input_dir, output_dir, output_file, opts, project=project, exclude=typed_exclude(ctx))
+    if project is not None:
+        answered(project_steps.train_pca, project, input_dir, output_dir, output_file, opts,
+                 exclude=typed_exclude(ctx))
+    else:
+        answered(_without_project, 'train_pca', input_dir, output_dir, output_file, opts, exclude=typed_exclude(ctx))
 
 
 @cli.command(name='apply-pca', help='Compute PCA Scores of extraction data given a pre-trained PCA')
@@ -155,9 +183,12 @@ def apply_pca(ctx, input_dir, output_dir, output_file, pca_file, **_):
     opts = ApplyPCAOptions.resolve(config=config, explicit=explicit_values(ctx, ApplyPCAOptions))
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     try:
-        steps.apply_pca(input_dir, output_dir, output_file, opts,
-                        components_file=pca_file or recorded_paths(project).get('pca_file'), project=project,
-                        exclude=typed_exclude(ctx))
+        if project is not None:
+            answered(project_steps.apply_pca, project, input_dir, output_dir, output_file, opts,
+                     components_file=pca_file, exclude=typed_exclude(ctx))
+        else:
+            answered(_without_project, 'apply_pca', input_dir, output_dir, output_file, opts,
+                     components_file=pca_file, exclude=typed_exclude(ctx))
     except TrainedSettingsError as error:
         raise click.ClickException(str(error)) from None
 
@@ -177,12 +208,13 @@ def compute_changepoints(ctx, input_dir, output_dir, output_file, pca_file, pca_
     config = command_settings(ctx, ChangepointsOptions, stage_classes=PCA_STAGE)
     opts = ChangepointsOptions.resolve(config=config, explicit=explicit_values(ctx, ChangepointsOptions))
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
-    recorded = recorded_paths(project)
     try:
-        steps.compute_changepoints(input_dir, output_dir, output_file, opts,
-                                   components_file=pca_file or recorded.get('pca_file'),
-                                   scores_file=pca_file_scores or recorded.get('pca_file_scores'), project=project,
-                                   exclude=typed_exclude(ctx))
+        if project is not None:
+            answered(project_steps.compute_changepoints, project, input_dir, output_dir, output_file, opts,
+                     components_file=pca_file, scores_file=pca_file_scores, exclude=typed_exclude(ctx))
+        else:
+            answered(_without_project, 'compute_changepoints', input_dir, output_dir, output_file, opts,
+                     components_file=pca_file, scores_file=pca_file_scores, exclude=typed_exclude(ctx))
     except TrainedSettingsError as error:
         raise click.ClickException(str(error)) from None
 

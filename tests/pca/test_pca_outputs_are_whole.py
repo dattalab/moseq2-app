@@ -10,8 +10,6 @@ final name, and the record was added afterwards.
 
 from __future__ import annotations
 
-import builtins
-
 import h5py
 import numpy as np
 import pytest
@@ -48,17 +46,18 @@ def project(tmp_path, monkeypatch):
     return root
 
 
-def run(project, step, **opts):
+def run(project, step, replace_existing=None, **opts):
     from moseq2_common.project import Project
-    from moseq2_pca import options, steps
+    from moseq2_pca import options
+    from moseq2_pca import project as project_steps
 
     out = str(project / "_pca")
     if step == "train":
-        return steps.train_pca(None, out, "pca", options.TrainPCAOptions(
-            cluster_type="local", nworkers=1, overwrite_pca_train=True, dask_cache_path=str(project / "cache")),
-            project=Project.at(project))
-    return steps.apply_pca(None, out, "pca_scores", options.ApplyPCAOptions(cluster_type="nodask", **opts),
-                           components_file=str(project / "_pca" / "pca.h5"), project=Project.at(project))
+        return project_steps.train_pca(Project.at(project), None, out, "pca", options.TrainPCAOptions(
+            cluster_type="local", nworkers=1, overwrite_pca_train=True, dask_cache_path=str(project / "cache")))
+    return project_steps.apply_pca(Project.at(project), None, out, "pca_scores",
+                                   options.ApplyPCAOptions(cluster_type="nodask", **opts),
+                                   components_file=str(project / "_pca" / "pca.h5"), replace_existing=replace_existing)
 
 
 def interrupt_the_record(monkeypatch):
@@ -103,13 +102,17 @@ def test_a_completed_pca_output_carries_its_record(project):
     assert leftovers(project) == []
 
 
-def test_declining_to_overwrite_keeps_the_existing_scores(project, monkeypatch):
+def test_declining_to_overwrite_keeps_the_existing_scores(project):
+    from moseq2_common.project import OverwriteNeeded
+
     run(project, "train")
     run(project, "apply", overwrite_pca_apply=True)
     final = project / "_pca" / "pca_scores.h5"
     before = final.read_bytes()
-    monkeypatch.setattr(builtins, "input", lambda *args: "n")
-    result = run(project, "apply", overwrite_pca_apply=False)
+    with pytest.raises(OverwriteNeeded):
+        run(project, "apply", overwrite_pca_apply=False)
+    assert final.read_bytes() == before
+    result = run(project, "apply", replace_existing=False, overwrite_pca_apply=False)
     assert result.scores_file is None
     assert final.read_bytes() == before
     assert leftovers(project) == []

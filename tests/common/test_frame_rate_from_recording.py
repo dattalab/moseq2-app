@@ -193,16 +193,17 @@ def test_best_model_times_syllables_at_each_sessions_rate(tmp_path, monkeypatch)
 
 def test_an_fps_key_in_config_is_named_and_ignored(tmp_path, monkeypatch):
     """An `fps:` line in the pca section is listed with the settings no step reads; apply-pca runs."""
+    import moseq2_pca.project as project_steps
     import moseq2_pca.steps as steps
     from moseq2_pca.cli import cli
 
     calls = []
 
-    def record(input_dir, output_dir, output_file, opts, **kwargs):
+    def record(project, input_dir, output_dir, output_file, opts, **kwargs):
         calls.append(opts)
         return steps.ApplyPCAResult(**{f.name: None for f in dataclasses.fields(steps.ApplyPCAResult)})
 
-    monkeypatch.setattr(steps, "apply_pca", record)
+    monkeypatch.setattr(project_steps, "apply_pca", record)
     config = tmp_path / "config.yaml"
     write_yaml({"camera_type": "auto", "pca": {"fps": 20, "chunk_size": 250}}, str(config))
 

@@ -328,9 +328,20 @@ def test_batch_extract_defaults_to_the_project_folder(project, typed, monkeypatc
 
 @pytest.fixture
 def pca(monkeypatch):
+    """compute-changepoints with its file layer stood in for: the step, recorded, returning a result that names
+    no file, and its reading of the extractions, which this project does not hold."""
     import moseq2_pca.cli as cli
 
-    return cli.cli, stand_in(monkeypatch, cli.steps, "compute_changepoints")
+    calls = {}
+
+    def compute_changepoints(*args, **kwargs):
+        calls["compute_changepoints"] = (args, kwargs)
+        return cli.steps.ChangepointsResult(changepoints_file=None)
+
+    monkeypatch.setattr(cli.steps, "compute_changepoints", compute_changepoints)
+    monkeypatch.setattr(cli.steps, "check_extractions", lambda *args: None)
+    monkeypatch.setattr(cli.steps, "extraction_inputs", lambda sessions: [])
+    return cli.cli, calls
 
 
 def test_compute_changepoints_reads_the_project_components(project, pca):

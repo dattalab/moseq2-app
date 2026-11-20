@@ -46,7 +46,8 @@ def sectioned(path: Path, **sections) -> Path:
 
 @pytest.fixture
 def pca_steps(monkeypatch):
-    """moseq2_pca's three steps replaced by recorders of the options each is handed."""
+    """moseq2_pca's three steps in a project replaced by recorders of the options each is handed."""
+    import moseq2_pca.project as project_steps
     import moseq2_pca.steps as steps
 
     calls = {"train_pca": [], "apply_pca": [], "compute_changepoints": []}
@@ -54,14 +55,14 @@ def pca_steps(monkeypatch):
                "compute_changepoints": steps.ChangepointsResult}
 
     def recorder(name):
-        def record(input_dir, output_dir, output_file, opts, **kwargs):
+        def record(project, input_dir, output_dir, output_file, opts, **kwargs):
             calls[name].append(opts)
             # a result naming no file written
             return results[name](**{f.name: None for f in dataclasses.fields(results[name])})
         return record
 
     for name in calls:
-        monkeypatch.setattr(steps, name, recorder(name))
+        monkeypatch.setattr(project_steps, name, recorder(name))
     return calls
 
 

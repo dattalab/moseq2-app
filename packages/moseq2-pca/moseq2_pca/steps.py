@@ -1,79 +1,72 @@
-"""The PCA pipeline steps, one function each.
+"""The PCA steps on the extractions they are given: the file layer.
 
-``train-pca``, ``apply-pca`` and ``compute-changepoints`` on the command line
-(``cli.py``) and the notebook's PCA cells (``gui.py``) resolve their settings
-into one options object and call these. A step needs no ``config.yaml``: from a
-script, pass the paths and an options object, such as
-``train_pca("aggregate_results", "_pca", "pca", TrainPCAOptions(nworkers=4))``.
-
-The sessions: a step given an ``input_dir`` reads every extraction it finds
-under that folder, inside a project or not. Given none, it reads the sessions
-the project's bookkeeping file lists (``moseq2_common.bookkeeping.session_index``),
-the same list the model and analysis steps use, leaving out the ones
-``config.yaml``'s ``exclude`` lists, or, when a step is given ``exclude``, the
-ones it names (``[]`` for none) for that run. The extractions found under an
-``input_dir`` are matched to session keys (``moseq2_common.bookkeeping.extraction_keys``)
-and the same list applies to them: the running project's, also when the folder
-is in another project. Either way the sessions are read in the
-order they were recorded (``moseq2_common.bookkeeping.recording_order``); the
-changepoints depend on that order, since they draw one random projection per
-session in turn. Inside a project, what a step writes is the project's PCA
-either way, and its record names the extractions it read, and the sessions used
-and left out.
+``train_pca``, ``apply_pca`` and ``compute_changepoints`` each take the
+extractions to read as (session name, extraction ``.h5``) pairs, in the order to
+read them, an output folder and name, and the step's options object, and read no
+project file. From a script, pass them directly, such as
+``train_pca([("mouse_1", "proc/results_00.h5")], "_pca", "pca", TrainPCAOptions(nworkers=4))``.
+The order matters: the changepoints draw one random projection per session in
+turn. In a project, ``moseq2_pca.project`` resolves the sessions (those
+``moseq2-project.yaml`` lists, less ``exclude``, in the order they were recorded),
+the components and scores the project recorded, and the run's record, and calls
+these; the command line and the notebook's PCA cells call it.
 
 Each step hands its work function (the ``*_wrapper`` in
-``moseq2_pca.helpers.wrappers``) the options as a dict, with the files it reads:
-``components_file`` (the trained components; ``<output_dir>/pca.h5`` when None)
-and, for changepoints, ``scores_file`` (the PC scores, read for missing-data
-PCA).
-
-Inside a project (``project``), each step records the file it wrote in the
-project's bookkeeping file (``moseq2_common.bookkeeping``), where the next step
-finds it: the components, the scores, the changepoints. No step writes
-``config.yaml``.
+``moseq2_pca.helpers.wrappers``) the extractions and the options as a dict, with
+the files it reads: ``components_file`` (the trained components;
+``<output_dir>/pca.h5`` when None) and, for changepoints, ``scores_file`` (the PC
+scores, read for missing-data PCA).
 
 Each ``.h5`` a step writes holds the record of the run (``moseq2_common.records``)
-as its ``/provenance`` attribute: the options, every extraction and file read, and
-the arrays written, with the figures written beside it. The ``.h5`` and its
-figures are written under temporary names, the record stored, and all renamed
-into place when the step completes (``moseq2_common.records.atomic_outputs``), so
-a step stopped partway leaves the previous output as it was.
+as its ``/provenance`` attribute: the options, every extraction and file read, the
+sessions used and left out, and the arrays written, with the figures written
+beside it. A step given a record (``record=``, started by its caller) fills it in;
+without one, it starts its own, naming the sessions it was given and none left
+out. The ``.h5`` and its figures are written under temporary names, the record
+stored, and all renamed into place when the step completes
+(``moseq2_common.records.atomic_outputs``), so a step stopped partway leaves the
+previous output as it was.
 
-Before any work, a step stops on an ``input_dir`` that does not exist or holds
-no extraction, on a session's extraction or a components file that does not
-exist, is empty or cannot be read (``moseq2_common.records.check_inputs``), and
-on an extraction whose frames and timestamps disagree in number
-(``moseq2_pca.util.check_frame_counts``).
+When ``train_pca`` or ``apply_pca`` would write over an output that already
+exists and its ``overwrite_pca_*`` option is off, the step decides nothing and
+prints nothing: it raises ``moseq2_common.project.OverwriteNeeded`` before any
+other check (``keep_existing``). Called again with ``replace_existing=True`` it
+replaces the output; with ``replace_existing=False`` it keeps it and returns a
+result naming no file.
+
+Before any work, a step stops when it is given no extractions, on an extraction
+or a components file that does not exist, is empty or cannot be read
+(``moseq2_common.records.check_inputs``), and on an extraction whose frames and
+timestamps disagree in number (``moseq2_pca.util.check_frame_counts``)
+(``check_extractions``).
 
 The components carry the settings they were trained with (``TRAINED_SETTINGS``:
 the filters, the height range, FFT and missing-data PCA), as their ``.h5``'s
-``/settings`` attribute. ``apply_pca`` and ``compute_changepoints`` prepare
-each session's frames with those values, and, inside a project, stop before any
-work when ``config.yaml``'s ``pca`` section sets one of them to another value
-(``check_trained_settings``). ``trained_settings_heads_up`` names the settings
-typed for ``train-pca`` that differ from ``config.yaml``'s, which those checks
-will stop on.
+``/settings`` attribute. ``apply_pca`` and ``compute_changepoints`` prepare each
+session's frames with those values.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from os.path import abspath, join
 from pathlib import Path
 
-import click
 import h5py
 
-from moseq2_common.bookkeeping import (SESSION_ADVICE, BookkeepingError, check_given_exclude, exclude_line,
-                                       extraction_keys, relative_path, session_index, sessions_folder, update)
-from moseq2_common.options import read_config
-from moseq2_common.project import Project, read_exclude
-from moseq2_common.records import InputError, atomic_outputs, check_inputs, start_record, write_h5_record
-from moseq2_pca.helpers.data import TRAINED_SETTINGS, TrainedSettingsError, read_trained_settings
+from moseq2_common.bookkeeping import SESSION_ADVICE
+from moseq2_common.project import OverwriteNeeded
+from moseq2_common.records import InputError, Record, atomic_outputs, check_inputs, start_record, write_h5_record
+from moseq2_pca.helpers.data import TRAINED_SETTINGS
 from moseq2_pca.helpers.wrappers import apply_pca_wrapper, compute_changepoints_wrapper, train_pca_wrapper
 from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
 from moseq2_pca.util import check_frame_counts, find_extractions
 
+__all__ = ["COMPONENTS_ADVICE", "NO_PROJECT_CHANGEPOINTS_ADVICE", "NO_PROJECT_COMPONENTS_ADVICE", "TRAINED_SETTINGS",
+           "TRAIN_FIGURES", "ApplyPCAResult", "ChangepointsResult", "TrainPCAResult", "apply_pca",
+           "check_extractions", "compute_changepoints", "extraction_inputs", "keep_existing", "output_path",
+           "train_pca"]
 
 #: The figures train-pca writes beside the components, by the suffix added to their name.
 TRAIN_FIGURES = ("_components.png", "_components.pdf", "_scree.png", "_scree.pdf")
@@ -97,69 +90,6 @@ class ChangepointsResult:
     changepoints_file: Path | None
 
 
-def _shown(value):
-    """A setting's value as config.yaml writes it."""
-    if isinstance(value, (list, tuple)):
-        return "[" + ", ".join(_shown(v) for v in value) + "]"
-    return str(value)
-
-
-def _same(setting, trained, configured):
-    """Whether two values of ``setting`` are the same once read as ``train-pca`` reads them."""
-    def plain(value):
-        value = getattr(TrainPCAOptions.resolve(config={setting: value}), setting)
-        return list(value) if isinstance(value, tuple) else value
-    return plain(trained) == plain(configured)
-
-
-def check_trained_settings(components_file, project: Project | None) -> None:
-    """Stop when ``project``'s ``config.yaml`` sets a setting the components were trained with to another value.
-
-    Each of ``TRAINED_SETTINGS`` that the ``pca`` section sets is compared with the value the components in
-    ``components_file`` carry. Nothing is checked outside a project, or when either file does not exist yet
-    (the step itself then says which is missing).
-    """
-    if project is None or not Path(components_file).is_file() or not Path(project.config_file).is_file():
-        return
-    section = read_config(project.config_file).get("pca") or {}
-    configured = {key: section[key] for key in TRAINED_SETTINGS if section.get(key) is not None}
-    if not configured:
-        return
-    trained = read_trained_settings(components_file)
-    differ = [
-        f"The PCA components in {components_file} were trained with {key} {_shown(trained[key])}, but the pca "
-        f"section of {project.config_file} sets {_shown(value)}. Scores and changepoints must use the trained "
-        f"value: set {key} back to {_shown(trained[key])} in {project.config_file}, or train PCA again with these "
-        "settings."
-        for key, value in configured.items() if not _same(key, trained[key], value)
-    ]
-    if differ:
-        raise TrainedSettingsError("\n".join(differ))
-
-
-def trained_settings_heads_up(typed: dict, configured: dict, config_file) -> list[str]:
-    """One line for each of ``TRAINED_SETTINGS`` typed for ``train-pca`` (``typed``) at another value than
-    ``config_file``'s ``pca`` section (``configured``) sets, saying that ``apply-pca`` and ``compute-changepoints``
-    will stop (``check_trained_settings``) until the two agree."""
-    return [
-        f"train-pca trains with {key} {_shown(typed[key])}, typed on the command line, but the pca section of "
-        f"{config_file} sets {_shown(configured[key])}. apply-pca and compute-changepoints will stop until the two "
-        f"agree: set {key} to {_shown(typed[key])} in {config_file}, or train again without typing it."
-        for key in TRAINED_SETTINGS
-        if key in typed and configured.get(key) is not None and not _same(key, typed[key], configured[key])
-    ]
-
-
-def _components(components_file, output_dir):
-    """The components a step reads: ``components_file``, else ``<output_dir>/pca.h5``."""
-    return components_file or join(abspath(output_dir), 'pca.h5')
-
-
-def _written(output_dir, output_file):
-    """The file a wrapper writes for ``output_dir`` and ``output_file``."""
-    return Path(join(abspath(output_dir), f'{output_file}.h5'))
-
-
 #: What to do about the components a PCA step reads, when they are unusable (a session's: ``SESSION_ADVICE``).
 COMPONENTS_ADVICE = ("Train PCA again (moseq2-pca train-pca, or the notebook's PCA cell), or give the components "
                      "file it wrote with --pca-file.")
@@ -172,92 +102,57 @@ NO_PROJECT_COMPONENTS_ADVICE = _NO_PROJECT.format(step="apply-pca")
 NO_PROJECT_CHANGEPOINTS_ADVICE = _NO_PROJECT.format(step="compute-changepoints")
 
 
-@dataclass(frozen=True)
-class _Sessions:
-    #: What the wrapper reads: a folder of extractions, or the extraction files.
-    read: str | list
-    #: The session keys used and left out, when known.
-    used: list | None = None
-    left_out: list | None = None
+def output_path(output_dir: str, output_file: str) -> Path:
+    """The file a step writes for ``output_dir`` and ``output_file``: ``<output_dir>/<output_file>.h5``."""
+    return Path(join(abspath(output_dir), f'{output_file}.h5'))
 
 
-def _sessions(input_dir, project, exclude=None) -> _Sessions:
-    """What a step reads: the extractions under ``input_dir`` when one is given, else the project's sessions'
-    ``.h5`` files, less the sessions ``exclude`` names (None: ``config.yaml``'s ``exclude``)."""
-    if input_dir is not None:
-        return _folder_sessions(input_dir, project, exclude)
-    if project is None:
-        raise InputError("A PCA step needs a folder of extractions (input_dir) or a project to read the sessions "
-                         "of; it was given neither. Pass one of them.")
-    sessions_folder(project)  # stops when the project lists no sessions yet
-    index = session_index(project, exclude=exclude)
-    files = index["files"]
-    if not files:
-        if exclude is not None:
-            raise BookkeepingError(
-                f"Every session in {project.bookkeeping_file} is in the list to leave out given for this run, so "
-                "there is nothing for PCA to read. Name fewer sessions to leave out."
-            )
-        raise BookkeepingError(
-            f"Every session in {project.bookkeeping_file} is listed under exclude in {project.config_file}, so "
-            f"there is nothing for PCA to read. Remove at least one session from exclude in {project.config_file}."
-        )
-    return _Sessions([f["path"][0] for f in files], [f["key"] for f in files], list(index.get("excluded") or {}))
+def keep_existing(output: Path, overwrite: bool, replace_existing: bool | None, *, step: str, option: str) -> bool:
+    """Whether a step keeps ``output`` rather than replace it.
+
+    False (go on) when there is no file there, when ``overwrite`` (the step's ``option``) is set, or when
+    ``replace_existing`` is True; True (keep it) when ``replace_existing`` is False. When the file exists and
+    neither decides, raises ``OverwriteNeeded`` for ``step``.
+    """
+    if overwrite or not Path(output).exists():
+        return False
+    if replace_existing is None:
+        raise OverwriteNeeded(output, step=step, option=option)
+    return not replace_existing
 
 
-def _folder_sessions(input_dir, project, exclude) -> _Sessions:
-    """The extractions under ``input_dir``, less those whose session ``exclude`` names (None: the running
-    project's ``config.yaml``'s ``exclude``, none outside a project). The folder itself when none is left out
-    and no list was given."""
-    if not Path(input_dir).is_dir():
-        return _Sessions(input_dir)  # the step's check names the folder
-    h5s, dicts, _ = find_extractions(input_dir)
-    keys = extraction_keys(h5s, [info["uuid"] for info in dicts], project, input_dir)
-    if exclude is None:
-        listed = read_exclude(project) if project is not None else []
-    else:
-        listed = list(dict.fromkeys(str(key) for key in exclude))
-        check_given_exclude(listed, keys, f"the extractions in {abspath(input_dir)}")
-    left_out = [key for key in keys if key in listed]
-    line = exclude_line(left_out, given=exclude is not None, in_project=project is not None)
-    if line:
-        print(line)
-    if not left_out and exclude is None:
-        return _Sessions(input_dir, keys, [])
-    kept = [(h5, key) for h5, key in zip(h5s, keys) if key not in left_out]
-    if not kept:
+def extraction_inputs(sessions: Sequence[tuple[str, str]]) -> list[dict]:
+    """The extractions of ``sessions`` as a record's inputs: each ``.h5`` with its session uuid."""
+    h5s, dicts, _ = find_extractions([h5 for _, h5 in sessions])
+    return [{"path": h5, "uuid": info["uuid"]} for h5, info in zip(h5s, dicts)]
+
+
+def check_extractions(step: str, sessions: Sequence[tuple[str, str]], *files: tuple[str, str]) -> None:
+    """Stop ``step`` before its work when it was given no extractions, when an extraction of ``sessions`` or one
+    of ``files`` (each with what to do about it) is unusable, or when an extraction's frames and timestamps
+    disagree in number."""
+    if not sessions:
         raise InputError(
-            f"Every extraction in {abspath(input_dir)} is left out ({', '.join(left_out)}), so there is nothing for "
-            "PCA to read. Name fewer sessions to leave out, or pass another folder with --input-dir."
+            f"{step.replace('-', '_')} was given no extractions to read. Pass each session as a (session name, "
+            "path to its extraction .h5) pair."
         )
-    return _Sessions([h5 for h5, _ in kept], [key for _, key in kept], left_out)
-
-
-def _check(step, sessions, *files):
-    """Stop ``step`` before its work when a session's extraction or one of ``files`` (each with what to do about
-    it) is unusable, or when an extraction's frames and timestamps disagree in number."""
-    if not isinstance(sessions, list):
-        _check_folder(step, sessions)
-    h5s = sessions if isinstance(sessions, list) else find_extractions(sessions)[0]
-    if not h5s:
-        raise InputError(
-            f"{step} found no extractions in {abspath(sessions)}: it looks for the .h5 files extraction writes "
-            "(results.h5, holding frames and a session uuid) in that folder and every folder below it. Run it from "
-            "the project folder, or name the project with --config-file /path/to/project/config.yaml, to read the "
-            "sessions its moseq2-project.yaml lists; or pass the folder holding the extractions with --input-dir."
-        )
+    h5s = [h5 for _, h5 in sessions]
     check_inputs(step, {**{h5: SESSION_ADVICE for h5 in h5s}, **dict(files)})
     check_frame_counts(h5s)
 
 
-def _check_folder(step, folder):
-    """Stop ``step`` when the folder of extractions it was given does not exist."""
-    if not Path(folder).is_dir():
-        raise InputError(
-            f"{step} needs the folder of extractions {abspath(folder)}, which does not exist. Check the path given "
-            "with --input-dir, or run it from the project folder (or name the project with --config-file "
-            "/path/to/project/config.yaml) to read the sessions its moseq2-project.yaml lists."
-        )
+def _components(components_file, output_dir):
+    """The components a step reads: ``components_file``, else ``<output_dir>/pca.h5``."""
+    return components_file or join(abspath(output_dir), 'pca.h5')
+
+
+def _advice(components_file, components_advice, no_project_advice):
+    """What to do about unusable components: ``components_advice`` when given; else, as a step run outside a
+    project says it, ``COMPONENTS_ADVICE`` for a ``components_file`` given and ``no_project_advice`` for the
+    one looked for in the output folder."""
+    if components_advice is not None:
+        return components_advice
+    return COMPONENTS_ADVICE if components_file is not None else no_project_advice
 
 
 def _settings(opts, output_dir):
@@ -268,23 +163,12 @@ def _settings(opts, output_dir):
     return settings
 
 
-def _keep_existing(written, overwrite):
-    """Whether the person keeps an existing ``written`` rather than overwrite it, asked as the wrappers ask."""
-    if overwrite or not written.exists():
-        return False
-    click.echo(f'The file {written} already exists.\nWould you like to overwrite it? [y -> yes, n -> no]\n')
-    return input().lower() != 'y'
-
-
-def _start(step, opts, sessions: _Sessions, project, *files):
-    """The record of ``step``, its inputs the extractions of ``sessions`` and ``files``, noting the sessions
-    used and left out."""
-    extractions = [{"path": h5, "uuid": info["uuid"]} for h5, info in zip(*find_extractions(sessions.read)[:2])]
-    settings = [path for path in (project.config_file,) if path.is_file()] if project is not None else []
-    record = start_record(step, opts, [*settings, *[f for f in files if f], *extractions], project=project)
-    if sessions.used is not None:
-        record.note("sessions", sessions.used)
-        record.note("exclude", sessions.left_out or [])
+def _start(step, opts, sessions, *files):
+    """The record of ``step`` run with no record given: its inputs ``files`` (those not None) and the extractions
+    of ``sessions``, noting the sessions given and none left out."""
+    record = start_record(step, opts, [*[f for f in files if f], *extraction_inputs(sessions)])
+    record.note("sessions", [name for name, _ in sessions])
+    record.note("exclude", [])
     return record
 
 
@@ -316,74 +200,78 @@ def _write(record, written, suffixes, work):
     return written
 
 
-def _record(project, output, written):
-    """Record ``written`` as the project's PCA ``output`` (``components``, ``scores``, ``changepoints``)."""
-    if project is None or written is None:
-        return
+def train_pca(sessions: Sequence[tuple[str, str]], output_dir: str, output_file: str, opts: TrainPCAOptions, *,
+              record: Record | None = None, replace_existing: bool | None = None) -> TrainPCAResult:
+    """Train PCA on the extractions of ``sessions``; write ``<output_dir>/<output_file>.h5``.
 
-    def change(bookkeeping):
-        bookkeeping.pca[output] = relative_path(project, written)
-
-    update(project, change)
-
-
-def train_pca(input_dir: str | None, output_dir: str, output_file: str, opts: TrainPCAOptions, *,
-              project: Project | None = None, exclude: list[str] | None = None) -> TrainPCAResult:
-    """Train PCA on the extractions under ``input_dir``, else on the project's sessions, less the sessions
-    ``exclude`` names (None: ``config.yaml``'s ``exclude``); write ``<output_dir>/<output_file>.h5``."""
-    sessions = _sessions(input_dir, project, exclude)
-    _check("train-pca", sessions.read)
-    written = _written(output_dir, output_file)
-    if _keep_existing(written, opts.overwrite_pca_train):
+    When that file exists and ``opts.overwrite_pca_train`` is off, ``replace_existing`` decides (None: raise
+    ``OverwriteNeeded``). ``record`` is the run's record, started by the caller; without one, the step starts
+    its own.
+    """
+    written = output_path(output_dir, output_file)
+    if keep_existing(written, opts.overwrite_pca_train, replace_existing, step="train_pca",
+                     option="overwrite_pca_train"):
         return TrainPCAResult(components_file=None)
-    record = _start("train-pca", opts, sessions, project)
+    check_extractions("train-pca", sessions)
+    if record is None:
+        record = _start("train-pca", opts, sessions)
+    h5s = [h5 for _, h5 in sessions]
     settings = {**_settings(opts, output_dir), 'overwrite_pca_train': True}
     components = _write(record, written, TRAIN_FIGURES, lambda name: bool(
-        train_pca_wrapper(sessions.read, settings, output_dir, name).get('pca_file')))
-    _record(project, "components", components)
+        train_pca_wrapper(h5s, settings, output_dir, name).get('pca_file')))
     return TrainPCAResult(components_file=components)
 
 
-def apply_pca(input_dir: str | None, output_dir: str, output_file: str, opts: ApplyPCAOptions, *,
-              components_file: str | None = None, project: Project | None = None,
-              exclude: list[str] | None = None) -> ApplyPCAResult:
-    """Compute each session's PC scores with the components in ``components_file``, preparing the frames
-    with the settings the components were trained with, less the sessions ``exclude`` names (None:
-    ``config.yaml``'s ``exclude``); write ``<output_dir>/<output_file>.h5``."""
-    components = _components(components_file, output_dir)
-    sessions = _sessions(input_dir, project, exclude)
-    advice = NO_PROJECT_COMPONENTS_ADVICE if project is None and components_file is None else COMPONENTS_ADVICE
-    _check("apply-pca", sessions.read, (components, advice))
-    check_trained_settings(components, project)
-    written = _written(output_dir, output_file)
-    if _keep_existing(written, opts.overwrite_pca_apply):
+def apply_pca(sessions: Sequence[tuple[str, str]], output_dir: str, output_file: str, opts: ApplyPCAOptions, *,
+              components_file: str | None = None, components_advice: str | None = None,
+              record: Record | None = None, replace_existing: bool | None = None) -> ApplyPCAResult:
+    """Compute the PC scores of the extractions of ``sessions`` with the components in ``components_file``
+    (``<output_dir>/pca.h5`` when None), preparing the frames with the settings the components were trained
+    with; write ``<output_dir>/<output_file>.h5``.
+
+    ``components_advice`` is what the message for unusable components says to do (None: as a step run outside a
+    project says it). When the output exists and ``opts.overwrite_pca_apply`` is off, ``replace_existing``
+    decides (None: raise ``OverwriteNeeded``). ``record`` is the run's record, started by the caller; without
+    one, the step starts its own.
+    """
+    written = output_path(output_dir, output_file)
+    if keep_existing(written, opts.overwrite_pca_apply, replace_existing, step="apply_pca",
+                     option="overwrite_pca_apply"):
         return ApplyPCAResult(scores_file=None)
-    record = _start("apply-pca", opts, sessions, project, components_file)
+    components = _components(components_file, output_dir)
+    check_extractions("apply-pca", sessions,
+                      (components, _advice(components_file, components_advice, NO_PROJECT_COMPONENTS_ADVICE)))
+    if record is None:
+        record = _start("apply-pca", opts, sessions, components_file)
+    h5s = [h5 for _, h5 in sessions]
     settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'overwrite_pca_apply': True}
-    scores = _write(record, written, (),
-                    lambda name: apply_pca_wrapper(sessions.read, settings, output_dir, name)[1])
-    _record(project, "scores", scores)
+    scores = _write(record, written, (), lambda name: apply_pca_wrapper(h5s, settings, output_dir, name)[1])
     return ApplyPCAResult(scores_file=scores)
 
 
-def compute_changepoints(input_dir: str | None, output_dir: str, output_file: str, opts: ChangepointsOptions, *,
-                         components_file: str | None = None, scores_file: str | None = None,
-                         project: Project | None = None, exclude: list[str] | None = None) -> ChangepointsResult:
-    """Compute the model-free changepoints, with missing-data PCA when the components were trained with it,
-    less the sessions ``exclude`` names (None: ``config.yaml``'s ``exclude``); write
-    ``<output_dir>/<output_file>.h5``."""
+def compute_changepoints(sessions: Sequence[tuple[str, str]], output_dir: str, output_file: str,
+                         opts: ChangepointsOptions, *, components_file: str | None = None,
+                         scores_file: str | None = None, components_advice: str | None = None,
+                         record: Record | None = None) -> ChangepointsResult:
+    """Compute the model-free changepoints of the extractions of ``sessions``, with missing-data PCA when the
+    components in ``components_file`` (``<output_dir>/pca.h5`` when None) were trained with it, reading the
+    scores in ``scores_file``; write ``<output_dir>/<output_file>.h5``.
+
+    ``components_advice`` is what the message for unusable components says to do (None: as a step run outside a
+    project says it). ``record`` is the run's record, started by the caller; without one, the step starts its
+    own.
+    """
     components = _components(components_file, output_dir)
-    sessions = _sessions(input_dir, project, exclude)
-    advice = NO_PROJECT_CHANGEPOINTS_ADVICE if project is None and components_file is None else COMPONENTS_ADVICE
-    _check("compute-changepoints", sessions.read, (components, advice))
-    check_trained_settings(components, project)
-    record = _start("compute-changepoints", opts, sessions, project, components_file, scores_file)
+    check_extractions("compute-changepoints", sessions,
+                      (components, _advice(components_file, components_advice, NO_PROJECT_CHANGEPOINTS_ADVICE)))
+    if record is None:
+        record = _start("compute-changepoints", opts, sessions, components_file, scores_file)
+    h5s = [h5 for _, h5 in sessions]
     settings = {**_settings(opts, output_dir), 'pca_file': components_file, 'pca_file_scores': scores_file}
 
     def work(name):
-        compute_changepoints_wrapper(sessions.read, settings, output_dir, name)
+        compute_changepoints_wrapper(h5s, settings, output_dir, name)
         return True
 
-    changepoints = _write(record, _written(output_dir, output_file), ("_dist.png", "_dist.pdf"), work)
-    _record(project, "changepoints", changepoints)
+    changepoints = _write(record, output_path(output_dir, output_file), ("_dist.png", "_dist.pdf"), work)
     return ChangepointsResult(changepoints_file=changepoints)
