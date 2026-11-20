@@ -28,10 +28,15 @@ pairs and that record, and records the file the step wrote in
 ``moseq2-project.yaml`` as the project's components, scores or changepoints, where
 the next step finds it. No step writes ``config.yaml``.
 
-When ``train_pca`` or ``apply_pca`` would write over an output that already
-exists and its ``overwrite_pca_*`` option is off, the question is the first
-thing decided: before the sessions are listed, any line is printed or any input
-is checked, the step raises ``moseq2_common.project.OverwriteNeeded``. The caller
+Each step first runs the checks that print nothing and only stop it: that
+``moseq2-project.yaml`` lists sessions and can be read, when the step reads the
+project's sessions (``NoSessionsError``), and, for ``apply_pca``, that the
+components were trained with the settings ``config.yaml`` sets. A step that
+cannot go ahead therefore says so before anyone is asked anything. When
+``train_pca`` or ``apply_pca`` would then write over an output that already
+exists and its ``overwrite_pca_*`` option is off, the question comes next:
+before the sessions are listed, any line is printed or the input files are
+checked, the step raises ``moseq2_common.project.OverwriteNeeded``. The caller
 asks and calls again with the answer as ``replace_existing``, which leaves the
 options, and so the record, as they were resolved.
 
@@ -60,8 +65,14 @@ from moseq2_pca.helpers.data import TRAINED_SETTINGS, TrainedSettingsError, read
 from moseq2_pca.options import ApplyPCAOptions, ChangepointsOptions, TrainPCAOptions
 from moseq2_pca.util import find_extractions
 
-__all__ = ["PCASessions", "apply_pca", "check_trained_settings", "compute_changepoints", "folder_sessions",
-           "project_sessions", "recorded_paths", "start_record", "train_pca", "trained_settings_heads_up"]
+__all__ = ["NoSessionsError", "PCASessions", "apply_pca", "check_trained_settings", "compute_changepoints",
+           "folder_sessions", "project_sessions", "recorded_paths", "start_record", "train_pca",
+           "trained_settings_heads_up"]
+
+
+class NoSessionsError(BookkeepingError):
+    """The project's ``moseq2-project.yaml`` lists no sessions yet or cannot be read, so a step that reads the
+    project's sessions has none to read."""
 
 
 @dataclass(frozen=True)
@@ -72,10 +83,19 @@ class PCASessions:
     left_out: list[str]
 
 
+def _check_sessions(project: Project) -> None:
+    """Stop with ``NoSessionsError`` when ``project``'s ``moseq2-project.yaml`` lists no sessions yet or cannot be
+    read. Prints nothing."""
+    try:
+        sessions_folder(project)
+    except BookkeepingError as error:
+        raise NoSessionsError(str(error)) from None
+
+
 def project_sessions(project: Project, exclude: list[str] | None = None) -> PCASessions:
     """The sessions ``project``'s bookkeeping file lists, less those ``exclude`` names (None: ``config.yaml``'s
-    ``exclude``)."""
-    sessions_folder(project)  # stops when the project lists no sessions yet
+    ``exclude``). Stops with ``NoSessionsError`` when it lists none or cannot be read."""
+    _check_sessions(project)
     index = session_index(project, exclude=exclude)
     files = index["files"]
     if not files:
@@ -176,8 +196,8 @@ def check_trained_settings(components_file: str, project: Project) -> None:
     """Stop when ``project``'s ``config.yaml`` sets a setting the components were trained with to another value.
 
     Each of ``TRAINED_SETTINGS`` that the ``pca`` section sets is compared with the value the components in
-    ``components_file`` carry. Nothing is checked when either file does not exist yet (the step itself then
-    says which is missing).
+    ``components_file`` carry. Nothing is checked when either file does not exist yet, or when the components
+    cannot be opened (the step's input check then says what is wrong with them). Prints nothing.
     """
     if not Path(components_file).is_file() or not Path(project.config_file).is_file():
         return
@@ -185,7 +205,10 @@ def check_trained_settings(components_file: str, project: Project) -> None:
     configured = {key: section[key] for key in TRAINED_SETTINGS if section.get(key) is not None}
     if not configured:
         return
-    trained = read_trained_settings(components_file)
+    try:
+        trained = read_trained_settings(components_file)
+    except OSError:
+        return
     differ = [
         f"The PCA components in {components_file} were trained with {key} {_shown(trained[key])}, but the pca "
         f"section of {project.config_file} sets {_shown(value)}. Scores and changepoints must use the trained "
@@ -235,9 +258,12 @@ def train_pca(project: Project, input_dir: str | None, output_dir: str, output_f
     sessions ``exclude`` names (None: ``config.yaml``'s ``exclude``); write ``<output_dir>/<output_file>.h5`` and
     record it as the project's components.
 
-    When that file exists and ``opts.overwrite_pca_train`` is off, ``replace_existing`` decides (None: raise
-    ``OverwriteNeeded`` before anything else).
+    Stops first when, without ``input_dir``, the project lists no sessions (``NoSessionsError``). When the output
+    exists and ``opts.overwrite_pca_train`` is off, ``replace_existing`` decides (None: raise ``OverwriteNeeded``
+    before anything is printed).
     """
+    if input_dir is None:
+        _check_sessions(project)
     if steps.keep_existing(steps.output_path(output_dir, output_file), opts.overwrite_pca_train, replace_existing,
                            step="train_pca", option="overwrite_pca_train"):
         return steps.TrainPCAResult(components_file=None)
@@ -257,18 +283,21 @@ def apply_pca(project: Project, input_dir: str | None, output_dir: str, output_f
     ``components_file`` (None: those the project recorded, else ``<output_dir>/pca.h5``); write
     ``<output_dir>/<output_file>.h5`` and record it as the project's scores.
 
-    Stops when ``config.yaml``'s ``pca`` section sets a setting the components were trained with to another
-    value. When the output exists and ``opts.overwrite_pca_apply`` is off, ``replace_existing`` decides (None:
-    raise ``OverwriteNeeded`` before anything else).
+    Stops first when, without ``input_dir``, the project lists no sessions (``NoSessionsError``), and when
+    ``config.yaml``'s ``pca`` section sets a setting the components were trained with to another value. When the
+    output exists and ``opts.overwrite_pca_apply`` is off, ``replace_existing`` decides (None: raise
+    ``OverwriteNeeded`` before anything is printed).
     """
+    if input_dir is None:
+        _check_sessions(project)
+    components_file = components_file or recorded_paths(project).get('pca_file')
+    components = components_file or join(abspath(output_dir), 'pca.h5')
+    check_trained_settings(components, project)
     if steps.keep_existing(steps.output_path(output_dir, output_file), opts.overwrite_pca_apply, replace_existing,
                            step="apply_pca", option="overwrite_pca_apply"):
         return steps.ApplyPCAResult(scores_file=None)
-    components_file = components_file or recorded_paths(project).get('pca_file')
     sessions = _sessions("apply-pca", project, input_dir, exclude)
-    components = components_file or join(abspath(output_dir), 'pca.h5')
     steps.check_extractions("apply-pca", sessions.pairs, (components, steps.COMPONENTS_ADVICE))
-    check_trained_settings(components, project)
     record = start_record("apply-pca", opts, sessions, components_file, project=project)
     result = steps.apply_pca(sessions.pairs, output_dir, output_file, opts, components_file=components_file,
                              components_advice=steps.COMPONENTS_ADVICE, record=record, replace_existing=True)
@@ -285,9 +314,11 @@ def compute_changepoints(project: Project, input_dir: str | None, output_dir: st
     components in ``components_file`` and the scores in ``scores_file`` (None: those the project recorded); write
     ``<output_dir>/<output_file>.h5`` and record it as the project's changepoints.
 
-    Stops when ``config.yaml``'s ``pca`` section sets a setting the components were trained with to another
-    value.
+    Stops first when, without ``input_dir``, the project lists no sessions (``NoSessionsError``). Stops when
+    ``config.yaml``'s ``pca`` section sets a setting the components were trained with to another value.
     """
+    if input_dir is None:
+        _check_sessions(project)
     recorded = recorded_paths(project)
     components_file = components_file or recorded.get('pca_file')
     scores_file = scores_file or recorded.get('pca_file_scores')

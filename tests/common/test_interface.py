@@ -1,10 +1,10 @@
 """A step that needs a person's decision raises it; the interface asks and calls again.
 
-Neither the file layer nor the project layer prompts. Where a step today stops
-to ask (an output that already exists, a flip classifier to pick), it raises a
-``DecisionNeeded`` (``OverwriteNeeded``, ``ChoiceNeeded``) before any work, and
-``moseq2_common.interface`` asks with the words the command line has always used,
-then calls the step once more with the answer as a keyword argument. A script
+Neither the file layer nor the project layer prompts. Where a step needs a
+person's decision (an output that already exists, a flip classifier to pick), it
+raises a ``DecisionNeeded`` (``OverwriteNeeded``, ``ChoiceNeeded``) before any
+work, and ``moseq2_common.interface`` asks in the command line's words, then
+calls the step once more with the answer as a keyword argument. A script
 that meets the exception unanswered reads what it found and how to answer it.
 """
 

@@ -2,9 +2,8 @@
 
 A step that needs a decision raises a ``moseq2_common.project.DecisionNeeded``
 before doing any work. ``answered`` calls the step, and on that exception asks
-the person in the words the command line has always used (``ask_overwrite``,
-``ask_choice``), then calls the step once more with the answer passed as the
-exception's ``keyword``.
+the person in the command line's words (``ask_overwrite``, ``ask_choice``), then
+calls the step once more with the answer passed as the exception's ``keyword``.
 """
 
 from __future__ import annotations

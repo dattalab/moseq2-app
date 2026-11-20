@@ -26,9 +26,12 @@ out.
 
 A step that would write over an output that already exists, with its
 ``--overwrite-pca-*`` option off, asks first whether to overwrite it, before
-anything else the step prints (``moseq2_common.interface.answered``). A command
-with nothing to read stops before any work, naming where it looked and the ways
-out. ``train-pca`` names each trained setting typed at another value than
+anything else the step prints (``moseq2_common.interface.answered``). A step
+that cannot go ahead (a project that lists no sessions; for ``apply-pca``,
+components trained with other settings than ``config.yaml``'s) stops before it
+asks. A command with nothing to read stops before any work, naming where it
+looked and the ways out; in a project that lists no sessions, that includes
+reading a folder of extractions with ``--input-dir``. ``train-pca`` names each trained setting typed at another value than
 ``config.yaml``'s, on which ``apply-pca`` and ``compute-changepoints`` will stop.
 """
 
@@ -36,7 +39,7 @@ import os
 from os.path import join
 
 import click
-from moseq2_common.bookkeeping import BookkeepingError, sessions_folder
+from moseq2_common.bookkeeping import BookkeepingError
 from moseq2_common.interface import answered
 from moseq2_common.options import (
     ProjectGroup,
@@ -113,19 +116,23 @@ CHANGEPOINTS_ORDER = (*_INPUT_AND_DASK, 'output_file', 'pca_file', 'pca_file_sco
 
 def _folders(ctx, input_dir, output_dir):
     """The project the command runs in (None outside one), the folder of extractions it reads and its output
-    folder. The folder read is ``--input-dir``; without it, None in a project (its sessions, which must have been
-    aggregated), else the working folder. The output folder is ``--output-dir``, else ``_pca/`` in the project
-    folder (in the working folder outside a project)."""
+    folder. The folder read is ``--input-dir``; without it, None in a project (its sessions), else the working
+    folder. The output folder is ``--output-dir``, else ``_pca/`` in the project folder (in the working folder
+    outside a project)."""
     project = command_project(ctx)
-    if not input_dir and project is not None:
-        try:
-            sessions_folder(project)
-        except BookkeepingError as error:
-            raise BookkeepingError(f'{error} To read a folder of extractions instead, pass it with --input-dir.') \
-                from None
-    elif not input_dir:
+    if not input_dir and project is None:
         input_dir = os.getcwd()
     return project, input_dir or None, output_dir or join(output_folder(ctx), '_pca')
+
+
+def _in_project(step, *args, **kwargs):
+    """``step`` of the project layer, its question asked (``answered``). When the project lists no sessions, the
+    message adds how to read a folder of extractions instead."""
+    try:
+        return answered(step, *args, **kwargs)
+    except project_steps.NoSessionsError as error:
+        raise BookkeepingError(f'{error} To read a folder of extractions instead, pass it with --input-dir.') \
+            from None
 
 
 #: The option that lets each step write over an existing output without asking (None: it always does).
@@ -164,8 +171,8 @@ def train_pca(ctx, input_dir, output_dir, output_file, **_):
                                                         config_file):
         click.echo(line)
     if project is not None:
-        answered(project_steps.train_pca, project, input_dir, output_dir, output_file, opts,
-                 exclude=typed_exclude(ctx))
+        _in_project(project_steps.train_pca, project, input_dir, output_dir, output_file, opts,
+                    exclude=typed_exclude(ctx))
     else:
         answered(_without_project, 'train_pca', input_dir, output_dir, output_file, opts, exclude=typed_exclude(ctx))
 
@@ -184,8 +191,8 @@ def apply_pca(ctx, input_dir, output_dir, output_file, pca_file, **_):
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     try:
         if project is not None:
-            answered(project_steps.apply_pca, project, input_dir, output_dir, output_file, opts,
-                     components_file=pca_file, exclude=typed_exclude(ctx))
+            _in_project(project_steps.apply_pca, project, input_dir, output_dir, output_file, opts,
+                        components_file=pca_file, exclude=typed_exclude(ctx))
         else:
             answered(_without_project, 'apply_pca', input_dir, output_dir, output_file, opts,
                      components_file=pca_file, exclude=typed_exclude(ctx))
@@ -210,8 +217,8 @@ def compute_changepoints(ctx, input_dir, output_dir, output_file, pca_file, pca_
     project, input_dir, output_dir = _folders(ctx, input_dir, output_dir)
     try:
         if project is not None:
-            answered(project_steps.compute_changepoints, project, input_dir, output_dir, output_file, opts,
-                     components_file=pca_file, scores_file=pca_file_scores, exclude=typed_exclude(ctx))
+            _in_project(project_steps.compute_changepoints, project, input_dir, output_dir, output_file, opts,
+                        components_file=pca_file, scores_file=pca_file_scores, exclude=typed_exclude(ctx))
         else:
             answered(_without_project, 'compute_changepoints', input_dir, output_dir, output_file, opts,
                      components_file=pca_file, scores_file=pca_file_scores, exclude=typed_exclude(ctx))
