@@ -230,7 +230,7 @@ def project(tmp_path):
 
 def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch):
     """Each step with two front ends gets equal options from both, types included."""
-    import moseq2_extract.steps as extract_steps
+    import moseq2_extract.project as extract_project
     import moseq2_model.steps as model_steps
     import moseq2_viz.steps as viz_steps
     from moseq2_extract.cli import cli as extract_cli
@@ -256,8 +256,9 @@ def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch
 
     # extraction
     batches = []
-    monkeypatch.setattr(extract_steps, "batch_extract", lambda input_dir, opts, **kwargs: batches.append(opts)
-                        or extract_steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None))
+    monkeypatch.setattr(extract_project, "batch_extract",
+                        lambda project, input_dir, opts, **kwargs: batches.append(opts)
+                        or extract_project.BatchExtractResult(found=[], extracted=[], failures=[], script=None))
     extract_found_sessions(str(project), str(config), extract_all=True, skip_extracted=True)
     result = CliRunner().invoke(extract_cli, ["batch-extract", str(project), "--config-file", str(config),
                                               "--skip-completed"])

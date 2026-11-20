@@ -76,7 +76,7 @@ def chosen(monkeypatch):
     """The recordings handed to the local extraction loop; nothing is extracted."""
     recorded = []
     monkeypatch.setattr(
-        "moseq2_extract.steps.run_local_extract",
+        "moseq2_extract.project.run_local_extract",
         lambda to_extract, config_file, skip_extracted=False, **kw: recorded.extend(to_extract) or [],
     )
     return recorded

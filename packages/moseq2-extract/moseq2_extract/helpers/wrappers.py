@@ -9,8 +9,6 @@ from uuid import uuid4
 import h5py
 import warnings
 import numpy as np
-import urllib.request
-from moseq2_common.yaml import read_yaml, write_config
 from tqdm.auto import tqdm
 from moseq2_extract.io.image import write_image
 from moseq2_extract.helpers.extract import process_extract_batches
@@ -18,7 +16,7 @@ from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from os.path import join, exists, dirname, basename, abspath, splitext
 from moseq2_extract.io.video import load_movie_data, get_movie_info, write_frames
 from moseq2_extract.extract.flip_classifier import load_flip_classifier, training_settings
-from moseq2_extract.util import mouse_threshold_filter, filter_warnings
+from moseq2_extract.util import mouse_threshold_filter
 from moseq2_extract.helpers.data import (
     recording_frame_rate,
     handle_extract_metadata,
@@ -685,85 +683,6 @@ def describe_recording(record, recording, input_file, config_data, timestamp_sou
     if config_data.get("flip_classifier"):
         inputs.append(config_data["flip_classifier"])
     record.add_inputs(inputs)
-
-
-@filter_warnings
-def flip_file_wrapper(config_file, output_dir, selected_flip=None):
-    """
-    Download and save flip classifiers.
-
-    Args:
-    config_file (str): path to config file
-    output_dir (str): path to directory to save classifier in.
-    selected_flip (int or str): int: index of desired flip classifier; str: path to flip file
-
-    Returns:
-    output_filename (str): path to the downloaded classifier.
-    """
-
-    # The classifiers published before 2026 are scikit-learn 0.20 pickles, and a
-    # pickle records the module path of the class it was made from --
-    # sklearn.ensemble.forest, renamed to sklearn.ensemble._forest in 0.22. No
-    # modern scikit-learn can unpickle them, and no amount of care at this end
-    # changes that, because the incompatibility is inside the file.
-    #
-    # These are the same four forests transcribed into pickle-free .npz archives
-    # of plain arrays, read by moseq2_extract.extract.flip_classifier. Nothing
-    # about them names a class or a library version, so they cannot rot the same
-    # way, and the package no longer imports scikit-learn at all.
-    #
-    # The originals are still served at the URLs they always were; these were
-    # published beside them under new names rather than replacing them, so an
-    # older moseq2-extract keeps downloading exactly what it downloaded before.
-    flip_files = {
-        "large mice with fibers (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_largemicewithfiber.npz",
-        "adult male c57s (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_c57_10to13weeks.npz",
-        "mice with Inscopix cables (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_inscopix.npz",
-        "adult male c57s (Azure)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_azure_temp.npz",
-    }
-
-    key_list = list(flip_files)
-
-    if selected_flip is None:
-        for idx, (k, v) in enumerate(flip_files.items()):
-            print(f"[{idx}] {k} ---> {v}")
-    else:
-        if selected_flip < 0:
-            raise IndexError("list index out of range")
-        selected_flip = key_list[selected_flip]
-
-    # prompt for user selection if not already inputted
-    while selected_flip is None:
-        try:
-            choice = int(input("Enter a selection "))
-            if choice < 0:
-                raise IndexError
-            selected_flip = key_list[choice]
-        except (ValueError, IndexError):
-            print("Please enter a valid number listed above")
-            continue
-
-    if not exists(output_dir):
-        os.makedirs(output_dir)
-
-    selection = flip_files[selected_flip]
-
-    output_filename = join(output_dir, basename(selection))
-
-    urllib.request.urlretrieve(selection, output_filename)
-    print("Successfully downloaded flip file to", output_filename)
-
-    # Update the config file with the latest path to the flip classifier
-    try:
-        config_data = read_yaml(config_file)
-        config_data.setdefault("extract", {})["flip_classifier"] = output_filename
-
-        write_config(config_data, config_file)
-    except Exception as e:
-        print("Could not update configuration file flip classifier path")
-        print("Unexpected error:", e)
-
-    return output_filename
 
 
 def _copy_frames(

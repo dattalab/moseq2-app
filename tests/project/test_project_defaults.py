@@ -311,11 +311,11 @@ def test_batch_extract_defaults_to_the_project_folder(project, typed, monkeypatc
     class Result:
         failures = []
 
-    def batch_extract(input_folder, *args, **kwargs):
+    def batch_extract(project, input_folder, *args, **kwargs):
         calls["input_folder"] = input_folder
         return Result()
 
-    monkeypatch.setattr(cli.steps, "batch_extract", batch_extract)
+    monkeypatch.setattr(cli.project_steps, "batch_extract", batch_extract)
     run(cli.cli, "batch-extract", cwd=project)
     assert Path(calls["input_folder"]).resolve() == project.resolve()
 
@@ -389,7 +389,7 @@ def test_download_flip_file_output_dir_is_the_folder_it_runs_in(project, monkeyp
     import moseq2_extract.cli as cli
 
     received = {}
-    monkeypatch.setattr(cli.setup, "download_flip_file",
+    monkeypatch.setattr(cli.project_steps, "download_flip_file",
                         lambda config_file, output_dir, selection: received.setdefault("output_dir", output_dir))
     run(cli.cli, "download-flip-file", cwd=project)
 

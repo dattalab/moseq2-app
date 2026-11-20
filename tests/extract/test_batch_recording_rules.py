@@ -1,7 +1,7 @@
 """The command line and the notebook extract the same recordings from a project.
 
 ``moseq2-extract batch-extract`` and the notebook's extraction cell
-(``extract_found_sessions``) run one step, ``moseq2_extract.steps.batch_extract``,
+(``extract_found_sessions``) run one step, ``moseq2_extract.project.batch_extract``,
 which finds the project's recordings and leaves out the ones already extracted.
 Both search every recording type the pipeline reads (``.dat``, ``.mkv``,
 ``.avi``, ``.tar.gz``) unless told otherwise, and both leave out a recording
@@ -53,7 +53,7 @@ def extracted(monkeypatch):
     """The recordings the step hands to the local extraction, in place of extracting them."""
     chosen = []
     monkeypatch.setattr(
-        "moseq2_extract.steps.run_local_extract",
+        "moseq2_extract.project.run_local_extract",
         lambda to_extract, config_file, skip_extracted=False, **kw: chosen.extend(to_extract) or [],
     )
     return chosen
