@@ -5,7 +5,8 @@ Each command's settings are generated from its options class in
 ``moseq2_extract.options``; the command reads the ``extract`` section of its
 project's ``config.yaml`` (``--config-file``, or the working folder's), resolves
 the settings and calls its step in ``moseq2_extract.steps`` (or
-``moseq2_extract.setup``). ``find-roi`` and ``extract`` lay the arena tool's
+``moseq2_extract.setup``); ``find-roi`` in a project calls its project layer,
+``moseq2_extract.project``. ``find-roi`` and ``extract`` lay the arena tool's
 entry for the recording in the project's ``session_config.yaml`` over
 ``config.yaml``, and write into the recording's session folder in the project's
 ``aggregate_results/`` (``proc/`` beside the recording outside a project).
@@ -31,7 +32,7 @@ from moseq2_common.options import (
 )
 from moseq2_common.project import find_project, is_job_file
 from moseq2_common.records import print_record_command
-from moseq2_extract import setup, steps
+from moseq2_extract import project as project_steps, setup, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
     copy_slice_wrapper,
@@ -140,7 +141,10 @@ def find_roi(ctx, input_file, output_dir, config_file, **_):
     # a --bg-roi-depth-range typed sets --manual-set-depth-range (RoiOptions.resolve)
     opts = RoiOptions.resolve(config=config, entry=_entry(project, config_file, input_file),
                               explicit=explicit_values(ctx, RoiOptions))
-    steps.find_roi(input_file, output_dir, opts, project=project)
+    if project is not None:
+        project_steps.find_roi(project, input_file, opts, output_dir=output_dir)
+    else:
+        steps.find_roi(input_file, output_dir, opts)
 
 
 @cli.command(

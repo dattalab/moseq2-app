@@ -35,6 +35,14 @@ no ``moseq2-project.yaml`` beside it. 1.6.0 does not read or convert one:
 command and the notebooks' project cell call it first. A name a 1.5 notebook
 imports that 1.6.0 removed stops the import with ``OutdatedNotebookError``
 (``outdated_names``).
+
+A step's project layer (``moseq2_<package>.project``) lists the settings files a
+step in the project reads as its record's inputs (``settings_files``). Where a
+step needs a person's decision (an output that already exists, one of several
+things to pick), neither layer asks: it raises a ``DecisionNeeded``
+(``OverwriteNeeded``, ``ChoiceNeeded``) before doing any work or printing
+anything, and the interface asks and calls it again with the answer passed as
+the exception's ``keyword`` (``moseq2_common.interface.answered``).
 """
 
 from __future__ import annotations
@@ -43,13 +51,15 @@ import os
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePath
+from typing import ClassVar
 
 from moseq2_common.yaml import read_yaml, write_config
 
-__all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "OldProjectError", "OutdatedNotebookError", "Project",
-           "check_not_old", "find_project", "is_job_file", "old_project_message", "outdated_names",
-           "outdated_notebook_message", "check_session_names", "exclude_note", "read_exclude", "read_groups",
-           "session_key", "standalone_note", "write_groups"]
+__all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "ChoiceNeeded", "DecisionNeeded", "OldProjectError",
+           "OutdatedNotebookError", "OverwriteNeeded", "Project", "check_not_old", "find_project", "is_job_file",
+           "old_project_message", "outdated_names", "outdated_notebook_message", "check_session_names",
+           "exclude_note", "read_exclude", "read_groups", "session_key", "settings_files", "standalone_note",
+           "write_groups"]
 
 CONFIG_NAME = "config.yaml"
 #: The file holding each recording's arena-tool settings, in the project folder.
@@ -311,3 +321,57 @@ def write_groups(project: Project, groups: Mapping[str, str], exclude: Iterable[
     if exclude is not None:
         data["exclude"] = [str(key) for key in exclude]
     write_config(data, str(project.config_file))
+
+
+def settings_files(project: Project, *, session_config: bool = True) -> list[Path]:
+    """The settings files a step in ``project`` reads, for its record's inputs: ``config.yaml``, then
+    ``session_config.yaml`` unless ``session_config`` is False, each only when it is a file."""
+    files = [project.config_file, project.session_config_file] if session_config else [project.config_file]
+    return [path for path in files if Path(path).is_file()]
+
+
+class DecisionNeeded(Exception):
+    """A question a step cannot answer itself, raised before it does any work or prints anything.
+
+    Call the step again with the answer passed as the keyword argument ``keyword`` names;
+    ``moseq2_common.interface.answered`` asks a person and does that.
+    """
+
+    #: The keyword argument the answer is passed back as.
+    keyword: ClassVar[str]
+
+
+class OverwriteNeeded(DecisionNeeded):
+    """``output`` already exists, and ``step`` replaces it only when told to (its ``option`` is off).
+
+    The answer is ``replace_existing``: True replaces the output, False keeps it.
+    """
+
+    keyword = "replace_existing"
+
+    def __init__(self, output: str | os.PathLike, *, step: str, option: str):
+        self.output = Path(output)
+        self.step = step
+        self.option = option
+        super().__init__(
+            f"{self.output} already exists, and {step} replaces an existing output only when told to. Call it "
+            f"again with replace_existing=True to replace it or replace_existing=False to keep it, or pass "
+            f"{option}=True in its options to replace it every time.")
+
+
+class ChoiceNeeded(DecisionNeeded):
+    """``step`` needs one of ``choices`` (each label and what it names), numbered from 0 in their order.
+
+    The answer is ``selection``: the number of the one to use.
+    """
+
+    keyword = "selection"
+
+    def __init__(self, choices: Mapping[str, str], *, what: str, step: str):
+        self.choices = dict(choices)
+        self.what = what
+        self.step = step
+        numbered = ", ".join(f"{index} {label}" for index, label in enumerate(self.choices))
+        super().__init__(
+            f"{step} needs a choice of {what}: {numbered}. Call it again with selection= the number of the one "
+            "to use.")

@@ -15,11 +15,15 @@ the options as a dict. Each output carries the record of the run that wrote it
 session's ``results.h5``, holding the options after detection; ``find-roi``'s
 and a SLURM batch's script's are a ``.yaml`` beside them (``sidecar_path``).
 
-Inside a project, a recording's outputs go into its session's folder in
-``aggregate_results/`` (``moseq2_extract.recordings.session_outputs``) and keep
-the uuid ``moseq2-project.yaml`` gave the session; outside one, ``extract``
-writes into ``proc/`` beside the recording. ``aggregate_results`` lists the
-extracted sessions in ``moseq2-project.yaml``.
+``find_roi`` is the file layer: it takes the recording, the output folder and
+the options, and reads no project file. Its project layer,
+``moseq2_extract.project.find_roi``, resolves the session's folder in the
+project and starts the record with the project. Inside a project, ``extract``
+writes a recording's outputs into its session's folder in ``aggregate_results/``
+(``moseq2_extract.recordings.session_outputs``) and keeps the uuid
+``moseq2-project.yaml`` gave the session; outside one, ``find_roi`` and
+``extract`` write into ``proc/`` beside the recording. ``aggregate_results``
+lists the extracted sessions in ``moseq2-project.yaml``.
 
 Before any work, ``find-roi`` and ``extract`` stop on a recording that does not
 exist, is empty or cannot be read (``moseq2_common.records.check_inputs``), and
@@ -35,8 +39,8 @@ from pathlib import Path
 from uuid import uuid4
 
 from moseq2_common.bookkeeping import SESSION_FILE, Session, load, relative_path, update
-from moseq2_common.records import InputError, check_inputs, start_record, write_record
-from moseq2_common.project import Project, find_project as find_project_of, session_key
+from moseq2_common.records import InputError, Record, check_inputs, start_record, write_record
+from moseq2_common.project import Project, find_project as find_project_of, session_key, settings_files
 from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
 from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
@@ -88,17 +92,19 @@ def _settings(opts, leave_out=()):
 
 
 def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
-             project: Project | None = None) -> FindRoiResult:
+             record: Record | None = None) -> FindRoiResult:
     """Find the arena and background of ``input_file``; write the background and arena images.
 
-    They go where ``extract`` writes the recording's outputs: into ``output_dir`` when given, into its
-    session's folder in ``project``'s ``aggregate_results/``, or outside a project into ``proc/`` beside it.
+    They go into ``output_dir`` when given, else into ``proc/`` beside the recording. ``record`` is the run's
+    record, started by the caller (``moseq2_extract.project.find_roi`` starts it with the project); without
+    one, the step starts its own, its one input the recording.
     """
     check_inputs("find-roi", {input_file: RECORDING_ADVICE})
-    record = start_record("find-roi", opts, [input_file, *_project_inputs(project)], project=project)
+    if record is None:
+        record = start_record("find-roi", opts, [input_file])
     settings = _settings(opts)
     if output_dir is None:
-        output_dir = str(_output_folder(input_file, None, project))
+        output_dir = str(standalone_outputs(input_file).folder)
     get_roi_wrapper(input_file, settings, output_dir)
     # the wrapper records in settings the folder it wrote to
     folder = settings.get("output_dir")
@@ -110,13 +116,6 @@ def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
     for roi_file in result.roi_files:
         write_record(roi_file, finished)
     return result
-
-
-def _project_inputs(project):
-    """The project's settings files, which every step in it reads."""
-    if project is None:
-        return []
-    return [path for path in (project.config_file, project.session_config_file) if Path(path).is_file()]
 
 
 def _output_folder(input_file, output_dir, project, keys=None):
@@ -146,7 +145,7 @@ def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
     In a project, a session ``moseq2-project.yaml`` lists keeps its uuid.
     """
     check_inputs("extract", {input_file: RECORDING_ADVICE})
-    record = start_record("extract", opts, _project_inputs(project), project=project)
+    record = start_record("extract", opts, settings_files(project) if project is not None else [], project=project)
     settings = _settings(opts, leave_out=_WRAPPER_ARGUMENTS)
     folder = _output_folder(input_file, output_dir, project)
     written = extract_wrapper(input_file, str(folder), settings, num_frames=opts.num_frames,
