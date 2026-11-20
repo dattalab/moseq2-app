@@ -137,7 +137,7 @@ def chosen(monkeypatch):
         recorded.extend(to_extract)
         return []
 
-    monkeypatch.setattr("moseq2_extract.steps.run_local_extract", record)
+    monkeypatch.setattr("moseq2_extract.project.run_local_extract", record)
     return recorded
 
 

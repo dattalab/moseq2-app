@@ -204,7 +204,7 @@ def test_help_still_answers_in_a_1_5_project(tmp_path):
 def test_setup_commands_stop_on_a_1_5_project(tmp_path, monkeypatch, kind):
     """generate-config and download-flip-file, and the notebook functions behind them, stop and write nothing."""
     from moseq2_common.project import OldProjectError
-    from moseq2_extract import setup
+    from moseq2_extract import project as project_steps
     from moseq2_extract.gui import download_flip_command, generate_config_command
 
     folder = old_project(tmp_path / "project", kind)
@@ -213,9 +213,9 @@ def test_setup_commands_stop_on_a_1_5_project(tmp_path, monkeypatch, kind):
     monkeypatch.setattr("builtins.input", lambda *_: "y")
 
     file, reason = OLD_KINDS[kind]
-    for call in (lambda: setup.generate_config(config, "auto", overwrite=True),
+    for call in (lambda: project_steps.generate_config(config, "auto", overwrite=True),
                  lambda: generate_config_command(config, camera_type="auto"),
-                 lambda: setup.download_flip_file(config, str(folder), 0),
+                 lambda: project_steps.download_flip_file(config, str(folder), 0),
                  lambda: download_flip_command(str(folder), config, 0)):
         with pytest.raises(OldProjectError) as error:
             call()

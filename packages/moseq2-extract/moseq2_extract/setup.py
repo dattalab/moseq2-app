@@ -1,30 +1,26 @@
-"""Setting up a project: its ``config.yaml`` and its flip classifier.
+"""What a project's ``config.yaml`` holds when it is written: its sections and each camera's preset.
 
-``generate-config`` and ``download-flip-file`` on the command line and the
-Extract notebook's ``generate_config_command`` and ``download_flip_command``
-call these. They are the setup commands: they write ``config.yaml`` on a
-person's behalf, where no pipeline step does. Both stop on a project made by
-MoSeq2 1.5.0 or earlier (``moseq2_common.project.check_not_old``) before writing.
+``moseq2_extract.steps.generate_config`` writes a config file from these, and
+``moseq2_extract.project.generate_config`` writes a project's after checking it
+is no MoSeq2 1.5.0 project; ``generate-config`` on the command line and the
+Extract notebook's ``generate_config_command`` call the project layer.
 
 ``config.yaml`` holds ``camera_type`` at its top level and one section per
 stage (``extract``, ``pca``, ``model``, ``crowd_movies``), each holding every
-setting of its stage's steps at its default, with the camera's preset values
-(``CAMERA_PRESETS``) in place of the defaults they replace, and an empty
-``exclude`` list, where the sessions every step after extraction leaves out are
-named.
+setting of its stage's steps at its default (``_stages``, ``_defaults``), with
+the camera's preset values (``CAMERA_PRESETS``) in place of the defaults they
+replace, and an empty ``exclude`` list, where the sessions every step after
+extraction leaves out are named. ``project_camera`` tells the camera from the
+recordings in a folder.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import importlib
-from os.path import abspath, dirname, exists
 from pathlib import Path
 
-from moseq2_common.options import check_top_level, read_config, setting_fields
-from moseq2_common.project import check_not_old
-from moseq2_common.yaml import write_config
-from moseq2_extract.helpers.wrappers import flip_file_wrapper
+from moseq2_common.options import setting_fields
 from moseq2_extract.recordings import find_recordings
 
 #: Each camera's settings in place of the defaults, by section. A Kinect v2 takes the defaults.
@@ -99,43 +95,3 @@ def project_camera(folder: str | Path) -> str:
     if recordings and all(str(recording).endswith(".mkv") for recording in recordings):
         return "azure"
     return "kinect"
-
-
-def generate_config(output_file: str, camera_type: str, *, overwrite: bool) -> Path:
-    """Write ``config.yaml``: every setting at its default, by section, with the camera's preset.
-
-    ``camera_type`` is ``kinect`` (or ``k2``), ``azure``, or ``auto``, which
-    takes ``azure`` when every recording in ``output_file``'s folder is an
-    ``.mkv`` and ``kinect`` otherwise. An existing file is replaced only when
-    ``overwrite`` is True; otherwise it is kept as it is. A folder holding a
-    1.5.0 project stops with ``OldProjectError``.
-    """
-    check_not_old(dirname(abspath(output_file)))
-    if exists(output_file) and not overwrite:
-        return Path(output_file)
-    camera = {"k2": "kinect"}.get(camera_type, camera_type)
-    if camera == "auto":
-        camera = project_camera(dirname(abspath(output_file)))
-    if camera not in CAMERA_PRESETS:
-        raise ValueError(f"generate-config takes the camera types auto, kinect (or k2) and azure, not "
-                         f"{camera_type!r}. Pass one of those as --camera-type.")
-    preset = CAMERA_PRESETS[camera]
-    data = {"camera_type": _CAMERA_TYPE[camera]}
-    for section, classes in _stages().items():
-        data[section] = {**_defaults(classes), **preset.get(section, {})}
-    data["exclude"] = []
-    write_config(data, output_file)
-    return Path(output_file)
-
-
-def download_flip_file(config_file: str, output_dir: str, selection: int | None) -> Path:
-    """Download a flip classifier into ``output_dir`` and name it in ``config_file``'s ``extract`` section.
-
-    ``selection`` is the classifier's number in the list ``flip_file_wrapper``
-    prints; None asks for it. A config file without sections, or a folder
-    holding a 1.5.0 project, stops before anything is downloaded.
-    """
-    check_not_old(dirname(abspath(config_file)))
-    if exists(config_file):
-        check_top_level(config_file, read_config(config_file))
-    return Path(flip_file_wrapper(config_file, output_dir, selected_flip=selection))

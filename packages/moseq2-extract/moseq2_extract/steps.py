@@ -1,51 +1,53 @@
-"""The extraction pipeline steps, one function each.
+"""Extraction's steps on the files they are given: the file layer.
 
-``find-roi``, ``extract``, ``batch-extract`` and ``aggregate-results`` on the
-command line (``cli.py``) and the Extract notebook's functions (``gui.py``)
-resolve their settings into one options object and call these. A step needs no
-``config.yaml``: from a script, pass the paths and an options object, such as
+Each function here is one step on explicit files, and knows nothing of
+projects: ``find_roi`` and ``extract`` take a recording, an output folder and a
+resolved options object (``moseq2_extract.options``), ``generate_config`` writes
+the config file it is given, and ``download_flip_file`` downloads a flip
+classifier into a folder. None of them reads or writes a project's
+``config.yaml``, ``session_config.yaml`` or ``moseq2-project.yaml``, and none
+asks a person anything: a choice a step needs (which flip classifier) is a
+``moseq2_common.project.ChoiceNeeded`` raised before any work. From a script,
+pass the paths and an options object, such as
 ``extract("session_1/depth.dat", "proc", ExtractOptions(num_frames=900))``.
-``batch_extract`` is the exception, since each recording's settings come from
-``config.yaml``'s ``extract`` section and its entry in ``session_config.yaml``.
 
-Each step hands its work function (``get_roi_wrapper``, ``extract_wrapper``,
-``aggregate_extract_results_wrapper`` in ``moseq2_extract.helpers.wrappers``)
-the options as a dict. Each output carries the record of the run that wrote it
-(``moseq2_common.records``): extraction's is the ``/provenance`` attribute of the
-session's ``results.h5``, holding the options after detection; ``find-roi``'s
-and a SLURM batch's script's are a ``.yaml`` beside them (``sidecar_path``).
+The project layer, ``moseq2_extract.project``, runs these steps in a project:
+it decides where a recording's outputs go (its session's folder in
+``aggregate_results/``), the uuid ``moseq2-project.yaml`` gave the session and
+the settings files the run reads, starts the run's record with the project, and
+calls the function here with that record. Batch extraction and aggregation are
+project steps and live there.
 
-``find_roi`` is the file layer: it takes the recording, the output folder and
-the options, and reads no project file. Its project layer,
-``moseq2_extract.project.find_roi``, resolves the session's folder in the
-project and starts the record with the project. Inside a project, ``extract``
-writes a recording's outputs into its session's folder in ``aggregate_results/``
-(``moseq2_extract.recordings.session_outputs``) and keeps the uuid
-``moseq2-project.yaml`` gave the session; outside one, ``find_roi`` and
-``extract`` write into ``proc/`` beside the recording. ``aggregate_results``
-lists the extracted sessions in ``moseq2-project.yaml``.
+Each step hands its work function (``get_roi_wrapper``, ``extract_wrapper`` in
+``moseq2_extract.helpers.wrappers``) the options as a dict. Each output carries
+the record of the run that wrote it (``moseq2_common.records``): extraction's is
+the ``/provenance`` attribute of the session's ``results.h5``, holding the
+options after detection; ``find_roi``'s is a ``.yaml`` beside each arena image
+(``sidecar_path``). Called without a record, a step starts its own, with no
+project. Without an output folder, ``find_roi`` and ``extract`` write into
+``proc/`` beside the recording.
 
-Before any work, ``find-roi`` and ``extract`` stop on a recording that does not
+Before any work, ``find_roi`` and ``extract`` stop on a recording that does not
 exist, is empty or cannot be read (``moseq2_common.records.check_inputs``), and
 extraction on a recording whose frames and timestamps disagree in number.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+import os
+import urllib.request
 from dataclasses import dataclass
-from os.path import abspath
+from os.path import abspath, basename, dirname, exists, join
 from pathlib import Path
-from uuid import uuid4
 
-from moseq2_common.bookkeeping import SESSION_FILE, Session, load, relative_path, update
-from moseq2_common.records import InputError, Record, check_inputs, start_record, write_record
-from moseq2_common.project import Project, find_project as find_project_of, session_key, settings_files
-from moseq2_extract.helpers.extract import run_local_extract, run_slurm_extract
-from moseq2_extract.helpers.wrappers import aggregate_extract_results_wrapper, extract_wrapper, get_roi_wrapper
-from moseq2_extract.options import AggregateOptions, BatchExtractOptions, ExtractOptions, RoiOptions
-from moseq2_extract.recordings import (SESSIONS_FOLDER, extracted_in, find_recordings, project_keys,
-                                       session_outputs, standalone_outputs)
+from moseq2_common.project import ChoiceNeeded
+from moseq2_common.records import Record, check_inputs, start_record, write_record
+from moseq2_common.yaml import write_config
+from moseq2_extract.helpers.wrappers import extract_wrapper, get_roi_wrapper
+from moseq2_extract.options import ExtractOptions, RoiOptions
+from moseq2_extract.recordings import standalone_outputs
+from moseq2_extract.setup import _CAMERA_TYPE, CAMERA_PRESETS, _defaults, _stages, project_camera
+from moseq2_extract.util import filter_warnings
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
 _WRAPPER_ARGUMENTS = ("num_frames", "skip_completed")
@@ -63,27 +65,31 @@ class ExtractResult:
     h5_file: Path | None
 
 
-@dataclass(frozen=True)
-class BatchExtractResult:
-    #: The recordings the search found, before any were picked.
-    found: list
-    #: The recordings extracted locally, or skipped there as already extracted.
-    extracted: list
-    #: (recording, exception) for each local extraction that failed, in the order tried.
-    failures: list
-    #: The script of sbatch commands, when the cluster type is slurm.
-    script: Path | None
-
-
-@dataclass(frozen=True)
-class AggregateResult:
-    #: The session keys listed in the bookkeeping file by this run.
-    sessions: list
-
-
 #: What to do about a recording that is missing, empty or unreadable.
 RECORDING_ADVICE = ("Check that it is the recording you meant and that it was copied completely, or copy it again "
                     "from where it was recorded.")
+
+# The classifiers published before 2026 are scikit-learn 0.20 pickles, and a
+# pickle records the module path of the class it was made from --
+# sklearn.ensemble.forest, renamed to sklearn.ensemble._forest in 0.22. No
+# modern scikit-learn can unpickle them, and no amount of care at this end
+# changes that, because the incompatibility is inside the file.
+#
+# These are the same four forests transcribed into pickle-free .npz archives
+# of plain arrays, read by moseq2_extract.extract.flip_classifier. Nothing
+# about them names a class or a library version, so they cannot rot the same
+# way, and the package no longer imports scikit-learn at all.
+#
+# The originals are still served at the URLs they always were; these were
+# published beside them under new names rather than replacing them, so an
+# older moseq2-extract keeps downloading exactly what it downloaded before.
+#: The published flip classifiers: each one's label and the URL it downloads from, numbered from 0 in this order.
+FLIP_CLASSIFIERS: dict[str, str] = {
+    "large mice with fibers (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_largemicewithfiber.npz",
+    "adult male c57s (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_c57_10to13weeks.npz",
+    "mice with Inscopix cables (K2)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_k2_inscopix.npz",
+    "adult male c57s (Azure)": "https://moseq-data.s3.amazonaws.com/flip-classifiers/flip_classifier_azure_temp.npz",
+}
 
 
 def _settings(opts, leave_out=()):
@@ -118,166 +124,87 @@ def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
     return result
 
 
-def _output_folder(input_file, output_dir, project, keys=None):
+def _output_folder(input_file, output_dir):
     """Where ``input_file``'s outputs go: ``output_dir`` when given (a relative one below the recording's
-    folder), its session's folder in a project, else ``proc/`` beside it."""
+    folder), else ``proc/`` beside it."""
     if output_dir is not None:
         return Path(abspath(input_file)).parent / output_dir
-    if project is None:
-        return standalone_outputs(input_file).folder
-    return session_outputs(project, session_key(project, input_file), keys=keys).folder
+    return standalone_outputs(input_file).folder
 
 
-def _session_uuid(input_file, project):
-    """The uuid moseq2-project.yaml gave the recording's session; None before it lists the session."""
-    if project is None:
-        return None
-    listed = load(project).sessions.get(session_key(project, input_file))
-    return listed.uuid if listed is not None else None
-
-
-def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *,
-            project: Project | None = None) -> ExtractResult:
+def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *, uuid: str | None = None,
+            record: Record | None = None) -> ExtractResult:
     """Extract ``input_file``.
 
-    Its outputs go into ``output_dir`` when given (relative to the recording's folder), into its session's folder in ``project``'s
-    ``aggregate_results/`` (``session_outputs``), or outside a project into ``proc/`` beside it.
-    In a project, a session ``moseq2-project.yaml`` lists keeps its uuid.
+    Its outputs go into ``output_dir`` when given (a relative one is relative to the recording's folder), else
+    into ``proc/`` beside it. ``uuid`` is the session's uuid when it has one already
+    (``moseq2_extract.project.extract`` passes the one ``moseq2-project.yaml`` lists); None draws a new one.
+    ``record`` is the run's record, started by the caller (the project layer starts it with the project and
+    the settings files); without one, the step starts its own. The extraction adds the recording and the
+    files read beside it to the record's inputs.
     """
     check_inputs("extract", {input_file: RECORDING_ADVICE})
-    record = start_record("extract", opts, settings_files(project) if project is not None else [], project=project)
+    if record is None:
+        record = start_record("extract", opts, [])
     settings = _settings(opts, leave_out=_WRAPPER_ARGUMENTS)
-    folder = _output_folder(input_file, output_dir, project)
+    folder = _output_folder(input_file, output_dir)
     written = extract_wrapper(input_file, str(folder), settings, num_frames=opts.num_frames,
-                              skip=opts.skip_completed, uuid=_session_uuid(input_file, project), record=record)
+                              skip=opts.skip_completed, uuid=uuid, record=record)
     if written is None:
         return ExtractResult(h5_file=None)
     return ExtractResult(h5_file=Path(written) / "results.h5")
 
 
-def batch_extract(input_dir: str, opts: BatchExtractOptions, *, config_file: str,
-                  output_dir: str | None = None, explicit: Mapping | None = None,
-                  select: Callable[[Sequence[str]], Sequence[str]] | None = None,
-                  project: Project | None = None) -> BatchExtractResult:
-    """Find the recordings under ``input_dir`` and extract each, here or as SLURM jobs.
+def generate_config(output_file: str, camera_type: str, *, overwrite: bool) -> Path:
+    """Write the config file ``output_file``: every setting at its default, by section, with the camera's preset.
 
-    The search looks for ``opts.extensions`` down to ``opts.max_depth`` folders
-    below ``input_dir`` and, unless ``opts.skip_checks`` is set, leaves out each
-    recording whose ``results.h5`` exists in its session folder. The command line
-    and the notebook both list recordings this way.
-
-    Each recording is extracted with ``config.yaml``'s ``extract`` settings, the
-    arena tool's settings from its entry in ``session_config.yaml``, and
-    ``explicit`` (options typed on the command line) over both
-    (``session_config.recordings_options``).
-
-    Args:
-    input_dir: the folder to search.
-    opts: the search, the cluster type and the SLURM job settings; ``num_frames`` and
-        ``skip_completed`` apply to every recording.
-    config_file: the project's ``config.yaml``.
-    output_dir: the folder holding the session folders; None for the project's ``aggregate_results/``.
-    explicit: options typed on the command line, applied over each recording's settings.
-    select: picks the recordings to extract from those found (the notebook's prompt).
-    project: the project the recordings are sessions of; with SLURM, each job's settings file names it.
-
-    With ``opts.cluster_type`` slurm, each recording ``opts.skip_completed`` does not leave out gets a job: its
-    session is given its uuid in ``moseq2-project.yaml`` and its settings are written to a job settings file
-    in its session folder (``moseq2_common.slurm.job_settings_file``), before ``opts.extract_out_script``
-    is written and, with ``opts.run_cmd``, submitted.
+    ``camera_type`` is ``kinect`` (or ``k2``), ``azure``, or ``auto``, which
+    takes ``azure`` when every recording in ``output_file``'s folder is an
+    ``.mkv`` and ``kinect`` otherwise. An existing file is replaced only when
+    ``overwrite`` is True; otherwise it is kept as it is. The sections and
+    presets are ``moseq2_extract.setup``'s.
     """
-    project = project if project is not None else find_project_of(config_file)
-    search = find_recordings(input_dir, extensions=opts.extensions, max_depth=opts.max_depth,
-                             extracted=None if opts.skip_checks else extracted_in(project, output_dir))
-    message = search.report()
-    if message:
-        print(message)
-    if not search.recordings:
-        return BatchExtractResult(found=[], extracted=[], failures=[], script=None)
-    to_extract = list(select(search.recordings) if select is not None else search.recordings)
-    keys = set(project_keys(project)) | {session_key(project, r) for r in to_extract}
-    folders = {recording: str(session_outputs(project, session_key(project, recording), keys=keys,
-                                              sessions_dir=output_dir).folder)
-               for recording in to_extract}
-
-    if opts.cluster_type == "local":
-        failures = run_local_extract(to_extract, config_file, opts.skip_completed, num_frames=opts.num_frames,
-                                     output_dirs=folders, cli_options=dict(explicit) if explicit else None)
-        failed = {path for path, _ in failures}
-        return BatchExtractResult(found=list(search.recordings),
-                                  extracted=[Path(p) for p in to_extract if p not in failed],
-                                  failures=failures, script=None)
-
-    record = start_record("batch-extract", opts, [config_file, *to_extract], project=project)
-    if opts.skip_completed:
-        to_extract = [r for r in to_extract if not (Path(folders[r]) / SESSION_FILE).is_file()]
-    batch = {**opts.as_dict(), "config_file": abspath(config_file), "output_dir": output_dir}
-    run_slurm_extract(input_dir, to_extract, batch, num_frames=opts.num_frames,
-                      cli_options=dict(explicit) if explicit else None, output_dirs=folders,
-                      jobs=_submit(project, to_extract, folders))
-    # run_slurm_extract records where it wrote the script
-    script = Path(batch["extract_out_script"])
-    if script.is_file():
-        write_record(script, record.finish({"files": {"script": str(script), "session_folders": sorted(folders.values())}}))
-    return BatchExtractResult(found=list(search.recordings), extracted=[], failures=[], script=script)
+    if exists(output_file) and not overwrite:
+        return Path(output_file)
+    camera = {"k2": "kinect"}.get(camera_type, camera_type)
+    if camera == "auto":
+        camera = project_camera(dirname(abspath(output_file)))
+    if camera not in CAMERA_PRESETS:
+        raise ValueError(f"generate-config takes the camera types auto, kinect (or k2) and azure, not "
+                         f"{camera_type!r}. Pass one of those as --camera-type.")
+    preset = CAMERA_PRESETS[camera]
+    data = {"camera_type": _CAMERA_TYPE[camera]}
+    for section, classes in _stages().items():
+        data[section] = {**_defaults(classes), **preset.get(section, {})}
+    data["exclude"] = []
+    write_config(data, output_file)
+    return Path(output_file)
 
 
-def _submit(project, recordings, folders):
-    """Give each recording's session its uuid in ``moseq2-project.yaml`` before its job is submitted; return
-    each recording's ``job:`` block (the project, the session and that uuid).
+def download_flip_file(output_dir: str, selection: int | None = None) -> Path:
+    """Download flip classifier number ``selection`` of ``FLIP_CLASSIFIERS`` into ``output_dir``; its path.
 
-    A session the file lists keeps its uuid; a new one gets a new uuid. Its extraction, run by the job, takes
-    the uuid from the file, and ``aggregate-results`` lists the session once its ``results.h5`` exists.
+    Without a ``selection`` it raises ``ChoiceNeeded`` (answered as ``selection=``) before anything is
+    downloaded or written. A negative number, or one past the list, raises ``IndexError``. ``output_dir`` is
+    made when missing. ``moseq2_extract.project.download_flip_file`` also names the classifier in a
+    project's ``config.yaml``.
     """
-    folder = str(Path(project.folder).absolute())
-    listed = load(project).sessions
-    sessions = {}
-    for recording in recordings:
-        key = session_key(project, recording)
-        uuid = listed[key].uuid if key in listed and listed[key].uuid else str(uuid4())
-        sessions[recording] = Session(key=key, recording=key, folder=relative_path(project, folders[recording]),
-                                      uuid=uuid)
-
-    def add(bookkeeping):
-        for session in sessions.values():
-            bookkeeping.sessions[session.key] = session
-
-    if sessions:
-        update(project, add)
-    return {recording: {"project": folder, "session": s.key, "uuid": s.uuid} for recording, s in sessions.items()}
+    if selection is None:
+        raise ChoiceNeeded(FLIP_CLASSIFIERS, what="flip classifier", step="download_flip_file")
+    if selection < 0:
+        raise IndexError("list index out of range")
+    return Path(_fetch(FLIP_CLASSIFIERS[list(FLIP_CLASSIFIERS)[selection]], output_dir))
 
 
-def aggregate_results(project: Project, opts: AggregateOptions, *, input_dir: str | None = None,
-                      output_dir: str | None = None) -> AggregateResult:
-    """List every extracted recording of ``project`` as a session in its bookkeeping file.
+@filter_warnings
+def _fetch(url, output_dir):
+    """Download ``url`` into ``output_dir``, made when missing; the downloaded file's path, joined to ``output_dir``
+    as given."""
+    if not exists(output_dir):
+        os.makedirs(output_dir)
 
-    Each recording found under ``input_dir`` (the project folder by default) whose ``results.h5``
-    exists in its session folder (in ``output_dir``, the project's ``aggregate_results/`` by default)
-    becomes a session, keyed by the recording, with the uuid its extraction carries. Nothing is copied.
-    Sessions listed before are kept, and nothing else in the file changes. When no recording has a finished
-    extraction and the project lists no session yet, it stops before writing anything, saying where it looked.
-    """
-    folder = str(input_dir or project.folder)
-    found = aggregate_extract_results_wrapper(folder, output_dir, opts.mouse_threshold, project=project)
-    if not found and not load(project).sessions:
-        count = len(find_recordings(folder).recordings)
-        sessions_dir = output_dir or Path(project.folder) / SESSIONS_FOLDER
-        raise InputError(
-            f"aggregate-results found {count} recording{'' if count == 1 else 's'} under {abspath(folder)}, and "
-            f"none of them has a finished extraction to list: a recording is listed when its session folder in "
-            f"{abspath(sessions_dir)} holds its results.h5 (and its frames' mean depth is above mouse_threshold). "
-            f"Extract the recordings first (`moseq2-extract batch-extract {abspath(folder)}`, or the notebook's "
-            "extraction cell). If the recordings are in another folder, name it with --input-dir; if extraction "
-            "wrote the session folders elsewhere, name that folder with --output-dir."
-        )
-    sessions = [Session(key=key, recording=key, folder=relative_path(project, folder), uuid=uuid)
-                for key, folder, uuid in found]
+    output_filename = join(output_dir, basename(url))
 
-    def add(bookkeeping):
-        for session in sessions:
-            bookkeeping.sessions[session.key] = session
-
-    update(project, add)
-    print(f"{len(sessions)} session(s) listed in {project.bookkeeping_file}; it lists "
-          f"{len(load(project).sessions)} in all.")
-    return AggregateResult(sessions=[session.key for session in sessions])
+    urllib.request.urlretrieve(url, output_filename)
+    print("Successfully downloaded flip file to", output_filename)
+    return output_filename

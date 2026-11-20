@@ -4,14 +4,15 @@ CLI for extracting the depth data.
 Each command's settings are generated from its options class in
 ``moseq2_extract.options``; the command reads the ``extract`` section of its
 project's ``config.yaml`` (``--config-file``, or the working folder's), resolves
-the settings and calls its step in ``moseq2_extract.steps`` (or
-``moseq2_extract.setup``); ``find-roi`` in a project calls its project layer,
-``moseq2_extract.project``. ``find-roi`` and ``extract`` lay the arena tool's
-entry for the recording in the project's ``session_config.yaml`` over
-``config.yaml``, and write into the recording's session folder in the project's
-``aggregate_results/`` (``proc/`` beside the recording outside a project).
-``batch-extract`` searches the project folder when its ``INPUT_FOLDER`` is left
-out.
+the settings and calls its step in the project layer, ``moseq2_extract.project``,
+or outside a project in the file layer, ``moseq2_extract.steps``. ``find-roi``
+and ``extract`` lay the arena tool's entry for the recording in the project's
+``session_config.yaml`` over ``config.yaml``, and write into the recording's
+session folder in the project's ``aggregate_results/`` (``proc/`` beside the
+recording outside a project). ``batch-extract`` searches the project folder when
+its ``INPUT_FOLDER`` is left out; it and ``aggregate-results`` run only in a
+project. ``download-flip-file`` asks which classifier to download
+(``moseq2_common.interface.answered``).
 """
 
 import os
@@ -19,6 +20,7 @@ import os
 import click
 from click.core import ParameterSource
 
+from moseq2_common.interface import answered
 from moseq2_common.options import (
     PROJECT_FOLDER,
     ConfigFileError,
@@ -32,7 +34,7 @@ from moseq2_common.options import (
 )
 from moseq2_common.project import find_project, is_job_file
 from moseq2_common.records import print_record_command
-from moseq2_extract import project as project_steps, setup, steps
+from moseq2_extract import project as project_steps, steps
 from moseq2_extract.helpers.wrappers import (
     convert_raw_to_avi_wrapper,
     copy_slice_wrapper,
@@ -169,7 +171,10 @@ def extract(ctx, input_file, output_dir, config_file, output_file, **_):
     project = command_project(ctx)
     opts = ExtractOptions.resolve(config=config, entry=_entry(project, config_file, input_file),
                                   explicit=explicit_values(ctx, ExtractOptions))
-    steps.extract(input_file, output_dir, opts, project=project)
+    if project is not None:
+        project_steps.extract(project, input_file, opts, output_dir=output_dir)
+    else:
+        steps.extract(input_file, output_dir, opts)
 
 
 #: ExtractOptions fields batch-extract hands the step in its options rather than as typed values.
@@ -219,12 +224,11 @@ def batch_extract(ctx, input_folder, config_file, **_):
     typed = _typed_extract_options(ctx)
     # --output-file names no file in a batch: each recording's is named from its arena mask
     typed.pop("output_file", None)
-    result = steps.batch_extract(
-        input_folder, opts, config_file=config_file,
+    result = project_steps.batch_extract(
+        find_project(config_file), input_folder, opts, config_file=config_file,
         # an --output-dir not typed is the project's aggregate_results
         output_dir=typed.pop("output_dir", None),
         explicit=typed,
-        project=find_project(config_file),
     )
     # the summary the local extraction printed names each failure
     if result.failures:
@@ -255,7 +259,7 @@ def download_flip_file(config_file, output_dir):
             "as its argument: `moseq2-extract download-flip-file /path/to/project/config.yaml`. To start a "
             "project here, write its config.yaml first with `moseq2-extract generate-config`."
         )
-    setup.download_flip_file(config_file, output_dir or os.getcwd(), None)
+    answered(project_steps.download_flip_file, config_file, output_dir or os.getcwd(), selection=None)
 
 
 @cli.command(
@@ -274,7 +278,7 @@ def download_flip_file(config_file, output_dir):
 )
 def generate_config(output_file, camera_type):
 
-    setup.generate_config(output_file, camera_type, overwrite=True)
+    project_steps.generate_config(output_file, camera_type, overwrite=True)
 
     print("Successfully generated config file in base directory.")
 
@@ -302,9 +306,9 @@ def aggregate_extract_results(ctx, input_dir, output_dir, **_):
             "config.yaml and the recordings."
         )
     config = command_settings(ctx, AggregateOptions, stage_classes=EXTRACT_STAGE)
-    steps.aggregate_results(project, AggregateOptions.resolve(config=config,
-                                                              explicit=explicit_values(ctx, AggregateOptions)),
-                            input_dir=input_dir, output_dir=output_dir)
+    project_steps.aggregate_results(project, AggregateOptions.resolve(config=config,
+                                                                      explicit=explicit_values(ctx, AggregateOptions)),
+                                    input_dir=input_dir, output_dir=output_dir)
 
 
 @cli.command(
