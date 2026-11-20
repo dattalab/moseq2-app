@@ -2,17 +2,22 @@
 GUI front-end operations accessible from a jupyter notebook.
 
 Each function reads the ``extract`` section of the project's ``config.yaml``,
-resolves the step's settings and calls the step in ``moseq2_extract.steps`` (or
-``moseq2_extract.setup``).
+resolves the step's settings and calls the step in the project layer,
+``moseq2_extract.project`` (``extract_command`` on a recording outside any
+project calls the file layer, ``moseq2_extract.steps``). The questions a person
+answers here (which sessions to extract, whether to replace a config file,
+which flip classifier to download) are asked by these functions, never by the
+layers.
 """
 
 import re
 from dataclasses import replace
 from os.path import exists, join
 
+from moseq2_common.interface import answered
 from moseq2_common.options import read_settings
 from moseq2_common.project import find_project
-from moseq2_extract import setup, steps
+from moseq2_extract import project as project_steps, steps
 from moseq2_extract.options import EXTRACT_STAGE, AggregateOptions, BatchExtractOptions
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
 from moseq2_extract.session_config import recordings_options
@@ -127,7 +132,7 @@ def generate_config_command(output_file, camera_type="auto"):
             return "Configuration file has been retained"
     else:
         print("Creating configuration file.")
-    setup.generate_config(output_file, camera_type, overwrite=True)
+    project_steps.generate_config(output_file, camera_type, overwrite=True)
 
     return "Configuration file has been successfully generated."
 
@@ -169,10 +174,9 @@ def extract_found_sessions(
         "skip_completed": skip_extracted,
         "run_cmd": run_cmd,
     })
-    result = steps.batch_extract(
-        input_dir, opts, config_file=config_file,
+    result = project_steps.batch_extract(
+        find_project(config_file), input_dir, opts, config_file=config_file,
         select=lambda found: get_selected_sessions(found, extract_all),
-        project=find_project(config_file),
     )
     # the local extraction ends with a summary naming each recording that failed
     if opts.cluster_type == "local" and result.found and not result.failures:
@@ -208,7 +212,7 @@ def aggregate_extract_results_command(project_folder, output_dir=None, mouse_thr
     explicit = {} if mouse_threshold is None else {"mouse_threshold": mouse_threshold}
     opts = AggregateOptions.resolve(config=config, explicit=explicit)
     folder = None if output_dir is None else join(project_folder, output_dir)
-    return steps.aggregate_results(project, opts, output_dir=folder).sessions
+    return project_steps.aggregate_results(project, opts, output_dir=folder).sessions
 
 
 def download_flip_command(output_dir, config_file="", selection=1):
@@ -218,12 +222,13 @@ def download_flip_command(output_dir, config_file="", selection=1):
     Args:
     output_dir (str): path to output directory to save flip classifier
     config_file (str): path to config file (config.yaml)
-    selection (int): index of which flip file to download (default is Adult male C57 classifer)
+    selection (int): index of which flip file to download (default is Adult male C57 classifer); None lists
+        them and asks.
 
     Returns:
     """
 
-    setup.download_flip_file(config_file, output_dir, selection)
+    answered(project_steps.download_flip_file, config_file, output_dir, selection=selection)
 
 
 @filter_warnings
@@ -257,6 +262,10 @@ def extract_command(
 
     resolved = recordings_options(config_file, [input_file], cli_options)
     opts = replace(resolved[input_file], num_frames=num_frames, skip_completed=skip)
-    result = steps.extract(input_file, output_dir, opts, project=find_project(config_file))
+    project = find_project(config_file)
+    if project is not None:
+        result = project_steps.extract(project, input_file, opts, output_dir=output_dir)
+    else:
+        result = steps.extract(input_file, output_dir, opts)
 
     return None if result.h5_file is None else str(result.h5_file.parent)

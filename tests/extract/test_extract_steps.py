@@ -2,10 +2,11 @@
 
 ``find-roi``, ``extract``, ``batch-extract`` and ``aggregate-results`` on the
 command line and the Extract notebook's functions resolve their settings into
-one options object (``moseq2_extract.options``) and hand it to the same step in
-``moseq2_extract.steps``; ``generate-config`` and ``download-flip-file`` call
-``moseq2_extract.setup``. A ``--config-file`` that does not exist stops the
-command, naming the file.
+one options object (``moseq2_extract.options``) and hand it to the same step:
+``find-roi`` and ``extract`` reach ``moseq2_extract.steps`` through the project
+layer, and ``batch-extract``, ``aggregate-results``, ``generate-config`` and
+``download-flip-file`` call ``moseq2_extract.project``. A ``--config-file`` that
+does not exist stops the command, naming the file.
 
 ``extract_chunk`` takes every setting the options declare from its caller, with
 no default of its own, and the arena tool saves exactly the settings
@@ -34,10 +35,10 @@ def steps():
 
 
 @pytest.fixture
-def setup():
-    import moseq2_extract.setup
+def project_steps():
+    import moseq2_extract.project
 
-    return moseq2_extract.setup
+    return moseq2_extract.project
 
 
 @pytest.fixture
@@ -48,8 +49,8 @@ def options():
 
 
 @pytest.fixture
-def called(monkeypatch, steps, setup):
-    """Each step replaced by a recorder of its options (or its arguments, for setup)."""
+def called(monkeypatch, steps, project_steps):
+    """Each step replaced by a recorder of its options (or its arguments, for the setup steps)."""
     calls = {name: [] for name in ("find_roi", "extract", "batch_extract", "aggregate_results",
                                    "generate_config", "download_flip_file")}
 
@@ -61,13 +62,13 @@ def called(monkeypatch, steps, setup):
         calls["extract"].append(opts)
         return steps.ExtractResult(h5_file=None)
 
-    def batch_extract(input_dir, opts, **kwargs):
+    def batch_extract(project, input_dir, opts, **kwargs):
         calls["batch_extract"].append(opts)
-        return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
+        return project_steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
 
     def aggregate_results(project, opts, **kwargs):
         calls["aggregate_results"].append(opts)
-        return steps.AggregateResult(sessions=[])
+        return project_steps.AggregateResult(sessions=[])
 
     def generate_config(output_file, camera_type, *, overwrite):
         calls["generate_config"].append((output_file, camera_type))
@@ -77,11 +78,11 @@ def called(monkeypatch, steps, setup):
         calls["download_flip_file"].append(selection)
         return None
 
-    for name, function in (("find_roi", find_roi), ("extract", extract), ("batch_extract", batch_extract),
-                           ("aggregate_results", aggregate_results)):
+    for name, function in (("find_roi", find_roi), ("extract", extract)):
         monkeypatch.setattr(steps, name, function)
-    monkeypatch.setattr(setup, "generate_config", generate_config)
-    monkeypatch.setattr(setup, "download_flip_file", download_flip_file)
+    for name, function in (("batch_extract", batch_extract), ("aggregate_results", aggregate_results),
+                           ("generate_config", generate_config), ("download_flip_file", download_flip_file)):
+        monkeypatch.setattr(project_steps, name, function)
     return calls
 
 
@@ -215,7 +216,7 @@ def test_the_aggregate_function_takes_its_defaults_from_the_options_class(projec
     assert [o.mouse_threshold for o in called["aggregate_results"]] == [5.0, 2.0]
 
 
-def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monkeypatch, steps):
+def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monkeypatch, project_steps):
     """Every extraction option typed on batch-extract's command line, and only those, reaches
     each recording; num_frames, skip_completed and the cluster type travel in the options. A
     typed depth range is used as given (``RoiOptions.resolve``), and --output-file names no
@@ -223,11 +224,11 @@ def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monk
     root, _, config = project
     seen = {}
 
-    def batch_extract(input_dir, opts, **kwargs):
+    def batch_extract(project, input_dir, opts, **kwargs):
         seen.update(kwargs, opts=opts)
-        return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
+        return project_steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
 
-    monkeypatch.setattr(steps, "batch_extract", batch_extract)
+    monkeypatch.setattr(project_steps, "batch_extract", batch_extract)
     invoke("batch-extract", root, "--config-file", config, "--bg-roi-depth-range", 600, 700, "--compress-threads", 25,
            "--noise-tolerance", 30, "--num-frames", 9, "--skip-completed", "--cluster-type", "local",
            "--output-dir", "out", "--output-file", "o.h5", "--max-depth", 2, "--ncpus", 2)
@@ -237,15 +238,15 @@ def test_batch_extract_hands_the_step_the_typed_extraction_options(project, monk
     assert (seen["opts"].num_frames, seen["opts"].skip_completed, seen["opts"].max_depth) == (9, True, 2)
 
 
-def test_batch_extract_without_typed_options_hands_the_step_none(project, monkeypatch, steps):
+def test_batch_extract_without_typed_options_hands_the_step_none(project, monkeypatch, project_steps):
     root, _, config = project
     seen = {}
 
-    def batch_extract(input_dir, opts, **kwargs):
+    def batch_extract(project, input_dir, opts, **kwargs):
         seen.update(kwargs)
-        return steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
+        return project_steps.BatchExtractResult(found=[], extracted=[], failures=[], script=None)
 
-    monkeypatch.setattr(steps, "batch_extract", batch_extract)
+    monkeypatch.setattr(project_steps, "batch_extract", batch_extract)
     invoke("batch-extract", root, "--config-file", config)
 
     assert (seen["output_dir"], seen["explicit"]) == (None, {})

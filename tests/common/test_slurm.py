@@ -80,11 +80,11 @@ def _batch_extract(tmp_path, monkeypatch, args):
     """``batch-extract``'s ``get_cmd``, with the step replaced by a stand-in."""
     seen = {}
 
-    def stand_in(input_folder, opts, **_):
+    def stand_in(project, input_folder, opts, **_):
         seen["opts"] = opts
         return SimpleNamespace(failures=[])
 
-    monkeypatch.setattr(extract_cli.steps, "batch_extract", stand_in)
+    monkeypatch.setattr(extract_cli.project_steps, "batch_extract", stand_in)
     config = tmp_path / "config.yaml"
     config.write_text("extract:\n  cluster_type: slurm\n")
     result = CliRunner().invoke(extract_cli.cli, ["batch-extract", str(tmp_path), "--config-file", str(config),

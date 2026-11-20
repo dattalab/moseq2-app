@@ -1,5 +1,11 @@
-"""
-Extraction-helper utility functions.
+"""The pieces extraction is built from, and the batch's summary and SLURM script.
+
+``process_extract_batches`` extracts a recording chunk by chunk, writing each
+chunk's frames and scalars to the open ``results.h5``
+(``write_extracted_chunk_to_h5``) and its preview movie (``make_output_movie``).
+``extraction_summary`` and ``run_slurm_extract`` serve batch extraction,
+``moseq2_extract.project.batch_extract``: the summary a local batch ends with,
+and the script of one sbatch command per recording a SLURM batch writes.
 """
 
 import numpy as np
@@ -227,54 +233,6 @@ def process_extract_batches(
     # Check if video is done writing. If not, wait.
     if video_pipe is not None:
         video_pipe.communicate()
-
-
-def run_local_extract(
-    to_extract,
-    config_file,
-    skip_extracted=False,
-    num_frames=None,
-    output_dirs=None,
-    cli_options=None,
-):
-    """
-    Run the extract command on given list of sessions to extract on a local platform.
-
-    Args:
-    to_extract (list): list of paths to files to extract
-    config_file (str): path to configuration file containing pre-configured extract and ROI
-    skip_extracted (bool): Whether to skip already extracted session.
-    num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
-    output_dirs (dict): each recording's output folder; a recording it does not name goes to its session's folder.
-    cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
-
-    Returns:
-    failures (list): (path, exception) for each recording that could not be extracted, in the order tried.
-    """
-    from moseq2_extract.gui import extract_command
-
-    failures = []
-    n_skipped = 0
-    for ext in tqdm(to_extract, desc="Extracting Sessions"):
-        try:
-            result = extract_command(
-                ext,
-                (output_dirs or {}).get(ext),
-                config_file=config_file,
-                num_frames=num_frames,
-                skip=skip_extracted,
-                cli_options=cli_options,
-            )
-        except Exception as e:
-            print("Unexpected error:", e)
-            print("could not extract", ext)
-            failures.append((ext, e))
-        else:
-            if result is None:
-                n_skipped += 1
-
-    print(extraction_summary(len(to_extract), n_skipped, failures))
-    return failures
 
 
 def extraction_summary(n_recordings, n_skipped, failures):

@@ -21,7 +21,7 @@ from click.testing import CliRunner
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 import moseq2_extract.gui as extract_gui
-from moseq2_extract.helpers.extract import run_local_extract
+from moseq2_extract.project import run_local_extract
 
 SESSIONS = ("session_a", "session_b", "session_c", "session_d")
 FAILS = "session_b"
