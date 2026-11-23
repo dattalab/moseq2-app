@@ -121,6 +121,9 @@ class Control:
     between the settings file and the control (``to_gui``, ``from_gui``):
     ``gigabytes`` (``"16GB"`` is 16), ``hours`` (``"4:00:00"`` is 4, ``auto``
     stays), ``percent`` (0.5 is 50) and ``square`` (``(80, 80)`` is 80).
+    ``help`` is the GUI's form of the setting's help, given where the flag's
+    help names the command line's values or forms (``local``, ``16GB``), which
+    the GUI shows otherwise; without it the GUI shows the setting's help.
     """
 
     kind: str
@@ -135,6 +138,7 @@ class Control:
     link: str = ""
     show_if: tuple | None = None
     shown_as: str = ""
+    help: str = ""
 
 
 def option(default, *flags: str, help: str, type=None, multiple: bool = False,
@@ -888,7 +892,8 @@ def gui_fields(cls: type[Options], names: Sequence[str], values: Mapping | None 
     out = []
     for name in names:
         field, control = _control(cls, name)
-        entry = {"key": name, "type": control.kind, "label": control.label, "help": _spec(field)["help"]}
+        entry = {"key": name, "type": control.kind, "label": control.label,
+                 "help": control.help or _spec(field)["help"]}
         for key, value in (("min", control.minimum), ("max", control.maximum), ("step", control.step)):
             if value is not None:
                 entry[key] = value

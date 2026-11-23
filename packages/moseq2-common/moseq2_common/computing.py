@@ -101,7 +101,8 @@ class ComputingOptions(Options):
     cluster_type: str = option(
         "local", "--cluster-type", type=click.Choice(["local", "slurm"]),
         help="Where the work runs: on this computer (local), or as jobs on a SLURM cluster (slurm).",
-        control=Control("segmented", "Run on", choices=_PLACES))
+        control=Control("segmented", "Run on", choices=_PLACES,
+                        help="Where the work runs: on this computer, or as jobs on a SLURM cluster."))
     cores: int | None = option(
         None, "--cores", type=int,
         help="How many of this computer's CPU cores it may use; by default, every core it may use.",
@@ -114,12 +115,14 @@ class ComputingOptions(Options):
         "16GB", "--memory", type=str,
         help="How much memory each cluster job asks for, such as 16GB.",
         control=Control("number", "Memory per job", minimum=2, maximum=512, unit="GB", shown_as="gigabytes",
+                        help="How much memory each cluster job asks for.",
                         show_if=("cluster_type", "slurm")))
     wall_time: str = option(
         "auto", "--wall-time", type=str,
         help="How long each cluster job may run before the cluster stops it, as hours:minutes:seconds "
              "(such as 4:00:00), or auto to set it from the work each job has.",
-        control=Control("choice", "Time per job", shown_as="hours", show_if=("cluster_type", "slurm")))
+        control=Control("choice", "Time per job", shown_as="hours", show_if=("cluster_type", "slurm"),
+                        help="How long each cluster job may run before the cluster stops it."))
     prefix: str = option(
         "", "--prefix", type=str,
         help="Shell commands each cluster job runs before its work, such as loading a module or activating "

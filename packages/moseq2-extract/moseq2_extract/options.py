@@ -81,7 +81,9 @@ class ProjectOptions(CameraOptions):
              "tail: c57 (adult C57 mice), fiber (large mice with fiber implants), inscopix (mice with Inscopix "
              "cables) or other (detected as adult C57 mice). A head/tail classifier you trained, kept in the "
              "project folder, is used in its place.",
-        control=Control("choice", "Animals", choices=ANIMALS))
+        control=Control("choice", "Animals", choices=ANIMALS,
+                        help="The animals in your recordings, which decides how the mouse's head is told from its "
+                             "tail."))
     exclude: tuple = option(
         (), "--exclude", type=str, multiple=True,
         help="Recordings to leave out of every step after extraction, each by its path in the project folder "
@@ -241,6 +243,7 @@ class ExtractOptions(RoiOptions, CleaningOptions):
         (80, 80), "--crop-size", "-c", type=(int, int), arena=True,
         help="The width and height, in pixels, of the box cut out around the mouse in every frame.",
         control=Control("number", "Crop around the mouse", minimum=40, maximum=200, unit="pixels",
+                        help="The size of the square cut out around the mouse in every frame.",
                         shown_as="square"))
 
 
@@ -282,6 +285,7 @@ class ExtractComputing(ComputingOptions):
         help="How long each cluster job may run before the cluster stops it, as hours:minutes:seconds (such as "
              "4:00:00), or auto for three times its recording's length, at least an hour.",
         control=Control("choice", "Time per job", choices=_WALL_TIMES, shown_as="hours",
+                        help="How long each cluster job may run before the cluster stops it.",
                         show_if=("cluster_type", "slurm")))
 
 

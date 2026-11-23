@@ -28,7 +28,7 @@ import threading
 import time
 from collections.abc import Mapping, Sequence
 from importlib import resources
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
 import anywidget
@@ -39,12 +39,31 @@ from moseq2_common.errors import ExpectedError, StepStopped, details_for_bug
 from moseq2_common.project import Project
 from moseq2_common.report import reporting
 
-__all__ = ["GuiReporter", "RunningStep", "StepWidget", "problem_of", "static_text"]
+__all__ = ["GuiReporter", "RunningStep", "StepWidget", "problem_of", "session_labels", "static_text"]
 
 #: The bug panel's title and text (W6); its traceback is folded under "Details for a bug report".
 BUG_TITLE = "Something unexpected went wrong"
 BUG_TEXT = ("This looks like a bug in MoSeq2, not a problem with your data or settings. Please report it at "
             "https://github.com/dattalab/moseq2-app/issues and include the details below.")
+
+
+def session_labels(keys: Sequence[str]) -> dict:
+    """How a GUI names each session: by its recording's folder, not the recording's file
+    (``saline_example_0`` for ``saline_example_0/depth.avi``), with as many folders above it as tell it from
+    the others. A recording whose folder holds another session's recording too keeps its file name, in the
+    shortest form no other session shares; one in the project folder itself is its file name."""
+    def candidates(key: str) -> list[str]:
+        *folders, name = PurePosixPath(key).parts
+        named = ["/".join(folders[-depth:]) for depth in range(1, len(folders) + 1)]
+        return named + ["/".join([*folders[len(folders) - depth:], name]) for depth in range(1, len(folders) + 1)] \
+            + [key]
+
+    every = {key: candidates(key) for key in keys}
+    labels = {}
+    for key, own in every.items():
+        taken = {label for other, theirs in every.items() if other != key for label in theirs}
+        labels[key] = next((label for label in own if label not in taken), key)
+    return labels
 
 
 def static_text(*names: str) -> str:

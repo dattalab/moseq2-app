@@ -13,7 +13,8 @@ are extracted.
 Each setting shown is declared once, with its control, in the options classes
 (``moseq2_extract.options``): the computing block's ``cluster_type``, ``cores``,
 ``partition``, ``memory`` and ``wall_time``, and extraction's ``crop_size``,
-``max_height`` and ``use_tracking_model``.
+``max_height`` and ``use_tracking_model``. Each recording is named by its session's
+folder (``session_labels``), the way a person knows it.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from collections.abc import Mapping
 
 import traitlets
 
-from moseq2_app.notebook._widget import RunningStep, static_text
+from moseq2_app.notebook._widget import RunningStep, session_labels, static_text
 from moseq2_common import capture
 from moseq2_common.computing import available_cores
 from moseq2_common.options import from_gui, gui_fields, read_settings, to_gui
@@ -76,7 +77,8 @@ class ExtractWidget(RunningStep):
                 seconds[item.key] = extraction_steps.recording_seconds(item.recording)
             except Exception:  # noqa: BLE001 -- a recording that cannot be measured shows no length
                 pass
-        self.recordings = [{"id": p.key, "label": p.key, "plan": p.plan, "reason": p.reason,
+        labels = session_labels([p.key for p in planned])
+        self.recordings = [{"id": p.key, "label": labels[p.key], "plan": p.plan, "reason": p.reason,
                             "changed": list(p.changed),
                             "meta": _length(seconds[p.key]) if p.key in seconds else ""} for p in planned]
         computing, extraction = self._settings()

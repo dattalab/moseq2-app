@@ -52,7 +52,7 @@ def test_running_the_cell_only_opens_the_gui(tmp_path, raw_sessions, in_folder):
     widget = _open(project, in_folder)
 
     assert widget.run["state"] == "idle"
-    assert [(r["id"], r["plan"]) for r in widget.recordings] == [(f"{n}/depth.avi", "new") for n in TWO]
+    assert [(r["id"], r["label"], r["plan"]) for r in widget.recordings] == [(f"{n}/depth.avi", n, "new") for n in TWO]
     assert [s["title"] for s in widget.sections] == ["Where it runs", "More settings"]
     assert widget.problem == {}
     assert sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*")) == before
@@ -193,3 +193,28 @@ def test_cores_start_at_every_core_this_computer_may_use(tmp_path, raw_sessions,
     assert widget.saved["cores"] == available_cores()
     (cores,) = [f for s in widget.sections for f in s["fields"] if f["key"] == "cores"]
     assert (cores["min"], cores["max"], cores["slider"]) == (1, available_cores(), True)
+
+
+def test_rows_name_each_recording_by_its_session():
+    from moseq2_app.notebook._widget import session_labels
+
+    assert session_labels(["saline_example_0/depth.avi", "cohort1/saline_example_1/depth.avi"]) == {
+        "saline_example_0/depth.avi": "saline_example_0", "cohort1/saline_example_1/depth.avi": "saline_example_1"}
+    # two folders of one name: the folder above tells them apart
+    assert session_labels(["a/mouse/depth.avi", "b/mouse/depth.avi"]) == {
+        "a/mouse/depth.avi": "a/mouse", "b/mouse/depth.avi": "b/mouse"}
+    # two recordings in one folder keep their files; one in the project folder is its file
+    assert session_labels(["day1/one.avi", "day1/two.avi", "depth.dat"]) == {
+        "day1/one.avi": "day1/one.avi", "day1/two.avi": "day1/two.avi", "depth.dat": "depth.dat"}
+
+
+def test_the_gui_help_names_no_command_line_values(tmp_path, raw_sessions, in_folder):
+    project = small_project(tmp_path / "project", raw_sessions, TWO[:1])
+
+    widget = _open(project, in_folder)
+
+    helps = {f["key"]: f["help"] for s in widget.sections for f in s["fields"]}
+    assert helps["cluster_type"] == "Where the work runs: on this computer, or as jobs on a SLURM cluster."
+    for key, text in helps.items():
+        for value in ("(local)", "(slurm)", "16GB", "4:00:00", "auto"):
+            assert value not in text, (key, text)
