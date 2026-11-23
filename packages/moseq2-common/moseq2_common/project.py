@@ -414,6 +414,31 @@ def _lock_holder(path: Path) -> dict | None:
     return None
 
 
+def _running(pid: int) -> bool:
+    """Whether process ``pid`` on this computer is running. On Windows, ``os.kill`` would end it, so the
+    process is opened and asked instead."""
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ctypes.get_last_error() == 5  # ERROR_ACCESS_DENIED: running, as another user
+        try:
+            code = ctypes.c_ulong()
+            kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _holder_gone(holder: Mapping | None) -> bool:
     """Whether the process a lock file names has ended: only known for a process on this computer."""
     if holder is None:
@@ -421,12 +446,10 @@ def _holder_gone(holder: Mapping | None) -> bool:
     if holder.get("host") != socket.gethostname():
         return False
     try:
-        os.kill(int(holder.get("pid")), 0)
-    except ProcessLookupError:
-        return True
-    except (PermissionError, TypeError, ValueError):
+        pid = int(holder.get("pid"))
+    except (TypeError, ValueError):
         return False
-    return False
+    return not _running(pid)
 
 
 def _started_text(started: str) -> str:

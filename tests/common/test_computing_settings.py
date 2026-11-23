@@ -68,7 +68,8 @@ def test_saved_computing_settings_land_in_their_block(tmp_path):
 
 
 def test_cores_default_to_what_this_process_may_use():
-    assert available_cores() == len(os.sched_getaffinity(0))
+    expected = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+    assert available_cores() == expected
 
 
 def test_conversions():

@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import os
 import re
+import shutil
 import subprocess
 import sys
 from importlib.metadata import entry_points
@@ -95,13 +96,15 @@ def test_debug_shows_the_traceback_of_an_expected_error(tmp_path):
 
 
 def test_python_m_moseq2_app_is_the_same_command(tmp_path):
-    script = Path(sys.executable).parent / "moseq2"
+    script = shutil.which("moseq2", path=str(Path(sys.executable).parent))
+    assert script is not None, f"no moseq2 script beside {sys.executable}"
     module = subprocess.run([sys.executable, "-m", "moseq2_app", "--help"], capture_output=True, text=True,
                             cwd=tmp_path)
-    console = subprocess.run([str(script), "--help"], capture_output=True, text=True, cwd=tmp_path)
+    console = subprocess.run([script, "--help"], capture_output=True, text=True, cwd=tmp_path)
 
     assert module.returncode == console.returncode == 0
-    assert module.stdout == console.stdout
+    # a Windows launcher may name the program moseq2.exe
+    assert module.stdout == console.stdout.replace("moseq2.exe", "moseq2")
     assert module.stdout.startswith("Usage: moseq2 ")
 
 
