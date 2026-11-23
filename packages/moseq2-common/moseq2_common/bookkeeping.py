@@ -51,7 +51,7 @@ BOOKKEEPING_NAME = "moseq2-project.yaml"
 SESSION_FILE = "results.h5"
 
 #: What to do when a session's extraction, which a step after extraction reads, is unusable.
-SESSION_ADVICE = ("Extract that session again (moseq2-extract extract, or the notebook's extraction cell), then "
+SESSION_ADVICE = ("Extract that session again (`moseq2 extract`, or the notebook's Extract step), then "
                   "run this step again; or, to leave the session out, list its recording under exclude in "
                   "config.yaml (the group widget's exclude column).")
 
@@ -111,7 +111,7 @@ def _unreadable(project: Project, problem: str) -> BookkeepingError:
     return BookkeepingError(
         f"{project.bookkeeping_file} {problem}, so MoSeq2 cannot tell what this project holds. It is "
         f"written by the pipeline's steps; if it was edited by hand, undo the edit, or delete it and run "
-        f"`moseq2-extract aggregate-results` in {project.folder} (or the notebook's aggregation cell) to "
+        f"`moseq2 extract` in {project.folder} (or the notebook's Extract step) to "
         "list the sessions again, then run the steps after it again."
     )
 
@@ -162,8 +162,8 @@ def sessions_folder(project: Project, bookkeeping: Bookkeeping | None = None) ->
     if not bookkeeping.sessions:
         raise BookkeepingError(
             f"{project.bookkeeping_file if Path(project.bookkeeping_file).exists() else project.folder} lists no "
-            "sessions yet. Aggregate the extractions first: run `moseq2-extract aggregate-results` in "
-            f"{project.folder}, or the notebook's aggregation cell."
+            "sessions yet. Extract the recordings first: run `moseq2 extract` in "
+            f"{project.folder}, or the notebook's Extract step."
         )
     folders = {dirname(resolve_path(project, s.folder)) for s in bookkeeping.sessions.values()}
     return Path(os.path.commonpath(sorted(folders)))

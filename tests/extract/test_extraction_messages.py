@@ -7,14 +7,16 @@ container's own frame times when no ``depth_ts.txt`` sits beside the ``.mkv``,
 and the file's lines when one does. The message names the recording, the count
 and where the count came from.
 
-``-t`` is the short flag of ``--temporal-filter-size`` on ``extract`` and
-``batch-extract``, as it has been since 2018. ``--threads``, which those two
-commands take and do not use, carries no short flag there; it keeps ``-t`` on
-``convert-raw-to-avi`` and ``copy-slice``, where nothing else claims it.
+``-t`` is the short flag of ``--temporal-filter-size`` on ``moseq2 extract``
+and ``moseq2 standalone extract``, as it has been on extraction since 2018.
+``--threads``, which only ``moseq2 standalone extract`` takes, carries no short
+flag there; it keeps ``-t`` on ``moseq2 standalone convert-raw-to-avi`` and
+``copy-slice``, where nothing else claims it.
 
-``-c`` is the short flag of ``--crop-size`` on ``extract`` and
-``batch-extract``. ``batch-extract``'s ``--ncpus``, the CPUs each SLURM job
-requests, has no short flag. No moseq2-extract command defines a flag twice.
+``-c`` is the short flag of ``--crop-size`` on both extraction commands.
+``moseq2 extract``'s ``--cores``, the cores a local run uses, has no short flag.
+No moseq2-extract command, and no ``moseq2`` command that extracts or converts a
+recording, defines a flag twice.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import pytest
 from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
+from moseq2_app.cli import cli
 
 from fixtures import fetch_azure_mkv
 
@@ -45,16 +48,17 @@ def azure_recording(tmp_path):
 
 
 def extract(recording):
-    """Extract a recording; return what it printed and every warning it raised."""
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = CliRunner().invoke(
-            extract_cli.cli,
-            ["extract", str(recording), "--output-dir", str(recording.parent / "proc"),
-             "--camera-type", "azure"],
-        )
+    """Extract a recording with ``moseq2 standalone extract``; return its status lines and every warning it
+    gave, both on standard error (a warning as a ``Warning: <text>`` line)."""
+    result = CliRunner().invoke(
+        cli,
+        ["standalone", "extract", str(recording), "--output-dir", str(recording.parent / "proc"),
+         "--camera-type", "azure"],
+    )
     assert result.exit_code == 0, result.output + repr(result.exception)
-    return result.output, [str(w.message) for w in caught]
+    lines = result.stderr.splitlines()
+    caught = [line.removeprefix("Warning: ") for line in lines if line.startswith("Warning: ")]
+    return "\n".join(line for line in lines if not line.startswith("Warning: ")), caught
 
 
 def test_an_mkv_counts_its_frames_from_its_own_timestamps(azure_recording):
@@ -98,51 +102,75 @@ def options(command):
     return {p.name: p for p in command.params}
 
 
-def duplicate_flag_warnings(command):
+#: The ``moseq2`` commands that extract or convert a recording, by the words that run them.
+MOSEQ2_COMMANDS = ["extract", "standalone extract", "standalone convert-raw-to-avi", "standalone copy-slice",
+                   "run-job"]
+#: The two extraction commands: in a project, and on recordings named.
+EXTRACTION_COMMANDS = ["extract", "standalone extract"]
+
+
+def moseq2_command(words):
+    """The ``moseq2`` command ``words`` (``"standalone extract"``) runs."""
+    command = cli
+    for word in words.split():
+        command = command.commands[word]
+    return command
+
+
+def duplicate_flag_warnings(group, words):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        result = CliRunner().invoke(extract_cli.cli, [command, "--help"])
+        result = CliRunner().invoke(group, [*words.split(), "--help"])
     assert result.exit_code == 0, result.output
     return [str(w.message) for w in caught if "used more than once" in str(w.message)]
 
 
-def test_extract_help_does_not_warn_about_a_duplicate_flag():
-    assert duplicate_flag_warnings("extract") == []
+@pytest.mark.parametrize("words", EXTRACTION_COMMANDS)
+def test_extract_help_does_not_warn_about_a_duplicate_flag(words):
+    assert duplicate_flag_warnings(cli, words) == []
 
 
-@pytest.mark.parametrize("command", sorted(extract_cli.cli.commands))
-def test_no_command_warns_about_a_duplicate_flag(command):
-    assert duplicate_flag_warnings(command) == []
+@pytest.mark.parametrize(
+    "group, words",
+    [(extract_cli.cli, name) for name in sorted(extract_cli.cli.commands)] + [(cli, words) for words in MOSEQ2_COMMANDS],
+    ids=[f"moseq2-extract {name}" for name in sorted(extract_cli.cli.commands)] + [f"moseq2 {w}" for w in MOSEQ2_COMMANDS],
+)
+def test_no_command_warns_about_a_duplicate_flag(group, words):
+    assert duplicate_flag_warnings(group, words) == []
 
 
-@pytest.mark.parametrize("command", [extract_cli.extract, extract_cli.batch_extract])
-def test_c_is_the_crop_size_on_extraction_commands(command):
-    args = ["x.dat", "-c", "100", "100"] if command is extract_cli.extract else [".", "-c", "100", "100"]
-    ctx = command.make_context(command.name, args, resilient_parsing=True)
+@pytest.mark.parametrize("words", EXTRACTION_COMMANDS)
+def test_c_is_the_crop_size_on_extraction_commands(words):
+    command = moseq2_command(words)
+    ctx = command.make_context(command.name, ["-c", "100", "100"], resilient_parsing=True)
     assert ctx.params["crop_size"] == (100, 100)
 
 
-def test_batch_extract_ncpus_has_no_short_flag():
-    params = options(extract_cli.batch_extract)
-    assert params["ncpus"].opts == ["--ncpus"] and params["ncpus"].secondary_opts == []
-    ctx = extract_cli.batch_extract.make_context(
-        "batch-extract", [".", "-c", "100", "100"], resilient_parsing=True
-    )
-    assert ctx.params["ncpus"] == 1
+def test_extract_cores_has_no_short_flag():
+    command = moseq2_command("extract")
+    params = options(command)
+    assert params["cores"].opts == ["--cores"] and params["cores"].secondary_opts == []
+    ctx = command.make_context("extract", ["-c", "100", "100"], resilient_parsing=True)
+    assert ctx.params["cores"] is None
+    assert ctx.params["crop_size"] == (100, 100)
 
 
-@pytest.mark.parametrize("command", [extract_cli.extract, extract_cli.batch_extract])
-def test_t_is_the_temporal_filter_on_extraction_commands(command):
+@pytest.mark.parametrize("words", EXTRACTION_COMMANDS)
+def test_t_is_the_temporal_filter_on_extraction_commands(words):
+    command = moseq2_command(words)
     params = options(command)
     assert "-t" in params["temporal_filter_size"].opts
-    assert params["threads"].opts == ["--threads"]
-    args = ["x.dat", "-t", "5"] if command is extract_cli.extract else [".", "-t", "5"]
-    ctx = command.make_context(command.name, args, resilient_parsing=True)
+    ctx = command.make_context(command.name, ["-t", "5"], resilient_parsing=True)
     assert ctx.params["temporal_filter_size"] == (5,)
+    if words == "extract":
+        # a local run reads with its cores; a cluster job with the CPUs it asks for
+        assert "threads" not in params
+        return
+    assert params["threads"].opts == ["--threads"]
     assert ctx.params["threads"] == 8
 
 
-@pytest.mark.parametrize("name", ["convert_raw_to_avi", "copy_slice"])
+@pytest.mark.parametrize("name", ["convert-raw-to-avi", "copy-slice"])
 def test_t_is_still_threads_on_the_video_commands(name):
-    command = getattr(extract_cli, name)
+    command = moseq2_command(f"standalone {name}")
     assert options(command)["threads"].opts == ["-t", "--threads"]

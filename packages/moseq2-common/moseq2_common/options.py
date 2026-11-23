@@ -55,12 +55,14 @@ import click
 from click.core import ParameterSource
 from ruamel.yaml import YAMLError
 
+from moseq2_common.errors import ExpectedError
 from moseq2_common.yaml import read_yaml, write_config
 
 __all__ = [
     "SECTIONS",
     "TOP_LEVEL_KEYS",
     "ConfigFileError",
+    "Control",
     "Options",
     "ProjectCommand",
     "ProjectGroup",
@@ -71,6 +73,8 @@ __all__ = [
     "command_project",
     "described_argument",
     "exclude_options",
+    "from_gui",
+    "gui_fields",
     "option",
     "output_folder",
     "project_argument",
@@ -83,34 +87,71 @@ __all__ = [
     "in_project",
     "read_config",
     "read_settings",
+    "save_settings",
     "setting_fields",
+    "to_gui",
     "typed_exclude",
 ]
 
 _KEY = "moseq2_option"
 
-#: The sections of config.yaml, one per stage.
-SECTIONS = ("extract", "pca", "model", "crowd_movies")
+#: The sections of config.yaml: one per stage, and ``computing``, which holds a block per step that does long
+#: work (``moseq2_common.computing``).
+SECTIONS = ("extract", "pca", "model", "crowd_movies", "computing")
 
 #: The keys config.yaml holds at its top level, outside the sections; ``job`` is a job settings file's.
-TOP_LEVEL_KEYS = ("camera_type", "groups", "exclude", "job")
+TOP_LEVEL_KEYS = ("camera_type", "animals", "groups", "exclude", "job")
 
 O = TypeVar("O", bound="Options")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+@dataclasses.dataclass(frozen=True)
+class Control:
+    """How a step's GUI shows one setting.
+
+    ``kind`` is the control: ``number``, ``toggle``, ``choice`` (a dropdown),
+    ``segmented`` (a few choices side by side), ``text`` or ``checklist``.
+    ``label`` is its name in the GUI; the setting's ``help`` is shown under it.
+    A number has ``minimum``, ``maximum``, ``step`` and ``unit``, and a slider
+    beside its box with ``slider``. A choice has ``choices``, (value, label)
+    pairs. ``placeholder`` is a text box's hint, ``link`` the title of the help
+    page that explains more, and ``show_if`` (key, value) shows the control only
+    while that other setting holds that value. ``shown_as`` converts the value
+    between the settings file and the control (``to_gui``, ``from_gui``):
+    ``gigabytes`` (``"16GB"`` is 16), ``hours`` (``"4:00:00"`` is 4, ``auto``
+    stays), ``percent`` (0.5 is 50) and ``square`` (``(80, 80)`` is 80).
+    """
+
+    kind: str
+    label: str
+    minimum: float | None = None
+    maximum: float | None = None
+    step: float | None = None
+    unit: str = ""
+    slider: bool = False
+    choices: tuple = ()
+    placeholder: str = ""
+    link: str = ""
+    show_if: tuple | None = None
+    shown_as: str = ""
+
+
 def option(default, *flags: str, help: str, type=None, multiple: bool = False,
-           is_flag: bool = False, arena: bool = False, setting: bool = True) -> dataclasses.Field:
-    """Declare one setting: its default, flags, click type and help text.
+           is_flag: bool = False, arena: bool = False, setting: bool = True,
+           control: Control | None = None) -> dataclasses.Field:
+    """Declare one setting: its default, flags, click type, help text and GUI control.
 
     ``type`` is passed to click unchanged (a Python type, a ``click.ParamType``
     or a tuple of types). ``arena`` marks a setting the arena tool detects for
     each recording. ``setting=False`` marks a one-run switch, which ``resolve``
     never takes from ``config.yaml`` or a session entry and ``generate-config``
-    never writes.
+    never writes. ``help`` is the setting's one plain-language description, shown
+    by the command line's help, the GUI and the settings docs; ``control`` is how
+    a step's GUI shows it (``Control``), None for a setting no GUI shows.
     """
     spec = {"flags": flags, "help": help, "type": type, "multiple": multiple,
-            "is_flag": is_flag, "arena": arena, "setting": setting}
+            "is_flag": is_flag, "arena": arena, "setting": setting, "control": control}
     return dataclasses.field(default=default, metadata={_KEY: spec})
 
 
@@ -201,7 +242,7 @@ def setting_fields(cls: type[Options]) -> tuple[str, ...]:
     return tuple(f.name for f in dataclasses.fields(cls) if _spec(f)["setting"])
 
 
-class ConfigFileError(ValueError):
+class ConfigFileError(ExpectedError, ValueError):
     """A config file named by the user is missing, empty or unreadable."""
 
 
@@ -335,7 +376,10 @@ def read_settings(config_file: str | os.PathLike | None, cls: type[Options], *,
     top-level ``camera_type`` is added when ``cls`` declares it. A key no step
     of the stage reads (``_ignored_settings``) and a setting at the top level
     outside the sections are left out, and a message naming them is printed.
-    A class with no section, or no ``config_file``, reads nothing.
+    A class with no section, or no ``config_file``, reads nothing. A computing
+    class (``SECTION`` ``computing``) reads its step's block, ``computing.<STEP>``,
+    checked against its own fields; a class whose ``SECTION`` is ``""`` reads the
+    top-level keys it declares.
 
     Raises ``ConfigFileError`` for a file that cannot be read or a section that
     does not hold settings, and ``moseq2_common.project.OldProjectError`` for a
@@ -348,13 +392,25 @@ def read_settings(config_file: str | os.PathLike | None, cls: type[Options], *,
     stray = _stray_keys(data)
     if stray:
         click.echo(_stray_message(config_file, stray))
+    names = {f.name for f in dataclasses.fields(cls)}
+    if cls.SECTION == "":
+        return {name: data[name] for name in names if data.get(name) is not None}
+    section = cls.SECTION
     settings = dict(data.get(cls.SECTION) or {})
-    ignored, messages = _ignored_settings(config_file, cls.SECTION, settings, stage_classes)
+    if cls.SECTION == "computing":
+        section = f"computing.{cls.STEP}"
+        block = settings.get(cls.STEP)
+        if block is not None and not isinstance(block, Mapping):
+            raise ConfigFileError(
+                f"{config_file}'s `{section}` holds {type(block).__name__}, not settings written as `name: value` "
+                f"lines indented below `{cls.STEP}:`. Correct it, or delete it to use the defaults.")
+        settings = dict(block or {})
+        stage_classes = (cls,)
+    ignored, messages = _ignored_settings(config_file, section, settings, stage_classes)
     for message in messages:
         click.echo(message)
     for key in ignored:
         del settings[key]
-    names = {f.name for f in dataclasses.fields(cls)}
     if "camera_type" in names and data.get("camera_type") is not None:
         settings["camera_type"] = data["camera_type"]
     return settings
@@ -457,10 +513,17 @@ _PROJECT = "moseq2_common.project"
 
 
 def _command_name(ctx: click.Context) -> str:
-    """The command as a person types it: ``moseq2-viz make-df``, named by the program it belongs to."""
+    """The command as a person types it: ``moseq2-viz make-df``, named by the program it belongs to, or
+    ``moseq2 standalone copy-slice`` under the ``moseq2`` command (``moseq2_app.cli``)."""
     root = ctx.find_root().command if ctx.parent is not None else ctx.command
     callback = root.callback or ctx.command.callback
     package = callback.__module__.split(".")[0] if callback else ""
+    if package == "moseq2_app":
+        names, context = [], ctx
+        while context.parent is not None:
+            names.append(context.info_name)
+            context = context.parent
+        return " ".join(["moseq2", *reversed(names)])
     return f"{package.replace('_', '-')} {ctx.info_name}".strip()
 
 
@@ -734,7 +797,7 @@ def command_project(ctx: click.Context, *, required: bool = False):
         raise click.ClickException(
             f"`{_command_name(ctx)}` works on the sessions a project's {BOOKKEEPING_NAME} lists, and there is no "
             f"{BOOKKEEPING_NAME} in {project.folder} yet, so the project has no sessions. Run "
-            f"`moseq2-extract aggregate-results` in {project.folder} (or the notebook's aggregation cell) to list "
+            f"`moseq2 extract` in {project.folder} (or the notebook's Extract step) to list "
             "its extractions. If the project is another folder, run the command from there, or name it with "
             f"`--project-file /path/to/project/{BOOKKEEPING_NAME}`."
         )
@@ -795,3 +858,160 @@ class ProjectGroup(click.Group):
     """A command-line program whose commands are ``ProjectCommand``s."""
 
     command_class = ProjectCommand
+
+
+# ---------------------------------------------------------------- the GUI and saving
+
+
+def _control(cls: type[Options], name: str) -> tuple[dataclasses.Field, Control]:
+    fields = {f.name: f for f in dataclasses.fields(cls)}
+    if name not in fields:
+        raise TypeError(f"{cls.__name__} has no option {name!r}. Its options are: {', '.join(fields)}.")
+    control = _spec(fields[name])["control"]
+    if control is None:
+        raise TypeError(f"{cls.__name__}.{name} declares no GUI control (option(..., control=Control(...))).")
+    return fields[name], control
+
+
+def _hours_label(value) -> str:
+    return "1 hour" if value == 1 else f"{value:g} hours"
+
+
+def gui_fields(cls: type[Options], names: Sequence[str], values: Mapping | None = None) -> list[dict]:
+    """The GUI's description of the settings ``names`` of ``cls``, in that order, for ``kit.js``.
+
+    Each is ``{"key", "type", "label", "help"}`` and whichever of ``min``, ``max``, ``step``, ``unit``,
+    ``slider``, ``choices`` (``{"value", "label"}`` each), ``placeholder``, ``link`` and ``show_if``
+    (``{"key", "value"}``) its ``Control`` sets. ``values`` (as ``to_gui`` gives them) adds a choice for a
+    value a choice control does not list, so the control can show it.
+    """
+    out = []
+    for name in names:
+        field, control = _control(cls, name)
+        entry = {"key": name, "type": control.kind, "label": control.label, "help": _spec(field)["help"]}
+        for key, value in (("min", control.minimum), ("max", control.maximum), ("step", control.step)):
+            if value is not None:
+                entry[key] = value
+        for key, value in (("unit", control.unit), ("placeholder", control.placeholder), ("link", control.link)):
+            if value:
+                entry[key] = value
+        if control.slider:
+            entry["slider"] = True
+        if control.show_if is not None:
+            entry["show_if"] = {"key": control.show_if[0], "value": control.show_if[1]}
+        if control.kind in ("choice", "segmented"):
+            choices = [{"value": value, "label": label} for value, label in control.choices]
+            current = (values or {}).get(name)
+            if current is not None and all(choice["value"] != current for choice in choices):
+                label = _hours_label(current) if control.shown_as == "hours" else str(current)
+                choices.append({"value": current, "label": label})
+            entry["choices"] = choices
+        out.append(entry)
+    return out
+
+
+def _to_gui(value, shown_as: str):
+    if value is None or not shown_as:
+        return list(value) if isinstance(value, tuple) else value
+    if shown_as == "gigabytes":
+        from moseq2_common.computing import gigabytes
+
+        number = gigabytes(value)
+        return int(number) if float(number).is_integer() else number
+    if shown_as == "hours":
+        from moseq2_common.computing import hours
+
+        number = hours(value)
+        if number is None:
+            return value
+        return int(number) if float(number).is_integer() else number
+    if shown_as == "percent":
+        return value * 100
+    if shown_as == "square":
+        return value[0] if isinstance(value, (list, tuple)) else value
+    raise ValueError(f"No conversion for shown_as={shown_as!r}.")
+
+
+def _from_gui(value, shown_as: str):
+    if value is None or not shown_as:
+        return value
+    if shown_as == "gigabytes":
+        return f"{value:g}GB"
+    if shown_as == "hours":
+        if isinstance(value, str):
+            return value
+        whole = int(round(float(value) * 3600))
+        return f"{whole // 3600}:{whole % 3600 // 60:02d}:{whole % 60:02d}"
+    if shown_as == "percent":
+        return value / 100
+    if shown_as == "square":
+        return (int(value), int(value))
+    raise ValueError(f"No conversion for shown_as={shown_as!r}.")
+
+
+def to_gui(opts: Options, names: Sequence[str]) -> dict:
+    """The values of the settings ``names`` of ``opts`` as their GUI controls show them (``Control.shown_as``)."""
+    out = {}
+    for name in names:
+        _, control = _control(type(opts), name)
+        out[name] = _to_gui(getattr(opts, name), control.shown_as)
+    return out
+
+
+def from_gui(cls: type[Options], values: Mapping) -> dict:
+    """The settings of ``cls`` among ``values`` (as the GUI sends them), converted back to their own form;
+    keys ``cls`` does not declare are left out."""
+    fields = {f.name: f for f in dataclasses.fields(cls)}
+    out = {}
+    for name, value in values.items():
+        if name not in fields:
+            continue
+        control = _spec(fields[name])["control"]
+        value = _from_gui(value, control.shown_as if control is not None else "")
+        if _is_tuple_valued(_spec(fields[name])) and value is not None:
+            value = _as_tuple(value)
+        out[name] = value
+    return out
+
+
+def _yaml_value(value):
+    if isinstance(value, tuple):
+        return [_yaml_value(v) for v in value]
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
+    return value
+
+
+def save_settings(project, cls: type[Options], values: Mapping) -> None:
+    """Write ``values``, settings of ``cls``, into ``project``'s ``config.yaml``; the rest of the file is kept.
+
+    They go into the class's section: a computing class's into ``computing.<STEP>``, a class whose
+    ``SECTION`` is ``""`` and ``camera_type`` at the top level. One-run switches (``setting=False``) are
+    never saved; a name ``cls`` does not declare raises ``TypeError``. The file is written through a
+    temporary name renamed into place.
+    """
+    declared = {f.name for f in dataclasses.fields(cls)}
+    undeclared = sorted(set(values) - declared)
+    if undeclared:
+        raise TypeError(f"{cls.__name__} has no setting {', '.join(map(repr, undeclared))}.")
+    saved = {name: _yaml_value(value) for name, value in values.items() if name in setting_fields(cls)}
+    if not saved:
+        return
+    data = read_config(project.config_file)
+    if cls.SECTION == "":
+        data.update(saved)
+    elif cls.SECTION == "computing":
+        computing = data.get("computing")
+        computing = dict(computing) if isinstance(computing, Mapping) else {}
+        block = computing.get(cls.STEP)
+        computing[cls.STEP] = {**(dict(block) if isinstance(block, Mapping) else {}), **saved}
+        data["computing"] = computing
+    else:
+        if "camera_type" in saved:
+            data["camera_type"] = saved.pop("camera_type")
+        section = data.get(cls.SECTION)
+        data[cls.SECTION] = {**(dict(section) if isinstance(section, Mapping) else {}), **saved}
+    path = Path(project.config_file)
+    temporary = path.with_name(f".{path.name}.tmp")
+    write_config(data, str(temporary))
+    os.replace(temporary, path)

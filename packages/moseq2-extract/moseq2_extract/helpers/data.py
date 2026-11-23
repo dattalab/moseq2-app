@@ -6,6 +6,8 @@ import tarfile
 import warnings
 import numpy as np
 from importlib.metadata import version
+from moseq2_common.records import StepInputError
+from moseq2_common.report import current
 from moseq2_common.timestamps import FRAME_RATE_PATH, rate_from_timestamps
 from moseq2_extract.io.video import load_timestamps_from_movie
 from os.path import exists, join, basename
@@ -54,6 +56,14 @@ def write_misc_metadata(h5_file, recording_folder):
 TIMESTAMP_UNIT = "milliseconds"
 
 
+class TimestampsError(StepInputError, FileNotFoundError):
+    """A recording's timestamps cannot be found, or hold none."""
+
+
+class FrameRateError(StepInputError, ValueError):
+    """A recording's frame rate cannot be told from its timestamps or its video."""
+
+
 def _no_timestamps_message(recording, looked_in, empty=None, where="next to it"):
     """The error for a recording with no per-frame timestamps from any source."""
     places = "\n".join(f"  {place}" for place in looked_in)
@@ -96,7 +106,7 @@ def handle_extract_metadata(input_file, dirname, with_source=False):
 
     # Handle TAR files
     if input_file.endswith((".tar.gz", ".tgz")):
-        print(f"Scanning tarball {input_file} (this will take a minute)")
+        current().status(f"Scanning tarball {input_file} (this will take a minute)")
         # compute NEW psuedo-dirname now, `input_file` gets overwritten below with test_vid.dat tarinfo...
         dirname = join(
             dirname, basename(input_file).replace(".tar.gz", "").replace(".tgz", "")
@@ -143,7 +153,7 @@ def handle_extract_metadata(input_file, dirname, with_source=False):
             from_depth_file = True
 
     if timestamp_path is None and not from_depth_file:
-        raise FileNotFoundError(_no_timestamps_message(recording, looked_in, where=where))
+        raise TimestampsError(_no_timestamps_message(recording, looked_in, where=where))
 
     if not from_depth_file:
         if tar is None:
@@ -156,7 +166,7 @@ def handle_extract_metadata(input_file, dirname, with_source=False):
         looked_in = looked_in + [source]
 
     if len(timestamps) == 0:
-        raise FileNotFoundError(
+        raise TimestampsError(
             _no_timestamps_message(recording, looked_in, empty=source, where=where)
         )
 
@@ -186,7 +196,7 @@ def recording_frame_rate(recording, timestamps, finfo):
     if not rate or not np.isfinite(rate) or rate <= 0:
         first = ", ".join(f"{d:g}" for d in np.diff(np.asarray(timestamps if timestamps is not None else [],
                                                                dtype="float64"))[:5])
-        raise ValueError(
+        raise FrameRateError(
             f"Cannot tell the frame rate of {recording}: its timestamps give no frame period "
             f"(the first differences are [{first}] milliseconds) and the video declares no frame "
             f"rate. Check that the recording's timestamp file (depth_ts.txt or timestamps.csv) "

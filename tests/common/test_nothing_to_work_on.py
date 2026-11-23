@@ -34,6 +34,7 @@ def written(folder):
 
 
 def run(program, args):
+    """``args`` given to ``moseq2_<program>``'s command; ``app`` is the ``moseq2`` command."""
     import importlib
 
     cli = importlib.import_module(f"moseq2_{program}.cli").cli
@@ -56,16 +57,25 @@ def check(empty, program, args, expected):
     assert written(empty) == []
 
 
+# ---------------------------------------------------------------- moseq2 (extraction and the video utilities)
+
+MOSEQ2 = [
+    (["extract"], ["`moseq2 extract` runs in a project folder", "{folder} has no config.yaml", "moseq2 setup"]),
+    (["standalone", "extract"], ["Name at least one recording", "--files-from"]),
+    (["standalone", "convert-raw-to-avi"], ["INPUT_FILE", "depth.dat"]),
+    (["standalone", "copy-slice"], ["INPUT_FILE", "depth recording"]),
+]
+
+
+@pytest.mark.parametrize("args, expected", MOSEQ2, ids=[" ".join(a) for a, _ in MOSEQ2])
+def test_moseq2_commands_with_nothing_to_work_on_say_where_they_looked(empty, args, expected):
+    check(empty, "app", args, expected)
+
+
 # ---------------------------------------------------------------- moseq2-extract (and print-record)
 
 EXTRACT = [
     ("find-roi", [], ["INPUT_FILE", "depth recording", "session_1/depth.avi"]),
-    ("extract", [], ["INPUT_FILE", "depth recording", "session_1/depth.avi"]),
-    ("convert-raw-to-avi", [], ["INPUT_FILE", "depth.dat"]),
-    ("copy-slice", [], ["INPUT_FILE", "depth recording"]),
-    ("batch-extract", [], ["INPUT_FOLDER", "project folder", "left out when run from a project folder"]),
-    ("batch-extract", ["."], ["{folder}", "project folder", "--config-file"]),
-    ("aggregate-results", [], ["{folder}", "project folder"]),
     ("download-flip-file", [], ["{folder}", "project folder", "config.yaml", "generate-config"]),
     ("print-record", [], ["OUTPUT", "aggregate_results", "session key"]),
 ]
@@ -184,27 +194,16 @@ def new_project(empty):
     return empty
 
 
-def test_aggregate_results_with_nothing_extracted_writes_no_bookkeeping(new_project):
-    (new_project / "session_1").mkdir()
-    (new_project / "session_1" / "depth.avi").write_bytes(b"0")
-
-    message = stops(run("extract", ["aggregate-results"]))
-
-    assert f"found 1 recording under {new_project}" in message
-    assert "batch-extract" in message
-    assert written(new_project) == ["config.yaml", "session_1", "session_1/depth.avi"]
-
-
 def test_train_pca_in_a_project_with_no_sessions_names_input_dir(new_project):
     message = stops(run("pca", ["train-pca"]))
 
-    assert "aggregate-results" in message
+    assert "`moseq2 extract`" in message and "Extract step" in message
     assert "--input-dir" in message
     assert written(new_project) == ["config.yaml"]
 
 
 @pytest.mark.parametrize("command", ["plot-scalar-summary", "make-df"])
-def test_viz_in_a_project_with_no_sessions_says_to_aggregate(new_project, command):
+def test_viz_in_a_project_with_no_sessions_says_to_extract(new_project, command):
     args = [command] if command != "make-df" else [command, "model.p"]
     if command == "make-df":
         (new_project / "model.p").write_bytes(b"0")
@@ -213,7 +212,7 @@ def test_viz_in_a_project_with_no_sessions_says_to_aggregate(new_project, comman
     message = stops(run("viz", args))
 
     assert f"no moseq2-project.yaml in {new_project}" in message
-    assert "moseq2-extract aggregate-results" in message
+    assert f"Run `moseq2 extract` in {new_project}" in message and "Extract step" in message
     assert written(new_project) == before
 
 

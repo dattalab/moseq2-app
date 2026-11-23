@@ -2,8 +2,9 @@
 
 ``moseq2-common`` holds the code the other five share, starting with the YAML
 helpers. It releases with them from one tag, so each requires it at exactly
-the version it is itself. Its base install needs only numpy, ruamel.yaml and
-h5py (the video libraries come with its ``video`` extra), and requiring it must
+the version it is itself. Its base install needs only click, numpy,
+ruamel.yaml, h5py and tqdm (the video libraries come with its ``video`` extra;
+tqdm draws ``moseq2_common.report``'s progress bars), and requiring it must
 not make a core package pull in a sibling: ``python -m pip install
 moseq2-model`` installs moseq2-model and moseq2-common, nothing else from
 MoSeq2.
@@ -43,7 +44,7 @@ def moseq2_requirements(package):
 def test_moseq2_common_base_requirements():
     reqs = [Requirement(r) for r in distribution("moseq2-common").requires or []]
     names = {req.name for req in reqs if req.marker is None}
-    assert names == {"click", "numpy", "ruamel.yaml", "h5py"}
+    assert names == {"click", "numpy", "ruamel.yaml", "h5py", "tqdm"}
 
 
 def test_the_video_extra_holds_the_video_libraries():

@@ -7,10 +7,10 @@ agree: a key the tool writes but the list lacks would be tuned in the tool and
 then ignored, and a key the list holds but the tool never writes would never
 be saved.
 
-The second test follows the notebook: the
-arena cell runs, a recording is tuned and saved, then ``config.yaml`` gains a
-flip classifier and a ``frame_trim`` and the arena cell runs again before the
-extraction cell.
+The second test follows the pipeline: the
+arena tool opens, a recording is tuned and saved, then ``config.yaml`` gains a
+flip classifier and a ``frame_trim`` and the arena tool opens again before the
+Extract step runs.
 """
 
 from __future__ import annotations
@@ -21,7 +21,9 @@ import pytest
 
 import moseq2_extract.steps as extract_steps
 from moseq2_app.util import update_config
-from moseq2_extract.gui import extract_command, generate_config_command
+from moseq2_common.project import Project
+from moseq2_extract.gui import generate_config_command
+from moseq2_extract.project import extract
 from moseq2_common.yaml import read_yaml
 
 from widgets import buttons_of, click
@@ -53,7 +55,7 @@ def test_the_tool_saves_exactly_the_shared_list():
 
 
 def open_arena_tool(root):
-    """The notebook's arena cell."""
+    """The arena tool, opened on the project."""
     import panel as pn
 
     from moseq2_app.roi.widget import ArenaMaskWidget
@@ -93,7 +95,7 @@ def test_config_yaml_changes_after_the_tool_reach_extraction(project, monkeypatc
         "extract_wrapper",
         lambda input_file, output_dir, config, num_frames=None, skip=False, uuid=None, record=None: received.update(config),
     )
-    extract_command(str(project / "saline_example_0" / "depth.avi"), None, str(project / "config.yaml"))
+    extract(Project.at(project), recordings=[str(project / "saline_example_0" / "depth.avi")])
 
     assert received["flip_classifier"] == classifier
     assert tuple(received["frame_trim"]) == (100, 0)
@@ -252,7 +254,7 @@ def test_config_yaml_changes_after_the_tool_reach_the_arena_shown(project, monke
     assert (project / "aggregate_results" / "saline_example_0" / "bground.tiff").exists()
 
 
-def test_background_is_the_same_whether_the_arena_tool_ran_first(project, tmp_path):
+def test_background_is_the_same_whether_the_arena_tool_ran_first(project, tmp_path, raw_sessions):
     """X12: extraction computes the background it subtracts itself, sampling the recording at
     the one stride the arena tool shares, and never reads one back from the session folder. A
     recording whose arena the tool found first is extracted against the background a recording
@@ -260,6 +262,9 @@ def test_background_is_the_same_whether_the_arena_tool_ran_first(project, tmp_pa
     import h5py
     import numpy as np
 
+    with update_config(str(project / "config.yaml"), section="extract") as config:
+        config["flip_classifier"] = f"{raw_sessions}/flip_classifier_k2_c57_10to13weeks.npz"
+        config["num_frames"] = 50
     untouched = tmp_path / "untouched"
     shutil.copytree(project, untouched)
     widget = open_arena_tool(project)
@@ -267,8 +272,7 @@ def test_background_is_the_same_whether_the_arena_tool_ran_first(project, tmp_pa
 
     backgrounds = {}
     for root in (project, untouched):
-        extract_command(str(root / "saline_example_0" / "depth.avi"), None, str(root / "config.yaml"),
-                        num_frames=50)
+        extract(Project.at(root), recordings=[str(root / "saline_example_0" / "depth.avi")])
         with h5py.File(root / "aggregate_results" / "saline_example_0" / "results.h5", "r") as f:
             backgrounds[root] = f["metadata/extraction/background"][()]
 

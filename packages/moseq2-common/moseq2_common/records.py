@@ -73,6 +73,7 @@ import click
 import h5py
 import numpy as np
 
+from moseq2_common.errors import ExpectedError
 from moseq2_common.yaml import dump_block_yaml, read_yaml
 
 __all__ = ["RECORD_ATTRIBUTE", "InputError", "Record", "StepInputError", "atomic_output", "atomic_outputs",
@@ -426,7 +427,7 @@ def atomic_outputs(stem: str | os.PathLike, suffixes: Sequence[str]) -> Iterator
 # ------------------------------------------------------------------ checking inputs
 
 
-class StepInputError(Exception):
+class StepInputError(ExpectedError):
     """A step's inputs or settings are not usable, found by a check at the top of the step before any work.
 
     Its message names what was found and says what to do; a ``ProjectCommand`` prints it as a message,

@@ -5,9 +5,11 @@ project (its session's folder in ``aggregate_results/``) and the uuid
 ``moseq2-project.yaml`` gave the session, starts the run's record with the
 project (so its inputs are described relative to the project folder and include
 ``config.yaml`` and ``session_config.yaml``), and hands both to the file layer.
-Batch extraction and aggregation are the project's alone, and writing a config
-file or naming a flip classifier in one stops on a 1.5.0 project. What each
-writes is what the step wrote when it took the project itself.
+The Extract step (``extract``) is the project's alone: it extracts each
+recording with its own entry and lists every recording it plans as a session in
+``moseq2-project.yaml``, keeping the uuid an extraction already holds. Writing a
+config file or naming a flip classifier in one stops on a 1.5.0 project. What
+each writes is what the step wrote when it took the project itself.
 """
 
 from __future__ import annotations
@@ -25,16 +27,17 @@ from click.testing import CliRunner
 
 from fixtures import fetch_raw_sessions
 
+from moseq2_app.cli import cli
 from moseq2_common.bookkeeping import Session, load
 from moseq2_common.options import read_settings
 from moseq2_common.project import OldProjectError, Project
 from moseq2_common.records import read_record
-from moseq2_common.yaml import read_yaml, write_yaml
+from moseq2_common.yaml import read_yaml, write_config, write_yaml
 from moseq2_extract import project as project_steps
-from moseq2_extract.options import (EXTRACT_STAGE, AggregateOptions, BatchExtractOptions, ExtractOptions,
-                                    RoiOptions)
+from moseq2_extract.options import EXTRACT_STAGE, ExtractOptions, RoiOptions
 from moseq2_extract.recordings import session_outputs
 from moseq2_extract.session_config import recording_entry
+from reporting import CollectingReporter
 
 SESSION = "saline_example_0"
 KEY = f"{SESSION}/depth.avi"
@@ -56,18 +59,21 @@ def call(project, recording, opts, **kwargs):
 
 
 def call_extract(project, recording, opts, output_dir=None):
-    """``extract`` in ``project``, through the project layer."""
-    return project_steps.extract(project, recording, opts, output_dir=output_dir)
+    """One recording's extraction in ``project``, through the project layer (``extract_recording``)."""
+    return project_steps.extract_recording(project, recording, opts, output_dir=output_dir)
 
 
-def call_batch_extract(project, input_dir, opts, **kwargs):
-    """``batch_extract`` in ``project``, through the project layer."""
-    return project_steps.batch_extract(project, input_dir, opts, **kwargs)
+#: The fixture's head/tail classifier, a copy of the published adult C57 one.
+CLASSIFIER = "flip_classifier_k2_c57_10to13weeks.npz"
 
 
-def call_aggregate_results(project, opts, **kwargs):
-    """``aggregate_results`` in ``project``, through the project layer."""
-    return project_steps.aggregate_results(project, opts, **kwargs)
+def name_classifier(project):
+    """Copy the fixture's head/tail classifier into ``project`` and name it in config.yaml, so its
+    extraction downloads nothing."""
+    shutil.copy(Path(fetch_raw_sessions()) / CLASSIFIER, project.folder / CLASSIFIER)
+    data = read_yaml(str(project.config_file))
+    data["extract"]["flip_classifier"] = str(project.folder / CLASSIFIER)
+    write_config(data, str(project.config_file))
 
 
 def call_generate_config(output_file, camera_type):
@@ -208,45 +214,43 @@ def test_extract_with_a_typed_output_dir_in_a_project_keeps_the_uuid_and_record(
     assert not (project.folder / "aggregate_results").exists()
 
 
-def test_extract_with_a_relative_config_file_writes_where_it_did(project, monkeypatch):
-    """``extract session/depth.avi --config-file config.yaml`` from the project folder makes the project folder
-    ``.``, so the session folder is the relative ``aggregate_results/<session>``, which ``extract_wrapper`` joins
-    under the recording's folder. That is dattalab/moseq2-app#518; this pins where the outputs go until it is
-    fixed."""
-    import moseq2_extract.cli as extract_cli
-
+def test_moseq2_extract_from_the_project_folder_writes_into_the_session_folder(project, monkeypatch):
+    """``moseq2 extract session/depth.avi`` from the project folder takes the project from the working folder
+    as an absolute path, so the outputs go into the session folder in the project's ``aggregate_results/``,
+    not one joined under the recording's folder (dattalab/moseq2-app#518)."""
+    name_classifier(project)
     monkeypatch.chdir(project.folder)
-    result = CliRunner().invoke(extract_cli.cli, ["extract", KEY, "--config-file", "config.yaml",
-                                                  "--num-frames", "20"], catch_exceptions=False)
+    result = CliRunner().invoke(cli, ["extract", KEY, "--num-frames", "20"], catch_exceptions=False)
     assert result.exit_code == 0, result.output
 
-    written = project.folder / SESSION / "aggregate_results" / SESSION
+    written = project.folder / "aggregate_results" / SESSION
     assert (written / "results.h5").is_file()
     assert read_record(written / "results.h5")["project"] == str(project.folder.resolve())
-    assert not (project.folder / "aggregate_results").exists()
+    assert not (project.folder / SESSION / "aggregate_results").exists()
 
 
-def test_batch_extract_extracts_each_recording_with_its_entry(project, monkeypatch, capsys):
+def test_batch_extract_extracts_each_recording_with_its_entry(project, monkeypatch):
     """Each recording is extracted with ``config.yaml``'s settings and its own ``session_config.yaml`` entry."""
     other = "saline_example_1"
     copy_session(project.folder, other, source=other)
-    config = read_settings(project.config_file, BatchExtractOptions, stage_classes=EXTRACT_STAGE)
-    opts = BatchExtractOptions.resolve(config=config, explicit={"num_frames": 20, "cluster_type": "local"})
-    configured = opts.noise_tolerance
+    name_classifier(project)
+    configured = ExtractOptions.resolve(read_settings(project.config_file, ExtractOptions,
+                                                      stage_classes=EXTRACT_STAGE)).noise_tolerance
     assert configured != 25
     monkeypatch.chdir(project.folder)
+    reporter = CollectingReporter()
 
-    result = call_batch_extract(project, str(project.folder), opts, config_file=str(project.config_file))
+    run = project_steps.extract(project, settings={"num_frames": 20, "cluster_type": "local"}, reporter=reporter)
 
-    assert result.failures == []
-    assert sorted(result.extracted) == [project.folder / KEY, project.folder / other / "depth.avi"]
+    assert run.failed == {}
+    assert sorted(run.extracted) == [KEY, f"{other}/depth.avi"]
     tolerances = {}
     for key in (KEY, f"{other}/depth.avi"):
         record = read_record(session_outputs(project, key).h5)
         assert record["project"] == str(project.folder.resolve())
         tolerances[key] = record["options"]["noise_tolerance"]
     assert tolerances == {KEY: 25, f"{other}/depth.avi": configured}
-    assert capsys.readouterr().out.endswith("Extracted 2 of 2 recordings.\n")
+    assert reporter.statuses[-1] == "Extracted 2 of 2 recordings."
 
 
 def fake_extraction(project, name, uuid):
@@ -262,27 +266,40 @@ def fake_extraction(project, name, uuid):
         h5.create_dataset("metadata/uuid", data=uuid)
 
 
-def test_aggregate_results_lists_the_extracted_sessions(tmp_path, monkeypatch, capsys):
+def test_extraction_lists_each_session_with_the_uuid_its_extraction_holds(tmp_path, monkeypatch):
+    """Before extracting anything, the Extract step lists every recording it plans in ``moseq2-project.yaml``:
+    one extracted already keeps the uuid its ``results.h5`` holds, and one not yet extracted gets a new uuid."""
     folder = tmp_path / "proj"
     folder.mkdir()
     project_steps.generate_config(str(folder / "config.yaml"), "kinect", overwrite=True)
     project = Project.at(folder)
+    name_classifier(project)
     fake_extraction(project, "session_a", "uuid-a")
     fake_extraction(project, "session_b", "uuid-b")
     (folder / "session_c").mkdir()
     (folder / "session_c" / "depth.avi").write_bytes(b"\0")
     monkeypatch.chdir(folder)
+    listed_at_extraction = []
+    monkeypatch.setattr(project_steps, "extract_recording",
+                        lambda project_, input_file, opts, **kwargs: listed_at_extraction.append(
+                            dict(load(project_).sessions)))
 
-    result = call_aggregate_results(project, AggregateOptions())
+    run = project_steps.extract(project)
 
-    assert result.sessions == ["session_a/depth.avi", "session_b/depth.avi"]
-    assert load(project).sessions == {
+    keys = ["session_a/depth.avi", "session_b/depth.avi", "session_c/depth.avi"]
+    assert sorted(run.extracted) == keys
+    sessions = load(project).sessions
+    assert {key: sessions[key] for key in keys[:2]} == {
         "session_a/depth.avi": Session(key="session_a/depth.avi", recording="session_a/depth.avi",
                                        folder="aggregate_results/session_a", uuid="uuid-a"),
         "session_b/depth.avi": Session(key="session_b/depth.avi", recording="session_b/depth.avi",
                                        folder="aggregate_results/session_b", uuid="uuid-b"),
     }
-    assert capsys.readouterr().out == (f"2 session(s) listed in {project.bookkeeping_file}; it lists 2 in all.\n")
+    new = sessions["session_c/depth.avi"]
+    assert (new.recording, new.folder) == ("session_c/depth.avi", "aggregate_results/session_c")
+    assert new.uuid not in (None, "", "uuid-a", "uuid-b")
+    assert sorted(sessions) == keys
+    assert listed_at_extraction == [sessions] * 3
 
 
 def test_generate_config_stops_on_a_1_5_project(tmp_path):

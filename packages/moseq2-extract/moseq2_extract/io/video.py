@@ -7,7 +7,7 @@ import av
 import functools
 import tarfile
 import numpy as np
-from tqdm.auto import tqdm
+from moseq2_common.report import current
 from moseq2_common.video import VideoWriter, frame_dimensions
 
 
@@ -244,9 +244,7 @@ def write_frames(
         )
 
     if isinstance(frames, np.ndarray):
-        for i in tqdm(
-            range(frames.shape[0]), disable=True, desc=f"Writing frames to {filename}"
-        ):
+        for i in range(frames.shape[0]):
             pipe.write(frames[i].astype(frame_dtype), format=pixel_format)
 
     if close_pipe:
@@ -448,7 +446,7 @@ def load_movie_data(
             frame_data = read_frames(filename, frames, frame_size=frame_size, **kwargs)
 
     except AttributeError as e:
-        print("Error reading movie:", e)
+        current().status(f"Error reading movie: {e}")
         frame_data = read_frames_raw(
             filename,
             frames=frames,
@@ -491,7 +489,7 @@ def get_movie_info(
                 filename, mapping=mapping, threads=threads, **kwargs
             )
     except AttributeError as e:
-        print("Error reading movie metadata:", e)
+        current().status(f"Error reading movie metadata: {e}")
         metadata = {}
 
     return metadata
@@ -513,7 +511,7 @@ def load_timestamps_from_movie(input_file, threads=8, mapping="DEPTH"):
     timestamps (list): list of float values representing timestamps for each frame.
     """
 
-    print("Loading movie timestamps")
+    current().status("Loading movie timestamps")
 
     with _open(input_file) as container:
         stream = _video_stream(container, mapping)

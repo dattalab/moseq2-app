@@ -1,4 +1,12 @@
 camera_type: auto
+computing:
+  extract:
+    cluster_type: local
+    cores: null
+    memory: 16GB
+    partition: short
+    prefix: ''
+    wall_time: auto
 crowd_movies:
   cmap: jet
   count: usage
@@ -62,10 +70,8 @@ extract:
   centroid_hampel_span: 0
   chunk_overlap: 0
   chunk_size: 3000
-  cluster_type: local
   compress: false
   compress_chunk_size: 3000
-  compress_threads: 3
   compute_raw_scalars: false
   crop_size:
   - 80
@@ -79,7 +85,6 @@ extract:
   - .mkv
   - .avi
   - .tar.gz
-  extract_out_script: extract_out.sh
   flip_classifier: null
   flip_classifier_smoothing: 51
   frame_dtype: uint8
@@ -91,20 +96,15 @@ extract:
   mapping: DEPTH
   max_depth: 5
   max_height: 120
-  memory: 5GB
   min_height: 10
   model_smoothing_clips:
   - 0
   - 0
   mouse_threshold: 0
   movie_dtype: <u2
-  ncpus: 1
   noise_tolerance: 30
   num_frames: null
-  partition: short
   pixel_format: gray16le
-  prefix: ''
-  skip_checks: false
   skip_completed: false
   spatial_filter_size:
   - 3
@@ -115,14 +115,12 @@ extract:
   - 9
   temporal_filter_size:
   - 0
-  threads: 8
   tracking_model_init: raw
   tracking_model_ll_clip: -100
   tracking_model_segment: true
   use_cc: true
   use_plane_bground: false
   use_tracking_model: false
-  wall_time: '3:00:00'
   widen_radius: 0
   write_movie: true
 model:

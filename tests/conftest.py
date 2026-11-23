@@ -275,20 +275,17 @@ def arena(project, started, configured, flipped):
 
 @pytest.fixture(scope="session")
 def aggregation(tmp_path_factory, project, started, extracted):
-    """Cell 9: list every extraction as one of the project's sessions.
+    """The project's sessions, as extraction listed them.
 
-    Extraction has written each recording's files into its own folder in
-    ``aggregate_results/``; the cell copies nothing and lists each extracted
-    recording as one of the project's sessions in ``moseq2-project.yaml``.
-    That file is what every cell from here on reads its sessions from.
+    Extraction lists every recording it plans as one of the project's sessions
+    in ``moseq2-project.yaml`` before it extracts any, each with its folder in
+    ``aggregate_results/`` and its uuid. That file is what every step from here
+    on reads its sessions from.
 
-    Returns the bookkeeping file and a copy of it as this cell wrote it, since
-    later cells add their outputs to it and the chain may already have gone
-    past them when a test describing this cell runs.
+    Returns the bookkeeping file and a copy of it as extraction wrote it, since
+    later steps add their outputs to it and the chain may already have gone past
+    them when a test describing extraction's listing runs.
     """
-    from moseq2_extract.gui import aggregate_extract_results_command
-
-    aggregate_extract_results_command(str(project))
     bookkeeping = project / "moseq2-project.yaml"
 
     as_written = tmp_path_factory.mktemp("aggregated") / "moseq2-project.yaml"
@@ -298,36 +295,38 @@ def aggregation(tmp_path_factory, project, started, extracted):
 
 @pytest.fixture(scope="session")
 def aggregated(aggregation):
-    """Cell 9's ``moseq2-project.yaml`` in the project, as later cells change it."""
+    """The project's ``moseq2-project.yaml``, as later steps change it."""
     return aggregation[0]
 
 
 @pytest.fixture(scope="session")
 def bookkeeping_as_aggregated(aggregation):
-    """A copy of ``moseq2-project.yaml`` as cell 9 wrote it: the sessions and nothing else."""
+    """A copy of ``moseq2-project.yaml`` as extraction wrote it: the sessions and nothing else."""
     return aggregation[1]
 
 
 @pytest.fixture(scope="session")
 def extracted(project, configured, arena):
-    """Cell 6: extract every recording in the project.
+    """The notebook's Extract step: extract every recording in the project.
 
-    The heaviest cell, and the one the rest of the notebook is built on. It
-    searches the project for depth files, hands them to a local extraction
-    loop, and leaves a ``proc`` directory beside each recording.
-
-    ``skip_extracted`` carries over from cell 5, where the notebook sets it,
-    so a second run of the cell extracts nothing.
+    The heaviest step, and the one the rest of the pipeline is built on. The
+    cell opens the Extract GUI in the project folder; pressing its button
+    lists every recording as a session and extracts each into its folder in
+    ``aggregate_results/``, in the background, and the chain waits for it. A
+    second run extracts nothing: every recording is up to date.
     """
-    from moseq2_extract.gui import extract_found_sessions
+    from moseq2_app.notebook import extract
 
-    extract_found_sessions(
-        str(project),
-        str(configured),
-        extract_all=True,
-        skip_extracted=True,
-        run_cmd=False,
-    )
+    before = os.getcwd()
+    os.chdir(project)
+    try:
+        widget = extract()
+        widget.start()
+        run = widget.wait()
+    finally:
+        os.chdir(before)
+    if run["state"] != "finished" or any(item["state"] != "done" for item in run["items"].values()):
+        raise RuntimeError(f"the Extract step's run ended {run['state']}: {run['items']}; {widget.problem}")
     return project
 
 

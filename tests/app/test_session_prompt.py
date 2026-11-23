@@ -1,11 +1,12 @@
-"""Choosing recordings at the extraction cell's prompt.
+"""Choosing recordings at the numbered prompt of the extraction preview.
 
-With ``extract_all = False`` the extraction cell lists the recordings it
-found, numbered from 1, and asks which to extract. An answer is a list of
+``preview_extractions``' viewer (``moseq2_app.main.view_extraction`` with a
+negative ``default``) lists the extractions, numbered from 1, and asks which to
+show. An answer is a list of
 items separated by commas. Each item is a recording number ``N``, a range
 ``N-M`` including both ends, or either of those prefixed with ``e`` to leave
 those recordings out. Without any item that picks recordings, the answer
-starts from all of them. A recording is extracted once, however many items
+starts from all of them. A recording is chosen once, however many items
 name it.
 
 An item the prompt cannot use is named in a message, and the prompt asks
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import pytest
 
-from moseq2_extract.gui import get_selected_sessions
+from moseq2_app.main import _selected_sessions as get_selected_sessions
 
 RECORDINGS = ["r1", "r2", "r3", "r4"]
 AGAIN = "Try again or press q to quit."

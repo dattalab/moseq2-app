@@ -6,38 +6,53 @@ project), holding only the settings the tool sets (``ARENA_TOOL_SETTINGS``).
 Extraction takes those from the entry and every other setting from
 ``config.yaml``, so a ``frame_trim``, ``num_frames`` or flip classifier set in
 ``config.yaml`` after the tool ran reaches every recording (moseq2-extract#158).
-Options typed on ``batch-extract``'s command line win over both.
+Options typed on ``moseq2 extract``'s command line are saved first, an arena
+setting typed with recordings named to their entries, so they win over both.
+``compress_threads`` is a one-run switch: neither file sets it, and a local run
+uses its ``cores``.
 
-Every path is covered: the notebook's local extraction and ``batch-extract``
-(both through ``extract_command``), and the per-recording ``config.yaml`` in its session folder
-that ``batch-extract --cluster-type slurm`` and the notebook's SLURM path write.
-Nothing is submitted; each SLURM command is run through ``extract`` with
-``extract_wrapper`` recorded, so what is checked is what the job would extract with.
+Every path is covered: the project's extraction of named recordings
+(``moseq2_extract.project.extract``), ``moseq2 extract`` run locally, and the
+job settings file in each session folder that ``moseq2 extract`` and the
+notebook's Extract step write on SLURM. Nothing is submitted; each job is run
+through ``moseq2 run-job`` with ``extract_wrapper`` recorded, so what is checked
+is what the job would extract with.
 """
 
 from __future__ import annotations
 
+import os
+import shlex
 from copy import deepcopy
 
 import pytest
 from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
-from commands import split_command
+from moseq2_app.cli import cli
+from moseq2_common.project import Project
 from moseq2_common.slurm import job_settings_file
 from moseq2_common.yaml import read_yaml, write_yaml
 
 from configs import read_settings
-from moseq2_extract.gui import extract_command, extract_found_sessions, generate_config_command
+from moseq2_extract import project as extraction
+from moseq2_extract.gui import generate_config_command
 from moseq2_extract.session_config import ARENA_TOOL_SETTINGS
 from moseq2_extract.util import detect_and_set_camera_parameters
 
 SESSIONS = ("session_0", "session_1")
+#: The cores ``computing.extract`` gives a local run, which reads and compresses with them.
+CORES = 2
 
 
-def run(*args):
-    result = CliRunner().invoke(extract_cli.cli, list(args), catch_exceptions=False)
+def run(*args, cwd):
+    """``moseq2 ARGS`` with ``cwd`` as the working folder; its result."""
+    before = os.getcwd()
+    os.chdir(cwd)
+    try:
+        result = CliRunner().invoke(cli, [str(a) for a in args], catch_exceptions=False)
+    finally:
+        os.chdir(before)
     assert result.exit_code == 0, result.output
     return result
 
@@ -76,6 +91,7 @@ def project(tmp_path):
     extract["flip_classifier"] = str(root / "flip_classifier.npz")
     extract["crop_size"] = [80, 80]
     extract["bg_roi_depth_range"] = [650, 750]
+    data["computing"]["extract"]["cores"] = CORES
     write_yaml(data, str(config))
     return root, config, session_config
 
@@ -93,15 +109,22 @@ def local(monkeypatch):
     return calls
 
 
+def job_files(script):
+    """The job settings file each ``sbatch`` line of ``script`` runs ``moseq2 run-job`` on."""
+    files = []
+    for line in filter(str.strip, script.read_text().splitlines()):
+        words = shlex.split(line)
+        wrapped = shlex.split(words[words.index("--wrap") + 1].rstrip().removesuffix(";"))
+        assert wrapped[1:4] == ["-m", "moseq2_app", "run-job"], line
+        files.append(wrapped[4])
+    return files
+
+
 @pytest.fixture
 def slurm(monkeypatch):
-    """Write the SLURM commands without submitting, run each through ``extract``
+    """Write the SLURM jobs, which submits nothing, run each through ``moseq2 run-job``
     and return what each received, keyed by recording, plus each written
-    job ``config.yaml`` in its session folder."""
-    monkeypatch.setattr(
-        "moseq2_extract.helpers.extract.system",
-        lambda *_: pytest.fail("a job was submitted"),
-    )
+    job settings file in its session folder."""
     calls = {}
 
     def go(root, write_commands):
@@ -114,10 +137,11 @@ def slurm(monkeypatch):
                 {f: {"config": config, "num_frames": num_frames}}
             ),
         )
-        script = (root / "extract_out.sh").read_text()
-        for line in filter(str.strip, script.splitlines()):
-            command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
-            run("extract", *split_command(command))
+        files = job_files(root / "extract_out.sh")
+        assert sorted(files) == sorted(str(job_settings_file(root / "aggregate_results" / name, "extract"))
+                                       for name in SESSIONS)
+        for job_file in files:
+            run("run-job", job_file, cwd=root)
         written = {name: read_settings(job_settings_file(root / "aggregate_results" / name, "extract")) for name in SESSIONS}
         return calls, written
 
@@ -139,27 +163,29 @@ def assert_config_yaml_settings_with_tuned_arena(config, root):
     assert config["pixel_format"] == "gray16le"
 
 
-# ------------------------------------------------------------------ R3: extract_command
+# ------------------------------------------------------------------ R3: one recording named
 
 
 def test_extract_command_takes_settings_set_in_config_yaml_after_the_tool(project, local):
     """R3/R5: a flip classifier and a frame_trim set in config.yaml after the
     arena tool saved the entry reach the extraction; the crop size and depth
     range tuned in the tool still win over config.yaml's."""
-    root, config, session_config = project
+    root, _, _ = project
 
-    extract_command(recording(root, "session_0"), None, str(config))
+    extraction.extract(Project.at(root), recordings=["session_0/depth.dat"])
+
+    assert sorted(local) == [recording(root, "session_0")]
 
     assert_config_yaml_settings_with_tuned_arena(local[recording(root, "session_0")]["config"], root)
 
 
 def test_a_recording_without_an_entry_takes_config_yaml(project, local):
-    root, config, session_config = project
+    root, _, session_config = project
     entries = read_yaml(str(session_config))
     del entries["session_1/depth.dat"]
     write_yaml(entries, str(session_config))
 
-    extract_command(recording(root, "session_1"), None, str(config))
+    extraction.extract(Project.at(root), recordings=["session_1/depth.dat"])
 
     received = local[recording(root, "session_1")]["config"]
     assert tuple(received["crop_size"]) == (80, 80)
@@ -167,15 +193,15 @@ def test_a_recording_without_an_entry_takes_config_yaml(project, local):
     assert tuple(received["frame_trim"]) == (100, 0)
 
 
-# ------------------------------------------------------------------ B1: batch-extract, local and SLURM
+# ------------------------------------------------------------------ B1: moseq2 extract, local and SLURM
 
 
 def test_local_batch_extract_takes_frame_trim_and_num_frames_from_config_yaml(project, local):
     """B1, moseq2-extract#158 as reported: frame_trim and num_frames edited in
     config.yaml reach every recording that has an entry."""
-    root, config, session_config = project
+    root, _, _ = project
 
-    run("batch-extract", str(root), "--config-file", str(config), "--extensions", ".dat")
+    run("extract", "--extensions", ".dat", cwd=root)
 
     assert sorted(local) == [recording(root, name) for name in SESSIONS]
     for name in SESSIONS:
@@ -185,16 +211,13 @@ def test_local_batch_extract_takes_frame_trim_and_num_frames_from_config_yaml(pr
 
 
 def test_slurm_batch_extract_writes_config_yaml_settings_into_each_job(project, slurm):
-    """B1 on SLURM: each job's config.yaml holds config.yaml's frame_trim and
+    """B1 on SLURM: each job's settings file holds config.yaml's frame_trim and
     num_frames over the recording's tuned arena settings."""
-    root, config, session_config = project
+    root, _, _ = project
 
     calls, written = slurm(
         root,
-        lambda: run(
-            "batch-extract", str(root), "--config-file", str(config),
-            "--extensions", ".dat", "--cluster-type", "slurm",
-        ),
+        lambda: run("extract", "--extensions", ".dat", "--cluster-type", "slurm", cwd=root),
     )
 
     for name in SESSIONS:
@@ -204,16 +227,29 @@ def test_slurm_batch_extract_writes_config_yaml_settings_into_each_job(project, 
         call = calls[recording(root, name)]
         assert call["num_frames"] == 50
         assert_config_yaml_settings_with_tuned_arena(call["config"], root)
-    assert "--num-frames 50" in (root / "extract_out.sh").read_text()
+    # the settings travel in each job's settings file, not on its command line
+    assert "--num-frames" not in (root / "extract_out.sh").read_text()
 
 
 def test_notebook_slurm_path_takes_frame_trim_from_config_yaml(project, slurm):
-    root, config, session_config = project
+    root, config, _ = project
     data = read_yaml(str(config))
-    data["extract"]["cluster_type"] = "slurm"
+    data["computing"]["extract"]["cluster_type"] = "slurm"
     write_yaml(data, str(config))
 
-    calls, written = slurm(root, lambda: extract_found_sessions(str(root), str(config), [".dat"]))
+    def notebook():
+        from moseq2_app.notebook import extract
+
+        before = os.getcwd()
+        os.chdir(root)
+        try:
+            widget = extract()
+            widget.start()
+            assert widget.wait()["state"] == "finished", widget.problem
+        finally:
+            os.chdir(before)
+
+    calls, written = slurm(root, notebook)
 
     for name in SESSIONS:
         assert tuple(written[name]["frame_trim"]) == (100, 0)
@@ -225,18 +261,18 @@ def test_notebook_slurm_path_takes_frame_trim_from_config_yaml(project, slurm):
 
 def test_an_entry_key_the_tool_does_not_set_takes_config_yaml_and_is_named(project, local):
     """An entry holding a setting the arena tool does not set (compress_threads, frame_trim, typed in
-    by hand) is read as it is, not rewritten: those settings come from config.yaml and
+    by hand) is read as it is, not rewritten: those settings do not come from the entry, and
     one line names them; the tool's own settings in it still apply."""
-    root, config, session_config = project
+    root, _, session_config = project
     entries = read_yaml(str(session_config))
     entries["session_0/depth.dat"].update(compress_threads=15, frame_trim=[5, 5], noise_tolerance=40)
     write_yaml(entries, str(session_config))
     before = session_config.read_text()
 
-    out = run("batch-extract", str(root), "--config-file", str(config), "--extensions", ".dat").output
+    out = run("extract", "--extensions", ".dat", cwd=root).stderr
 
     received = local[recording(root, "session_0")]["config"]
-    assert received["compress_threads"] == read_yaml(str(config))["extract"]["compress_threads"]
+    assert received["compress_threads"] == CORES
     assert tuple(received["frame_trim"]) == (100, 0)
     assert received["noise_tolerance"] == 40
     assert session_config.read_text() == before
@@ -250,19 +286,18 @@ def test_an_entry_key_the_tool_does_not_set_takes_config_yaml_and_is_named(proje
 
 @pytest.mark.parametrize("cluster", ["local", "slurm"])
 def test_typed_options_win_over_both(project, local, slurm, cluster):
-    """#421: an option typed on batch-extract's command line wins over config.yaml
-    and the entry."""
-    root, config, session_config = project
-    typed = ("--frame-trim", "7", "7", "--crop-size", "90", "90", "--num-frames", "20")
-    args = ("batch-extract", str(root), "--config-file", str(config), "--extensions", ".dat")
+    """#421: an option typed on ``moseq2 extract``'s command line wins over config.yaml
+    and the entry: it is saved first, an arena setting typed with the recordings named to their entries."""
+    root, _, _ = project
+    typed = ("--frame-trim", "7", "7", "--crop-size", "90", "90", "--num-frames", "20",
+             *(f"{name}/depth.dat" for name in SESSIONS))
+    args = ("extract", "--extensions", ".dat")
 
     if cluster == "local":
-        out = run(*args, *typed).output
+        run(*args, *typed, cwd=root)
         calls = local
     else:
-        holder = {}
-        calls, _ = slurm(root, lambda: holder.update(out=run(*args, "--cluster-type", "slurm", *typed).output))
-        out = holder["out"]
+        calls, _ = slurm(root, lambda: run(*args, "--cluster-type", "slurm", *typed, cwd=root))
 
     for name in SESSIONS:
         call = calls[recording(root, name)]

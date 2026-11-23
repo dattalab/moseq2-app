@@ -4,8 +4,8 @@
 recordings for the progress cell, the arena tool and extraction. The tests
 here follow what those cells do with what it finds:
 
-- the extraction cell, with the notebook's own text, takes every recording
-  type the pipeline reads, ``.mkv`` included;
+- the notebook's Extract step, as the notebook ships it, takes every
+  recording type the pipeline reads, ``.mkv`` included;
 - the validation and preview cells find each recording's extraction in its
   session folder in ``aggregate_results/``, however deep the recording is;
 - a session is named in the notebook's lists by its folder's name, or by its
@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 
-import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from cells import code_cell
 from moseq2_common.project import Project
@@ -31,14 +30,14 @@ from commands import split_command
 from moseq2_common.slurm import job_settings_file
 from moseq2_app.gui.progress import get_session_paths
 from moseq2_app.roi.controller import InteractiveExtractionViewer
-from moseq2_app.util import update_config
-from moseq2_common.yaml import read_yaml, write_yaml
-from moseq2_extract.gui import extract_found_sessions, generate_config_command
+from moseq2_common.yaml import read_yaml, write_config, write_yaml
+from moseq2_extract.gui import generate_config_command
+from moseq2_extract.project import extract
 
-EXTRACT_NOTEBOOK = "MoSeq2-Extract-Modeling-Notebook.ipynb"
+EXTRACT_NOTEBOOK = "MoSeq2-Pipeline.ipynb"
 
-#: The extraction cell, numbered as ``code_cell`` counts.
-EXTRACTION_CELL = 6
+#: The Extract step's cell, numbered as ``code_cell`` counts.
+EXTRACTION_CELL = 3
 
 #: A grouped project made from the fixture recordings: where each session
 #: folder sits below the project, and the recording copied into it. The two
@@ -73,22 +72,38 @@ def empty_session(root, where, recording="depth.dat", extracted=False):
 
 @pytest.fixture
 def chosen(monkeypatch):
-    """The recordings handed to the local extraction loop; nothing is extracted."""
+    """The recordings extraction extracts, one at a time; nothing is extracted."""
     recorded = []
-    monkeypatch.setattr(
-        "moseq2_extract.project.run_local_extract",
-        lambda to_extract, config_file, skip_extracted=False, **kw: recorded.extend(to_extract) or [],
-    )
+    monkeypatch.setattr("moseq2_extract.project.extract_recording",
+                        lambda project, input_file, opts, **kw: recorded.append(input_file))
     return recorded
+
+
+def set_config(root, extract=None, computing=None):
+    """Set ``extract`` in ``root/config.yaml``'s extract section and ``computing`` in its
+    ``computing.extract`` block."""
+    data = read_yaml(str(root / "config.yaml"))
+    data["extract"].update(extract or {})
+    data["computing"]["extract"].update(computing or {})
+    write_config(data, str(root / "config.yaml"))
+
+
+def project_config(root, camera_type="k2", **extract):
+    """``generate-config``'s ``root/config.yaml``, naming a head/tail classifier so nothing is downloaded."""
+    generate_config_command(str(root / "config.yaml"), camera_type=camera_type)
+    set_config(root, extract={"flip_classifier": str(root / "flip_classifier.npz"), **extract})
+    return root / "config.yaml"
 
 
 @pytest.fixture
 def grouped(tmp_path, raw_sessions):
-    """The ``GROUPED`` project, with a config from ``generate-config``."""
+    """The ``GROUPED`` project, with a config from ``generate-config`` naming the fixture's head/tail
+    classifier."""
     root = tmp_path / "project"
     for where, source in GROUPED.items():
         shutil.copytree(Path(raw_sessions) / source, root / where)
     generate_config_command(str(root / "config.yaml"), camera_type="k2")
+    set_config(root, extract={"flip_classifier": str(Path(raw_sessions) / "flip_classifier_k2_c57_10to13weeks.npz")})
     return root
 
 
@@ -110,11 +125,11 @@ def give_each_session_its_own_noise_tolerance(root):
     return tolerance
 
 
-# ------------------------------------------------------------------ the extraction cell
+# ------------------------------------------------------------------ the Extract step
 
 
-def test_extraction_without_extensions_takes_every_recording_type(tmp_path, chosen):
-    """``extract_found_sessions`` called without extensions takes every type
+def test_extraction_takes_every_recording_type_by_default(tmp_path, chosen):
+    """With the ``extensions`` ``generate-config`` writes, extraction takes every type
     ``find_recordings`` knows: ``.dat``, ``.mkv`` (any name), ``.avi`` and ``.tar.gz``."""
     root = tmp_path / "project"
     expected = sorted(str(p) for p in (
@@ -123,47 +138,56 @@ def test_extraction_without_extensions_takes_every_recording_type(tmp_path, chos
         empty_session(root, "converted", recording="depth.avi"),
         empty_session(root, "archived", recording="session_20190320.tar.gz"),
     ))
-    config = tmp_path / "config.yaml"
-    config.write_text("extract:\n  cluster_type: local\n")
+    project_config(root)
 
-    extract_found_sessions(str(root), str(config))
+    extract(Project.at(root))
 
     assert sorted(chosen) == expected
 
 
-def test_extensions_passed_by_an_older_notebook_are_still_obeyed(tmp_path, chosen, capsys):
-    """An older notebook passes its list; it gets what it asks for, and the
+def test_an_extensions_setting_is_obeyed(tmp_path, chosen, capsys):
+    """An ``extensions`` setting that leaves out ``.mkv`` gets what it asks for, and the
     message names the ``.mkv`` passed over."""
     root = tmp_path / "project"
     dat = empty_session(root, "kinect")
     mkv = empty_session(root, "azure", recording="recording.mkv")
-    config = tmp_path / "config.yaml"
-    config.write_text("extract:\n  cluster_type: local\n")
+    project_config(root, extensions=[".avi", ".dat", ".tar.gz"])
     capsys.readouterr()
 
-    extract_found_sessions(str(root), str(config), [".avi", ".dat", ".tar.gz"])
+    extract(Project.at(root))
 
     assert chosen == [str(dat)]
-    assert f"{mkv.parent}: holds recording.mkv" in capsys.readouterr().out
+    assert f"{mkv.parent}: holds recording.mkv" in capsys.readouterr().err
 
 
 def test_the_notebooks_extraction_cell_extracts_an_mkv(tmp_path, chosen):
-    """The cell as the notebook ships it, on a project of Azure or Femto ``.mkv``
-    recordings and a Kinect v2 ``.dat``, with no edit by the user."""
+    """The Extract cell as the notebook ships it, on a project of Azure or Femto ``.mkv``
+    recordings and a Kinect v2 ``.dat``, with no edit by the user: the cell opens the
+    Extract GUI in the notebook's folder, and its button extracts both."""
+    import ast
+    import os
+
     root = tmp_path / "project"
     expected = sorted(str(p) for p in (
         empty_session(root, "GroupA/femto_0", recording="2024-05-01-10-31-07.mkv"),
         empty_session(root, "GroupB/kinect_0"),
     ))
-    config = root / "config.yaml"
-    generate_config_command(str(config), camera_type="azure")
+    project_config(root, camera_type="azure")
 
-    namespace = {
-        "project": Project.at(root),
-        "skip_extracted": True,
-    }
-    exec(compile(code_cell(EXTRACT_NOTEBOOK, EXTRACTION_CELL), "<extraction cell>", "exec"), namespace)
+    tree = ast.parse(code_cell(EXTRACT_NOTEBOOK, EXTRACTION_CELL))
+    last = tree.body.pop()
+    namespace = {}
+    before = os.getcwd()
+    os.chdir(root)
+    try:
+        exec(compile(tree, "<Extract cell>", "exec"), namespace)
+        widget = eval(compile(ast.Expression(last.value), "<Extract cell>", "eval"), namespace)
+        widget.start()
+        run = widget.wait()
+    finally:
+        os.chdir(before)
 
+    assert run["state"] == "finished", widget.problem
     assert sorted(chosen) == expected
 
 
@@ -295,21 +319,16 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
         ),
     )
     tolerance = give_each_session_its_own_noise_tolerance(grouped)
-    with update_config(str(grouped / "config.yaml"), section="extract") as config:
-        config["cluster_type"] = "local"
+    set_config(grouped, extract={"extensions": [".avi"]}, computing={"cluster_type": "local"})
 
-    extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
+    extract(Project.at(grouped))
 
     assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}
 
 
 def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch):
-    """The SLURM path writes each session's parameters into its own
-    ``config.yaml`` in its session folder, and each job extracts with that file."""
-    monkeypatch.setattr(
-        "moseq2_extract.helpers.extract.system",
-        lambda *_: pytest.fail("extract_found_sessions submitted a job"),
-    )
+    """The SLURM path writes each session's parameters into its own job settings
+    file in its session folder, and each job (``moseq2 run-job``) extracts with that file."""
     received = {}
     monkeypatch.setattr(
         extract_steps,
@@ -319,18 +338,21 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
         ),
     )
     tolerance = give_each_session_its_own_noise_tolerance(grouped)
-    with update_config(str(grouped / "config.yaml"), section="extract") as config:
-        config["cluster_type"] = "slurm"
+    set_config(grouped, extract={"extensions": [".avi"]}, computing={"cluster_type": "slurm"})
 
-    extract_found_sessions(str(grouped), str(grouped / "config.yaml"), [".avi"])
+    extract(Project.at(grouped))
 
+    assert received == {}, "a job ran before its sbatch line was"
     for key in GROUPED:
         assert read_yaml(str(job_settings_file(session_folder(grouped, key), "extract")))["extract"]["noise_tolerance"] == tolerance[key], key
     script = (grouped / "extract_out.sh").read_text()
     for line in filter(str.strip, script.splitlines()):
-        command = line.split("moseq2-extract extract", 1)[1].split(";", 1)[0]
+        words = split_command(line)
+        job = split_command(words[words.index("--wrap") + 1].split(";", 1)[0])
         from click.testing import CliRunner
 
-        result = CliRunner().invoke(extract_cli.cli, ["extract", *split_command(command)], catch_exceptions=False)
+        from moseq2_app.cli import cli
+
+        result = CliRunner().invoke(cli, job[job.index("run-job"):], prog_name="moseq2", catch_exceptions=False)
         assert result.exit_code == 0, result.output
     assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}

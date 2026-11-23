@@ -20,14 +20,13 @@ These run the real extraction on a copy of the suite's 600-frame
 from __future__ import annotations
 
 import shutil
-import warnings
 
 import h5py
 import numpy as np
 import pytest
 from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
+from moseq2_app.cli import cli
 
 RECORDING = "saline_example_0"
 FLIP_CLASSIFIER = "flip_classifier_k2_c57_10to13weeks.npz"
@@ -45,8 +44,10 @@ def recording(raw_sessions, tmp_path_factory):
 
 def extract(recording, output_dir, chunk_size, overlap=0, classifier=False):
     """Extract and return the results file's frames, flips and angles, and the
-    warnings the extraction gave."""
+    warnings about the flip classifier the extraction gave (``Warning:`` lines on
+    standard error)."""
     args = [
+        "standalone",
         "extract",
         str(recording / "depth.avi"),
         "--chunk-size", str(chunk_size),
@@ -55,16 +56,15 @@ def extract(recording, output_dir, chunk_size, overlap=0, classifier=False):
     ]
     if classifier:
         args += ["--flip-classifier", str(recording.parent / FLIP_CLASSIFIER)]
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = CliRunner().invoke(extract_cli.cli, args, catch_exceptions=False)
+    result = CliRunner().invoke(cli, args, catch_exceptions=False)
     assert result.exit_code == 0, result.output
+    caught = [line.removeprefix("Warning: ") for line in result.stderr.splitlines() if line.startswith("Warning: ")]
     with h5py.File(recording / output_dir / "results.h5", "r") as f:
         return {
             "frames": f["frames"][()],
             "angle": f["scalars/angle"][()],
             "flips": f["metadata/extraction/flips"][()] if classifier else None,
-            "warnings": [w for w in caught if "flip classifier" in str(w.message)],
+            "warnings": [w for w in caught if "flip classifier" in w],
         }
 
 
@@ -96,7 +96,7 @@ def test_heading_does_not_depend_on_the_chunk_size(whole, chunked):
 
 def test_extracting_without_a_flip_classifier_warns_once(recording, whole):
     assert len(whole["warnings"]) == 1
-    message = str(whole["warnings"][0].message)
+    message = whole["warnings"][0]
     assert str(recording / "depth.avi") in message
     assert "half a turn" in message
     assert "--flip-classifier" in message

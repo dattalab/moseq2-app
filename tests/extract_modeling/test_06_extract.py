@@ -1,35 +1,30 @@
-"""Cell 6: extract every recording in the project.
+"""The Extract step: extract every recording in the project.
 
-    run_cmd = False
+    from moseq2_app.notebook import extract
+    extract()
 
-    extract_all = True
-
-    extract_found_sessions(progress_paths['base_dir'],
-                           progress_paths['config_file'],
-                           extract_all=extract_all,
-                           skip_extracted=skip_extracted,
-                           run_cmd=run_cmd)
-
-The heaviest cell, and the one every later cell is built on. It does four
-things: walk the project for depth recordings of every type the pipeline reads,
-narrow that list to what the user wants, dispatch on ``cluster_type``, and
-extract. What it leaves behind is a folder for each recording in
+The heaviest step, and the one every later step is built on. The notebook's
+cell opens the Extract GUI; pressing its button runs
+``moseq2_extract.project.extract``, which ``moseq2 extract`` runs too. It walks
+the project for depth recordings of the types ``config.yaml``'s ``extensions``
+names, plans each one (new, to redo, or up to date), lists every planned
+recording as a session in ``moseq2-project.yaml``, and extracts what the plan
+says on this computer or, with ``computing.extract.cluster_type`` set to
+``slurm``, writes one job per recording and the script of ``sbatch`` lines that
+runs them. What it leaves behind is a folder for each recording in
 ``aggregate_results/``, named from the recording's path in the project, holding
 the cropped frames, the scalars computed from them, a preview movie and a
 record of the parameters used. Nothing is written beside the recordings.
 
 The tests split along that seam. The ones that only need to know which
 recordings were chosen run against a directory of empty files with a stand-in
-for the extraction, which costs nothing. The ones that need real output use
-the chain's own extraction, which runs once for the whole suite.
+for the extraction of one recording, which costs nothing. The ones that need
+real output use the chain's own extraction, which runs once for the whole
+suite.
 
-Two things make the cell quieter than it looks. ``run_local_extract`` catches
-every exception a recording raises, prints it and moves to the next, so the
-cell finishes without raising; a failure shows only in the summary it prints
-at the end in place of ``Extractions Complete.``. And the recordings it
-extracts have already been filtered twice, so a project that yields nothing is
-indistinguishable from one that extracted everything. Both mean a test has to
-look at the files on disk.
+A recording that fails is recorded in the run's ``failed`` and the rest are
+extracted, so the step finishes without raising; a test reads the run and the
+files on disk.
 """
 
 from __future__ import annotations
@@ -44,15 +39,14 @@ import pytest
 
 from video import index_is_at_the_front, probe
 
-from moseq2_extract.gui import extract_found_sessions
+from moseq2_common.project import Project
 from moseq2_common.records import read_record
-from moseq2_common.yaml import read_yaml
+from moseq2_common.yaml import read_yaml, write_config
 
 from test_03_config import plain
-from test_05_arena_mask import RECORDINGS
+from test_05_arena_mask import RECORDINGS, SESSIONS
 
-#: The extensions notebooks from earlier releases pass to the cell; a list
-#: passed is still the list searched.
+#: An ``extensions`` setting that leaves out ``.mkv``.
 EXTENSIONS = [".avi", ".dat", ".tar.gz"]
 
 #: What extraction writes into every recording's session folder.
@@ -109,53 +103,75 @@ def proc(project, recording):
     return Path(project) / "aggregate_results" / recording
 
 
+def set_settings(root, section, **values):
+    """Set ``values`` in ``root``'s config.yaml: in ``section``, or, for ``computing``, its ``extract`` block."""
+    config_file = Path(root) / "config.yaml"
+    data = read_yaml(str(config_file))
+    block = data["computing"]["extract"] if section == "computing" else data[section]
+    block.update(values)
+    write_config(data, str(config_file))
+
+
 def build_fake_project(root, recordings=RECORDINGS, extension=".avi"):
     """A project of empty depth files, for testing which recordings get chosen.
 
-    The cell finds recordings with ``find_recordings``, which decides from
-    filenames alone and never opens anything.
+    The step finds recordings with ``find_recordings``, which decides from
+    filenames alone and never opens anything. The config is the one
+    ``generate-config`` writes, naming a head/tail classifier so nothing is
+    downloaded; the stand-in extraction never reads it.
     """
+    from moseq2_extract.project import generate_config
+
     root = Path(root)
     for name in recordings:
         session = root / name
         session.mkdir(parents=True)
         (session / f"depth{extension}").touch()
         (session / "metadata.json").write_text("{}")
-    (root / "config.yaml").write_text("extract:\n  cluster_type: local\n")
+    generate_config(str(root / "config.yaml"), "auto", overwrite=True)
+    set_settings(root, "extract", flip_classifier=str(root / "flip_classifier.npz"))
     return root
+
+
+def run_extraction(root, **kwargs):
+    """The Extract step's run in the project at ``root``."""
+    from moseq2_extract.project import extract
+
+    return extract(Project.at(root), **kwargs)
 
 
 @pytest.fixture
 def chosen(monkeypatch):
-    """Record the recordings handed to the extraction loop, and extract none.
+    """Record the recordings the step extracts, and extract none.
 
-    Returns the list, which fills in when ``extract_found_sessions`` is called.
+    Returns the list, which fills in as the run extracts each recording.
     """
     recorded = []
 
-    def record(to_extract, config_file, skip_extracted=False, **kwargs):
-        recorded.extend(to_extract)
-        return []
+    def record(project, input_file, opts, **kwargs):
+        recorded.append(input_file)
 
-    monkeypatch.setattr("moseq2_extract.project.run_local_extract", record)
+    monkeypatch.setattr("moseq2_extract.project.extract_recording", record)
     return recorded
 
 
 def test_every_recording_is_found(tmp_path, chosen):
-    """1. The cell's search: one depth file per recording, in sorted order."""
+    """1. The step's search: one depth file per recording, in sorted order."""
     root = build_fake_project(tmp_path / "project")
-    extract_found_sessions(str(root), str(root / "config.yaml"), EXTENSIONS)
+    run_extraction(root)
 
     assert chosen == sorted(str(root / name / "depth.avi") for name in RECORDINGS)
 
 
 def test_only_the_named_extensions_are_searched(tmp_path, chosen):
-    """2. A recording in a format the user did not ask for is left alone."""
+    """2. A recording in a format ``extensions`` leaves out is left alone."""
     root = build_fake_project(tmp_path / "project", extension=".mkv")
-    extract_found_sessions(str(root), str(root / "config.yaml"), EXTENSIONS)
+    set_settings(root, "extract", extensions=EXTENSIONS)
+    run_extraction(root)
     assert chosen == []
 
-    extract_found_sessions(str(root), str(root / "config.yaml"), [".mkv"])
+    set_settings(root, "extract", extensions=[".mkv"])
+    run_extraction(root)
     assert len(chosen) == len(RECORDINGS)
 
 
@@ -165,140 +181,106 @@ def test_the_nidaq_stream_is_not_a_recording(tmp_path, chosen):
     root = build_fake_project(tmp_path / "project", extension=".dat")
     for name in RECORDINGS:
         (root / name / "nidaq.dat").touch()
-    extract_found_sessions(str(root), str(root / "config.yaml"), [".dat"])
+    run_extraction(root)
 
     assert chosen == sorted(str(root / name / "depth.dat") for name in RECORDINGS)
 
 
 def test_a_missing_config_is_reported_before_the_search(tmp_path, chosen):
-    """3. The cell's one explicit error."""
+    """3. The step's first check: ``moseq2 extract`` in a folder of recordings with no config.yaml stops,
+    naming the folder, and extracts nothing."""
+    from click.testing import CliRunner
+
+    from moseq2_app.cli import cli
+
     root = build_fake_project(tmp_path / "project")
-    with pytest.raises(IOError, match="does not exist"):
-        extract_found_sessions(str(root), str(root / "nope.yaml"), EXTENSIONS)
+    (root / "config.yaml").unlink()
+    before = os.getcwd()
+    os.chdir(root)
+    try:
+        result = CliRunner().invoke(cli, ["extract"], prog_name="moseq2")
+    finally:
+        os.chdir(before)
+
+    assert result.exit_code == 1, result.output
+    assert f"{root} has no config.yaml" in result.stderr
     assert chosen == []
 
 
 @pytest.mark.skipif(not os.path.isdir("/tmp"), reason="no /tmp on this platform")
 def test_recordings_under_tmp_are_extracted(chosen):
-    """4. Where a project lives is not the cell's business.
+    """4. Where a project lives is not the step's business.
 
     Recordings under ``/tmp``, or under any path with a ``tmp`` component
     such as ``/data/tmp/pilot``, are extracted like any others.
     """
     with tempfile.TemporaryDirectory(dir="/tmp") as tmp:
         root = build_fake_project(Path(tmp) / "project")
-        extract_found_sessions(str(root), str(root / "config.yaml"), EXTENSIONS)
+        run_extraction(root)
 
     assert len(chosen) == len(RECORDINGS)
 
 
 @pytest.mark.parametrize(
-    ("typed", "expected"),
+    "named",
     [
-        ("1,3", [RECORDINGS[0], RECORDINGS[2]]),
-        ("1,4", [RECORDINGS[0], RECORDINGS[3]]),
-        ("1-2", RECORDINGS[:2]),
-        ("e1-2", RECORDINGS[2:]),
+        [RECORDINGS[0], RECORDINGS[2]],
+        [RECORDINGS[0], RECORDINGS[3]],
+        RECORDINGS[:2],
+        RECORDINGS[2:],
     ],
 )
-def test_selecting_a_subset_of_recordings(tmp_path, chosen, monkeypatch, typed, expected):
-    """5. What a user can type when they do not want all of them.
+def test_naming_recordings_extracts_only_those(tmp_path, chosen, named):
+    """5. What a user does when they do not want all of them: name the recordings
+    (``moseq2 extract RECORDING ...``), each by its path or its session key."""
+    root = build_fake_project(tmp_path / "project")
 
-    With ``extract_all=False`` the cell lists the recordings and asks. Commas
-    pick individual ones, a hyphen gives an inclusive range, and an ``e``
-    prefix excludes a range instead. The indices shown are one-based. An
-    answer the prompt refused would be followed by ``q``, extracting nothing.
+    first, *rest = named
+    run_extraction(root, recordings=[str(root / first / "depth.avi"), *(f"{name}/depth.avi" for name in rest)])
+
+    assert chosen == [str(root / name / "depth.avi") for name in named]
+
+
+def test_the_slurm_branch_writes_a_script_and_submits_nothing(tmp_path, chosen, monkeypatch):
+    """6. The other half of the dispatch.
+
+    With ``computing.extract.cluster_type`` set to ``slurm``, the step writes
+    each recording's job settings file into its session folder and one
+    ``sbatch`` line per recording, running ``moseq2 run-job`` on that file, into
+    ``extract_out.sh``, and stops. Nothing reaches the scheduler.
     """
-    root = build_fake_project(tmp_path / "project")
-    answers = iter([typed, "q"])
-    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+    import subprocess
 
-    extract_found_sessions(
-        str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
-    )
+    root = build_fake_project(tmp_path / "project", extension=".dat")
+    set_settings(root, "computing", cluster_type="slurm")
+    real_system, real_popen = os.system, subprocess.Popen
 
-    assert chosen == [str(root / name / "depth.avi") for name in expected]
+    def refuse_sbatch(run):
+        def guarded(command, *args, **kwargs):
+            words = command if isinstance(command, (list, tuple)) else [command]
+            if any("sbatch" in str(word) for word in words):
+                pytest.fail(f"the slurm branch submitted a job: {command}")
+            return run(command, *args, **kwargs)
+        return guarded
 
+    monkeypatch.setattr(os, "system", refuse_sbatch(real_system))
+    monkeypatch.setattr(subprocess, "Popen", refuse_sbatch(real_popen))
 
-def test_an_empty_answer_asks_again(tmp_path, chosen, monkeypatch):
-    """The prompt keeps asking until it is given something it understands.
-
-    An empty answer prints `Invalid input. Try again or press q to quit.` and
-    loops, so a user who hits return by accident is not taken to mean
-    everything, or nothing.
-    """
-    root = build_fake_project(tmp_path / "project")
-    answers = iter(["", "1"])
-    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
-
-    extract_found_sessions(
-        str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
-    )
-    assert chosen == [str(root / RECORDINGS[0] / "depth.avi")]
-
-
-def test_quitting_the_prompt_extracts_nothing(tmp_path, chosen, monkeypatch):
-    """6. The way out of the prompt."""
-    root = build_fake_project(tmp_path / "project")
-    monkeypatch.setattr("builtins.input", lambda *_: "q")
-
-    extract_found_sessions(
-        str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
-    )
-    assert chosen == []
-
-
-@pytest.mark.parametrize("typo", ["first", "1,x", "1 2", "1,9", "9,1", "1,0"])
-def test_an_unreadable_selection_asks_again(tmp_path, chosen, monkeypatch, capsys, typo):
-    """7. A typo at the prompt costs a user one more line, not the cell.
-
-    An answer that is not a number, a list or a range, or names a recording
-    that is not on the list, prints a line naming what it could not use,
-    ending ``Try again or press q to quit.``, and asks again. Nothing from it
-    carries over into the next answer. ``tests/extract/test_session_prompt.py``
-    holds every kind of answer.
-    """
-    root = build_fake_project(tmp_path / "project")
-    answers = iter([typo, "2"])
-    monkeypatch.setattr("builtins.input", lambda *_: next(answers))
-
-    extract_found_sessions(
-        str(root), str(root / "config.yaml"), EXTENSIONS, extract_all=False
-    )
-    assert chosen == [str(root / RECORDINGS[1] / "depth.avi")]
-    printed = capsys.readouterr().out
-    assert 'Invalid input "' in printed and "Try again or press q to quit." in printed
-
-
-def test_the_slurm_branch_writes_a_script_and_submits_nothing(
-    tmp_path, chosen, monkeypatch
-):
-    """8. The other half of the dispatch, which the notebook leaves commented out.
-
-    Setting ``cluster_type`` to anything but ``local`` writes one ``sbatch``
-    line per recording into ``extract_out_script`` and stops. Submitting is
-    behind ``run_cmd``, which is off by default, so running the cell this way
-    does not reach the scheduler.
-    """
-    root = build_fake_project(tmp_path / "project")
-    (root / "config.yaml").write_text("extract:\n  cluster_type: slurm\n")
-    monkeypatch.setattr(
-        "moseq2_extract.helpers.extract.system",
-        lambda *_: pytest.fail("the slurm branch submitted a job"),
-    )
-
-    extract_found_sessions(str(root), str(root / "config.yaml"), EXTENSIONS)
+    run = run_extraction(root)
 
     script = (root / "extract_out.sh").read_text()
     assert script.count("sbatch") == len(RECORDINGS)
-    assert script.count("moseq2-extract extract") == len(RECORDINGS)
-    for name in RECORDINGS:
-        assert str(root / name / "depth.avi") in script
+    assert script.count("run-job") == len(RECORDINGS)
+    assert sorted(run.jobs) == [f"{name}/depth.dat" for name in RECORDINGS]
+    for key, job_file in run.jobs.items():
+        assert Path(job_file).parent == proc(root, key.split("/")[0])
+        assert str(job_file) in script
+        assert read_yaml(str(job_file))["job"]["recording"] == key
     assert chosen == [], "the local extractor ran on the slurm branch"
 
 
 def test_every_recording_is_extracted(extracted):
-    """9. The cell's output: a full session folder for each recording, and nothing beside it."""
+    """7. The step's output: a full session folder for each recording, and nothing beside it."""
     for name in RECORDINGS:
         written = sorted(p.name for p in proc(extracted, name).iterdir())
         assert written == sorted(OUTPUTS), name
@@ -306,7 +288,7 @@ def test_every_recording_is_extracted(extracted):
 
 
 def test_the_extracted_frames_are_a_cropped_movie_of_the_mouse(extracted):
-    """10. The frames every later cell reads.
+    """8. The frames every later step reads.
 
     Cropped to the configured size, one frame per frame of the recording, and
     paired with the mask that produced them.
@@ -322,7 +304,7 @@ def test_the_extracted_frames_are_a_cropped_movie_of_the_mouse(extracted):
 
 
 def test_a_mouse_is_found_in_all_but_the_opening_frames(extracted):
-    """11. The frames hold a mouse rather than correctly shaped emptiness.
+    """9. The frames hold a mouse rather than correctly shaped emptiness.
 
     ``get_bground_im_file`` takes the median of the frames it samples at a
     stride of 1000, so a 600-frame recording gets a background built from
@@ -352,7 +334,7 @@ def test_a_mouse_is_found_in_all_but_the_opening_frames(extracted):
 
 
 def test_every_scalar_is_measured(extracted):
-    """12. The seventeen per-frame measurements the modeling and analysis read.
+    """10. The seventeen per-frame measurements the modeling and analysis read.
 
     Which frames carry a value and which do not is the next test's business.
     """
@@ -366,7 +348,7 @@ def test_every_scalar_is_measured(extracted):
 
 
 def test_a_frame_without_a_mouse_has_no_measurements(extracted):
-    """13. The scalars and the frames agree about which frames hold a mouse.
+    """11. The scalars and the frames agree about which frames hold a mouse.
 
     Twelve of the measurements are NaN where nothing was found. The two
     counted in pixels read zero instead, since zero pixels is what was
@@ -391,8 +373,8 @@ def test_a_frame_without_a_mouse_has_no_measurements(extracted):
 
 
 def test_each_recording_reports_itself_finished(extracted):
-    """14. How the next run, and cell 2's progress report, know this is done: ``results.h5`` exists under
-    its final name, with the extraction's record, and nothing is left under a temporary name."""
+    """12. How the next run, and the project's progress report, know this is done: ``results.h5`` exists
+    under its final name, with the extraction's record, and nothing is left under a temporary name."""
     for name in RECORDINGS:
         folder = proc(extracted, name)
         record = read_record(folder / "results.h5")
@@ -402,14 +384,14 @@ def test_each_recording_reports_itself_finished(extracted):
 
 
 def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
-    """15. The contract between cell 5 and this one.
+    """13. The contract between the arena tool and this step.
 
-    ``extract_command`` reads the project's ``session_config.yaml`` and takes
-    the settings the arena widget sets from the entry belonging to the
-    recording, so what a user settled on in the widget is literally what the
-    extraction ran with. The extraction's record holds that set, which is where
-    the two are compared; a depth range the extraction detected (the entry not
-    setting ``manual_set_depth_range``) is the detected one.
+    Extraction reads the project's ``session_config.yaml`` and takes the
+    settings the arena widget sets from the entry belonging to the recording,
+    so what a user settled on in the widget is literally what the extraction
+    ran with. The extraction's record holds that set, which is where the two
+    are compared; a depth range the extraction detected (the entry not setting
+    ``manual_set_depth_range``) is the detected one.
     """
     saved = plain(read_yaml(str(arena)))
     for name in RECORDINGS:
@@ -426,7 +408,7 @@ def test_extraction_ran_with_the_parameters_the_widget_saved(extracted, arena):
 
 
 def test_the_preview_movie_is_h264(extracted):
-    """16a. The movie a user opens to see whether extraction worked.
+    """14a. The movie a user opens to see whether extraction worked.
 
     Written as H.264 with 4:2:0 chroma, which is what a browser will decode.
     """
@@ -436,7 +418,7 @@ def test_the_preview_movie_is_h264(extracted):
 
 
 def test_the_preview_movie_starts_without_reading_all_of_it(extracted):
-    """16b. The index belongs at the front.
+    """14b. The index belongs at the front.
 
     With the moov atom at the end a browser has to fetch the whole file before
     it can show the first frame or seek, which is the difference between a
@@ -446,21 +428,29 @@ def test_the_preview_movie_starts_without_reading_all_of_it(extracted):
         assert index_is_at_the_front(proc(extracted, name) / "results.mp4"), name
 
 
-def test_rerunning_the_cell_extracts_nothing_again(extracted, configured):
-    """17. ``skip_extracted`` carries over from cell 5, so a second run is free."""
+def test_rerunning_the_step_extracts_nothing_again(extracted):
+    """15. A second run is free: reopened, the step shows every recording up to date, and pressing its
+    button extracts none of them."""
+    from moseq2_app.notebook import extract
+
     before = {
         name: proc(extracted, name).joinpath("results.h5").stat().st_mtime_ns
         for name in RECORDINGS
     }
 
-    extract_found_sessions(
-        str(extracted),
-        str(configured),
-        EXTENSIONS,
-        extract_all=True,
-        skip_extracted=True,
-    )
+    cwd = os.getcwd()
+    os.chdir(extracted)
+    try:
+        widget = extract()
+        plans = {row["id"]: row["plan"] for row in widget.recordings}
+        widget.start()
+        run = widget.wait()
+    finally:
+        os.chdir(cwd)
 
+    assert plans == {key: "done" for key in SESSIONS}
+    assert run["state"] == "finished", widget.problem
+    assert run["items"] == {}
     for name in RECORDINGS:
         assert (
             proc(extracted, name).joinpath("results.h5").stat().st_mtime_ns

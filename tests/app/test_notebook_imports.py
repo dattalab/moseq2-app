@@ -19,6 +19,11 @@ from cells import NOTEBOOKS
 
 IMPORT_LINE = ("import ", "from ")
 
+#: The pipeline notebook's steps whose GUIs later pull requests of this stage build (stage 2's plan, PRs 3 to
+#: 6): each is a name ``moseq2_app.notebook`` declares, imported once its module exists. Each pull request
+#: takes its step off this list.
+PLANNED_STEPS = {"setup", "arena_tool", "diagnostics", "train_pca", "scores_and_changepoints"}
+
 
 def notebook_imports(notebook):
     cells = json.loads(notebook.read_text(encoding="utf-8"))["cells"]
@@ -44,7 +49,15 @@ def test_every_name_a_notebook_imports_exists(notebook):
         except ImportError as err:
             missing.append(f"code cell {cell}: import {module} ({err})")
             continue
-        if name is not None and not hasattr(imported, name):
+        if module == "moseq2_app.notebook" and name in PLANNED_STEPS:
+            if name not in imported.__all__:
+                missing.append(f"code cell {cell}: from {module} import {name} (not a step it declares)")
+            continue
+        try:
+            found = name is None or hasattr(imported, name)
+        except ImportError:
+            found = False
+        if not found:
             try:
                 importlib.import_module(f"{module}.{name}")
             except ImportError:

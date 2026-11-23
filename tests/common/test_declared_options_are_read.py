@@ -34,6 +34,14 @@ OPTIONS_MODULES = [
 ]
 
 
+#: Options a step this stage builds later reads, by name, with that step. Each pull request that builds the
+#: step takes its options off this list.
+READ_BY_A_LATER_STEP = {
+    # stage 2's plan, R13 and PR 5: Extraction diagnostics flags a recording whose first frames hold no mouse
+    "mouse_threshold": "Extraction diagnostics",
+}
+
+
 def _package_dirs():
     names = ["moseq2_app", "moseq2_common", "moseq2_extract", "moseq2_pca", "moseq2_model", "moseq2_viz"]
     return [Path(importlib.import_module(name).__file__).parent for name in names]
@@ -77,7 +85,7 @@ def test_every_declared_option_is_read_by_a_step():
     unread = sorted(
         f"{name} (declared in {where})"
         for name, where in _declared().items()
-        if name not in read
+        if name not in read and name not in READ_BY_A_LATER_STEP
     )
     assert not unread, (
         "These options are declared but no code reads them, so setting them changes nothing: "

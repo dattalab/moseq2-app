@@ -1,22 +1,22 @@
-"""The pieces extraction is built from, and the batch's summary and SLURM script.
+"""The pieces extraction is built from, and the summary a run of several extractions ends with.
 
 ``process_extract_batches`` extracts a recording chunk by chunk, writing each
 chunk's frames and scalars to the open ``results.h5``
 (``write_extracted_chunk_to_h5``) and its preview movie (``make_output_movie``).
-``extraction_summary`` and ``run_slurm_extract`` serve batch extraction,
-``moseq2_extract.project.batch_extract``: the summary a local batch ends with,
-and the script of one sbatch command per recording a SLURM batch writes.
+Its progress bar is ``EXTRACTION_BAR`` on the current reporter
+(``moseq2_common.report``), and it stops between chunks when the person asks
+(``checkpoint``). ``extraction_summary`` is the last line of a project's
+extraction run (``moseq2_extract.project.extract``).
 """
 
 import numpy as np
-from moseq2_common.slurm import command_line, job_settings_file, sbatch_command
-from os.path import join, abspath
-from os import makedirs, system
-from tqdm.auto import tqdm
+from moseq2_common.report import checkpoint, iterate
 from moseq2_extract.extract.extract import extract_chunk
 from moseq2_extract.io.video import load_movie_data
 from moseq2_common.video import write_frames_preview
-from moseq2_extract.session_config import recordings_options
+
+#: The label of the bar that follows a recording's extraction chunk by chunk.
+EXTRACTION_BAR = "Processing batches"
 
 
 def write_extracted_chunk_to_h5(
@@ -176,7 +176,8 @@ def process_extract_batches(
     # the heading carried from one chunk to the next
     previous_orientation = None
 
-    for i, frame_range in enumerate(tqdm(frame_batches, desc="Processing batches")):
+    for i, frame_range in enumerate(iterate(frame_batches, EXTRACTION_BAR)):
+        checkpoint()
         raw_chunk = load_movie_data(
             input_file, frame_range, frame_size=bground_im.shape[::-1], **config_data
         )
@@ -260,91 +261,7 @@ def extraction_summary(n_recordings, n_skipped, failures):
         message = f"{type(error).__name__}: {error}"
         lines.extend(f"    {line}" for line in message.splitlines())
     lines.append(
-        "Fix the problem each error names, then run the extraction again. Recordings already "
-        "extracted are skipped: the notebook skips them when skip_extracted is True, and "
-        "batch-extract leaves them out unless --skip-checks is given (with --skip-checks, "
-        "--skip-completed skips them)."
+        "Fix the problem each error names, then run the extraction again with `moseq2 extract` (or the "
+        "notebook's Extract step): the recordings extracted already are left as they are."
     )
     return "\n".join(lines)
-
-
-def run_slurm_extract(
-    input_dir,
-    to_extract,
-    config_data,
-    num_frames=None,
-    cli_options=None,
-    output_dirs=None,
-    jobs=None,
-):
-    """
-    Write one sbatch command per recording to extract it on a SLURM cluster, and submit them if run_cmd is set.
-
-    Each recording is extracted with the settings ``recordings_options`` resolves: the arena tool's settings from
-    its entry in the project's session_config.yaml, every other setting from the config file, and the options typed
-    on the command line over both. They are written, with the recording's ``job:`` block, to its job settings file
-    in its session folder (``moseq2_common.slurm.job_settings_file(folder, "extract")``), which its command passes to
-    ``--config-file``, so a later edit to the config file does not change a queued job.
-
-    Args:
-    input_dir (str): directory the sessions were found in; extract_out_script is written there.
-    to_extract (list): the recordings to submit.
-    config_data (dict): batch-extract parameters, including config_file and the SLURM settings.
-    num_frames (int): number of frames to extract from each session. If None, all frames are extracted.
-    cli_options (dict): parameters typed on the command line, applied over the config file and each session's config.
-    output_dirs (dict): each recording's session folder, where its job file goes; with
-        ``config_data["output_dir"]`` set, the job is given its folder with ``--output-dir``.
-    jobs (dict): each recording's ``job:`` block (the project, the session and its uuid).
-    """
-
-    assert (
-        "extract_out_script" in config_data
-    ), "Need to supply extract_out_script to save extract commands"
-    # expand input_dir absolute path
-    input_dir = abspath(input_dir)
-
-    resolved = recordings_options(config_data["config_file"], to_extract, cli_options)
-
-    # Construct sbatch command for slurm
-    commands = ""
-    for depth_file in to_extract:
-        output_dir = output_dirs[depth_file]
-        makedirs(output_dir, exist_ok=True)
-
-        # the recording's settings: the arena tool's from its session config entry, the rest from the
-        # config file, typed options over both. It holds the entry already, so the job's extract does
-        # not lay the entry over it again.
-        config_file = resolved[depth_file].to_yaml(job_settings_file(output_dir, "extract"), job=jobs[depth_file])
-
-        # construct command
-        words = ["moseq2-extract", "extract", "--config-file", config_file]
-        if num_frames is not None:
-            words += ["--num-frames", num_frames]
-        if config_data.get("output_dir"):
-            words += ["--output-dir", output_dir]
-        commands += sbatch_command(
-            command_line(*words, depth_file) + "; ",
-            ncpus=config_data["ncpus"] if config_data["ncpus"] > 0 else 1,
-            memory=config_data["memory"],
-            partition=config_data["partition"],
-            wall_time=config_data["wall_time"],
-            prefix=config_data["prefix"],
-        ) + "\n"
-
-    # Ensure output directory exists
-    config_data["extract_out_script"] = join(
-        input_dir, config_data["extract_out_script"]
-    )
-    with open(config_data["extract_out_script"], "w") as f:
-        f.write(commands)
-    print("Commands saved to:", config_data["extract_out_script"])
-
-    # Print command
-    if config_data["get_cmd"]:
-        print("Listing extract commands...\n")
-        print(commands)
-
-    # Run command using system
-    if config_data["run_cmd"]:
-        print("Running extract commands")
-        system(commands)

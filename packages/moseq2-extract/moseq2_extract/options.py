@@ -1,23 +1,37 @@
 """The settings of each extraction step, declared once.
 
-One class per command. Each field carries its default, its command-line flags,
-its click type and its help text; ``cli.py`` generates the commands' options
-from these classes, and ``steps.py`` takes an instance. The paths a step works
-on (the recording or folder, ``--output-dir``, ``--output-file``) and
-``--config-file`` are not settings: they are the steps' arguments and plain
-options in ``cli.py``.
+One class per step. Each field carries its default, its command-line flags, its
+click type, its one plain-language help text and, for a setting a step's GUI
+shows, its control (``moseq2_common.options.Control``); the command line, the
+GUI and the settings docs are all made from these. The paths a step works on
+(the recordings, ``--output-dir``, ``--output-file``) and ``--config-file`` are
+not settings: they are the steps' arguments.
 
-``RoiOptions`` holds ``find-roi``'s settings, which ``extract`` and
-``batch-extract`` share; ``ExtractOptions`` adds the frame cleaning
-(``moseq2_common.frames.CleaningOptions``, which flip-classifier training
-shares) and the rest of ``extract``'s, and
-``BatchExtractOptions`` adds the folder search and the SLURM job settings. The
-fields marked ``arena=True`` are the settings the arena tool sets for each
-recording (``session_config.ARENA_TOOL_SETTINGS``).
+- ``CameraOptions``: the camera, ``camera_type``, read from ``config.yaml``'s top
+  level by every class that inherits it.
+- ``ProjectOptions``: the project's own settings, at ``config.yaml``'s top level
+  (``SECTION`` ``""``): the camera, which ``animals`` the recordings show (it
+  picks head/tail detection, ``moseq2_extract.project.head_tail_detection``) and
+  which recordings every step after extraction leaves out (``exclude``).
+- ``RoiOptions``: finding the arena and the background (``find-roi``).
+- ``ExtractOptions``: everything ``find-roi`` takes, the frame cleaning
+  (``moseq2_common.frames.CleaningOptions``, which flip-classifier training
+  shares) and the extraction itself. ``threads`` and ``compress_threads`` are
+  one-run switches: a project's extraction sets both from where it runs
+  (``ExtractComputing``), and ``moseq2 standalone extract`` takes them as flags.
+- ``RecordingsOptions``: which files in the project folder are recordings.
+- ``DiagnosticsOptions``: the mouse height under which extraction diagnostics
+  takes a recording's first frames to hold no mouse.
+- ``ExtractComputing``: where extraction runs, ``config.yaml``'s
+  ``computing.extract`` block (``moseq2_common.computing``).
+- ``ConvertOptions``, ``CopySliceOptions``: the video utilities, which read no
+  settings file.
 
-Every class here but the utilities' reads ``config.yaml``'s ``extract``
-section (``EXTRACT_STAGE``), and ``camera_type`` from its top level. A range
-passed explicitly in ``bg_roi_depth_range`` (typed on the command line, or in a
+The fields marked ``arena=True`` are the settings the arena tool sets for each
+recording (``session_config.ARENA_TOOL_SETTINGS``). Every class here but the
+utilities' and the computing block reads ``config.yaml``'s ``extract`` section
+(``EXTRACT_STAGE``), and ``camera_type`` from its top level. A range passed
+explicitly in ``bg_roi_depth_range`` (typed on the command line, or in a
 script's ``explicit``) is used as given: it sets ``manual_set_depth_range``
 unless that is passed too.
 """
@@ -29,61 +43,102 @@ from dataclasses import dataclass
 
 import click
 
+from moseq2_common.computing import ComputingOptions
 from moseq2_common.frames import CleaningOptions
-from moseq2_common.options import Options, option
-from moseq2_common.slurm import SlurmOptions
+from moseq2_common.options import Control, Options, option
 from moseq2_extract.recordings import DEFAULT_MAX_DEPTH, RECORDING_EXTENSIONS
+
+#: The animals a project's recordings can show, as Setup offers them.
+ANIMALS = (("c57", "Adult C57 mice"), ("fiber", "Large mice with fiber implants"),
+           ("inscopix", "Mice with Inscopix cables"), ("other", "Other"))
 
 
 @dataclass(frozen=True, kw_only=True)
-class RoiOptions(Options):
+class CameraOptions(Options):
+    """The camera the recordings were made with, at ``config.yaml``'s top level."""
+
+    SECTION = ""
+
+    camera_type: str = option(
+        "auto", "--camera-type", type=click.Choice(["auto", "kinect", "azure", "realsense"]),
+        help="The camera the recordings were made with: kinect (a Kinect v2), azure (an Azure Kinect or Orbbec "
+             "Femto), realsense, or auto to tell it from each recording (.dat is a Kinect v2, .mkv an Azure "
+             "Kinect or Orbbec Femto, .avi by its frame size). It sets how the depth frames are read wherever "
+             "those settings are still at the Kinect v2 values; a value you changed is kept. An .mkv recording "
+             "is read as an Azure one under kinect too.",
+    )
+
+
+@dataclass(frozen=True, kw_only=True)
+class ProjectOptions(CameraOptions):
+    """The project's own settings, at ``config.yaml``'s top level."""
+
+    SECTION = ""
+
+    animals: str = option(
+        "c57", "--animals", type=click.Choice([value for value, _ in ANIMALS]),
+        help="The animals in the recordings, which decides how extraction tells the mouse's head from its "
+             "tail: c57 (adult C57 mice), fiber (large mice with fiber implants), inscopix (mice with Inscopix "
+             "cables) or other (detected as adult C57 mice). A head/tail classifier you trained, kept in the "
+             "project folder, is used in its place.",
+        control=Control("choice", "Animals", choices=ANIMALS))
+    exclude: tuple = option(
+        (), "--exclude", type=str, multiple=True,
+        help="Recordings to leave out of every step after extraction, each by its path in the project folder "
+             "(such as cohort1/mouse_1/depth.avi).")
+
+
+@dataclass(frozen=True, kw_only=True)
+class RoiOptions(CameraOptions):
     """``find-roi``: finding the arena and the background."""
 
     SECTION = "extract"
 
     progress_bar: bool = option(False, "--progress-bar", "-p", is_flag=True, setting=False,
-                                help="Show verbose progress bars.")
-    use_plane_bground: bool = option(False, "--use-plane-bground", is_flag=True,
-                                     help="Use a plane fit for the background. Useful when mice don't move much")
+                                help="Show a progress bar for each stage of finding the arena and extracting.")
+    use_plane_bground: bool = option(
+        False, "--use-plane-bground", is_flag=True,
+        help="Take the arena floor to be a flat plane fitted to the depth, instead of the depth the recording "
+             "shows when the mouse is elsewhere. Helps when the mouse barely moves.")
     noise_tolerance: int = option(30, "--noise-tolerance", type=int, arena=True,
-                                  help="Extent of noise to accept during RANSAC Plane ROI computation.")
+                                  help="How far, in mm, a point may lie from the fitted floor plane and still count "
+                                       "as floor.")
     erode_iterations: int = option(0, "--erode-iterations", type=int,
-                                   help="Number of erosion iterations to decrease bucket floor size.")
+                                   help="How many times to shrink the arena from its edge, to keep the walls out.")
     bg_roi_erode: tuple = option((1, 1), "--bg-roi-erode", type=(int, int),
-                                 help="Size of cv2 Structure Element to erode roi.")
+                                 help="The width and height, in pixels, of each step that shrinks the arena.")
     dilate_iterations: int = option(1, "--dilate-iterations", type=int, arena=True,
-                                    help="Number of dilation iterations to increase bucket floor size.")
-    bg_sort_roi_by_position_max_rois: int = option(2, "--bg-sort-roi-by-position-max-rois", type=int,
-                                                   help="The number of maximum ROIs sorted by area")
-    bg_sort_roi_by_position: bool = option(False, "--bg-sort-roi-by-position", type=bool,
-                                           help="Sort ROIs by position")
-    bg_roi_fill_holes: bool = option(True, "--bg-roi-fill-holes", type=bool, help="Fill holes in ROI")
+                                    help="How many times to grow the arena from its edge, to take in more floor.")
+    bg_sort_roi_by_position_max_rois: int = option(
+        2, "--bg-sort-roi-by-position-max-rois", type=int,
+        help="With the candidate arenas numbered by position, how many of the largest are numbered.")
+    bg_sort_roi_by_position: bool = option(
+        False, "--bg-sort-roi-by-position", type=bool,
+        help="Number the candidate arenas by where they are in the frame, instead of by how well they match.")
+    bg_roi_fill_holes: bool = option(True, "--bg-roi-fill-holes", type=bool,
+                                     help="Fill any holes inside the arena.")
     bg_roi_gradient_kernel: int = option(7, "--bg-roi-gradient-kernel", type=int,
-                                         help="Kernel size for Sobel gradient filtering")
-    bg_roi_gradient_threshold: float = option(3000, "--bg-roi-gradient-threshold", type=float,
-                                              help="Gradient must be less than threshold to include points")
+                                         help="The size, in pixels, of the edge detector that finds the walls.")
+    bg_roi_gradient_threshold: float = option(
+        3000, "--bg-roi-gradient-threshold", type=float,
+        help="How steeply the depth may change at a point that still counts as floor; steeper points are wall.")
     bg_roi_gradient_filter: bool = option(False, "--bg-roi-gradient-filter", type=bool,
-                                          help="Use graident filter to exclude walls for detected ROI")
+                                          help="Leave the walls out of the arena by how steeply the depth changes.")
     bg_roi_depth_range: tuple = option((650, 750), "--bg-roi-depth-range", type=(float, float), arena=True,
-                                       help="Range to search for floor of arena (in mm)")
-    manual_set_depth_range: bool = option(False, "--manual-set-depth-range", is_flag=True, arena=True,
-                                          help="Flag to deactivate auto depth range setting.")
-    camera_type: str = option(
-        "auto", "--camera-type", type=click.Choice(["auto", "kinect", "azure", "realsense"]),
-        help="Camera the recordings were made with. It sets bg_roi_weights, pixel_format and "
-        "movie_dtype for that camera where they are missing or still at the Kinect v2 values; "
-        "a value you changed is kept. auto tells the camera from the file (.dat is a Kinect v2, "
-        ".mkv an Azure Kinect or Orbbec Femto, .avi by its frame size). An .mkv recording gets "
-        "the Azure settings under kinect too.",
-    )
-    bg_roi_weights: tuple = option((1, 0.1, 1), "--bg-roi-weights", type=(float, float, float), arena=True,
-                                   help="ROI feature weighting (area, extent, dist to center)")
+                                       help="The nearest and farthest the arena floor can be from the camera, in mm.")
+    manual_set_depth_range: bool = option(
+        False, "--manual-set-depth-range", is_flag=True, arena=True,
+        help="Search the floor depth range as given, instead of the range found from each recording.")
+    bg_roi_weights: tuple = option(
+        (1, 0.1, 1), "--bg-roi-weights", type=(float, float, float), arena=True,
+        help="How much a candidate arena's area, its shape and its distance from the frame's center count when "
+             "the arena is picked.")
     bg_roi_index: int = option(0, "--bg-roi-index", type=int, arena=True,
-                               help="Index of which detected ROI mask to use")
+                               help="Which candidate arena to use, from 0 for the best match.")
     bg_roi_shape: str = option("ellipse", "--bg-roi-shape", type=str, arena=True,
-                               help="Shape to use to detect roi (ellipse or rect)")
+                               help="The shape fitted to the arena: ellipse or rect.")
     bg_roi_dilate: tuple = option((10, 10), "--bg-roi-dilate", type=(int, int), arena=True,
-                                  help="Size of StructuringElement to dilate roi")
+                                  help="The width and height, in pixels, of each step that grows the arena.")
 
     @classmethod
     def resolve(cls, config: Mapping | None = None, entry: Mapping | None = None,
@@ -99,101 +154,135 @@ class RoiOptions(Options):
 class ExtractOptions(RoiOptions, CleaningOptions):
     """``extract``: everything ``find-roi`` takes, the frame cleaning, and the extraction itself."""
 
-    # as SlurmOptions.cluster_type, which batch-extract takes it from
-    cluster_type: str = option("local", "--cluster-type", type=click.Choice(["local", "slurm"]),
-                               help="Platform to train models on")
-    # reading the recording (moseq2-extract's -t is --temporal-filter-size, so --threads has no short flag)
+    # reading the recording (-t is --temporal-filter-size, so --threads has no short flag)
     mapping: str = option("DEPTH", "-m", "--mapping", type=str,
-                          help="Ffprobe stream selection variable. Default: DEPTH")
-    threads: int = option(8, "--threads", type=int, help="Number of threads for decoding .avi and .mkv recordings")
-    delete: bool = option(False, "--delete", is_flag=True, help="Delete raw file if encoding is sucessful")
-    chunk_size: int = option(3000, "-b", "--chunk-size", type=int, help="Chunk size")
+                          help="Which of the recording's video streams holds the depth: DEPTH, or the stream's "
+                               "number.")
+    threads: int = option(8, "--threads", type=int, setting=False,
+                          help="How many threads read an .avi or .mkv recording.")
+    delete: bool = option(False, "--delete", is_flag=True,
+                          help="Delete a .dat recording once its compressed .avi has been checked.")
+    chunk_size: int = option(3000, "-b", "--chunk-size", type=int,
+                             help="How many frames are extracted at a time; fewer use less memory.")
     skip_completed: bool = option(False, "--skip-completed", is_flag=True,
-                                  help="Will skip the extraction if it is already completed.")
-    compress_threads: int = option(3, "--compress-threads", type=int, help="Number of threads for encoding")
+                                  help="Leave a recording whose extraction has finished as it is.")
+    compress_threads: int = option(3, "--compress-threads", type=int, setting=False,
+                                   help="How many threads compress a .dat recording into an .avi.")
     compress_chunk_size: int = option(3000, "--compress-chunk-size", type=int,
-                                      help="Chunk size for .avi compression")
+                                      help="How many frames are compressed at a time.")
     compress: bool = option(False, "--compress", type=bool, arena=True,
-                            help="Convert .dat to .avi after successful extraction")
+                            help="After extracting a .dat recording, save it as an .avi about 8 times smaller.")
     frame_trim: tuple = option((0, 0), "--frame-trim", type=(int, int),
-                               help="Frames to trim from beginning and end of data")
-    model_smoothing_clips: tuple = option((0, 0), "--model-smoothing-clips", type=(float, float),
-                                          help="Model smoothing clips")
-    angle_hampel_sig: float = option(3, "--angle-hampel-sig", type=float, help="Angle filter sig")
-    angle_hampel_span: int = option(0, "--angle-hampel-span", type=int, help="Angle filter span")
-    centroid_hampel_sig: float = option(3, "--centroid-hampel-sig", type=float, help="Hampel filter sig")
-    centroid_hampel_span: int = option(0, "--centroid-hampel-span", type=int, help="Hampel filter span")
+                               help="How many frames to leave out at the start and at the end of each recording.")
+    model_smoothing_clips: tuple = option(
+        (0, 0), "--model-smoothing-clips", type=(float, float),
+        help="The range the tracking model's log-likelihoods are clipped to when it smooths the mouse's shape.")
+    angle_hampel_sig: float = option(
+        3, "--angle-hampel-sig", type=float,
+        help="How many standard deviations the heading may jump before the heading filter replaces it.")
+    angle_hampel_span: int = option(0, "--angle-hampel-span", type=int,
+                                    help="The window, in frames, of the filter that replaces outlying headings; "
+                                         "0 turns it off.")
+    centroid_hampel_sig: float = option(
+        3, "--centroid-hampel-sig", type=float,
+        help="How many standard deviations the position may jump before the position filter replaces it.")
+    centroid_hampel_span: int = option(0, "--centroid-hampel-span", type=int,
+                                       help="The window, in frames, of the filter that replaces outlying positions; "
+                                            "0 turns it off.")
     pixel_format: str = option("gray16le", "--pixel-format", type=str, arena=True,
-                               help="Pixel format for reading in .avi and .mkv videos")
+                               help="How an .avi or .mkv recording stores its depth values.")
     movie_dtype: str = option("<u2", "--movie-dtype", arena=True,
-                              help="Data type for raw frames read in for extraction")
+                              help="The data type of the depth values read from the recording.")
     frame_dtype: str = option("uint8", "--frame-dtype", type=click.Choice(["uint8", "uint16"]), arena=True,
-                              help="Data type for processed frames")
+                              help="The data type the extracted frames are saved as.")
     write_movie: bool = option(True, "--write-movie", type=bool,
-                               help="Write a results output movie including an extracted mouse")
+                               help="Save a short video of the extracted mouse beside each extraction, to check.")
     chunk_overlap: int = option(0, "--chunk-overlap", type=int, arena=True,
-                                help="Frames overlapped in each chunk. Useful for cable tracking")
+                                help="How many frames each chunk shares with the next; helps the tracking model "
+                                     "follow the mouse from one chunk to the next.")
     tracking_model_init: str = option("raw", "--tracking-model-init", type=str,
-                                      help="Method for tracking model initialization")
+                                      help="How the tracking model starts.")
     tracking_model_segment: bool = option(True, "--tracking-model-segment", type=bool,
-                                          help="Segment likelihood mask from tracking model")
+                                          help="Keep only the pixels the tracking model takes to be the mouse.")
     tracking_model_ll_clip: float = option(-100, "--tracking-model-ll-clip", type=float,
-                                           help="Clip log-likelihoods below this value")
+                                           help="The lowest log-likelihood the tracking model gives a pixel.")
     use_tracking_model: bool = option(
         False, "--use-tracking-model", type=bool, arena=True,
-        help="Use an expectation-maximization style model to aid mouse tracking. Useful for data with cables",
-    )
-    use_cc: bool = option(True, "--use-cc", type=bool, help="Extract features using largest connected components.")
+        help="Turn on if a cable or implant hides part of the mouse in many frames: the mouse is then followed "
+             "with a model of its shape.",
+        control=Control("toggle", "Follow the mouse under cables"))
+    use_cc: bool = option(True, "--use-cc", type=bool,
+                          help="Take the mouse to be the largest connected shape in each frame.")
     widen_radius: int = option(0, "--widen-radius", type=int,
-                               help="Number of pixels to increase/decrease radius by when graduating bucket walls.")
-    graduate_walls: bool = option(
-        False, "--graduate-walls", type=bool,
-        help="Graduates and dilates the background image to compensate for slanted bucket walls. \\_/",
-    )
-    flip_classifier_smoothing: int = option(51, "--flip-classifier-smoothing", type=int, arena=True,
-                                            help="Number of frames to smooth flip classifier probabilities")
+                               help="How many pixels to widen (or, below 0, narrow) the arena's edge when its walls "
+                                    "are graduated.")
+    graduate_walls: bool = option(False, "--graduate-walls", type=bool,
+                                  help="Make up for walls that slope outward, by graduating the background at the "
+                                       "arena's edge.")
+    flip_classifier_smoothing: int = option(
+        51, "--flip-classifier-smoothing", type=int, arena=True,
+        help="Over how many frames head/tail detection's answers are smoothed.")
     flip_classifier: str | None = option(
         None, "--flip-classifier",
-        help="path to the flip classifier used to properly orient the mouse (.pkl file)",
-    )
+        help="A head/tail classifier file to use in place of the one for the project's animals.")
     compute_raw_scalars: bool = option(False, "--compute-raw-scalars", is_flag=True,
-                                       help="Compute scalar values from raw cropped frames.")
+                                       help="Also measure the mouse in the raw frames, before they are cleaned.")
     detected_true_depth: str = option(
         "auto", "--detected-true-depth", type=str,
-        help='Option to override automatic depth estimation during extraction. \
-This is only a debugging parameter, for cases where dilate_iterations > 1, otherwise has no effect. Either "auto" or an int value.',
-    )
-    max_height: int = option(120, "--max-height", type=int, arena=True,
-                             help="Max mouse height threshold from floor (mm)")
+        help="The floor's depth, in mm, in place of the one found from each recording; auto finds it. It "
+             "matters only when dilate_iterations is above 1.")
+    max_height: int = option(
+        120, "--max-height", type=int, arena=True,
+        help="Anything taller than this above the floor isn't counted as the mouse, in mm.",
+        control=Control("number", "Tallest the mouse can be", minimum=20, maximum=300, unit="mm"))
     num_frames: int | None = option(None, "--num-frames", "-n", type=int,
-                                    help="Number of frames to extract. Will extract full session if set to None.")
-    crop_size: tuple = option((80, 80), "--crop-size", "-c", type=(int, int), arena=True,
-                              help="Width and height of cropped mouse image")
+                                    help="Extract only this many frames of each recording; left empty, every frame.")
+    crop_size: tuple = option(
+        (80, 80), "--crop-size", "-c", type=(int, int), arena=True,
+        help="The width and height, in pixels, of the box cut out around the mouse in every frame.",
+        control=Control("number", "Crop around the mouse", minimum=40, maximum=200, unit="pixels",
+                        shown_as="square"))
 
 
 @dataclass(frozen=True, kw_only=True)
-class BatchExtractOptions(ExtractOptions, SlurmOptions):
-    """``batch-extract``: ``extract``'s settings, the folder search and the SLURM jobs."""
-
-    extensions: tuple = option(RECORDING_EXTENSIONS, "--extensions", type=str, multiple=True,
-                               help="File extension of raw data")
-    skip_checks: bool = option(False, "--skip-checks", is_flag=True,
-                               help="Flag: include recordings whose extraction already finished")
-    max_depth: int = option(DEFAULT_MAX_DEPTH, "--max-depth", type=int,
-                            help="How many folders below the input folder to search for recordings")
-    extract_out_script: str = option("extract_out.sh", "--extract-out-script", type=click.Path(),
-                                     help="Name of bash script file to save extract commands.")
-    ncpus: int = option(1, "--ncpus", type=int, help="CPUs each extraction job requests (slurm only)")
-
-
-@dataclass(frozen=True, kw_only=True)
-class AggregateOptions(Options):
-    """``aggregate-results``."""
+class RecordingsOptions(Options):
+    """Which files in the project folder are recordings."""
 
     SECTION = "extract"
 
-    mouse_threshold: float = option(0, "--mouse-threshold", type=float,
-                                    help="Threshold value for mean depth to include frames in aggregated results")
+    extensions: tuple = option(RECORDING_EXTENSIONS, "--extensions", type=str, multiple=True,
+                               help="The kinds of recording file to look for, by extension; repeat it for each.")
+    max_depth: int = option(DEFAULT_MAX_DEPTH, "--max-depth", type=int,
+                            help="How many folders below the project folder to look in for recordings.")
+
+
+@dataclass(frozen=True, kw_only=True)
+class DiagnosticsOptions(Options):
+    """Extraction diagnostics' settings."""
+
+    SECTION = "extract"
+
+    mouse_threshold: float = option(
+        0, "--mouse-threshold", type=float,
+        help="A recording whose first frames average no more than this height, in mm, holds no mouse there.")
+
+
+#: Where extraction runs, as the Extract step offers it.
+_WALL_TIMES = (("auto", "From each recording's length"), (2, "2 hours"), (4, "4 hours"), (12, "12 hours"))
+
+
+@dataclass(frozen=True, kw_only=True)
+class ExtractComputing(ComputingOptions):
+    """Where extraction runs: ``config.yaml``'s ``computing.extract`` block."""
+
+    STEP = "extract"
+
+    wall_time: str = option(
+        "auto", "--wall-time", type=str,
+        help="How long each cluster job may run before the cluster stops it, as hours:minutes:seconds (such as "
+             "4:00:00), or auto for three times its recording's length, at least an hour.",
+        control=Control("choice", "Time per job", choices=_WALL_TIMES, shown_as="hours",
+                        show_if=("cluster_type", "slurm")))
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -201,11 +290,13 @@ class ConvertOptions(Options):
     """``convert-raw-to-avi``."""
 
     mapping: str = option("DEPTH", "-m", "--mapping", type=str,
-                          help="Ffprobe stream selection variable. Default: DEPTH")
-    threads: int = option(8, "-t", "--threads", type=int, help="Number of threads for encoding")
-    delete: bool = option(False, "--delete", is_flag=True, help="Delete raw file if encoding is sucessful")
-    fps: float = option(30, "--fps", type=float, help="Video FPS")
-    chunk_size: int = option(3000, "-b", "--chunk-size", type=int, help="Chunk size")
+                          help="Which of the recording's video streams holds the depth: DEPTH, or the stream's "
+                               "number.")
+    threads: int = option(8, "-t", "--threads", type=int, help="How many threads compress the video.")
+    delete: bool = option(False, "--delete", is_flag=True,
+                          help="Delete the .dat recording once its compressed copy has been checked.")
+    fps: float = option(30, "--fps", type=float, help="The video's frame rate, in frames per second.")
+    chunk_size: int = option(3000, "-b", "--chunk-size", type=int, help="How many frames are copied at a time.")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -213,8 +304,11 @@ class CopySliceOptions(ConvertOptions):
     """``copy-slice``."""
 
     copy_slice: tuple = option((0, 1000), "-c", "--copy-slice", type=(int, int),
-                               help="Slice indices used for copy")
+                               help="The first frame to copy and the frame to stop before.")
 
 
 #: The classes of the extraction steps, whose fields config.yaml's ``extract`` section may set.
-EXTRACT_STAGE = (RoiOptions, ExtractOptions, BatchExtractOptions, AggregateOptions, CleaningOptions)
+EXTRACT_STAGE = (RoiOptions, ExtractOptions, RecordingsOptions, DiagnosticsOptions, CleaningOptions)
+
+#: The computing blocks of the extraction steps, which ``generate-config`` writes under ``computing``.
+COMPUTING = (ExtractComputing,)

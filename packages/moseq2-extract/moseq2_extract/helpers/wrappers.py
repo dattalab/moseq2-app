@@ -1,5 +1,8 @@
 """
 Wrapper functions for data processing in extraction.
+
+What they do is reported through ``moseq2_common.report``'s current reporter:
+status lines, and progress bars for the chunk loops.
 """
 
 import os
@@ -9,22 +12,20 @@ from uuid import uuid4
 import h5py
 import warnings
 import numpy as np
-from tqdm.auto import tqdm
+from moseq2_common.report import current, iterate
 from moseq2_extract.io.image import write_image
 from moseq2_extract.helpers.extract import process_extract_batches
 from moseq2_extract.extract.proc import get_roi, get_bground_im_file
 from os.path import join, exists, dirname, basename, abspath, splitext
 from moseq2_extract.io.video import load_movie_data, get_movie_info, write_frames
 from moseq2_extract.extract.flip_classifier import load_flip_classifier, training_settings
-from moseq2_extract.util import mouse_threshold_filter
 from moseq2_extract.helpers.data import (
     recording_frame_rate,
     handle_extract_metadata,
     create_extract_h5,
     write_misc_metadata,
 )
-from moseq2_extract.recordings import find_recordings, outputs_in, project_keys, session_outputs
-from moseq2_common.project import session_key
+from moseq2_extract.recordings import outputs_in
 from dataclasses import fields
 from moseq2_common.frames import CleaningOptions, select_strel
 from moseq2_common.records import StepInputError, atomic_output, start_record, write_h5_record
@@ -41,43 +42,6 @@ from moseq2_extract.util import (
     get_frame_range_indices,
     check_filter_sizes,
 )
-
-
-def aggregate_extract_results_wrapper(input_dir, output_dir, mouse_threshold=0.0, project=None):
-    """
-    The finished extractions of the recordings under ``input_dir``, each in its session's folder.
-
-    Nothing is copied: extraction writes each session's files into its folder. A recording counts
-    when its ``results.h5`` exists (``moseq2_extract.recordings.session_outputs``) and its frames'
-    mean depth is above ``mouse_threshold``.
-
-    Args:
-    input_dir (str): the folder searched for recordings.
-    output_dir (str): the folder holding the session folders; None for each session's folder in the
-        project (the one moseq2-project.yaml names, else in ``aggregate_results/``).
-    mouse_threshold (float): the mean frame depth a session's extraction must exceed to be included.
-    project (Project): the project.
-
-    Returns:
-    found (list): (session key, its folder, its uuid) for each session included, sorted by key.
-    """
-    recordings = find_recordings(input_dir).recordings
-    keys = sorted(session_key(project, recording) for recording in recordings)
-    everything = set(keys) | set(project_keys(project))
-    found = []
-    for key in keys:
-        outputs = session_outputs(project, key, keys=everything, sessions_dir=output_dir)
-        if not outputs.h5.is_file():
-            continue
-        if not mouse_threshold_filter(str(outputs.h5), thresh=mouse_threshold):
-            print(f"Leaving out {key}: the mean depth of its first frames in {outputs.h5} is not above "
-                  f"mouse_threshold ({mouse_threshold}), so it is taken to hold no mouse. Set a lower "
-                  "mouse_threshold in config.yaml's extract section to include it.")
-            continue
-        with h5py.File(outputs.h5, "r") as f:
-            uuid_value = f["metadata/uuid"][()]
-        found.append((key, outputs.folder, uuid_value.decode() if isinstance(uuid_value, bytes) else str(uuid_value)))
-    return found
 
 
 def find_arena_candidates(bground_im, config_data, output_dir=None):
@@ -114,7 +78,7 @@ def find_arena_candidates(bground_im, config_data, output_dir=None):
     )
 
     if config_data["use_plane_bground"]:
-        print("Using plane fit for background...")
+        current().status("Using plane fit for background...")
         bground_im = set_bground_to_plane_fit(bground_im, plane, output_dir)
 
     # Keep the best-ranked ROIs and order them top to bottom
@@ -159,17 +123,17 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
     # checks camera type to set appropriate bg_roi_weights
     config_data = detect_and_set_camera_parameters(config_data, input_file)
 
-    print("Getting background...")
+    current().status("Getting background...")
     bground_im = get_bground_im_file(input_file, **config_data)
 
     # readjust depth range
     if not config_data.get("manual_set_depth_range", False):
         # search for depth values between the max distance and the halfway point to the camera
-        print(
+        current().status(
             "Automatically setting depth range. To manually set range values,"
             ' set "manual_set_depth_range" to True.\n For CLI users: use the --manual-set-depth-range flag.'
         )
-        print(
+        current().status(
             "To manually set a correct --bg-roi-depth-range value, "
             "set the min and max range values to +/-50mm of the actual camera height."
         )
@@ -194,7 +158,7 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
         scale_factor=config_data["bg_roi_depth_range"],
     )
 
-    print("Getting roi...")
+    current().status("Getting roi...")
     rois, bground_im = find_arena_candidates(bground_im, config_data, output_dir)
 
     if type(config_data["bg_roi_index"]) == int:
@@ -210,6 +174,10 @@ def get_roi_wrapper(input_file, config_data, output_dir=None):
         write_image(join(output_dir, roi_filename), rois[idx], scale=True)
 
     return roi, bground_im, first_frame
+
+
+class FrameCountMismatchError(StepInputError, ValueError):
+    """A recording's video and timestamps hold different numbers of frames."""
 
 
 class FlipClassifierError(StepInputError, ValueError):
@@ -421,12 +389,12 @@ def floor_depth_and_background(bground_im, roi, config_data, output_dir):
     else:
         config_data["true_depth"] = int(config_data["detected_true_depth"])
 
-    print("Detected true depth:", config_data["true_depth"])
+    current().status(f"Detected true depth: {config_data['true_depth']}")
 
     if config_data.get("dilate_iterations", 0) > 1 and config_data.get(
         "graduate_walls"
     ):
-        print("Dilating background and graduating walls")
+        current().status("Dilating background and graduating walls")
         bground_im = graduate_dilated_wall_area(
             bground_im,
             config_data,
@@ -461,7 +429,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     Returns:
     output_dir (str): path to directory containing extraction, or None if the file was skipped as already extracted
     """
-    print("Processing:", input_file)
+    current().status(f"Processing: {input_file}")
 
     # for a tarball, input_file becomes the opened archive further down
     recording = input_file
@@ -476,7 +444,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     # A recording already extracted is skipped before anything about it is
     # checked: the checks below guard an extraction that is about to run.
     if skip and exists(results_filename):
-        print("Skipping...")
+        current().status("Skipping...")
         return
 
     validate_flip_classifier(config_data, input_file)
@@ -518,7 +486,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
         # lack one. The timestamps then give the count: an .mkv's own frame
         # times are the video's frames, a timestamp file's lines are not.
         if timestamp_source == f"the frame timestamps inside {recording}":
-            print(
+            current().status(
                 f"{recording} records no frame count of its own; extracting the "
                 f"{n_timestamps} frames counted from {timestamp_source}."
             )
@@ -534,7 +502,7 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
             )
         config_data["finfo"]["nframes"] = n_timestamps
     elif n_timestamps > 0 and nframes_from_video != n_timestamps:
-        raise ValueError(
+        raise FrameCountMismatchError(
             f"Frame count mismatch for {recording}: the depth video has "
             f"{nframes_from_video} frames but {n_timestamps} timestamps were read "
             f"from {timestamp_source}. Each frame needs one timestamp, so the video "
@@ -639,8 +607,6 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
     for stale in outputs.folder.glob("roi_*.yaml"):
         stale.unlink()
 
-    print()
-
     # Compress the depth file to avi format; compresses original raw file by ~8x.
     try:
         if config_data["tar"] is None:
@@ -653,8 +619,8 @@ def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=F
                     threads=config_data["compress_threads"],
                 )
     except AttributeError as e:
-        print("Error converting raw video to avi format, continuing anyway...")
-        print(e)
+        current().status("Error converting raw video to avi format, continuing anyway...")
+        current().status(str(e))
 
     return output_dir
 
@@ -716,7 +682,7 @@ def _copy_frames(
 
     video_pipe = None
 
-    for batch in tqdm(frame_batches, desc="Encoding batches"):
+    for batch in iterate(frame_batches, "Encoding batches"):
         frames = load_movie_data(input_file, batch, mapping=mapping)
         if avi_encode:
             video_pipe = write_frames(
@@ -734,7 +700,7 @@ def _copy_frames(
     if video_pipe:
         video_pipe.communicate()
 
-    for batch in tqdm(frame_batches, desc="Checking data integrity"):
+    for batch in iterate(frame_batches, "Checking data integrity"):
         raw_frames = load_movie_data(input_file, batch, mapping=mapping)
         encoded_frames = load_movie_data(output_file, batch, mapping=mapping)
 
@@ -743,10 +709,10 @@ def _copy_frames(
                 f"Raw frames and encoded frames not equal from {batch[0]} to {batch[-1]}"
             )
 
-    print("Encoding successful")
+    current().status("Encoding successful")
 
     if delete:
-        print("Deleting", input_file)
+        current().status(f"Deleting {input_file}")
         os.remove(input_file)
 
 

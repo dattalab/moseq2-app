@@ -2,7 +2,8 @@
 
 The same project, copied twice, is taken through the pipeline once on the
 command line and once through the notebook's functions: extraction of every
-recording, aggregation, the three PCA steps, fitting a model, applying it and
+recording (``moseq2 extract`` and the Extract GUI), which lists them as the
+project's sessions, the three PCA steps, fitting a model, applying it and
 picking the best model. After each step the two outputs must hold the same
 data, and their records the same run, apart from the times, the front end and
 the command typed. Each step's random draws are seeded alike on both sides (the
@@ -73,6 +74,8 @@ def projects(tmp_path_factory, raw_sessions):
         generate_config_command(str(root / "config.yaml"), camera_type="k2")
         config = read_yaml(str(root / "config.yaml"))
         config["extract"]["num_frames"] = 120
+        # the fixture's head/tail classifier, so nothing is downloaded
+        config["extract"]["flip_classifier"] = str(Path(raw_sessions) / "flip_classifier_k2_c57_10to13weeks.npz")
         config["pca"].update({"cluster_type": "local", "nworkers": 1, "overwrite_pca_train": True,
                               "overwrite_pca_apply": True, "dask_cache_path": str(root / "dask_cache")})
         config["model"].update({"num_iter": 5, "npcs": 5, "kappa": 100, "robust": False})
@@ -87,10 +90,12 @@ def seeded(monkeypatch):
     import dask.array.linalg as linalg
 
     import moseq2_extract.helpers.wrappers as extract_wrappers
+    import moseq2_extract.project as extract_project
     import moseq2_pca.util as pca_util
 
     counter = iter(range(10 ** 6))
-    monkeypatch.setattr(extract_wrappers, "uuid4", lambda: uuid_module.UUID(int=next(counter)))
+    for module in (extract_wrappers, extract_project):
+        monkeypatch.setattr(module, "uuid4", lambda: uuid_module.UUID(int=next(counter)))
     svd = linalg.svd_compressed
     monkeypatch.setattr(linalg, "svd_compressed", lambda *a, **k: svd(*a, **{**k, "seed": 0}))
     monkeypatch.setattr(pca_util, "get_env_cpu_and_mem", lambda: (2e9, 2))
@@ -184,23 +189,23 @@ def bookkeeping(projects):
 # ------------------------------------------------------------------ the steps, in order
 
 
-def test_extract(projects, seeded):
-    from moseq2_extract.gui import extract_found_sessions
+def extract_in_the_gui(root):
+    """The Extract GUI opened in ``root``, its button pressed; waits for the run, which must finish."""
+    from moseq2_app.notebook import extract
 
-    both(seeded, projects,
-         lambda root: cli("extract", "batch-extract", root, "--config-file", root / "config.yaml",
-                                  "--skip-completed", cwd=root),
-         lambda root: extract_found_sessions(str(root), str(root / "config.yaml"), extract_all=True,
-                                             skip_extracted=True))
+    with working_in(root):
+        widget = extract()
+        widget.start()
+        run = widget.wait()
+    assert run["state"] == "finished", (run, widget.problem)
+    assert sorted(run["items"]) == [f"{name}/depth.avi" for name in sorted(RECORDINGS)], run
+    assert all(item["state"] == "done" for item in run["items"].values()), run
+
+
+def test_extract(projects, seeded):
+    both(seeded, projects, lambda root: cli("app", "extract", cwd=root), extract_in_the_gui)
     for name in RECORDINGS:
         same_h5(projects, Path("aggregate_results") / name / "results.h5")
-
-
-def test_aggregate_results(projects, seeded):
-    from moseq2_extract.gui import aggregate_extract_results_command
-
-    both(seeded, projects, lambda root: cli("extract", "aggregate-results", cwd=root),
-         lambda root: aggregate_extract_results_command(str(root)))
     bookkeeping(projects)
 
 

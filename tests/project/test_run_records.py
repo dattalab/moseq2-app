@@ -41,7 +41,7 @@ import h5py
 import pytest
 from click.testing import CliRunner
 
-from moseq2_common.yaml import read_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 RECORDING = "saline_example_0"
 KEY = f"{RECORDING}/depth.avi"
@@ -75,13 +75,25 @@ def extract_cli():
     return cli
 
 
+def moseq2_cli():
+    from moseq2_app.cli import cli
+
+    return cli
+
+
 def extracted_project(root, raw_sessions):
-    """A project holding one recording, extracted (30 frames) and aggregated on the command line."""
+    """A project holding one recording, extracted (30 frames) with ``moseq2 extract``, its config naming a copy
+    of the fixture's head/tail classifier in the project folder, as a downloaded one would be, so nothing is
+    downloaded."""
     root.mkdir(parents=True)
     shutil.copytree(raw_sessions / RECORDING, root / RECORDING)
+    classifier = "flip_classifier_k2_c57_10to13weeks.npz"
+    shutil.copy(raw_sessions / classifier, root / classifier)
     ok(extract_cli(), "generate-config", "--output-file", root / "config.yaml", cwd=root)
-    ok(extract_cli(), "extract", root / KEY, "--config-file", root / "config.yaml", "--num-frames", 30, cwd=root)
-    ok(extract_cli(), "aggregate-results", cwd=root)
+    config = read_yaml(str(root / "config.yaml"))
+    config["extract"]["flip_classifier"] = str(root / classifier)
+    write_yaml(config, str(root / "config.yaml"))
+    ok(moseq2_cli(), "extract", "--num-frames", 30, cwd=root)
     return root
 
 
@@ -147,8 +159,7 @@ def test_an_interrupted_step_leaves_the_previous_output_and_bookkeeping(tmp_path
         raise KeyboardInterrupt
 
     monkeypatch.setattr(wrappers, "process_extract_batches", stopped)
-    result = invoke(extract_cli(), "extract", root / KEY, "--config-file", root / "config.yaml",
-                    "--num-frames", 30, cwd=root)
+    result = invoke(moseq2_cli(), "extract", KEY, cwd=root)
     assert result.exit_code != 0
 
     for path, data in kept.items():

@@ -27,6 +27,9 @@ requires-python = ">=3.10"
 dependencies = [
     # Each floor is the oldest version the CI suite has passed with.
 
+    # The notebook's step GUIs. No ceiling: current versions need a browser
+    # with AbortSignal.any (Chrome 116, Firefox 124, Safari 17.4 or newer).
+    "anywidget>=0.11.0",
     "bokeh>=3.9.2",
     "h5py>=3.16.0",
     "holoviews>=1.23.2",
@@ -59,6 +62,9 @@ dependencies = [
     "Cython>=3.3.0",
     "requests>=2.34.2",
 ]
+
+[project.scripts]
+moseq2 = "moseq2_app.cli:cli"
 
 [project.optional-dependencies]
 tests = [

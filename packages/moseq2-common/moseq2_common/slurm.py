@@ -1,15 +1,19 @@
-"""The SLURM options ``batch-extract`` and ``kappa-scan`` share, their sbatch line and their jobs' settings files.
+"""The SLURM options ``kappa-scan`` takes, the ``sbatch`` line, and cluster jobs' commands and settings files.
 
-``ncpus`` is declared by each command, since its flags, default and help
-differ between the two.
+``ncpus`` is declared by the command, since its flags, default and help are
+its own. Where extraction runs, on a cluster included, is its block under
+``config.yaml``'s ``computing`` section (``moseq2_common.computing``).
 
-Each job runs its step with ``--config-file`` pointing at a settings file of
-its own, written when the job is submitted (``Options.to_yaml``), so a later
-edit to ``config.yaml`` does not change a queued job. The file sits in the
-folder of what the job writes: a session's in its folder in
-``aggregate_results/`` (``extract-job.yaml``), a kappa-scan fit's beside its
-model (``model-000-1000-job.yaml``), named by ``job_settings_file``.
+Each job runs its step from a settings file of its own, written when the job
+is submitted (``Options.to_yaml``), so a later edit to ``config.yaml`` does not
+change a queued job. The file sits in the folder of what the job writes: an
+extraction's in its session's folder in ``aggregate_results/``
+(``extract-job.yaml``), run by ``moseq2 run-job``; a kappa-scan fit's beside its
+model (``model-000-1000-job.yaml``), passed to ``learn-model --config-file``.
+``job_settings_file`` names them.
 
+A job runs MoSeq2 through the Python that submitted it (``job_command``), so it
+finds the MoSeq2 the notebook or terminal runs whatever its ``PATH`` holds.
 Every word of a job's command is quoted for the shell (``command_line``), and
 the command is quoted again as ``--wrap``'s one argument (``sbatch_command``),
 so a path with spaces or backslashes (``C:\\Users\\Jane Doe\\OneDrive``)
@@ -21,13 +25,14 @@ from __future__ import annotations
 import dataclasses
 import os
 import shlex
+import sys
 from pathlib import Path
 
 import click
 
 from moseq2_common.options import Options, option
 
-__all__ = ["SlurmOptions", "command_line", "job_settings_file", "sbatch_command"]
+__all__ = ["SlurmOptions", "command_line", "job_command", "job_settings_file", "sbatch_command"]
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -57,6 +62,15 @@ def job_settings_file(folder: str | os.PathLike, name: str) -> Path:
 def command_line(*words) -> str:
     """``words`` as one shell command, each quoted where the shell would otherwise split or read it."""
     return shlex.join(str(word) for word in words)
+
+
+def job_command(*words: object) -> str:
+    """The shell command a cluster job runs MoSeq2 with: this Python running ``moseq2_app`` with ``words``.
+
+    ``"<sys.executable>" -m moseq2_app <words>``, each word quoted (``command_line``), so the job runs the
+    MoSeq2 the notebook or terminal that submitted it runs, whatever the job's ``PATH`` holds.
+    """
+    return command_line(sys.executable, "-m", "moseq2_app", *words)
 
 
 def sbatch_command(command: str, *, ncpus: int, memory: str, partition: str,

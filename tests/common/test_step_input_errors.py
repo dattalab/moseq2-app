@@ -104,7 +104,7 @@ def test_an_unusable_input_prints_as_a_message(tmp_path, monkeypatch, check):
 
 
 def test_train_pca_in_a_project_with_no_sessions_says_what_to_do(tmp_path, monkeypatch):
-    """The reviewer's case: ``train-pca`` before any session is aggregated printed a 26-line traceback."""
+    """The reviewer's case: ``train-pca`` before any session is listed printed a 26-line traceback."""
     from moseq2_pca.cli import cli
 
     root = empty_project(tmp_path / "project")
@@ -113,4 +113,4 @@ def test_train_pca_in_a_project_with_no_sessions_says_what_to_do(tmp_path, monke
     assert result.exit_code == 1
     assert isinstance(result.exception, SystemExit), result.exception
     assert result.output.startswith("Error: ")
-    assert "lists no sessions yet. Aggregate the extractions first" in result.output
+    assert "lists no sessions yet. Extract the recordings first: run `moseq2 extract` in" in result.output

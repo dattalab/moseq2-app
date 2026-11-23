@@ -9,8 +9,9 @@ Extract notebook's ``generate_config_command`` call the project layer.
 stage (``extract``, ``pca``, ``model``, ``crowd_movies``), each holding every
 setting of its stage's steps at its default (``_stages``, ``_defaults``), with
 the camera's preset values (``CAMERA_PRESETS``) in place of the defaults they
-replace, and an empty ``exclude`` list, where the sessions every step after
-extraction leaves out are named. ``project_camera`` tells the camera from the
+replace; then ``computing``, with a block for each installed step that does long
+work, saying where it runs (``_computing``); and an empty ``exclude`` list,
+where the sessions every step after extraction leaves out are named. ``project_camera`` tells the camera from the
 recordings in a folder.
 """
 
@@ -74,6 +75,24 @@ def _stages():
                 raise
             stages[section] = ()
     return stages
+
+
+def _computing() -> dict:
+    """Each installed step's ``computing`` block at its defaults, keyed by the step's command.
+
+    The steps are the ``COMPUTING`` classes of each section's options module, in section order.
+    """
+    blocks = {}
+    for module, _ in _STAGES.values():
+        try:
+            classes = getattr(importlib.import_module(module), "COMPUTING", ())
+        except ModuleNotFoundError as error:
+            if error.name != module.split(".")[0]:
+                raise
+            continue
+        for cls in classes:
+            blocks[cls.STEP] = _defaults((cls,))
+    return blocks
 
 
 def _defaults(classes) -> dict:

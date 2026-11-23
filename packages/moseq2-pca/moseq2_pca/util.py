@@ -21,6 +21,7 @@ from glob import glob
 from copy import deepcopy
 from contextlib import contextmanager
 from moseq2_common.bookkeeping import recording_order
+from moseq2_common.errors import ExpectedError
 from moseq2_common.frames import clean_frames as clean_frames_spatial, odd_kernel
 from moseq2_common.h5 import extraction_labels
 from moseq2_common.records import StepInputError
@@ -831,7 +832,7 @@ class TrainingMemoryWarning(Warning):
     """
 
 
-class TrainingMemoryError(RuntimeError):
+class TrainingMemoryError(ExpectedError, RuntimeError):
     """
     The PCA training data is larger than the dask workers' memory, and the disk
     under dask_cache_path cannot hold what dask would spill.

@@ -1,19 +1,18 @@
-"""Cell 9: list the extracted recordings as the project's sessions.
+"""The project's sessions, as the Extract step lists them.
 
-    aggregate_extract_results_command(str(project.folder))
-
-The hinge of the notebook. Extraction has already written each recording's
-files into its own folder in ``aggregate_results/``, named from the
-recording's path in the project; this cell copies nothing and lists each
-extracted recording as one of the project's sessions in
-``moseq2-project.yaml``.
+The hinge of the pipeline. Before it extracts anything, the Extract step lists
+every recording it plans as one of the project's sessions in
+``moseq2-project.yaml``, each with its folder in ``aggregate_results/``, named
+from the recording's path in the project, and its uuid; extraction then writes
+each recording's files into that folder. No separate step lists them, and
+nothing is copied.
 
 That file is the project's table of contents from here on: one session per
 recording, keyed by the recording's path in the project, with its uuid and its
 folder in ``aggregate_results/``. The later steps read the sessions as an index
 in memory (``moseq2_common.bookkeeping.session_index``), each with the
 acquisition metadata and its group from ``config.yaml``, ``default`` until
-cell 10 sets them.
+the Assign Groups cell sets them.
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ def entries(where):
 
 
 def test_every_session_has_one_folder_in_aggregate_results(aggregated, project):
-    """1. The cell's purpose: one folder holding the whole experiment, one subfolder per session,
+    """1. The listing's purpose: one folder holding the whole experiment, one subfolder per session,
     named from the recording's folder, holding what extraction wrote and no copy of it."""
     folders = sorted(p.name for p in (project / "aggregate_results").iterdir())
     assert folders == RECORDINGS
@@ -71,8 +70,8 @@ def test_each_entry_points_at_its_session_folder(aggregated, project):
         assert Path(entry["path"][0]) == proc(project, name) / "results.h5"
 
 
-def test_aggregation_lists_the_sessions_and_nothing_else(bookkeeping_as_aggregated, project):
-    """4. What the cell writes: each recording as a session, keyed by its path in the project.
+def test_extraction_lists_the_sessions_and_nothing_else(bookkeeping_as_aggregated, project):
+    """4. What extraction writes: each recording as a session, keyed by its path in the project.
 
     No group is stored here (groups are config.yaml's), and no later step has
     recorded an output yet.
@@ -89,7 +88,8 @@ def test_aggregation_lists_the_sessions_and_nothing_else(bookkeeping_as_aggregat
 
 
 def test_a_session_no_group_names_is_in_the_default_group(bookkeeping_as_aggregated, tmp_path):
-    """5. The state cell 10 exists to change: with no groups in config.yaml, every session is ``default``."""
+    """5. The state the Assign Groups cell exists to change: with no groups in config.yaml, every session is
+    ``default``."""
     import shutil
 
     copy = tmp_path / "project"
@@ -101,5 +101,5 @@ def test_a_session_no_group_names_is_in_the_default_group(bookkeeping_as_aggrega
 
 
 def test_the_bookkeeping_file_is_written_in_the_project(aggregated, project):
-    """6. Where the rest of the notebook finds it."""
+    """6. Where the rest of the pipeline finds it."""
     assert aggregated == project / "moseq2-project.yaml"

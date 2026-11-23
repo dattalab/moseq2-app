@@ -91,8 +91,8 @@ class FlipClassifierWidget:
         if len(self.sessions) == 0:
             raise ValueError(
                 f"No completed extractions found in '{data_path}'. "
-                "Make sure you have run the 'aggregate results' step in the "
-                "extraction notebook and that input_dir points to the folder "
+                "Make sure you have run `moseq2 extract` (or the notebook's "
+                "Extract step) and that input_dir points to the folder "
                 "containing your extracted .h5 files (e.g. the "
                 "aggregate_results/ directory)."
             )

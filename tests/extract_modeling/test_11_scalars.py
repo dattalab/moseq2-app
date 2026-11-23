@@ -57,11 +57,11 @@ def test_the_cell_displays_its_controls_and_hands_back_the_viewer(grouped, displ
 
 
 def test_a_project_with_no_sessions_is_reported_rather_than_raised(tmp_path, capsys):
-    """2. Run before the aggregation cell, the cell says to run that first."""
+    """2. Run before the Extract step, the cell says to run that first."""
     assert interactive_scalar_summary(str(tmp_path)) is None
     out = capsys.readouterr().out
     assert str(tmp_path / "moseq2-project.yaml") in out
-    assert "aggregation cell" in out
+    assert "Run `moseq2 extract` (or the notebook's Extract step) first" in out
 
 
 def test_the_measurements_on_offer(scalar_viewer):

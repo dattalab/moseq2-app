@@ -20,7 +20,7 @@ import pytest
 from click.testing import CliRunner
 from dask.distributed import Client
 
-import moseq2_extract.cli as extract_cli
+from moseq2_app.cli import cli as moseq2_cli
 from moseq2_pca.pca.util import apply_pca_dask, get_timestamps
 from moseq2_pca.util import frame_rate_from_timestamps
 
@@ -83,9 +83,8 @@ def azure_extraction(tmp_path_factory):
     shutil.copy(Path(fetch_azure_mkv()) / "depth.mkv", session_dir / "depth.mkv")
     (session_dir / "metadata.json").write_text("{}")
     result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(session_dir / "depth.mkv"), "--camera-type", "azure",
-         "--output-dir", str(session_dir / "proc")],
+        moseq2_cli,
+        ["standalone", "extract", str(session_dir / "depth.mkv"), "--camera-type", "azure", "--output-dir", "proc"],
     )
     assert result.exit_code == 0, result.output + repr(result.exception)
     return session_dir / "proc" / "results.h5"

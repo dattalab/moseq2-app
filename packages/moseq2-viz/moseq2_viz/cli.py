@@ -90,7 +90,7 @@ def _sessions(ctx):
             )
         raise click.ClickException(
             f"{project.bookkeeping_file} lists no sessions, so `{ctx.info_name}` has none to work on. Run "
-            f"`moseq2-extract aggregate-results` in {project.folder} (or the notebook's aggregation cell) to list "
+            f"`moseq2 extract` in {project.folder} (or the notebook's Extract step) to list "
             "the project's extractions."
         )
     return index

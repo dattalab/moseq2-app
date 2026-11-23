@@ -1,9 +1,9 @@
 """
 Find the depth recordings in a project.
 
-The progress cell, the arena tool and extraction (the notebook cell and
-``moseq2-extract batch-extract``) all list a project's recordings through
-``find_recordings``, so they agree on what a recording is.
+The arena tool and extraction (the notebook's Extract step and ``moseq2
+extract``) list a project's recordings through ``find_recordings``, so they
+agree on what a recording is.
 
 A recording is one file per session folder whose name ends in one of the
 extensions the caller asks for (``.dat``, ``.avi``, ``.mkv``, ``.tar.gz``), at
@@ -20,7 +20,7 @@ project folder (``moseq2_common.project.session_key``). Inside a project, every
 file the pipeline writes for a session goes into the session's own folder in
 ``aggregate_results/`` (``session_outputs``), named from its key
 (``session_folder_name``): nothing is written beside or into a recording. Outside
-a project, ``moseq2-extract extract FILE`` writes into ``proc/`` beside the
+a project, ``moseq2 standalone extract FILE`` writes into ``proc/`` beside the
 recording. A recording is extracted when its ``results.h5`` exists under that
 name; extraction writes it under a temporary name and renames it when done.
 """
@@ -149,8 +149,7 @@ class RecordingSearch:
         extracted_line = (
             f"{len(self.extracted)} recording(s) already extracted were left out, each with its "
             f"extraction file written (such as {self.extracted[0][1]}). To include "
-            "them, set skip_extracted to False (in the notebook) or add --skip-checks "
-            "(moseq2-extract batch-extract)."
+            "them, set skip_extracted to False."
         ) if self.extracted else None
         left_out = self.passed_over or self.too_deep
         if self.recordings and not left_out:
@@ -160,8 +159,7 @@ class RecordingSearch:
         if all_extracted:
             lines.append(
                 f"All {len(self.extracted)} recordings under {self.root} are already extracted, so there is "
-                "nothing to extract. To extract them again, set skip_extracted to False (in the notebook) "
-                "or add --skip-checks (moseq2-extract batch-extract)."
+                "nothing to extract. To extract them again, set skip_extracted to False."
             )
             if not left_out:
                 return "\n".join(lines)
@@ -203,7 +201,7 @@ class RecordingSearch:
             deeper = self.max_depth + 5
             lines.append(
                 f"To search deeper, pass a larger max_depth, for example max_depth={deeper} "
-                f"(--max-depth {deeper} on the moseq2-extract batch-extract command line)."
+                f"(--max-depth {deeper} on the `moseq2 extract` command line)."
             )
         if not self.recordings and not self.extracted:
             lines.append(

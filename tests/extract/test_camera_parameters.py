@@ -57,15 +57,16 @@ def test_k2_is_the_kinect(camera_type, recwarn):
 KINECT = {"bg_roi_weights": (1, 0.1, 1), "pixel_format": "gray16le", "movie_dtype": "<u2"}
 
 
-def camera_lines(out):
-    return [line for line in out.splitlines() if "camera_type" in line]
+def camera_lines(err):
+    """The lines about camera_type a detection wrote; with no reporter, its status lines go to standard error."""
+    return [line for line in err.splitlines() if "camera_type" in line]
 
 
 @pytest.mark.parametrize("camera_type", ["k2", "kinect"])
 def test_an_mkv_recording_gets_the_azure_settings_when_the_config_says_kinect(camera_type, capsys):
     config = detect(camera_type, input_file="project/session_1/depth.mkv")
     assert {key: config[key] for key in AZURE} == AZURE
-    assert camera_lines(capsys.readouterr().out) == [
+    assert camera_lines(capsys.readouterr().err) == [
         f"project/session_1/depth.mkv is an .mkv recording, which only Azure Kinect and "
         f"Orbbec Femto cameras write, but config.yaml says camera_type: {camera_type} "
         f"(the Kinect v2). Used the Azure settings for it: bg_roi_weights [10, 0.1, 1], "
@@ -77,27 +78,33 @@ def test_an_mkv_recording_keeps_settings_the_user_set_when_the_config_says_k2(ca
     config = detect("k2", input_file="project/session_1/depth.mkv", bg_roi_weights=[5, 0.2, 1])
     assert list(config["bg_roi_weights"]) == [5, 0.2, 1]
     assert (config["pixel_format"], config["movie_dtype"]) == ("gray16be", ">u2")
-    assert "bg_roi_weights [5, 0.2, 1]" in capsys.readouterr().out
+    assert "bg_roi_weights [5, 0.2, 1]" in capsys.readouterr().err
 
 
 def test_auto_with_an_mkv_recording_is_azure_without_a_line(capsys):
     config = detect("auto", input_file="project/session_1/depth.mkv")
     assert {key: config[key] for key in AZURE} == AZURE
-    assert camera_lines(capsys.readouterr().out) == []
+    assert camera_lines(capsys.readouterr().err) == []
 
 
 @pytest.mark.parametrize("camera_type", ["k2", "kinect"])
 def test_a_dat_recording_stays_kinect_without_a_line(camera_type, capsys):
     config = detect(camera_type, input_file="project/session_1/depth.dat")
     assert {key: tuple(v) if isinstance(v, list) else v for key, v in config.items() if key in KINECT} == KINECT
-    assert camera_lines(capsys.readouterr().out) == []
+    assert camera_lines(capsys.readouterr().err) == []
 
 
-def test_camera_type_help_says_what_it_sets():
-    """``--camera-type``'s help names every setting it fills and when it leaves one alone."""
-    from moseq2_extract.cli import extract
+@pytest.mark.parametrize("path", [("extract",), ("standalone", "extract")], ids=" ".join)
+def test_camera_type_help_says_what_it_sets(path):
+    """``--camera-type``'s help on ``moseq2 extract`` and ``moseq2 standalone extract`` says what it sets (how
+    the depth frames are read, where those settings are still at the Kinect v2 values), when it leaves one alone,
+    and how ``auto`` and an ``.mkv`` recording are told apart."""
+    from moseq2_app.cli import cli
 
-    (option,) = [p for p in extract.params if p.name == "camera_type"]
-    for setting in ("bg_roi_weights", "pixel_format", "movie_dtype", "auto", ".mkv"):
-        assert setting in option.help
-    assert "changed" in option.help
+    command = cli
+    for name in path:
+        command = command.commands[name]
+    (option,) = [p for p in command.params if p.name == "camera_type"]
+    for words in ("how the depth frames are read", "still at the Kinect v2 values", "auto", ".mkv"):
+        assert words in option.help
+    assert "a value you changed is kept" in option.help

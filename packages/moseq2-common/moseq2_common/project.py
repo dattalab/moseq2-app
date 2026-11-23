@@ -5,8 +5,8 @@ it runs in when that holds a ``config.yaml`` (``find_project``). With neither it
 runs standalone: its outputs go where its arguments say, and one line says so
 (``standalone_note``).
 
-A job settings file, which ``batch-extract`` and ``kappa-scan`` write for each
-job they submit (``Options.to_yaml``, ``moseq2_common.slurm.job_settings_file``),
+A job settings file, which extraction on a cluster and ``kappa-scan`` write for
+each job (``Options.to_yaml``, ``moseq2_common.slurm.job_settings_file``),
 is a settings file in ``config.yaml``'s sectioned shape with a ``job:`` block
 naming the project folder and the session or model. It sits in a session's or
 the models' folder, so a step run from it takes its project from the block,
@@ -36,6 +36,11 @@ command and the notebooks' project cell call it first. A name a 1.5 notebook
 imports that 1.6.0 removed stops the import with ``OutdatedNotebookError``
 (``outdated_names``).
 
+One run of a step at a time: a step's project layer holds ``step_lock`` for the
+run's local work, a file in the project's ``.moseq2/`` folder naming the process
+holding it, so a second start from another notebook or a terminal is refused,
+saying where and when the first started (``StepRunning``).
+
 A step's project layer (``moseq2_<package>.project``) lists the settings files a
 step in the project reads as its record's inputs (``settings_files``). Where a
 step needs a person's decision (an output that already exists, one of several
@@ -47,30 +52,36 @@ the exception's ``keyword`` (``moseq2_common.interface.answered``).
 
 from __future__ import annotations
 
+import contextlib
+import json
 import os
-from collections.abc import Callable, Iterable, Mapping
+import socket
+import time
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PurePath
 from typing import ClassVar
 
+from moseq2_common.errors import ExpectedError, StepRunning
 from moseq2_common.yaml import read_yaml, write_config
 
 __all__ = ["CONFIG_NAME", "SESSION_CONFIG_NAME", "ChoiceNeeded", "DecisionNeeded", "OldProjectError",
            "OutdatedNotebookError", "OverwriteNeeded", "Project", "check_not_old", "find_project", "is_job_file",
            "old_project_message", "outdated_names", "outdated_notebook_message", "check_session_names",
            "exclude_note", "read_exclude", "read_groups", "session_key", "settings_files", "standalone_note",
-           "write_groups"]
+           "step_lock", "write_groups"]
 
 CONFIG_NAME = "config.yaml"
 #: The file holding each recording's arena-tool settings, in the project folder.
 SESSION_CONFIG_NAME = "session_config.yaml"
 
 
-class OldProjectError(Exception):
+class OldProjectError(ExpectedError):
     """A project made by MoSeq2 1.5.0 or earlier, which 1.6.0 does not read."""
 
 
-class OutdatedNotebookError(ImportError):
+class OutdatedNotebookError(ExpectedError, ImportError):
     """A 1.5 notebook importing a name MoSeq2 1.6.0 removed."""
 
 
@@ -236,13 +247,13 @@ def standalone_note(cwd: str | os.PathLike) -> str:
 
 def read_groups(project: Project) -> dict[str, str]:
     """``config.yaml``'s ``groups``: each session key's group. Empty without a config.yaml or groups."""
-    from moseq2_common.options import read_config
+    from moseq2_common.options import ConfigFileError, read_config
 
     if not Path(project.config_file).is_file():
         return {}
     groups = read_config(project.config_file).get("groups") or {}
     if not isinstance(groups, Mapping):
-        raise ValueError(
+        raise ConfigFileError(
             f"{project.config_file}'s `groups` holds {type(groups).__name__}, not one `session: group` line per "
             "session. Correct it, or delete it and set the groups again with the notebook's group widget or "
             "`moseq2-viz add-group`."
@@ -255,7 +266,7 @@ def read_exclude(project: Project) -> list[str]:
 
     Empty without a config.yaml or an ``exclude``.
     """
-    from moseq2_common.options import read_config
+    from moseq2_common.options import ConfigFileError, read_config
 
     if not Path(project.config_file).is_file():
         return []
@@ -263,7 +274,7 @@ def read_exclude(project: Project) -> list[str]:
     if isinstance(exclude, str):
         exclude = [exclude]
     if not isinstance(exclude, list):
-        raise ValueError(
+        raise ConfigFileError(
             f"{project.config_file}'s `exclude` holds {type(exclude).__name__}, not a list of sessions. Write "
             "it as one `- session` line per session to leave out (each session's recording path in the "
             "project, as `groups` names it), or delete it to leave no session out."
@@ -375,3 +386,99 @@ class ChoiceNeeded(DecisionNeeded):
         super().__init__(
             f"{step} needs a choice of {what}: {numbered}. Call it again with selection= the number of the one "
             "to use.")
+
+
+#: The folder in a project where a running step leaves its lock file.
+LOCK_FOLDER = ".moseq2"
+
+#: Each step as messages name it.
+_STEP_NAMES = {"extract": "Extract", "train-pca": "Train PCA", "scores-and-changepoints": "Scores and changepoints"}
+
+#: Where a run was started, as ``step_lock``'s ``where`` gives it, in a message's words.
+_STARTED_WHERE = {"notebook": "in another notebook", "command line": "on the command line",
+                  "script": "in a Python script"}
+
+
+def _lock_holder(path: Path) -> dict | None:
+    """The holder a lock file names; None when it cannot be read after a few tries (a file left half-written)."""
+    for _ in range(10):
+        try:
+            holder = json.loads(path.read_text())
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError):
+            time.sleep(0.05)
+            continue
+        if isinstance(holder, dict):
+            return holder
+    return None
+
+
+def _holder_gone(holder: Mapping | None) -> bool:
+    """Whether the process a lock file names has ended: only known for a process on this computer."""
+    if holder is None:
+        return True
+    if holder.get("host") != socket.gethostname():
+        return False
+    try:
+        os.kill(int(holder.get("pid")), 0)
+    except ProcessLookupError:
+        return True
+    except (PermissionError, TypeError, ValueError):
+        return False
+    return False
+
+
+def _started_text(started: str) -> str:
+    try:
+        when = datetime.fromisoformat(started)
+    except (TypeError, ValueError):
+        return str(started)
+    if when.date() == datetime.now(when.tzinfo).date():
+        return when.strftime("%H:%M")
+    return when.strftime("%H:%M on %Y-%m-%d")
+
+
+@contextlib.contextmanager
+def step_lock(project: Project, step: str, *, where: str) -> Iterator[None]:
+    """Hold ``step``'s lock in ``project`` for the block: ``<project>/.moseq2/<step>.running``.
+
+    The file is created only when it does not exist, and names this process, its host, when it started and
+    ``where`` (``notebook`` or ``command line``); it is removed when the block ends. A lock held by a
+    process still running, or on another computer, raises ``StepRunning`` saying who holds it; one left by
+    a process on this computer that has ended is taken over.
+    """
+    folder = Path(project.folder) / LOCK_FOLDER
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{step}.running"
+    mine = {"pid": os.getpid(), "host": socket.gethostname(),
+            "started": datetime.now().astimezone().isoformat(timespec="seconds"), "where": where}
+    for _ in range(3):
+        try:
+            handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            holder = _lock_holder(path)
+            if holder == {}:
+                continue  # removed meanwhile
+            if _holder_gone(holder):
+                with contextlib.suppress(FileNotFoundError):
+                    path.unlink()
+                continue
+            name = _STEP_NAMES.get(step, step.capitalize())
+            where = _STARTED_WHERE.get(holder.get("where"), holder.get("where"))
+            raise StepRunning(
+                f"{name} is already running in this project: it was started at "
+                f"{_started_text(holder.get('started'))} {where} "
+                f"(process {holder.get('pid')} on {holder.get('host')}).",
+                fix="wait for it to finish, or stop it where it was started.") from None
+        with os.fdopen(handle, "w") as stream:
+            json.dump(mine, stream)
+        break
+    else:
+        raise StepRunning(f"{_STEP_NAMES.get(step, step)} could not take its lock, {path}.",
+                          fix=f"delete {path} if no run of it is going, then start it again.")
+    try:
+        yield
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            path.unlink()

@@ -192,11 +192,14 @@ def test_a_command_given_a_1_5_project_from_elsewhere_stops(tmp_path, option):
 
 def test_help_still_answers_in_a_1_5_project(tmp_path):
     """--help and --version read nothing from the project, so they answer in one."""
+    from moseq2_app.cli import cli as moseq2
     from moseq2_extract.cli import cli
 
     folder = old_project(tmp_path / "project", "flat config")
     with working_in(folder):
-        assert CliRunner().invoke(cli, ["extract", "--help"]).exit_code == 0
+        assert CliRunner().invoke(moseq2, ["extract", "--help"]).exit_code == 0
+        assert CliRunner().invoke(moseq2, ["--version"]).exit_code == 0
+        assert CliRunner().invoke(cli, ["find-roi", "--help"]).exit_code == 0
         assert CliRunner().invoke(cli, ["--version"]).exit_code == 0
 
 
