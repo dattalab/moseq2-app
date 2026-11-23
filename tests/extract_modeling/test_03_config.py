@@ -1,8 +1,6 @@
-"""Cell 3: generate the configuration every later step reads.
+"""Generating the configuration every later step reads.
 
-    config_filepath = project.config_file
-    camera_type = 'k2'
-    generate_config_command(config_filepath, camera_type=camera_type)
+    generate_config_command(str(project.config_file), camera_type='auto')
 
 ``generate_config_command`` does not write a template. It writes every
 setting each stage's options classes declare, at its declared default, into
@@ -13,17 +11,18 @@ of those declarations.
 The full-config baseline below is therefore the alarm for that whole class of
 problem. A change to any default turns it red on purpose.
 
-This cell is the one place the notebook asks for the camera. ``'azure'``
+Generating the config is the one place the camera is chosen. ``'azure'``
 (an Azure Kinect or an Orbbec Femto) writes ``camera_type: azure`` and that
 camera's depth range, filters and crop in ``extract`` and its PCA filters in
 ``pca``, the same as ``moseq2-extract generate-config --camera-type azure``;
 ``'kinect'`` (or ``'k2'``) writes ``camera_type: auto``, so extraction tells the
 camera from the file, and ``'auto'`` takes ``'azure'`` when every recording is
-an ``.mkv``. Later cells read the key and never set it.
+an ``.mkv``. Later steps read the key, and no notebook cell sets it.
 """
 
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -31,10 +30,7 @@ import pytest
 from moseq2_extract.gui import generate_config_command
 from moseq2_common.yaml import read_yaml
 
-from cells import code_cell
-
-EXTRACT = "MoSeq2-Extract-Modeling-Notebook.ipynb"
-APPLY = "[OPTIONAL]MoSeq2-Apply-Pre-Trained-Model-Notebook.ipynb"
+from cells import NOTEBOOKS
 
 #: The only settings `camera_type='azure'` changes, by (section, key); None for the top level.
 AZURE_OVERRIDES = {
@@ -65,14 +61,18 @@ def generate(path, camera_type="auto"):
     return plain(read_yaml(str(path)))
 
 
-def settings(config):
-    """Every setting by (section, key), the top-level ones under section None."""
+def settings(config, within=None):
+    """Every setting by (section, key), the top-level ones under section None.
+
+    A block inside a section (``computing``'s ``extract``) gives its settings
+    as (section, block, key).
+    """
     out = {}
     for key, value in config.items():
         if isinstance(value, dict):
-            out.update({(key, name): item for name, item in value.items()})
+            out.update(settings(value, (key,) if within is None else (*within, key)))
         else:
-            out[(None, key)] = value
+            out[(None, key) if within is None else (*within, key)] = value
     return out
 
 
@@ -107,17 +107,12 @@ def test_the_camera_chosen_here_is_the_one_the_config_records(tmp_path):
     assert generate(tmp_path / "azure.yaml", camera_type="azure")["camera_type"] == "azure"
 
 
-@pytest.mark.parametrize("cell", [5, 13], ids=["arena", "pca"])
-def test_later_cells_do_not_reset_the_camera(cell):
-    """A later cell that assigned ``camera_type`` would undo the choice made here."""
-    assert not re.search(r"config_data\['camera_type'\]\s*=(?!=)", code_cell(EXTRACT, cell))
-
-
-def test_the_apply_notebooks_arena_cell_does_not_reset_the_camera():
-    """The Apply notebook asks for the camera in its own config cell, as this one does."""
-    arena = code_cell(APPLY, 4)
-    assert "ArenaMaskWidget(" in arena
-    assert not re.search(r"config_data\['camera_type'\]\s*=(?!=)", arena)
+@pytest.mark.parametrize("notebook", sorted(NOTEBOOKS.glob("*.ipynb")), ids=lambda p: p.name)
+def test_no_notebook_cell_resets_the_camera(notebook):
+    """A cell that assigned ``camera_type`` would undo the choice made when the config was generated."""
+    cells = json.loads(notebook.read_text(encoding="utf-8"))["cells"]
+    for number, cell in enumerate((c for c in cells if c["cell_type"] == "code"), start=1):
+        assert not re.search(r"\['camera_type'\]\s*=(?!=)", "".join(cell["source"])), f"code cell {number}"
 
 
 def test_every_value_is_a_plain_yaml_type(tmp_path):

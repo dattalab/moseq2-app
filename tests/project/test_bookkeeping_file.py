@@ -9,13 +9,14 @@ project moved or copied elsewhere runs its next step.
 
 A step run inside a project records what it wrote there, and the next step
 reads it there: the command line's ``apply-pca`` records its scores (1.5.0 left
-the index without them, so ``make-df`` stopped), aggregating again keeps the
-scores and the groups (1.5.0 rewrote the index), PCA trained under another name
-is found by ``apply-pca``, and no step writes ``config.yaml`` (1.5.0's PCA steps
-wrote their output paths into it). The viz commands and ``learn-model``,
-``apply-model`` and ``kappa-scan`` take their sessions from the project
-(``--project-file``, by default the working folder's ``moseq2-project.yaml``),
-and a viz command run outside a project stops, naming the folder it looked in.
+the index without them, so ``make-df`` stopped), extracting again, which lists
+the sessions again, keeps the scores and the groups (1.5.0's aggregation rewrote
+the index), PCA trained under another name is found by ``apply-pca``, and no
+step writes ``config.yaml`` (1.5.0's PCA steps wrote their output paths into
+it). The viz commands and ``learn-model``, ``apply-model`` and ``kappa-scan``
+take their sessions from the project (``--project-file``, by default the
+working folder's ``moseq2-project.yaml``), and a viz command run outside a
+project stops, naming the folder it looked in.
 A kappa-scan fit runs from its job settings file and never writes the
 bookkeeping file. The notebook's functions take the project folder and read
 the bookkeeping file on every call.
@@ -35,7 +36,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from moseq2_common.yaml import read_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 #: The two recordings the command-line project is built from, one per condition.
 RECORDINGS = ("saline_example_0", "amphetamine_example_0")
@@ -72,6 +73,12 @@ def extract_cli():
     return cli
 
 
+def moseq2_cli():
+    from moseq2_app.cli import cli
+
+    return cli
+
+
 def pca_cli():
     from moseq2_pca.cli import cli
 
@@ -90,13 +97,17 @@ def viz_cli():
     return cli
 
 
-def aggregate(root):
-    return ok(extract_cli(), "aggregate-results", "-i", root, "-o", root / "aggregate_results", cwd=root)
+def extract_again(root, monkeypatch):
+    """``moseq2 extract`` naming one recording, from the project folder: it lists every recording it plans as
+    a session again before it extracts. The extraction itself is stubbed; what it lists is what is checked."""
+    monkeypatch.setattr("moseq2_extract.project.extract_recording", lambda *args, **kwargs: None)
+    return ok(moseq2_cli(), "extract", f"{RECORDINGS[0]}/depth.avi", cwd=root)
 
 
 @pytest.fixture(scope="module")
 def cli_project(tmp_path_factory, raw_sessions):
-    """Two recordings taken through the command line: extracted, aggregated, PCA, scores, changepoints, a model.
+    """Two recordings taken through the command line: extracted (which lists them as the project's sessions),
+    PCA, scores, changepoints, a model.
 
     Every command runs from the project folder and names its paths, as the
     command-line instructions have a person do. Built once; tests that change
@@ -108,9 +119,11 @@ def cli_project(tmp_path_factory, raw_sessions):
         shutil.copytree(raw_sessions / name, root / name)
     config = root / "config.yaml"
     ok(extract_cli(), "generate-config", "--output-file", config, cwd=root)
-    for name in RECORDINGS:
-        ok(extract_cli(), "extract", root / name / "depth.avi", "--config-file", config, cwd=root)
-    aggregate(root)
+    # the fixture's head/tail classifier, so nothing is downloaded
+    data = read_yaml(str(config))
+    data["extract"]["flip_classifier"] = str(raw_sessions / "flip_classifier_k2_c57_10to13weeks.npz")
+    write_yaml(data, str(config))
+    ok(moseq2_cli(), "extract", cwd=root)
     pca_dir = root / "_pca"
     for command in ("train-pca", "apply-pca", "compute-changepoints"):
         ok(pca_cli(), command, "-i", root / "aggregate_results", "-o", pca_dir, "--config-file", config, cwd=root)
@@ -196,20 +209,20 @@ def test_command_line_apply_pca_reaches_make_df(cli_project, tmp_path):
     assert df["labels (original)"].notna().any()
 
 
-def test_aggregating_again_keeps_the_scores(project_copy):
-    aggregate(project_copy)
+def test_extracting_again_keeps_the_scores(project_copy, monkeypatch):
+    extract_again(project_copy, monkeypatch)
 
     index = session_index(project_copy)
     assert Path(index["pca_path"]) == project_copy / "_pca" / "pca_scores.h5"
     assert len(index["files"]) == len(RECORDINGS)
 
 
-def test_aggregating_again_keeps_groups(project_copy):
-    """add-group writes config.yaml's groups; aggregating again leaves them, and the sessions carry them."""
+def test_extracting_again_keeps_groups(project_copy, monkeypatch):
+    """add-group writes config.yaml's groups; extracting again leaves them, and the sessions carry them."""
     ok(viz_cli(), "add-group", "-k", "SessionName", "-v", "saline_example_0", "-g", "saline", cwd=project_copy)
     config_before = (project_copy / "config.yaml").read_bytes()
 
-    aggregate(project_copy)
+    extract_again(project_copy, monkeypatch)
 
     assert (project_copy / "config.yaml").read_bytes() == config_before
     assert read_yaml(str(project_copy / "config.yaml"))["groups"] == {"saline_example_0/depth.avi": "saline"}

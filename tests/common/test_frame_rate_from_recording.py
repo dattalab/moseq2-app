@@ -84,13 +84,14 @@ def recording_at_15_fps(tmp_path, raw_sessions):
 
 
 def test_extraction_records_the_recordings_own_frame_rate(recording_at_15_fps):
-    import moseq2_extract.cli as extract_cli
+    from moseq2_app.cli import cli
     from moseq2_extract.io.video import get_video_info
 
     output_dir = recording_at_15_fps / "proc"
     result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(recording_at_15_fps / "depth.avi"), "--output-dir", str(output_dir), "--num-frames", "20"],
+        cli,
+        ["standalone", "extract", str(recording_at_15_fps / "depth.avi"), "--output-dir", "proc",
+         "--num-frames", "20"],
     )
     assert result.exit_code == 0, result.output + repr(result.exception)
 

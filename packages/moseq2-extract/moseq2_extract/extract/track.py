@@ -5,7 +5,7 @@ Expectation-Maximization mouse tracking utilities.
 import cv2
 import numpy as np
 import scipy.stats
-from tqdm.auto import tqdm
+from moseq2_common.report import current, iterate, progress
 import statsmodels.stats.correlation_tools as stats_tools
 
 
@@ -181,7 +181,7 @@ def em_tracking(
         model_parameters[k][:] = np.nan
 
     frames = frames.reshape(frames.shape[0], frames.shape[1] * frames.shape[2])
-    pbar = tqdm(total=nframes, disable=not progress_bar, desc="Computing EM")
+    pbar = progress("Computing EM", nframes, show=progress_bar).__enter__()
     i = 0
     repeat = False
     while i < nframes:
@@ -261,7 +261,7 @@ def em_tracking(
                 cov_update = cov
 
         if (np.all(mean_update == 0) or np.all(cov_update.ravel() == 0)) and not repeat:
-            print("Backing off...")
+            current().status("Backing off...")
             repeat = True
             continue
         elif np.all(mean_update == 0) or np.all(cov_update.ravel() == 0):
@@ -282,9 +282,9 @@ def em_tracking(
 
         repeat = False
         i += 1
-        pbar.update(1)
+        pbar.advance(1)
 
-    pbar.close()
+    pbar.__exit__(None, None, None)
 
     return model_parameters
 
@@ -310,9 +310,7 @@ def em_get_ll(frames, mean, cov, progress_bar=False):
 
     ll = np.zeros(frames.shape, dtype="float64")
 
-    for i in tqdm(
-        range(nframes), disable=not progress_bar, desc="Computing EM likelihoods"
-    ):
+    for i in iterate(range(nframes), "Computing EM likelihoods", show=progress_bar):
         xyz = np.vstack((coords, frames[i].ravel()))
         ll[i] = scipy.stats.multivariate_normal.logpdf(xyz.T, mean[i], cov[i]).reshape(
             (r, c)

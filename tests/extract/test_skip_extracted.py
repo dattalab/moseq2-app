@@ -1,14 +1,16 @@
 """Rerunning an extraction skips the recordings already extracted, quietly.
 
-With ``skip_extracted = True`` (its default), the notebook's extraction cell
-leaves out the recordings whose ``results.h5`` is in their session folder, as ``moseq2-extract batch-extract`` does without ``--skip-checks``;
-when that is every recording, one line says there is nothing to extract. The checks that guard an extraction (the
-flip-classifier warning, the frame timestamps, the frame count) are about a
-recording that is about to be extracted, and a finished one is not. A project
-extracted before frame timestamps were required can hold a finished session
-without a ``depth_ts.txt``; a rerun leaves it out like any other.
-``extract_wrapper`` called on a finished recording with ``skip=True`` prints
-``Skipping...`` and nothing else.
+A project's extraction (``moseq2 extract``, the notebook's Extract step) plans
+first and leaves out every recording whose extraction is up to date: its
+``results.h5`` is in its session folder with the record of an extraction made
+with the settings and head/tail detection the project resolves now. When that is
+every recording, the run extracts nothing and its summary says so. The checks
+that guard an extraction (the flip-classifier warning, the frame timestamps,
+the frame count) are about a recording that is about to be extracted, and a
+finished one is not. A project extracted before frame timestamps were required
+can hold a finished session without a ``depth_ts.txt``; a rerun leaves it out
+like any other. ``extract_wrapper`` called on a finished recording with
+``skip=True`` says ``Skipping...`` and nothing else.
 
 A recording not yet extracted still gets every check.
 """
@@ -16,16 +18,20 @@ A recording not yet extracted still gets every check.
 from __future__ import annotations
 
 import shutil
+import urllib.request
 import warnings
 from pathlib import Path
 
 import pytest
 from moseq2_common.yaml import read_yaml
 
-from moseq2_extract.gui import extract_found_sessions, generate_config_command
+from moseq2_extract import project as extraction
+from moseq2_extract.gui import generate_config_command
 from moseq2_extract.helpers.wrappers import NoFlipClassifierWarning, extract_wrapper
 
+from extract_projects import CLASSIFIER, recorded_extraction, small_project
 from fixtures import fetch_azure_mkv
+from reporting import CollectingReporter
 
 SESSIONS = ("saline_example_0", "saline_example_1")
 NO_TIMESTAMPS = "saline_example_1"
@@ -41,44 +47,50 @@ def mark_extracted(session, folder=None):
 
 @pytest.fixture
 def extracted_project(tmp_path, raw_sessions, monkeypatch):
-    """Two finished sessions; one was extracted without a depth_ts.txt."""
-    project = tmp_path / "project"
-    project.mkdir()
+    """Two finished sessions, each with the record of its extraction; one was extracted without a
+    depth_ts.txt. config.yaml names no flip classifier: the project holds the published one already, so
+    nothing is downloaded."""
+    monkeypatch.setattr(urllib.request, "urlretrieve",
+                        lambda *args, **kwargs: pytest.fail("the rerun downloaded head/tail detection"))
+    project = small_project(tmp_path / "project", raw_sessions, SESSIONS, num_frames=None, classifier=False)
+    shutil.copy(Path(raw_sessions) / CLASSIFIER, extraction.head_tail_detection(project).path)
     for name in SESSIONS:
-        shutil.copytree(Path(raw_sessions) / name, project / name)
-        mark_extracted(project / name)
-    (project / NO_TIMESTAMPS / "depth_ts.txt").unlink()
-    monkeypatch.chdir(project)
-    generate_config_command(str(project / "config.yaml"), camera_type="k2")
+        recorded_extraction(project, f"{name}/depth.avi")
+    (Path(project.folder) / NO_TIMESTAMPS / "depth_ts.txt").unlink()
+    monkeypatch.chdir(project.folder)
     return project
 
 
 def rerun(project, capsys):
+    """Run the project's extraction again; its run, what it reported, and the warnings and output it gave."""
+    reporter = CollectingReporter()
+    capsys.readouterr()
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        extract_found_sessions(str(project), str(project / "config.yaml"), skip_extracted=True)
+        run = extraction.extract(project, reporter=reporter)
     captured = capsys.readouterr()
-    return captured.out, captured.err, caught
+    return run, reporter, captured.out + captured.err, caught
 
 
 def test_a_rerun_skips_finished_sessions_with_or_without_timestamps(extracted_project, capsys):
-    out, err, caught = rerun(extracted_project, capsys)
+    run, reporter, printed, caught = rerun(extracted_project, capsys)
 
-    assert out == (
-        f"All {len(SESSIONS)} recordings under {extracted_project} are already extracted, so there is "
-        "nothing to extract. To extract them again, set skip_extracted to False (in the notebook) "
-        "or add --skip-checks (moseq2-extract batch-extract).\n"
-    ), out
-    assert "failed" not in out and "No frame timestamps" not in out, out
+    assert (run.extracted, run.failed, run.jobs) == ([], {}, {})
+    assert run.up_to_date == [f"{name}/depth.avi" for name in SESSIONS]
+    assert reporter.statuses == ["Extracted 0 of 0 recordings."], reporter.statuses
+    assert reporter.warnings == []
+    assert printed == ""
+    assert not any("failed" in line or "No frame timestamps" in line for line in reporter.statuses)
 
 
 def test_a_rerun_extracts_nothing_and_warns_about_no_flip_classifier(extracted_project, capsys):
-    out, err, caught = rerun(extracted_project, capsys)
+    run, reporter, printed, caught = rerun(extracted_project, capsys)
 
     flip = [w for w in caught if issubclass(w.category, NoFlipClassifierWarning)]
     assert flip == [], [str(w.message) for w in flip]
-    assert "without a flip classifier" not in out + err
-    assert "Processing:" not in out, out
+    assert not any("without a flip classifier" in text for text in reporter.statuses + reporter.warnings + [printed])
+    assert reporter.bars == []
+    assert not any("Processing:" in line for line in reporter.statuses)
 
 
 # ---------------------------------------------------------------- single recordings
@@ -130,6 +142,7 @@ def test_a_finished_mkv_is_skipped_without_its_frame_count_line(tmp_path, config
         result = extract_wrapper(str(session / "depth.mkv"), "proc", config, skip=True)
 
     assert result is None
-    out = capsys.readouterr().out
-    assert out == f"Processing: {session / 'depth.mkv'}\nSkipping...\n"
+    # with no reporter, status lines go to standard error
+    err = capsys.readouterr().err
+    assert err == f"Processing: {session / 'depth.mkv'}\nSkipping...\n"
     assert caught == [], [str(w.message) for w in caught]

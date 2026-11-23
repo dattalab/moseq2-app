@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
+from moseq2_app.cli import cli
 from moseq2_extract.helpers.data import handle_extract_metadata
 from moseq2_extract.io.video import load_timestamps_from_movie
 from moseq2_extract.util import load_timestamps
@@ -31,8 +31,8 @@ from fixtures import fetch_azure_mkv
 def extract(recording, *args):
     output_dir = recording.parent / "proc"
     result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(recording), "--output-dir", str(output_dir), *args],
+        cli,
+        ["standalone", "extract", str(recording), "--output-dir", str(output_dir), *args],
     )
     assert result.exit_code == 0, result.output + repr(result.exception)
     return output_dir / "results.h5"

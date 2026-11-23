@@ -1,142 +1,187 @@
-"""A batch of extractions ends by saying which recordings failed.
+"""A run of extraction ends by saying which recordings failed.
 
-``run_local_extract``, which the notebook's extraction cell and
-``batch-extract`` run locally, extracts one recording at a time and catches
-each recording's error so the rest still run. With many recordings an error
-in the middle scrolls past, so the batch ends with a summary: how many of the
-recordings it tried were extracted, and each one that failed with its error.
-A recording skipped because it was already extracted counts as neither.
+``moseq2_extract.project.extract``, which ``moseq2 extract`` and the notebook's
+Extract step run, extracts one recording at a time on this computer and records
+each recording's error so the rest still run. With many recordings an error in
+the middle scrolls past, so the run ends with a summary: how many of the
+recordings it set out to extract were extracted, and each one that failed with
+its error. A recording the plan found up to date is left as it is and counted in
+neither.
 
-The notebook prints that summary in place of "Extractions Complete." when
-anything failed, and ``batch-extract`` exits with a non-zero status.
+The Extract step shows each failed recording's row as failed and the summary
+among its lines; ``moseq2 extract`` exits with a non-zero status: 1 when every
+failure was an expected one, 3 when one looks like a bug.
 
 The extraction itself is replaced by a stand-in that fails for one recording.
 """
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import pytest
 from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
-import moseq2_extract.gui as extract_gui
-from moseq2_extract.project import run_local_extract
+from moseq2_app.cli import cli
+from moseq2_common.errors import ExpectedError
+from moseq2_common.yaml import read_yaml, write_config
+from moseq2_extract import project as extraction
+
+from extract_projects import recorded_extraction, small_project
+from reporting import CollectingReporter
 
 SESSIONS = ("session_a", "session_b", "session_c", "session_d")
 FAILS = "session_b"
-SKIPPED = "session_d"
+UP_TO_DATE = "session_d"
+
+
+def key(name):
+    return f"{name}/depth.avi"
 
 
 @pytest.fixture
-def project(tmp_path):
-    """Four recordings and a local config file."""
+def project(tmp_path, raw_sessions):
+    """Four recordings in a project extracting locally, with the fixture's head/tail classifier; one of
+    them is extracted already, with the record of an extraction made with the project's settings."""
+    project = small_project(tmp_path / "project", raw_sessions, (), num_frames=None)
     for name in SESSIONS:
-        session = tmp_path / name
+        session = Path(project.folder) / name
         session.mkdir()
         (session / "depth.avi").write_bytes(b"\0")  # a placeholder: the work functions are stubbed, and an empty input stops a step
         (session / "metadata.json").write_text("{}")
-    (tmp_path / "config.yaml").write_text("extract:\n  cluster_type: local\n")
-    return tmp_path
+    data = read_yaml(str(project.config_file))
+    data["computing"]["extract"]["cluster_type"] = "local"
+    write_config(data, str(project.config_file))
+    recorded_extraction(project, key(UP_TO_DATE))
+    return project
 
 
-def stand_in(skipped=(SKIPPED,), fails=(FAILS,)):
-    """An extraction that fails for some recordings and skips others.
+class BrokenRecording(ExpectedError, ValueError):
+    """A recording the stand-in cannot extract, as an extraction step reports a problem with the data."""
 
-    ``extract_wrapper`` returns the output directory when it extracts a
-    recording and None when it skips one already extracted.
+
+def stand_in(fails=(FAILS,), error=ValueError):
+    """An extraction that fails for some recordings with ``error``.
+
+    ``extract_wrapper`` returns the output directory when it extracts a recording.
     """
 
     def extract_wrapper(input_file, output_dir, config_data, num_frames=None, skip=False, uuid=None, record=None):
         if any(name in input_file for name in fails):
-            raise ValueError(f"the depth video in {input_file} is broken\nsecond line")
-        if any(name in input_file for name in skipped):
-            return None
+            raise error(f"the depth video in {input_file} is broken\nsecond line")
         return output_dir
 
     return extract_wrapper
 
 
-def recordings(root):
-    return [str(root / name / "depth.avi") for name in SESSIONS]
+def recording(project, name):
+    return str(Path(project.folder) / name / "depth.avi")
 
 
-def test_the_batch_ends_with_a_summary_of_its_failures(project, monkeypatch, capsys):
+def test_the_batch_ends_with_a_summary_of_its_failures(project, monkeypatch):
     monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in())
+    reporter = CollectingReporter()
 
-    failures = run_local_extract(recordings(project), str(project / "config.yaml"))
+    run = extraction.extract(project, reporter=reporter)
 
-    out = capsys.readouterr().out
-    summary = out[out.index("Extracted 2 of 3 recordings"):]
-    failed = str(project / FAILS / "depth.avi")
-    assert summary.startswith(
-        "Extracted 2 of 3 recordings; 1 failed (1 already extracted and skipped).\n"
+    failed = recording(project, FAILS)
+    assert reporter.statuses[-1] == (
+        "Extracted 2 of 3 recordings; 1 failed.\n"
         "Failed:\n"
         f"  {failed}\n"
         f"    ValueError: the depth video in {failed} is broken\n"
         "    second line\n"
+        "Fix the problem each error names, then run the extraction again with `moseq2 extract` (or the "
+        "notebook's Extract step): the recordings extracted already are left as they are."
     )
-    assert "Fix the problem each error names" in summary
-    # batch-extract leaves finished extractions out by default; --skip-checks puts them back
-    assert "unless --skip-checks" in summary
-    assert "or --skip-completed (batch-extract) is set" not in summary
-    assert [path for path, _ in failures] == [failed]
+    assert list(run.failed) == [key(FAILS)]
+    assert sorted(run.extracted) == [key(name) for name in SESSIONS if name not in (FAILS, UP_TO_DATE)]
+    assert run.up_to_date == [key(UP_TO_DATE)]
 
 
-def test_a_batch_without_failures_says_how_many_were_extracted(project, monkeypatch, capsys):
+def test_a_batch_without_failures_says_how_many_were_extracted(project, monkeypatch):
     monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=()))
+    reporter = CollectingReporter()
 
-    failures = run_local_extract(recordings(project), str(project / "config.yaml"))
+    run = extraction.extract(project, reporter=reporter)
 
-    assert failures == []
-    out = capsys.readouterr().out
-    assert "Extracted 3 of 3 recordings (1 already extracted and skipped).\n" in out
-    assert "Failed" not in out
+    assert run.failed == {}
+    assert reporter.statuses[-1] == "Extracted 3 of 3 recordings."
+    assert not any("Failed" in line for line in reporter.statuses)
 
 
-def test_the_notebook_reports_failures_instead_of_complete(project, monkeypatch, capsys):
+def notebook_run(project):
+    """Run the notebook's Extract step in ``project``'s folder; the widget and its finished run."""
+    from moseq2_app.notebook import extract
+
+    before = os.getcwd()
+    os.chdir(project.folder)
+    try:
+        widget = extract()
+        widget.start()
+        run = widget.wait()
+    finally:
+        os.chdir(before)
+    return widget, run
+
+
+def test_the_notebook_reports_failures_instead_of_complete(project, monkeypatch):
     monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in())
 
-    extract_gui.extract_found_sessions(str(project), str(project / "config.yaml"), [".avi"])
+    widget, run = notebook_run(project)
 
-    out = capsys.readouterr().out
-    assert "Extracted 2 of 3 recordings; 1 failed" in out
-    assert "Extractions Complete." not in out
+    states = {item: value["state"] for item, value in run["items"].items()}
+    assert states == {key(name): "failed" if name == FAILS else "done"
+                      for name in SESSIONS if name != UP_TO_DATE}
+    statuses = [line["text"] for line in widget.lines if line["kind"] == "status"]
+    assert statuses[-1].startswith("Extracted 2 of 3 recordings; 1 failed")
+    assert not any("Extractions Complete." in text for text in statuses)
 
 
-def test_the_notebook_says_complete_when_nothing_failed(project, monkeypatch, capsys):
+def test_the_notebook_says_complete_when_nothing_failed(project, monkeypatch):
     monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=()))
 
-    extract_gui.extract_found_sessions(str(project), str(project / "config.yaml"), [".avi"])
+    widget, run = notebook_run(project)
 
-    assert "Extractions Complete." in capsys.readouterr().out
+    assert run["state"] == "finished", widget.problem
+    assert {value["state"] for value in run["items"].values()} == {"done"}
+    assert len(run["items"]) == 3
+    statuses = [line["text"] for line in widget.lines if line["kind"] == "status"]
+    assert statuses[-1] == "Extracted 3 of 3 recordings."
 
 
-@pytest.mark.parametrize("fails, status", [((FAILS,), 1), ((), 0)], ids=["one-fails", "none-fail"])
-def test_batch_extract_exits_non_zero_when_a_recording_failed(project, monkeypatch, fails, status):
-    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=fails))
+def moseq2_extract(project):
+    before = os.getcwd()
+    os.chdir(project.folder)
+    try:
+        return CliRunner().invoke(cli, ["extract"])
+    finally:
+        os.chdir(before)
 
-    result = CliRunner().invoke(
-        extract_cli.cli,
-        ["batch-extract", str(project), "--config-file", str(project / "config.yaml"),
-         "--extensions", ".avi"],
-    )
+
+@pytest.mark.parametrize("fails, error, status", [((FAILS,), BrokenRecording, 1), ((FAILS,), ValueError, 3),
+                                                  ((), ValueError, 0)],
+                         ids=["one-fails", "one-fails-as-a-bug", "none-fail"])
+def test_batch_extract_exits_non_zero_when_a_recording_failed(project, monkeypatch, fails, error, status):
+    monkeypatch.setattr(extract_steps, "extract_wrapper", stand_in(fails=fails, error=error))
+
+    result = moseq2_extract(project)
 
     assert result.exit_code == status, result.output
     assert result.exception is None or isinstance(result.exception, SystemExit), result.exception
 
 
 def test_batch_extract_without_a_config_file_stops_and_says_what_to_do(tmp_path, monkeypatch):
-    """Outside a project and without ``--config-file``, ``batch-extract`` stops with a non-zero status,
-    naming the folder it looked in. It used to print "Command not run." and exit 0, so a script carried on."""
+    """Outside a project, ``moseq2 extract`` stops with a non-zero status, naming the folder it looked in."""
     recordings = tmp_path / "recordings"
     (recordings / "session_a").mkdir(parents=True)
     (recordings / "session_a" / "depth.avi").write_bytes(b"\0")
     monkeypatch.chdir(tmp_path)
-    result = CliRunner().invoke(extract_cli.cli, ["batch-extract", str(recordings)])
+    result = CliRunner().invoke(cli, ["extract"])
     assert result.exit_code == 1
-    assert result.output == (
-        f"Error: batch-extract needs a project's config.yaml, and there is none in {tmp_path}. Run it from "
-        "the project folder, pass --config-file /path/to/project/config.yaml, or write a config.yaml here "
-        "first with `moseq2-extract generate-config`.\n"
+    assert result.stderr == (
+        f"Error: `moseq2 extract` runs in a project folder, and {tmp_path} has no config.yaml.\n"
+        "To fix it: run it from your project folder, or start a project here with `moseq2 setup`.\n"
     )

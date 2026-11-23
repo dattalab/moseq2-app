@@ -1,9 +1,9 @@
-"""Cell 5: find each recording's arena floor and save its extraction parameters.
+"""The arena tool: find each recording's arena floor and save its extraction parameters.
 
-    ArenaMaskWidget(str(project.folder), skip_extracted=skip_extracted)
+    ArenaMaskWidget(str(project.folder))
 
-The first interactive cell. Everything up to here produced one configuration
-for the whole project; this cell produces one per recording, because the arena
+The first interactive step. Everything up to here produced one configuration
+for the whole project; this step produces one per recording, because the arena
 sits at a different depth in every rig and often moves between recordings.
 
 Opening the widget writes nothing: it shows each recording's saved parameters
@@ -12,7 +12,7 @@ with ``detect_and_set_camera_parameters`` run over it. The widget lets a user
 look at the floor it found, adjust the parameters, and save; saving writes the
 arena tool's settings for that recording, and only that recording, into
 ``session_config.yaml`` in the project folder, keyed by the recording's path
-below the project. Running the cell again shows what was saved.
+below the project. Opening the tool again shows what was saved.
 
 The widget is a Panel object, so the tests drive it the way the browser does:
 they set a parameter, or assign a button's ``value``, and the callbacks run in
@@ -95,10 +95,10 @@ def parameters(session_config, recording="saline_example_0/depth.avi"):
 
 
 def open_widget(root):
-    """Open the widget on a project, as the cell does, and index its buttons.
+    """Open the widget on a project, as the chain does, and index its buttons.
 
     Extracted recordings are listed too: a copy of the chain's project may be taken after
-    another test file has extracted it, and the cell's own ``skip_extracted`` would then
+    another test file has extracted it, and the tool's ``skip_extracted`` would then
     show none.
     """
     widget = ArenaMaskWidget(str(root), skip_extracted=False)
@@ -109,8 +109,8 @@ def open_widget(root):
 def scratch(tmp_path, project, arena):
     """A copy of the project, for every test that opens the widget.
 
-    The chain's own copy holds what the walkthrough saved, and cell 6 extracts
-    from it. The tests below save tuned parameters, which would change what
+    The chain's own copy holds what the walkthrough saved, and the Extract step
+    extracts from it. The tests below save tuned parameters, which would change what
     the chain extracts with, before or after the chain's extraction depending
     on the order the tests run in. So every test that opens the widget works
     on its own copy. Copying costs a fraction of a second and the backgrounds
@@ -122,9 +122,9 @@ def scratch(tmp_path, project, arena):
 
 
 def test_every_recording_gets_a_parameter_file(arena, project):
-    """1. The cell's output: one entry per recording saved, keyed by session.
+    """1. The tool's output: one entry per recording saved, keyed by session.
 
-    A recording is a folder holding a depth video. Later cells add folders of
+    A recording is a folder holding a depth video. Later steps add folders of
     their own to the project (``aggregate_results/``, ``_pca/``, ``models/``),
     and the shared chain may have reached them before this test runs.
     """
@@ -178,7 +178,7 @@ def test_saved_parameters_differ_from_the_configuration_in_one_place(arena, conf
 
 
 def test_extraction_finds_the_parameter_file_by_its_name(arena, configured, project):
-    """5. How extraction finds the per-recording parameters in cell 6: at a fixed
+    """5. How the Extract step finds the per-recording parameters: at a fixed
     name in the project folder, with no pointer to it in config.yaml."""
     assert arena == project / "session_config.yaml"
     assert "session_config_path" not in plain(read_yaml(str(configured)))
@@ -215,7 +215,7 @@ def test_nothing_is_computed_until_a_button_is_pressed(scratch):
 
 
 def test_computing_the_arena_mask_finds_the_floor(scratch):
-    """9. The cell's purpose: a mask covering the arena and nothing else.
+    """9. The tool's purpose: a mask covering the arena and nothing else.
 
     ``get_roi`` returns candidate regions ranked by how arena-like they are.
     The first is the floor; the rest are fragments a user scrolls past with
@@ -241,7 +241,7 @@ def test_computing_the_arena_mask_finds_the_floor(scratch):
 def test_saving_records_the_parameters_as_set(scratch):
     """10. What the save button writes, parameter by parameter.
 
-    This is the cell's contract with cell 6: whatever a user settles on in the
+    This is the tool's contract with the Extract step: whatever a user settles on in the
     widget is what extraction runs with.
     """
     _, data, buttons = open_widget(scratch)
@@ -431,7 +431,7 @@ def test_the_weight_boxes_accept_a_decimal(scratch):
         assert boxes[label].value == 0.5, label
 
 
-# ------------------------------------------------- running the cell again
+# ------------------------------------------------- opening the tool again
 
 
 @pytest.fixture
@@ -439,8 +439,8 @@ def unextracted(tmp_path, project, arena):
     """A copy of the project as the arena step leaves it: recordings, config and
     session config, with nothing extracted.
 
-    The cell skips extracted recordings (``skip_extracted = True``), so a copy
-    made after the chain's extraction would show it none.
+    The tool skips extracted recordings by default, so a copy made after the
+    chain's extraction would show it none.
     """
     root = tmp_path / "project"
     shutil.copytree(
@@ -453,23 +453,9 @@ def unextracted(tmp_path, project, arena):
     return root
 
 
-def run_arena_cell(root):
-    """Run the notebook's own arena cell on a project; return the widget it shows.
-
-    The cell ends on the widget, which a notebook displays. Evaluated here the
-    way a kernel does, so that expression is what comes back.
-    """
-    import ast
-
-    from cells import code_cell
-
-    from moseq2_common.project import Project
-
-    namespace = {"project": Project.at(root)}
-    tree = ast.parse(code_cell("MoSeq2-Extract-Modeling-Notebook.ipynb", 5))
-    last = tree.body.pop()
-    exec(compile(tree, "<arena cell>", "exec"), namespace)
-    return eval(compile(ast.Expression(last.value), "<arena cell>", "eval"), namespace)
+def open_arena_tool(root):
+    """Open the arena tool on a project, as the chain does; return the widget it shows."""
+    return ArenaMaskWidget(str(root))
 
 
 def tune_first_recording(widget):
@@ -481,15 +467,15 @@ def tune_first_recording(widget):
     return data.path
 
 
-def test_rerunning_the_cell_keeps_saved_parameters(unextracted):
-    """A user tunes a recording, saves, and runs the cell again (after a kernel
+def test_reopening_the_tool_keeps_saved_parameters(unextracted):
+    """A user tunes a recording, saves, and opens the tool again (after a kernel
     restart, say). The saved parameters stay in the file and are what the
     widget shows."""
     session_config = unextracted / "session_config.yaml"
-    tuned = tune_first_recording(run_arena_cell(unextracted))
+    tuned = tune_first_recording(open_arena_tool(unextracted))
     saved = plain(read_yaml(str(session_config)))
 
-    widget = run_arena_cell(unextracted)
+    widget = open_arena_tool(unextracted)
 
     assert plain(read_yaml(str(session_config))) == saved
     assert saved[tuned]["bg_roi_depth_range"] == [600, 700]
@@ -511,11 +497,11 @@ def test_a_new_recording_is_detected_and_nothing_is_written(unextracted):
     from moseq2_app.util import read_and_clean_config
 
     session_config = unextracted / "session_config.yaml"
-    tune_first_recording(run_arena_cell(unextracted))
+    tune_first_recording(open_arena_tool(unextracted))
     before = session_config.read_bytes()
 
     shutil.copytree(unextracted / "saline_example_1", unextracted / "saline_example_2")
-    widget = run_arena_cell(unextracted)
+    widget = open_arena_tool(unextracted)
 
     assert session_config.read_bytes() == before
     detected = detect_and_set_camera_parameters(
@@ -547,7 +533,7 @@ def h5_arena_and_frames(results):
 def plane_run(tmp_path_factory, raw_sessions):
     """A user with a mouse that sits still sets ``use_plane_bground``, finds the
     arena in the tool (clicking "Compute arena mask" twice, then "Compute
-    extraction"), saves, runs the extraction cell, and runs it again.
+    extraction"), saves, extracts the recording, and extracts it again.
 
     ``use_plane_bground`` replaces the background extraction subtracts with a
     plane fit to the floor. The arena is found on the median background, where
@@ -557,7 +543,9 @@ def plane_run(tmp_path_factory, raw_sessions):
     One recording, so the two extractions take seconds. Returns what each step
     showed or wrote.
     """
-    from moseq2_extract.gui import extract_found_sessions, generate_config_command
+    from moseq2_common.project import Project
+    from moseq2_extract.gui import generate_config_command
+    from moseq2_extract.project import extract
     from moseq2_extract.io.image import read_image
     from moseq2_extract.session_config import recordings_options
 
@@ -567,7 +555,7 @@ def plane_run(tmp_path_factory, raw_sessions):
     generate_config_command(str(config), camera_type="k2")
     with update_config(str(config), section="extract") as config_data:
         config_data["use_plane_bground"] = True
-        config_data["cluster_type"] = "local"
+        config_data["flip_classifier"] = str(raw_sessions / "flip_classifier_k2_c57_10to13weeks.npz")
 
     widget, data, buttons = open_widget(root)
     proc = root / "aggregate_results" / STILL_RECORDING
@@ -599,10 +587,11 @@ def plane_run(tmp_path_factory, raw_sessions):
     run["saved"] = recordings_options(str(config), [recording])[recording].as_dict()
 
     results = proc / "results.h5"
-    extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
+    # the recording named, so the second run extracts it again although it is up to date
+    extract(Project.at(root), recordings=[recording])
     run["first extraction"] = h5_arena_and_frames(results)
     run["bground.tiff after the first extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
-    extract_found_sessions(str(root), str(config), extract_all=True, skip_extracted=False)
+    extract(Project.at(root), recordings=[recording])
     run["second extraction"] = h5_arena_and_frames(results)
     run["bground.tiff after the second extraction"] = read_image(str(proc / "bground.tiff"), scale=True)
     return run

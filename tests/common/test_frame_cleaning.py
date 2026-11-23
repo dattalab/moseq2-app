@@ -159,25 +159,27 @@ def clean_for_flip_training(tmp_path):
 
 
 def clean_for_extract_file(tmp_path):
-    """``extract FILE --config-file`` on a copy of one fixture recording, whose
-    settings reach extraction as tuples."""
+    """The file layer's extraction on a copy of one fixture recording, with its
+    settings read from a config file as ``moseq2 standalone extract FILE
+    --config-file`` reads them, so they reach extraction as tuples. The layer
+    is called directly: under the ``moseq2`` command a warning becomes a line on
+    standard error."""
     import shutil
 
-    from click.testing import CliRunner
-
-    import moseq2_extract.cli as extract_cli
+    from moseq2_common.options import read_settings
     from moseq2_common.yaml import write_yaml
+    from moseq2_extract import steps
+    from moseq2_extract.options import EXTRACT_STAGE, ExtractOptions
 
     session = tmp_path / "saline_example_0"
     shutil.copytree(Path(fetch_raw_sessions()) / "saline_example_0", session)
     config = tmp_path / "config.yaml"
     write_yaml({"extract": {"spatial_filter_size": [4], "temporal_filter_size": [4]}}, str(config))
-    result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(session / "depth.avi"), "--config-file", str(config), "--num-frames", "20"],
-        catch_exceptions=False,
-    )
-    assert result.exit_code == 0, result.output
+    opts = ExtractOptions.resolve(config=read_settings(config, ExtractOptions, stage_classes=EXTRACT_STAGE),
+                                  explicit={"num_frames": 20})
+    assert (opts.spatial_filter_size, opts.temporal_filter_size) == ((4,), (4,))
+    result = steps.extract(str(session / "depth.avi"), None, opts)
+    assert result.h5_file is not None and result.h5_file.is_file()
 
 
 @pytest.mark.parametrize(

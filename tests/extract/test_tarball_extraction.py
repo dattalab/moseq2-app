@@ -19,9 +19,8 @@ import h5py
 import pytest
 from click.testing import CliRunner
 
+from moseq2_app.cli import cli
 from moseq2_common.records import read_record
-
-import moseq2_extract.cli as extract_cli
 from moseq2_extract.io.video import get_movie_info, load_movie_data
 
 N_FRAMES = 200
@@ -52,7 +51,7 @@ def tarball(tmp_path, raw_sessions):
 
 
 def test_a_tarball_extracts_beside_the_archive(tarball):
-    result = CliRunner().invoke(extract_cli.cli, ["extract", str(tarball)])
+    result = CliRunner().invoke(cli, ["standalone", "extract", str(tarball)])
     assert result.exception is None, result.output
 
     proc = tarball.parent / "proc"

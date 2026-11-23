@@ -1,6 +1,7 @@
 """
 Main functions that facilitate all jupyter notebook functionality.
 """
+import re
 from os.path import exists, join
 import ipywidgets as widgets
 from IPython.display import display
@@ -10,7 +11,6 @@ from moseq2_common.options import read_settings
 from moseq2_common.project import Project
 from moseq2_viz.options import CROWD_MOVIE_STAGE, CrowdMovieOptions
 from moseq2_extract.util import filter_warnings
-from moseq2_extract.gui import get_selected_sessions
 from moseq2_app.gui.widgets import GroupSettingWidgets
 from moseq2_app.scalars.controller import InteractiveScalarViewer
 from moseq2_app.stat.controller import InteractiveSyllableStats
@@ -22,6 +22,92 @@ from moseq2_app.gui.wrappers import validate_extractions_wrapper, \
     interactive_plot_transition_graph_wrapper
 
 output_notebook()
+
+
+_SELECTION_ITEM = re.compile(r"(e?)\s*(\d+)(?:\s*-\s*(\d+))?", re.IGNORECASE)
+
+
+def _parse_session_selection(answer, n_sessions):
+    """
+    Turn an answer at the session prompt into the session numbers it selects.
+
+    The answer is a comma separated list of items. Each item is a session number
+    "N", an inclusive range "N-M", or either of those prefixed with "e" to leave
+    those sessions out. Without an item that selects sessions, the answer starts
+    from all of them. Sessions are numbered from 1.
+
+    Args:
+    answer (str): what the user typed.
+    n_sessions (int): number of sessions listed.
+
+    Returns:
+    selected (list): session numbers in the order first named, each once.
+
+    Raises:
+    ValueError: naming the item that is not a number or a range, names a session
+    that is not listed or runs backwards, or the answer if it leaves no sessions.
+    """
+    items = [item.strip() for item in answer.split(",") if item.strip()]
+    if not items:
+        raise ValueError("Invalid input.")
+
+    selected, excluded = [], set()
+    for item in items:
+        match = _SELECTION_ITEM.fullmatch(item)
+        if match is None:
+            raise ValueError(f'Invalid input "{item}": not a number or a range.')
+        first, last = int(match[2]), int(match[3] or match[2])
+        for number in (first, last):
+            if not 1 <= number <= n_sessions:
+                raise ValueError(f'Invalid input "{item}": there is no session {number}.')
+        if first > last:
+            raise ValueError(f'Invalid input "{item}": a range runs from the lower number to the higher.')
+        if match[1]:
+            excluded.update(range(first, last + 1))
+        else:
+            selected += [n for n in range(first, last + 1) if n not in selected]
+
+    selected = [n for n in selected or range(1, n_sessions + 1) if n not in excluded]
+    if not selected:
+        raise ValueError(f'Invalid input "{answer.strip()}": that leaves no sessions to extract.')
+    return selected
+
+
+def _selected_sessions(to_extract, extract_all):
+    """
+    The sessions a person picks from ``to_extract`` at a numbered prompt, or all of them.
+
+    Args:
+    to_extract (list): list of paths to sessions to extract
+    extract_all (bool): boolean to include all sessions and skip user-input prompt.
+
+    Returns:
+    to_extract (list): new list of selected sessions to extract.
+    """
+
+    if len(to_extract) > 1 and not extract_all:
+        for i, sess in enumerate(to_extract):
+            print(f"[{str(i + 1)}] {sess}")
+
+        print("You may input comma separated values for individual sessions")
+        print(
+            'Or you can input a hyphen separated range. E.g. "1-10" selects 10 sessions, including sessions 1 and 10'
+        )
+        print(
+            'You can also exclude a range by prefixing the range selection with the letter "e"; e.g.: "e1-5".'
+        )
+        print("Press q to quit.")
+        while True:
+            sessions = input("Input your selected sessions to extract: ")
+            if sessions.strip().lower() == "q":
+                return []
+            try:
+                return [to_extract[n - 1] for n in _parse_session_selection(sessions, len(to_extract))]
+            except ValueError as error:
+                print(f"{error} Try again or press q to quit.")
+    else:
+        return to_extract
+
 
 @filter_warnings
 def view_extraction(extractions, default=0):
@@ -43,7 +129,7 @@ def view_extraction(extractions, default=0):
     if default < 0:
         for i, sess in enumerate(extractions):
             print(f'[{str(i + 1)}] {sess}')
-        extractions = get_selected_sessions(extractions, False)
+        extractions = _selected_sessions(extractions, False)
     else:
         print(f"Displaying {extractions[default]}")
         return [extractions[default]]
@@ -107,8 +193,8 @@ def interactive_scalar_summary(project_folder):
     project = Project.at(project_folder)
     index = project_index(project)
     if index is None:
-        print(f'{project.bookkeeping_file} lists no sessions yet. Run the aggregation cell above first, '
-              'then run this cell again.')
+        print(f'{project.bookkeeping_file} lists no sessions yet. Run `moseq2 extract` (or the notebook\'s '
+              'Extract step) first, then run this cell again.')
         return
 
     viewer = InteractiveScalarViewer(index)

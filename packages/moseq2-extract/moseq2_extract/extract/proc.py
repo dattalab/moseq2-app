@@ -12,7 +12,7 @@ import skimage.measure
 import scipy.interpolate
 import skimage.morphology
 from copy import deepcopy
-from tqdm.auto import tqdm
+from moseq2_common.report import current, iterate
 import moseq2_extract.io.video
 import moseq2_extract.extract.roi
 from os.path import join
@@ -41,7 +41,7 @@ def get_flips(frames, flip_file=None, smoothing=None):
     try:
         clf = load_flip_classifier(flip_file)
     except IOError:
-        print(f"Could not open file {flip_file}")
+        current().status(f"Could not open file {flip_file}")
         raise
     except Exception as exc:
         # Only the failure this port introduces is reported differently. A file
@@ -87,7 +87,7 @@ def get_largest_cc(frames, progress_bar=False):
 
     foreground_obj = np.zeros((frames.shape), 'bool')
 
-    for i in tqdm(range(frames.shape[0]), disable=not progress_bar, desc='Computing largest Connected Component'):
+    for i in iterate(range(frames.shape[0]), 'Computing largest Connected Component', show=progress_bar):
         nb_components, output, stats, centroids =\
             cv2.connectedComponentsWithStats(frames[i], connectivity=4)
         szs = stats[:, -1]
@@ -386,7 +386,7 @@ def clean_frames(frames, prefilter_space=(3,), prefilter_time=None,
     # seeing enormous speed gains w/ opencv
     filtered_frames = frames.copy().astype(frame_dtype)
 
-    for i in tqdm(range(frames.shape[0]), disable=not progress_bar, desc='Cleaning frames'):
+    for i in iterate(range(frames.shape[0]), 'Cleaning frames', show=progress_bar):
         # Erode Frames
         if strel_min is not None and iters_min is not None and iters_min > 0:
             filtered_frames[i] = cv2.erode(filtered_frames[i], strel_min, iterations=iters_min)
@@ -440,7 +440,7 @@ def get_frame_features(frames, frame_threshold=10, mask=np.array([]),
         'axis_length': np.full((nframes, 2), np.nan)
     }
 
-    for i in tqdm(range(nframes), disable=not progress_bar, desc='Computing moments'):
+    for i in iterate(range(nframes), 'Computing moments', show=progress_bar):
         # Threshold frame to compute mask
         frame_mask = frames[i] > frame_threshold
 
@@ -494,7 +494,7 @@ def crop_and_rotate_frames(frames, features, crop_size=(80, 80), progress_bar=Fa
     win = (crop_size[0] // 2, crop_size[1] // 2 + 1)
     border = (crop_size[1], crop_size[1], crop_size[0], crop_size[0])
 
-    for i in tqdm(range(frames.shape[0]), disable=not progress_bar, desc='Rotating'):
+    for i in iterate(range(frames.shape[0]), 'Rotating', show=progress_bar):
 
         if np.any(np.isnan(features['centroid'][i])):
             continue

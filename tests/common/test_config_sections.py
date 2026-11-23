@@ -2,7 +2,8 @@
 
 A 1.6 ``config.yaml`` holds ``camera_type`` at its top level and the settings
 of each stage in a section of their own: ``extract``, ``pca``, ``model`` and
-``crowd_movies``. A name that means different things in two stages
+``crowd_movies``, and ``computing`` holds where extraction runs, in its
+``extract`` block. A name that means different things in two stages
 (``max_height``, ``chunk_size``) or a compute resource (``cluster_type``) has a
 value per stage, so setting it for extraction leaves PCA alone. Both front ends
 of a step resolve the same section the same way, with no difference in value or
@@ -86,15 +87,14 @@ def test_pca_height_range_is_independent_of_extraction(tmp_path, pca_steps):
 
 
 def test_choosing_slurm_for_extraction_leaves_pca_local(tmp_path, pca_steps):
-    """``cluster_type`` is set per stage: SLURM extraction does not send PCA to SLURM."""
+    """``cluster_type`` is set per stage: SLURM extraction (``computing.extract``) does not send PCA to SLURM."""
     from moseq2_common.options import read_settings
-    from moseq2_extract.options import EXTRACT_STAGE, BatchExtractOptions
+    from moseq2_extract.options import ExtractComputing
     from moseq2_pca.options import PCA_STAGE, TrainPCAOptions
 
-    config = sectioned(tmp_path / "config.yaml", extract={"cluster_type": "slurm"})
+    config = sectioned(tmp_path / "config.yaml", computing={"extract": {"cluster_type": "slurm"}})
 
-    extraction = BatchExtractOptions.resolve(
-        config=read_settings(config, BatchExtractOptions, stage_classes=EXTRACT_STAGE))
+    extraction = ExtractComputing.resolve(config=read_settings(config, ExtractComputing, stage_classes=()))
     pca = TrainPCAOptions.resolve(config=read_settings(config, TrainPCAOptions, stage_classes=PCA_STAGE))
 
     assert extraction.cluster_type == "slurm"
@@ -234,8 +234,8 @@ def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch
     import moseq2_extract.project as extract_project
     import moseq2_model.steps as model_steps
     import moseq2_viz.steps as viz_steps
-    from moseq2_extract.cli import cli as extract_cli
-    from moseq2_extract.gui import extract_found_sessions
+    from moseq2_app.cli import cli as moseq2_cli
+    from moseq2_app.notebook import extract as extract_gui
     from moseq2_model.cli import cli as model_cli
     from moseq2_model.gui import learn_model_command
     from moseq2_pca.gui import apply_pca_command, compute_changepoints_command, train_pca_command
@@ -255,16 +255,25 @@ def test_both_front_ends_resolve_the_same_values(project, pca_steps, monkeypatch
         assert notebook.timeout == 5 and type(notebook.timeout) is int, name
         _same(cli, notebook)
 
-    # extraction
-    batches = []
-    monkeypatch.setattr(extract_project, "batch_extract",
-                        lambda project, input_dir, opts, **kwargs: batches.append(opts)
-                        or extract_project.BatchExtractResult(found=[], extracted=[], failures=[], script=None))
-    extract_found_sessions(str(project), str(config), extract_all=True, skip_extracted=True)
-    result = CliRunner().invoke(extract_cli, ["batch-extract", str(project), "--config-file", str(config),
-                                              "--skip-completed"])
+    # extraction: the Extract GUI's button, sending the settings it shows, then `moseq2 extract`
+    (project / "s0").mkdir()
+    (project / "s0" / "depth.avi").write_bytes(b"")
+    (project / "flip.npz").write_bytes(b"")  # named, so nothing is downloaded; never read, as nothing is extracted
+    data = read_yaml(str(config))
+    data["extract"]["flip_classifier"] = str(project / "flip.npz")
+    write_yaml(data, str(config))
+    extractions = []
+    monkeypatch.setattr(extract_project, "extract_recording",
+                        lambda project, input_file, opts, **kwargs: extractions.append((input_file, opts)))
+    monkeypatch.chdir(project)
+    widget = extract_gui()
+    widget.start(dict(widget.saved))
+    run = widget.wait(timeout=120)
+    assert run["state"] == "finished", (run, widget.problem)
+    result = CliRunner().invoke(moseq2_cli, ["extract"])
     assert result.exit_code == 0, result.output
-    _same(batches[1], batches[0])
+    assert [input_file for input_file, _ in extractions] == [str(project / "s0" / "depth.avi")] * 2
+    _same(extractions[1][1], extractions[0][1])
 
     # modeling
     fits = []

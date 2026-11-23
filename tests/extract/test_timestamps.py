@@ -20,10 +20,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
+from moseq2_extract import steps
 from moseq2_extract.helpers.data import handle_extract_metadata
+from moseq2_extract.options import ExtractOptions
 from moseq2_extract.util import load_timestamps
 
 from fixtures import fetch_azure_mkv
@@ -84,15 +84,18 @@ def recording_without_timestamps(tmp_path, raw_sessions):
     return session
 
 
+def extract(recording, output_dir, **settings):
+    """Extract ``recording`` into ``output_dir`` with ``settings`` over the defaults, as ``moseq2 standalone
+    extract`` extracts each recording it is given (``moseq2_extract.steps.extract``)."""
+    return steps.extract(str(recording), str(output_dir), ExtractOptions.resolve(explicit=settings))
+
+
 def test_extraction_without_timestamps_stops_before_writing(recording_without_timestamps):
     session = recording_without_timestamps
     output_dir = session / "proc"
-    result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(session / "depth.avi"), "--output-dir", str(output_dir), "--num-frames", "20"],
-    )
-    assert isinstance(result.exception, FileNotFoundError), result.output
-    message = str(result.exception)
+    with pytest.raises(FileNotFoundError) as raised:
+        extract(session / "depth.avi", output_dir, num_frames=20)
+    message = str(raised.value)
     assert str(session / "depth.avi") in message
     assert str(session / "depth_ts.txt") in message
     assert str(session / "timestamps.csv") in message
@@ -149,12 +152,9 @@ def recording_with_short_timestamps(tmp_path, raw_sessions):
 
 
 def mismatch(session):
-    result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(session / "depth.avi"), "--output-dir", str(session / "proc"), "--num-frames", "20"],
-    )
-    assert isinstance(result.exception, ValueError), result.output
-    return str(result.exception)
+    with pytest.raises(ValueError) as raised:
+        extract(session / "depth.avi", session / "proc", num_frames=20)
+    return str(raised.value)
 
 
 def expected_mismatch(session, n_frames, n_timestamps, source):
@@ -201,12 +201,10 @@ def test_a_frame_count_mismatch_names_a_tarball_member(tmp_path):
             info = tarfile.TarInfo(name)
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
-    result = CliRunner().invoke(
-        extract_cli.cli, ["extract", str(tarball), "--output-dir", str(tmp_path / "proc")]
-    )
-    assert isinstance(result.exception, ValueError), result.output
+    with pytest.raises(ValueError) as raised:
+        extract(tarball, tmp_path / "proc")
     source = f"timestamps.csv inside {tarball}"
-    assert str(result.exception) == (
+    assert str(raised.value) == (
         f"Frame count mismatch for {tarball}: the depth video has 3 frames but "
         f"2 timestamps were read from {source}. Each frame needs one timestamp, "
         f"so the video or the timestamps are incomplete, or they do not belong together. "

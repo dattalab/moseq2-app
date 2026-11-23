@@ -12,11 +12,16 @@ pass the paths and an options object, such as
 ``extract("session_1/depth.dat", "proc", ExtractOptions(num_frames=900))``.
 
 The project layer, ``moseq2_extract.project``, runs these steps in a project:
-it decides where a recording's outputs go (its session's folder in
-``aggregate_results/``), the uuid ``moseq2-project.yaml`` gave the session and
-the settings files the run reads, starts the run's record with the project, and
-calls the function here with that record. Batch extraction and aggregation are
-project steps and live there.
+it decides which recordings to extract and with what settings, where each one's
+outputs go (its session's folder in ``aggregate_results/``), the uuid
+``moseq2-project.yaml`` gives the session and the settings files the run reads,
+starts the run's record with the project, and calls the function here with that
+record. ``moseq2 standalone extract`` calls ``extract`` here once per recording
+named.
+
+Each step reports what it is doing through ``moseq2_common.report``: its
+``reporter`` argument, or the reporter of the step that called it, or by default
+lines and progress bars on standard error.
 
 Each step hands its work function (``get_roi_wrapper``, ``extract_wrapper`` in
 ``moseq2_extract.helpers.wrappers``) the options as a dict. Each output carries
@@ -42,11 +47,12 @@ from pathlib import Path
 
 from moseq2_common.project import ChoiceNeeded
 from moseq2_common.records import Record, check_inputs, start_record, write_record
+from moseq2_common.report import Reporter, current, reporting
 from moseq2_common.yaml import write_config
 from moseq2_extract.helpers.wrappers import extract_wrapper, get_roi_wrapper
 from moseq2_extract.options import ExtractOptions, RoiOptions
 from moseq2_extract.recordings import standalone_outputs
-from moseq2_extract.setup import _CAMERA_TYPE, CAMERA_PRESETS, _defaults, _stages, project_camera
+from moseq2_extract.setup import _CAMERA_TYPE, CAMERA_PRESETS, _computing, _defaults, _stages, project_camera
 from moseq2_extract.util import filter_warnings
 
 #: ExtractOptions fields extract_wrapper takes as arguments rather than in its dict.
@@ -98,13 +104,19 @@ def _settings(opts, leave_out=()):
 
 
 def find_roi(input_file: str, output_dir: str | None, opts: RoiOptions, *,
-             record: Record | None = None) -> FindRoiResult:
+             record: Record | None = None, reporter: Reporter | None = None) -> FindRoiResult:
     """Find the arena and background of ``input_file``; write the background and arena images.
 
     They go into ``output_dir`` when given, else into ``proc/`` beside the recording. ``record`` is the run's
     record, started by the caller (``moseq2_extract.project.find_roi`` starts it with the project); without
-    one, the step starts its own, its one input the recording.
+    one, the step starts its own, its one input the recording. What it does is reported to ``reporter``
+    (``moseq2_common.report``; the caller's, or the default, when None).
     """
+    with reporting(reporter):
+        return _find_roi(input_file, output_dir, opts, record)
+
+
+def _find_roi(input_file, output_dir, opts, record):
     check_inputs("find-roi", {input_file: RECORDING_ADVICE})
     if record is None:
         record = start_record("find-roi", opts, [input_file])
@@ -133,7 +145,7 @@ def _output_folder(input_file, output_dir):
 
 
 def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *, uuid: str | None = None,
-            record: Record | None = None) -> ExtractResult:
+            record: Record | None = None, reporter: Reporter | None = None) -> ExtractResult:
     """Extract ``input_file``.
 
     Its outputs go into ``output_dir`` when given (a relative one is relative to the recording's folder), else
@@ -141,8 +153,16 @@ def extract(input_file: str, output_dir: str | None, opts: ExtractOptions, *, uu
     (``moseq2_extract.project.extract`` passes the one ``moseq2-project.yaml`` lists); None draws a new one.
     ``record`` is the run's record, started by the caller (the project layer starts it with the project and
     the settings files); without one, the step starts its own. The extraction adds the recording and the
-    files read beside it to the record's inputs.
+    files read beside it to the record's inputs. What it does is reported to ``reporter``
+    (``moseq2_common.report``; the caller's, or the default, when None), and it stops at the next chunk of
+    frames when the reporter says the person asked it to (``StepStopped``), leaving the recording's previous
+    outputs as they were.
     """
+    with reporting(reporter):
+        return _extract(input_file, output_dir, opts, uuid, record)
+
+
+def _extract(input_file, output_dir, opts, uuid, record):
     check_inputs("extract", {input_file: RECORDING_ADVICE})
     if record is None:
         record = start_record("extract", opts, [])
@@ -176,6 +196,7 @@ def generate_config(output_file: str, camera_type: str, *, overwrite: bool) -> P
     data = {"camera_type": _CAMERA_TYPE[camera]}
     for section, classes in _stages().items():
         data[section] = {**_defaults(classes), **preset.get(section, {})}
+    data["computing"] = _computing()
     data["exclude"] = []
     write_config(data, output_file)
     return Path(output_file)
@@ -206,5 +227,5 @@ def _fetch(url, output_dir):
     output_filename = join(output_dir, basename(url))
 
     urllib.request.urlretrieve(url, output_filename)
-    print("Successfully downloaded flip file to", output_filename)
+    current().status(f"Successfully downloaded flip file to {output_filename}")
     return output_filename

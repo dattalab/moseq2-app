@@ -35,6 +35,8 @@ dependencies = [
     "h5py>=3.16.0",
     "numpy>=2.2.6",
     "ruamel.yaml>=0.19.1",
+    # The progress bars moseq2_common.report draws on a terminal.
+    "tqdm>=4.70.1",
 ]
 
 [project.optional-dependencies]

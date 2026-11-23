@@ -33,24 +33,32 @@ class CleaningOptions(Options):
 
     SECTION = "extract"
 
-    temporal_filter_size: tuple = option((0,), "--temporal-filter-size", "-t", type=int, multiple=True, arena=True,
-                                         help="Time prefilter kernel (median filter; an even size rounds up to the next odd one)")
-    spatial_filter_size: tuple = option((3,), "--spatial-filter-size", "-s", type=int, multiple=True, arena=True,
-                                        help="Space prefilter kernel (median filter; an even size rounds up to the next odd one)")
-    tail_filter_shape: str = option("ellipse", "--tail-filter-shape", type=str, arena=True,
-                                    help="Tail filter shape (ellipse or rectangle); none turns the tail filter off")
-    tail_filter_size: tuple = option((9, 9), "--tail-filter-size", type=(int, int), arena=True,
-                                     help="Tail filter size (in pixels); 0 0 turns the tail filter off")
+    temporal_filter_size: tuple = option(
+        (0,), "--temporal-filter-size", "-t", type=int, multiple=True, arena=True,
+        help="The number of frames a median filter over time spans; an even number rounds up to the next odd one, "
+             "and 0 turns it off.")
+    spatial_filter_size: tuple = option(
+        (3,), "--spatial-filter-size", "-s", type=int, multiple=True, arena=True,
+        help="The width, in pixels, of a median filter over each frame; an even width rounds up to the next odd "
+             "one, and 0 turns it off.")
+    tail_filter_shape: str = option(
+        "ellipse", "--tail-filter-shape", type=str, arena=True,
+        help="The shape of the filter that trims the tail off the mouse: ellipse or rectangle; none turns it off.")
+    tail_filter_size: tuple = option(
+        (9, 9), "--tail-filter-size", type=(int, int), arena=True,
+        help="The width and height, in pixels, of the filter that trims the tail off the mouse; 0 0 turns it off.")
     tail_filter_iters: int = option(1, "--tail-filter-iters", type=int, arena=True,
-                                    help="Number of tail filter iterations")
-    cable_filter_size: tuple = option((5, 5), "--cable-filter-size", type=(int, int), arena=True,
-                                      help="Cable filter size (in pixels); 0 0 turns the cable filter off")
-    cable_filter_shape: str = option("rectangle", "--cable-filter-shape", type=str, arena=True,
-                                     help="Cable filter shape (rectangle or ellipse); none turns the cable filter off")
+                                    help="How many times the tail filter is applied.")
+    cable_filter_size: tuple = option(
+        (5, 5), "--cable-filter-size", type=(int, int), arena=True,
+        help="The width and height, in pixels, of the filter that removes a cable from the frame; 0 0 turns it off.")
+    cable_filter_shape: str = option(
+        "rectangle", "--cable-filter-shape", type=str, arena=True,
+        help="The shape of the filter that removes a cable from the frame: rectangle or ellipse; none turns it off.")
     cable_filter_iters: int = option(0, "--cable-filter-iters", type=int, arena=True,
-                                     help="Number of cable filter iterations")
+                                     help="How many times the cable filter is applied; 0 turns it off.")
     min_height: int = option(10, "--min-height", type=int, arena=True,
-                             help="Min mouse height threshold from floor (mm)")
+                             help="Anything lower than this above the floor, in mm, isn't counted as the mouse.")
 
 
 def odd_kernel(size: int) -> int:

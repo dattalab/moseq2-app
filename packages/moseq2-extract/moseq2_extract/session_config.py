@@ -28,6 +28,7 @@ from ruamel.yaml import YAMLError
 
 from moseq2_common.options import ConfigFileError, arena_fields, read_settings
 from moseq2_common.project import find_project, is_job_file, session_key
+from moseq2_common.report import current
 from moseq2_common.yaml import read_yaml, write_yaml
 from moseq2_extract.options import EXTRACT_STAGE, ExtractOptions
 
@@ -95,7 +96,7 @@ def arena_settings(entry, key="", path=""):
     other = [setting for setting in entry if setting not in ARENA_TOOL_SETTINGS]
     if other:
         names = ", ".join(f"`{setting}`" for setting in other)
-        print(f"{path}'s entry for {key} sets {names}, which the arena tool does not set, so extraction "
+        current().status(f"{path}'s entry for {key} sets {names}, which the arena tool does not set, so extraction "
               "ignores them and takes them from config.yaml's extract section. Delete those lines from the "
               "entry to silence this message.")
     return {setting: value for setting, value in entry.items() if setting in ARENA_TOOL_SETTINGS}

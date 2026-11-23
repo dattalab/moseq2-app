@@ -3,7 +3,7 @@
 Without ``manual_set_depth_range``, finding the arena replaces
 ``bg_roi_depth_range`` with a range detected from the background
 (moseq2-extract#121, #125). A range a user types as ``--bg-roi-depth-range``
-is used as given. A range that only comes from the config file still follows
+(``moseq2-extract find-roi``, ``moseq2 standalone extract``) is used as given. A range that only comes from the config file still follows
 ``manual_set_depth_range``, because a generated config holds a range nobody
 chose (``[550, 650]`` for the Azure).
 """
@@ -15,7 +15,11 @@ from click.testing import CliRunner
 
 import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
+from moseq2_app.cli import cli
 from moseq2_common.yaml import write_yaml
+
+#: Each command's command line: ``moseq2-extract find-roi``, ``moseq2 standalone extract``.
+COMMANDS = {"find-roi": (extract_cli.cli, ["find-roi"]), "extract": (cli, ["standalone", "extract"])}
 
 
 @pytest.fixture
@@ -27,8 +31,9 @@ def received(monkeypatch):
     return calls
 
 
-def run(*args):
-    result = CliRunner().invoke(extract_cli.cli, list(args), catch_exceptions=False)
+def run(command, *args):
+    group, words = COMMANDS[command]
+    result = CliRunner().invoke(group, [*words, *args], catch_exceptions=False)
     assert result.exit_code == 0, result.output
 
 

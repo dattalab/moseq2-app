@@ -190,8 +190,9 @@ def incomplete_extraction_message(session, recording, partial):
 
     extract_wrapper writes the session's ``.h5`` under a temporary name and renames it to
     ``results.h5`` only at the end, so the temporary file left behind means the extraction was
-    stopped partway. run_slurm_extract submits sbatch commands without an output path, so a SLURM
-    job's log is sbatch's default slurm-<job id>.out in the directory the jobs were submitted from.
+    stopped partway. The ``sbatch`` lines a cluster extraction writes (``extract_out.sh``) name no output
+    path, so a SLURM job's log is sbatch's default slurm-<job id>.out in the directory the jobs were
+    submitted from.
 
     Args:
     session (str): the session's name

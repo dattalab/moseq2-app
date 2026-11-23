@@ -1,6 +1,6 @@
 """Trimming frames off the start or end of a recording.
 
-``--frame-trim A B`` extracts a recording without its first ``A`` and last
+``--frame-trim A B`` (``moseq2 standalone extract``) extracts a recording without its first ``A`` and last
 ``B`` frames. The output holds only the kept frames, so frame ``A`` of the
 recording is frame 0 of the extraction, and every per-frame dataset and the
 timestamps line up on that numbering (moseq2-extract#157).
@@ -25,7 +25,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
+from moseq2_app.cli import cli
 from moseq2_extract.util import load_timestamps
 
 RECORDING = "saline_example_0"
@@ -47,8 +47,9 @@ def extract(recording, start, end):
     """Extract with the given trim and return what the results file holds."""
     output_dir = f"proc_{start}_{end}"
     result = CliRunner().invoke(
-        extract_cli.cli,
+        cli,
         [
+            "standalone",
             "extract",
             str(recording / "depth.avi"),
             "--frame-trim", str(start), str(end),

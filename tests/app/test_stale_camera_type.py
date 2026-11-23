@@ -17,7 +17,6 @@ names the Kinect v2 (``k2``, ``kinect``) or ``auto``:
 
 from __future__ import annotations
 
-import ast
 import json
 import shutil
 from pathlib import Path
@@ -25,20 +24,14 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-import moseq2_extract.cli as extract_cli
 import moseq2_extract.helpers.wrappers as extract_wrappers
-from moseq2_common.project import Project
 import moseq2_app.util as app_util
+from moseq2_app.cli import cli
 from moseq2_app.util import update_config
 from moseq2_extract.gui import generate_config_command
-from moseq2_common.yaml import read_yaml
 
-from cells import code_cell
+from cells import NOTEBOOKS
 from fixtures import fetch_azure_mkv, fetch_raw_sessions
-
-NOTEBOOK = "MoSeq2-Extract-Modeling-Notebook.ipynb"
-ARENA_CELL = 5
-PCA_CELL = 13
 
 AZURE = {"bg_roi_weights": [10, 0.1, 1], "pixel_format": "gray16be", "movie_dtype": ">u2"}
 KINECT = {"bg_roi_weights": [1, 0.1, 1], "pixel_format": "gray16le", "movie_dtype": "<u2"}
@@ -77,12 +70,22 @@ def project_as_145_left_it(root, camera_type, recording="azure-mkv"):
 
 
 def run_arena_cell(root):
-    """The notebook's arena cell, as a kernel runs it."""
-    namespace = {"project": Project.at(root), "skip_extracted": True}
-    tree = ast.parse(code_cell(NOTEBOOK, ARENA_CELL))
-    last = tree.body.pop()
-    exec(compile(tree, "<arena cell>", "exec"), namespace)
-    widget = eval(compile(ast.Expression(last.value), "<arena cell>", "eval"), namespace)
+    """The arena tool opened on the project, as the pipeline opens it; the settings it shows for the
+    recording.
+
+    In a notebook the tool's progress bar (``tqdm.auto``) is a widget, so stderr holds only the lines the
+    tool reports. Outside one the bar is text on stderr, so it is turned off here to read those lines as a
+    notebook shows them.
+    """
+    from functools import partial
+    from unittest import mock
+
+    from tqdm.auto import tqdm
+
+    from moseq2_app.roi.widget import ArenaMaskWidget
+
+    with mock.patch("moseq2_app.roi.widget.tqdm", partial(tqdm, disable=True)):
+        widget = ArenaMaskWidget(str(root))
     # what the tool shows for the recording; opening it saves nothing
     (key,) = [key for key in widget.session_config if key.startswith("session_1/")]
     return widget.session_config[key]
@@ -99,7 +102,7 @@ def test_the_arena_tool_gives_a_new_mkv_the_azure_settings_and_says_why(tmp_path
     entry = run_arena_cell(tmp_path)
 
     assert camera_settings(entry) == AZURE
-    assert camera_lines(capsys.readouterr().out) == [
+    assert camera_lines(capsys.readouterr().err) == [
         f"{recording} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras "
         f"write, but config.yaml says camera_type: {camera_type} (the Kinect v2). Used the Azure "
         "settings for it: bg_roi_weights [10, 0.1, 1], pixel_format gray16be, movie_dtype >u2. "
@@ -114,7 +117,8 @@ def test_the_arena_tool_with_auto_gives_an_mkv_the_azure_settings_quietly(tmp_pa
     entry = run_arena_cell(tmp_path)
 
     assert camera_settings(entry) == AZURE
-    assert camera_lines(capsys.readouterr().out) == []
+    captured = capsys.readouterr()
+    assert camera_lines(captured.out + captured.err) == []
 
 
 def test_the_arena_tool_keeps_the_kinect_for_a_kinect_recording(tmp_path, capsys):
@@ -124,7 +128,8 @@ def test_the_arena_tool_keeps_the_kinect_for_a_kinect_recording(tmp_path, capsys
     entry = run_arena_cell(tmp_path)
 
     assert camera_settings(entry) == KINECT
-    assert camera_lines(capsys.readouterr().out) == []
+    captured = capsys.readouterr()
+    assert camera_lines(captured.out + captured.err) == []
 
 
 # ------------------------------------------------------------------- extraction (R4)
@@ -150,65 +155,69 @@ def test_extract_gives_an_mkv_the_azure_settings(tmp_path, detected, camera_type
     recording = project_as_145_left_it(tmp_path, camera_type)
 
     result = CliRunner().invoke(
-        extract_cli.cli,
-        ["extract", str(recording), "--config-file", str(tmp_path / "config.yaml"),
+        cli,
+        ["standalone", "extract", str(recording), "--config-file", str(tmp_path / "config.yaml"),
          "--output-dir", str(recording.parent / "proc")],
+        prog_name="moseq2",
     )
 
     assert result.exit_code == 0, result.output + repr(result.exception)
     assert [camera_settings(config) for config in detected] == [AZURE]
-    printed = camera_lines(result.output)
     if line:
-        assert printed == [
+        assert camera_lines(result.stderr) == [
             f"{recording} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras "
             "write, but config.yaml says camera_type: k2 (the Kinect v2). Used the Azure "
             "settings for it: bg_roi_weights [10, 0.1, 1], pixel_format gray16be, movie_dtype >u2. "
             "Set camera_type: azure in config.yaml."
         ]
     else:
-        assert printed == []
+        assert camera_lines(result.output) == []
 
 
 # ------------------------------------------------------------------------- PCA (B2)
 
 
 @pytest.fixture
-def run_pca_cell(monkeypatch):
-    """Run the notebook's PCA cell with training replaced by a recorder; return the pca section it trains with."""
+def run_pca_training(monkeypatch):
+    """Train PCA in a project as the notebook's ``train_pca_command`` does, with the training replaced by a
+    recorder; return the filters it trains with."""
     import moseq2_pca.gui
+    import moseq2_pca.project
 
     trained = []
-    monkeypatch.setattr(moseq2_pca.gui, "train_pca_command",
-                        lambda folder, *args: trained.append(read_yaml(str(Path(folder) / "config.yaml"))["pca"]))
+    monkeypatch.setattr(moseq2_pca.project, "train_pca", lambda project, input_dir, output_dir, output_file, opts,
+                        *args, **kwargs: trained.append(opts))
 
     def run(root):
-        namespace = {"project": Project.at(root)}
-        exec(compile(code_cell(NOTEBOOK, PCA_CELL), "<PCA cell>", "exec"), namespace)
-        (section,) = trained
-        return {key: list(section.get(key) or []) for key in AZURE_FILTERS}
+        moseq2_pca.gui.train_pca_command(str(root), "pca")
+        (opts,) = trained
+        return {key: list(getattr(opts, key) or []) for key in AZURE_FILTERS}
 
     return run
 
 
 @pytest.mark.parametrize("camera_type", ["k2", "auto"])
-def test_the_pca_cell_trains_with_the_filters_config_yaml_holds(tmp_path, capsys, run_pca_cell, camera_type):
-    """generate-config wrote the Azure filters into the pca section; the cell neither sets nor replaces them."""
+def test_pca_trains_with_the_filters_config_yaml_holds(tmp_path, capsys, run_pca_training, camera_type):
+    """generate-config wrote the Azure filters into the pca section; training neither sets nor replaces them."""
     project_as_145_left_it(tmp_path, camera_type)
     capsys.readouterr()
 
-    filters = run_pca_cell(tmp_path)
+    filters = run_pca_training(tmp_path)
 
     assert filters == AZURE_FILTERS
-    assert camera_lines(capsys.readouterr().out) == []
+    captured = capsys.readouterr()
+    assert camera_lines(captured.out + captured.err) == []
 
 
 def test_the_notebook_no_longer_infers_the_camera_for_pca():
     """The camera's filters are config.yaml's, written by generate-config: nothing decides them at run time.
 
-    ``camera_for_pca`` is left only as the name a 1.5 notebook imports, which stops it.
+    ``camera_for_pca`` is left only as the name a 1.5 notebook imports, which stops it, and no notebook
+    cell uses it.
     """
     from moseq2_common.project import OutdatedNotebookError
 
     with pytest.raises(OutdatedNotebookError, match="camera_for_pca"):
         app_util.camera_for_pca
-    assert "camera_for_pca" not in code_cell(NOTEBOOK, PCA_CELL)
+    for notebook in NOTEBOOKS.glob("*.ipynb"):
+        assert "camera_for_pca" not in notebook.read_text(encoding="utf-8"), notebook.name

@@ -10,7 +10,8 @@ can be run without naming it:
   ``plot-stats`` read the project's current model;
 - ``get-best-model`` reads the changepoints it names, compares the models in
   ``models/`` and draws ``plots/model_vs_pc_changepoints``, as the notebook does;
-- ``batch-extract`` searches the project folder;
+- ``moseq2 extract`` extracts the recordings of the project it runs in, or the
+  ones named;
 - ``learn-model`` writes ``models/model.p``, ``kappa-scan`` writes into
   ``models/`` and ``apply-model`` into ``applied_models/``, as the notebook does;
 - ``compute-changepoints`` reads the components the project names, or the ones
@@ -300,27 +301,28 @@ def test_get_best_model_defaults_to_the_project(project, typed, viz):
     assert Path(output_file) == typed / "best"
 
 
-# ------------------------------------------------------------------ batch-extract
+# ------------------------------------------------------------------ moseq2 extract
 
 
-def test_batch_extract_defaults_to_the_project_folder(project, typed, monkeypatch):
-    import moseq2_extract.cli as cli
+def test_moseq2_extract_works_on_the_project_it_runs_in(project, monkeypatch):
+    """With no recording named, the project's plan decides; a recording named is the one extracted."""
+    import moseq2_extract.project as extraction
+    from moseq2_app.cli import cli
 
-    calls = {}
+    calls = []
 
-    class Result:
-        failures = []
+    def extract(project_, *, recordings=None, settings=None, reporter=None):
+        calls.append((project_, recordings))
+        return extraction.ExtractRun(extracted=[], failed={}, up_to_date=[], jobs={})
 
-    def batch_extract(project, input_folder, *args, **kwargs):
-        calls["input_folder"] = input_folder
-        return Result()
+    monkeypatch.setattr(extraction, "extract", extract)
+    run(cli, "extract", cwd=project)
+    (found, recordings), = calls
+    assert Path(found.folder).resolve() == project.resolve()
+    assert recordings is None
 
-    monkeypatch.setattr(cli.project_steps, "batch_extract", batch_extract)
-    run(cli.cli, "batch-extract", cwd=project)
-    assert Path(calls["input_folder"]).resolve() == project.resolve()
-
-    run(cli.cli, "batch-extract", typed, cwd=project)
-    assert Path(calls["input_folder"]).resolve() == typed.resolve()
+    run(cli, "extract", SESSION, cwd=project)
+    assert calls[1][1] == [SESSION]
 
 
 # ------------------------------------------------------------------ compute-changepoints --pca-file
@@ -369,7 +371,6 @@ OUTSIDE = [
     ("pca", ["clip-scores"], "PCA_FILE"),
     ("viz", ["plot-stats"], "MODEL_FIT"),
     ("viz", ["get-best-model"], "MODEL_DIR"),
-    ("extract", ["batch-extract"], "INPUT_FOLDER"),
 ]
 
 

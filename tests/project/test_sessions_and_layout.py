@@ -4,8 +4,9 @@ A session is its recording, keyed by the recording's path in the project
 (``saline_example_0/depth.avi``). Inside a project, extraction writes every file
 of a session straight into that session's folder in ``aggregate_results/``,
 named from its key (``saline_example_0``), and nothing beside or into the
-recording; ``aggregate-results`` lists the sessions in ``moseq2-project.yaml``
-without copying anything. Output names carry no arena-mask index
+recording; it lists every recording it plans as a session in
+``moseq2-project.yaml`` before it extracts any, and copies nothing. Output
+names carry no arena-mask index
 (``results.h5``, ``results.mp4``), so re-extracting a recording, with the same
 settings or another arena mask, replaces its session: the same key, the same
 uuid, one entry and one file.
@@ -32,7 +33,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from moseq2_common.yaml import read_yaml
+from moseq2_common.yaml import read_yaml, write_yaml
 
 #: The two recordings the projects here are built from, one per condition.
 RECORDINGS = ("saline_example_0", "amphetamine_example_0")
@@ -63,13 +64,23 @@ def extract_cli():
     return cli
 
 
+def moseq2_cli():
+    from moseq2_app.cli import cli
+
+    return cli
+
+
 def new_project(root, raw_sessions, recordings=RECORDINGS, *, metadata=True):
-    """A project folder holding ``recordings`` (each in its folder, as the fixtures have them) and a config.yaml."""
+    """A project folder holding ``recordings`` (each in its folder, as the fixtures have them) and a config.yaml
+    naming the fixture's head/tail classifier, so nothing is downloaded."""
     root.mkdir(parents=True)
     for name in recordings:
         shutil.copytree(raw_sessions / name, root / name,
                         ignore=None if metadata else shutil.ignore_patterns("metadata.json"))
     ok(extract_cli(), "generate-config", "--output-file", root / "config.yaml", cwd=root)
+    config = read_yaml(str(root / "config.yaml"))
+    config["extract"]["flip_classifier"] = str(raw_sessions / "flip_classifier_k2_c57_10to13weeks.npz")
+    write_yaml(config, str(root / "config.yaml"))
     return root
 
 
@@ -100,17 +111,13 @@ def h5s_in(folder):
 
 
 def test_reextracting_a_recording_replaces_its_session(tmp_path, raw_sessions):
-    """Extract, aggregate, extract again with other settings, aggregate again: one session, the same uuid,
-    and the file the project names is the second extraction (1.5.0 kept the first copy and gave the
-    second extraction a new uuid)."""
+    """Extract, then extract again with other settings: one session, the same uuid, and the file the project
+    names is the second extraction (1.5.0 kept the first copy and gave the second extraction a new uuid)."""
     root = new_project(tmp_path / "project", raw_sessions, (RECORDINGS[0],))
-    recording = root / KEY
-    ok(extract_cli(), "extract", recording, "--config-file", root / "config.yaml", "--num-frames", 60, cwd=root)
-    ok(extract_cli(), "aggregate-results", cwd=root)
+    ok(moseq2_cli(), "extract", "--num-frames", 60, cwd=root)
     first = sessions(root)
 
-    ok(extract_cli(), "extract", recording, "--config-file", root / "config.yaml", "--num-frames", 30, cwd=root)
-    ok(extract_cli(), "aggregate-results", cwd=root)
+    ok(moseq2_cli(), "extract", "--num-frames", 30, cwd=root)
     second = sessions(root)
 
     assert list(second) == [KEY]
@@ -128,15 +135,11 @@ def test_reextracting_with_another_arena_mask_replaces_the_session(tmp_path, raw
     second mask the arena search finds replaces the session's file (1.5.0 wrote ``results_01`` beside
     ``results_00``, and aggregation copied both)."""
     root = new_project(tmp_path / "project", raw_sessions, (RECORDINGS[0],))
-    recording = root / KEY
-    common = ("--config-file", root / "config.yaml", "--num-frames", 30)
-    ok(extract_cli(), "extract", recording, *common, cwd=root)
-    ok(extract_cli(), "aggregate-results", cwd=root)
+    ok(moseq2_cli(), "extract", "--num-frames", 30, cwd=root)
     with h5py.File(session_h5(root), "r") as f:
         first_roi = f["metadata/extraction/roi"][()]
 
-    ok(extract_cli(), "extract", recording, *common, "--bg-roi-index", 1, cwd=root)
-    ok(extract_cli(), "aggregate-results", cwd=root)
+    ok(moseq2_cli(), "extract", KEY, "--bg-roi-index", 1, cwd=root)
 
     assert list(sessions(root)) == [KEY]
     h5 = session_h5(root)
@@ -147,6 +150,19 @@ def test_reextracting_with_another_arena_mask_replaces_the_session(tmp_path, raw
 
 
 # ------------------------------------------------------------ metadata.json
+
+
+def extract_in_the_gui(root):
+    """The Extract GUI opened in ``root``, its button pressed; waits for the run, which must finish with every
+    recording extracted."""
+    from moseq2_app.notebook import extract
+
+    with working_in(root):
+        widget = extract()
+        widget.start()
+        run = widget.wait()
+    assert run["state"] == "finished", (run, widget.problem)
+    assert run["items"] and all(item["state"] == "done" for item in run["items"].values()), run
 
 
 def _acquisition(h5):
@@ -167,15 +183,13 @@ def test_a_recording_without_metadata_gets_one_subject_name_on_both_front_ends(t
     if front_end == "notebook":
         from moseq2_app.project import start
         from moseq2_app.util import update_config
-        from moseq2_extract.gui import extract_found_sessions
 
         start(str(root))
         with update_config(str(root / "config.yaml"), section="extract") as extract:
             extract["num_frames"] = 30
-        extract_found_sessions(str(root), str(root / "config.yaml"), extract_all=True, skip_extracted=True)
+        extract_in_the_gui(root)
     else:
-        ok(extract_cli(), "extract", folder / "depth.avi", "--config-file", root / "config.yaml",
-           "--num-frames", 30, cwd=root)
+        ok(moseq2_cli(), "extract", "--num-frames", 30, cwd=root)
 
     assert listing(folder) == before
     (h5,) = [p for p in h5s_in(root)]
@@ -187,8 +201,8 @@ def test_a_recording_without_metadata_gets_one_subject_name_on_both_front_ends(t
 
 @pytest.fixture(scope="module")
 def notebook_chain(tmp_path_factory, raw_sessions):
-    """The Extract notebook's cells on two recordings: project, config, the arena tool (Save and move on,
-    for each), extraction, QC, the preview list, aggregation; then one recording again with ``extract``.
+    """The notebooks' steps on two recordings: project, config, the arena tool (Save and move on, for each),
+    the Extract GUI, QC, the preview list; then one recording again with ``moseq2 extract``.
 
     Returns the project folder and the listing of each recording's folder before the first cell.
     """
@@ -199,7 +213,6 @@ def notebook_chain(tmp_path_factory, raw_sessions):
     from moseq2_app.project import start
     from moseq2_app.roi.widget import ArenaMaskWidget
     from moseq2_app.util import update_config
-    from moseq2_extract.gui import aggregate_extract_results_command, extract_found_sessions
 
     from widgets import buttons_of, click
 
@@ -215,11 +228,10 @@ def notebook_chain(tmp_path_factory, raw_sessions):
     for _ in widget.sessions:
         click(buttons["Save session parameters and move to next"])
 
-    extract_found_sessions(str(root), str(root / "config.yaml"), extract_all=True, skip_extracted=True)
+    extract_in_the_gui(root)
     validate_extractions(str(root))
     previews = get_session_paths(str(root), extracted=True)
-    aggregate_extract_results_command(str(root))
-    ok(extract_cli(), "extract", root / KEY, "--config-file", root / "config.yaml", "--num-frames", 30, cwd=root)
+    ok(moseq2_cli(), "extract", KEY, "--num-frames", 30, cwd=root)
     return {"root": root, "before": before, "previews": previews}
 
 

@@ -13,6 +13,7 @@ import warnings
 import numpy as np
 from copy import deepcopy
 from moseq2_common.frames import odd_kernel
+from moseq2_common.report import current
 from moseq2_extract.io.image import write_image
 from moseq2_extract.io.video import get_movie_info
 from os.path import join, exists, splitext, basename, abspath, dirname
@@ -310,7 +311,7 @@ def detect_and_set_camera_parameters(config_data, input_file=None):
     _fill_camera_defaults(config_data, CAMERA_DEFAULTS[camera], CAMERA_DEFAULTS['kinect'])
     if camera == 'azure' and stated in ('k2', 'kinect') and type(input_file) is not tarfile.TarFile:
         used = ', '.join(f'{key} {_setting_text(config_data[key])}' for key in CAMERA_DEFAULTS['azure'])
-        print(f'{input_file} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras '
+        current().status(f'{input_file} is an .mkv recording, which only Azure Kinect and Orbbec Femto cameras '
               f'write, but config.yaml says camera_type: {stated} (the Kinect v2). Used the Azure '
               f'settings for it: {used}. Set camera_type: azure in config.yaml.')
 
@@ -411,7 +412,11 @@ def scalar_attributes():
 
 def convert_raw_to_avi_function(input_file, chunk_size=2000, fps=30, delete=False, threads=3):
     """
-    Compress depth file (.dat, '.mkv') to avi file.
+    Compress a raw depth recording (.dat) into an .avi beside it, about 8 times smaller.
+
+    The frames are encoded in this process (``moseq2_extract.helpers.wrappers.convert_raw_to_avi_wrapper``),
+    so nothing it writes reaches the process's own standard output or error, and the .avi is checked against
+    the recording frame by frame before anything is deleted.
 
     Args:
     input_file (str): path to depth file
@@ -421,30 +426,12 @@ def convert_raw_to_avi_function(input_file, chunk_size=2000, fps=30, delete=Fals
     threads (int): number of threads to write video.
 
     """
+    from moseq2_extract.helpers.wrappers import convert_raw_to_avi_wrapper
 
     new_file = f'{splitext(input_file)[0]}.avi'
-    print(f'Converting {input_file} to {new_file}')
-    # turn into os system call...
-    use_kwargs = {
-        'output-file': new_file,
-        'chunk-size': chunk_size,
-        'fps': fps,
-        'threads': threads
-    }
-    use_flags = {
-        'delete': delete
-    }
-    base_command = f'moseq2-extract convert-raw-to-avi {input_file}'
-    for k, v in use_kwargs.items():
-        base_command += f' --{k} {v}'
-    for k, v in use_flags.items():
-        if v:
-            base_command += f' --{k}'
+    current().status(f'Converting {input_file} to {new_file}')
+    convert_raw_to_avi_wrapper(input_file, new_file, chunk_size, fps, delete, threads, "DEPTH")
 
-    print(base_command)
-    print()
-
-    os.system(base_command)
 
 def strided_app(a, L, S):  # Window len = L, Stride len/stepsize = S
     """
@@ -501,9 +488,9 @@ def dict_to_h5(h5, dic, root='/', annotations=None):
             else:
                 raise ValueError('Cannot save {} type to key {}'.format(type(item), dest))
         except Exception as e:
-            print(e)
+            current().status(str(e))
             if key != 'inputs':
-                print('h5py could not encode key:', key)
+                current().status(f'h5py could not encode key: {key}')
 
         if key in annotations:
             if annotations[key] is None:

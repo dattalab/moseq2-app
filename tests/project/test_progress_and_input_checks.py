@@ -305,11 +305,27 @@ def test_a_frame_count_that_disagrees_with_the_timestamps_stops_before_work(proj
     assert not (project / "_pca" / "pca.h5").exists()
 
 
+def moseq2_extract_in(root, raw_sessions):
+    """``moseq2 extract`` run from the project ``root`` after ``generate-config``, its config naming the
+    fixture's head/tail classifier so nothing is downloaded."""
+    from moseq2_app.cli import cli as moseq2
+    from moseq2_extract.cli import cli
+
+    CliRunner().invoke(cli, ["generate-config", "--output-file", str(root / "config.yaml")])
+    config = read_yaml(str(root / "config.yaml"))
+    config["extract"]["flip_classifier"] = str(Path(raw_sessions) / "flip_classifier_k2_c57_10to13weeks.npz")
+    write_yaml(config, str(root / "config.yaml"))
+    before = os.getcwd()
+    os.chdir(root)
+    try:
+        return CliRunner().invoke(moseq2, ["extract"])
+    finally:
+        os.chdir(before)
+
+
 def test_extraction_stops_on_a_frame_count_mismatch_before_writing(tmp_path, raw_sessions):
     """The recording's video and its timestamps disagree: extraction stops before writing anything into the
     session's folder."""
-    from moseq2_extract.cli import cli
-
     root = tmp_path / "project"
     session = root / "saline_example_0"
     session.mkdir(parents=True)
@@ -318,36 +334,29 @@ def test_extraction_stops_on_a_frame_count_mismatch_before_writing(tmp_path, raw
         shutil.copy(source / name, session / name)
     lines = (source / "depth_ts.txt").read_text().splitlines(keepends=True)
     (session / "depth_ts.txt").write_text("".join(lines[:-1]))
-    CliRunner().invoke(cli, ["generate-config", "--output-file", str(root / "config.yaml")])
-    result = CliRunner().invoke(cli, ["extract", str(session / "depth.avi"), "--config-file",
-                                      str(root / "config.yaml")])
-    assert isinstance(result.exception, ValueError), result.output
-    assert "Frame count mismatch" in str(result.exception)
+    result = moseq2_extract_in(root, raw_sessions)
+    assert result.exit_code != 0, result.output
+    assert f"Frame count mismatch for {session / 'depth.avi'}" in result.stderr, result.stderr
     assert not (root / "aggregate_results").exists()
 
 
 # ------------------------------------------------------------------ empty and unreadable inputs
 
 
-def test_an_empty_input_file_stops_before_work(tmp_path):
+def test_an_empty_input_file_stops_before_work(tmp_path, raw_sessions):
     """An empty recording stops extraction before any work, with a message naming the step, the file and
     what to do."""
-    from moseq2_extract.cli import cli
-
     root = tmp_path / "project"
     session = root / "session_1"
     session.mkdir(parents=True)
     (session / "depth.avi").write_bytes(b"")
     (session / "metadata.json").write_text("{}")
-    CliRunner().invoke(cli, ["generate-config", "--output-file", str(root / "config.yaml")])
-    result = CliRunner().invoke(cli, ["extract", str(session / "depth.avi"), "--config-file",
-                                      str(root / "config.yaml")])
-    assert result.exit_code != 0
-    message = str(result.exception) if not isinstance(result.exception, SystemExit) else result.output
-    assert message.strip().endswith(
+    result = moseq2_extract_in(root, raw_sessions)
+    assert result.exit_code == 1, result.output
+    assert (
         f"extract needs {session / 'depth.avi'}, which is empty. Check that it is the recording you meant "
-        "and that it was copied completely, or copy it again from where it was recorded."
-    ), message
+        "and that it was copied completely, or copy it again from where it was recorded.\n"
+    ) in result.stderr, result.stderr
     assert not (root / "aggregate_results").exists()
 
 
@@ -362,8 +371,8 @@ def test_an_empty_session_extraction_stops_pca_before_work(project, monkeypatch)
     with pytest.raises(ValueError) as error:
         project_steps.train_pca(Project.at(project), None, str(project / "_pca"), "pca", TrainPCAOptions())
     assert str(error.value) == (
-        f"train-pca needs {h5}, which is empty. Extract that session again (moseq2-extract extract, or the "
-        "notebook's extraction cell), then run this step again; or, to leave the session out, list its "
+        f"train-pca needs {h5}, which is empty. Extract that session again (`moseq2 extract`, or the "
+        "notebook's Extract step), then run this step again; or, to leave the session out, list its "
         "recording under exclude in config.yaml (the group widget's exclude column)."
     )
 

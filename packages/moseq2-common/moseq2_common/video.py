@@ -14,7 +14,7 @@ import av
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm.auto import tqdm
+from moseq2_common.report import current, iterate
 
 __all__ = ["VideoWriter", "frame_dimensions", "write_frames_preview"]
 
@@ -168,11 +168,7 @@ def write_frames_preview(
 
     if isinstance(frames, np.ndarray):
         use_cmap = plt.get_cmap(cmap)
-        for i in tqdm(
-            range(frames.shape[0]),
-            disable=not progress_bar,
-            desc=f"Writing frames to {filename}",
-        ):
+        for i in iterate(range(frames.shape[0]), f"Writing frames to {filename}", show=progress_bar):
             disp_img = frames[i, :].copy().astype("float32")
             disp_img = (disp_img - depth_min) / (depth_max - depth_min)
             disp_img[disp_img < 0] = 0
@@ -205,7 +201,7 @@ def write_frames_preview(
                     )
                 except (IndexError, ValueError):
                     # fewer numbers than frames, or the position is outside the frame
-                    print("Could not overlay frame number on preview on video.")
+                    current().status("Could not overlay frame number on preview on video.")
             elif text is not None:
                 cv2.putText(
                     disp_img,

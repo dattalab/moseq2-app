@@ -11,13 +11,17 @@ opening the tool writes nothing.
 
 from __future__ import annotations
 
+import os
 import shutil
 
 import pytest
 
 import moseq2_extract.steps as extract_steps
+from moseq2_app.util import update_config
+from moseq2_common.project import Project
 from moseq2_common.yaml import read_yaml, write_yaml
-from moseq2_extract.gui import extract_command, generate_config_command
+from moseq2_extract.gui import generate_config_command
+from moseq2_extract.project import extract
 
 from widgets import buttons_of, click
 
@@ -26,11 +30,14 @@ SESSIONS = ("saline_example_0", "saline_example_1")
 
 @pytest.fixture
 def project(tmp_path, raw_sessions):
-    """Two recordings and a ``config.yaml`` from ``generate-config``."""
+    """Two recordings and a ``config.yaml`` from ``generate-config``, naming the fixture's head/tail
+    classifier so extraction downloads nothing."""
     root = tmp_path / "project"
     for name in SESSIONS:
         shutil.copytree(f"{raw_sessions}/{name}", root / name)
     generate_config_command(str(root / "config.yaml"), camera_type="k2")
+    with update_config(str(root / "config.yaml"), section="extract") as config:
+        config["flip_classifier"] = f"{raw_sessions}/flip_classifier_k2_c57_10to13weeks.npz"
     return root
 
 
@@ -51,6 +58,11 @@ def recording(root, name="saline_example_0"):
     return str(root / name / "depth.avi")
 
 
+def extract_one(root, name="saline_example_0"):
+    """The Extract step in the project at ``root``, with one recording named."""
+    return extract(Project.at(root), recordings=[recording(root, name)])
+
+
 def open_arena_tool(root):
     """The notebook's arena cell."""
     import panel as pn
@@ -66,8 +78,8 @@ def test_session_config_is_found_without_a_pointer(project, received):
     write_yaml({"saline_example_0/depth.avi": {"max_height": 100}}, str(project / "session_config.yaml"))
     assert "session_config_path" not in read_yaml(str(project / "config.yaml"))
 
-    extract_command(recording(project), None, str(project / "config.yaml"))
-    extract_command(recording(project, "saline_example_1"), None, str(project / "config.yaml"))
+    extract_one(project)
+    extract_one(project, "saline_example_1")
 
     assert received[recording(project)]["max_height"] == 100
     # a recording without an entry takes config.yaml's
@@ -77,12 +89,16 @@ def test_session_config_is_found_without_a_pointer(project, received):
 def test_the_command_line_finds_the_entry_too(project, received):
     from click.testing import CliRunner
 
-    from moseq2_extract.cli import cli
+    from moseq2_app.cli import cli
 
     write_yaml({"saline_example_0/depth.avi": {"max_height": 100}}, str(project / "session_config.yaml"))
 
-    result = CliRunner().invoke(cli, ["extract", recording(project), "--config-file", str(project / "config.yaml")],
-                                catch_exceptions=False)
+    before = os.getcwd()
+    os.chdir(project)
+    try:
+        result = CliRunner().invoke(cli, ["extract", recording(project)], prog_name="moseq2", catch_exceptions=False)
+    finally:
+        os.chdir(before)
 
     assert result.exit_code == 0, result.output
     assert received[recording(project)]["max_height"] == 100
@@ -92,13 +108,13 @@ def test_a_moved_project_keeps_its_arena_settings(project, tmp_path, received):
     """Copied elsewhere and the original deleted, the project resolves the same options."""
     write_yaml({"saline_example_0/depth.avi": {"max_height": 100, "crop_size": [90, 90]}},
                str(project / "session_config.yaml"))
-    extract_command(recording(project), None, str(project / "config.yaml"))
+    extract_one(project)
     before = received.pop(recording(project))
 
     moved = tmp_path / "elsewhere" / "moved"
     shutil.copytree(project, moved)
     shutil.rmtree(project)
-    extract_command(recording(moved), None, str(moved / "config.yaml"))
+    extract_one(moved)
 
     after = received[recording(moved)]
     assert after == before
@@ -111,12 +127,12 @@ def test_an_entry_setting_the_arena_tool_does_not_set_is_ignored_and_named(proje
     write_yaml({"saline_example_0/depth.avi": {"max_height": 100, "frame_trim": [5, 5]}},
                str(project / "session_config.yaml"))
 
-    extract_command(recording(project), None, str(project / "config.yaml"))
+    extract_one(project)
 
     config = received[recording(project)]
     assert config["max_height"] == 100
     assert tuple(config["frame_trim"]) == (0, 0)
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
     lines = [line for line in out.splitlines() if "frame_trim" in line]
     assert len(lines) == 1
     assert "saline_example_0/depth.avi" in lines[0]
@@ -127,7 +143,7 @@ def test_an_unreadable_session_config_is_an_error(project, received):
     (project / "session_config.yaml").write_text("saline_example_0/depth.avi: [unclosed\n")
 
     with pytest.raises(Exception, match="session_config.yaml"):
-        extract_command(recording(project), None, str(project / "config.yaml"))
+        extract_one(project)
     assert received == {}
 
 

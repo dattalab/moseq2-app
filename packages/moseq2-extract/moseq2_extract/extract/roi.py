@@ -3,7 +3,7 @@ ROI detection pre-processing utilities for fitting a plane to an input depth ima
 """
 
 import numpy as np
-from tqdm.auto import tqdm
+from moseq2_common.report import iterate
 
 
 def plane_fit3(points):
@@ -108,7 +108,7 @@ def plane_ransac(
 
     npoints = np.sum(use_points)
 
-    for _ in tqdm(range(iters), disable=not progress_bar, desc="Finding plane"):
+    for _ in iterate(range(iters), "Finding plane", show=progress_bar):
 
         sel = coords[rng.choice(coords.shape[0], 3, replace=True)]
         tmp_plane = plane_fit3(sel)

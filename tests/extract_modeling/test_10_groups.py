@@ -4,7 +4,7 @@
 
     interactive_group_setting(str(project.folder))
 
-Cell 9 left every recording in group ``default``. Until that changes, every
+Extraction left every recording in group ``default``. Until that changes, every
 group comparison in the analysis notebook compares the experiment against
 itself, so this cell is the one that makes the rest of the project mean
 something.
@@ -64,7 +64,7 @@ def assign(widget, prefix, group):
 
 @pytest.fixture
 def scratch_project(tmp_path, project, aggregated, bookkeeping_as_aggregated):
-    """The project as cell 9 left it, for tests that save changes: its sessions, and a config.yaml without groups."""
+    """The project as extraction left it, for tests that save changes: its sessions, and a config.yaml without groups."""
     from moseq2_common.options import read_config
     from moseq2_common.yaml import write_config
 
