@@ -1,0 +1,50 @@
+"""Stands in for ``sacct`` in the tests: the accounting record of every job of ``$FAKE_SLURM_STATE``.
+
+    sacct [-n] [-P] -j ID,ID,... -o JobID,State,ExitCode,Reason
+
+A job that started has a ``.batch`` step too, as on a real cluster; a cancelled
+job's state is ``CANCELLED by <uid>``. With ``FAKE_SLURM_NO_SACCT=1`` it
+answers as a cluster with accounting turned off.
+"""
+
+import os
+import sys
+
+import _cluster
+
+
+def main(args):
+    _cluster.log_call("sacct", args)
+    if os.environ.get("FAKE_SLURM_NO_SACCT") == "1":
+        print("sacct: error: Slurm accounting storage is disabled", file=sys.stderr)
+        return 1
+    header, parsable, wanted, fields = True, False, [], ["JobID", "State", "ExitCode", "Reason"]
+    words = iter(args)
+    for word in words:
+        if word in ("-n", "--noheader"):
+            header = False
+        elif word in ("-P", "--parsable2"):
+            parsable = True
+        elif word in ("-j", "--jobs"):
+            wanted = _cluster.job_ids(next(words))
+        elif word in ("-o", "--format"):
+            fields = next(words).split(",")
+    separator = "|" if parsable else " "
+    if header:
+        print(separator.join(fields))
+    with _cluster.locked():
+        jobs = [_cluster.load(job_id) for job_id in wanted]
+    for job in filter(None, jobs):
+        state = job["state"] + (f" by {os.getuid()}" if job["state"] == "CANCELLED" else "")
+        rows = [{"JobID": job["id"], "State": state, "ExitCode": job["exit_code"],
+                 "Reason": job["reason"] or "None"}]
+        if job["state"] not in ("PENDING",) and job.get("started"):
+            step = "CANCELLED" if job["state"] == "TIMEOUT" else job["state"]
+            rows.append({"JobID": f"{job['id']}.batch", "State": step, "ExitCode": job["exit_code"], "Reason": ""})
+        for row in rows:
+            print(separator.join(str(row.get(field, "")) for field in fields))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

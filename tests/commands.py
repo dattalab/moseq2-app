@@ -1,10 +1,8 @@
-"""Split a command moseq2 writes into a script back into its arguments.
+"""Split a command line moseq2 writes back into its arguments.
 
-The SLURM path of ``batch-extract`` and of the notebook's extraction cell
-writes one ``moseq2-extract extract`` command per recording into
-``extract_out.sh``, with the config file and the recording as paths. Tests run
-each written command through ``extract`` to check what the job would extract
-with, so they split it first.
+A SLURM extraction records each recording's ``sbatch`` line, and ``kappa-scan``
+writes one per fit into a script, with paths as arguments. Tests run each
+written command to check what the job would do, so they split it first.
 """
 
 from __future__ import annotations

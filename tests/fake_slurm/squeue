@@ -1,0 +1,42 @@
+"""Stands in for ``squeue`` in the tests: lists the jobs of ``$FAKE_SLURM_STATE`` still in the queue or running.
+
+    squeue [-h] [-j ID,ID,...] [-o FORMAT]
+
+``FORMAT``'s ``%i``, ``%T`` and ``%r`` are the job id, its state and its reason.
+A job that has ended is not listed. Asked only about jobs it does not know, it
+fails as the real one does.
+"""
+
+import sys
+
+import _cluster
+
+
+def main(args):
+    _cluster.log_call("squeue", args)
+    header, wanted, form = True, None, "%i %T %r"
+    words = iter(args)
+    for word in words:
+        if word in ("-h", "--noheader"):
+            header = False
+        elif word in ("-j", "--jobs"):
+            wanted = _cluster.job_ids(next(words))
+        elif word in ("-o", "--format"):
+            form = next(words)
+    with _cluster.locked():
+        jobs = {job_id: _cluster.load(job_id) for job_id in (wanted or [])}
+        if wanted is None:
+            jobs = {path.stem: _cluster.load(path.stem) for path in (_cluster.folder() / "jobs").glob("*.json")}
+    if wanted and all(job is None for job in jobs.values()):
+        print("slurm_load_jobs error: Invalid job id specified", file=sys.stderr)
+        return 1
+    if header:
+        print(form.replace("%i", "JOBID").replace("%T", "STATE").replace("%r", "REASON"))
+    for job_id, job in jobs.items():
+        if job is not None and job["state"] in _cluster.ACTIVE:
+            print(form.replace("%i", job_id).replace("%T", job["state"]).replace("%r", job["reason"] or "None"))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,11 +1,12 @@
 """``moseq2 extract`` in a project, ``moseq2 standalone extract`` on recordings named, and ``moseq2 run-job``.
 
 ``moseq2 extract`` lists every recording it plans as a session before it
-extracts any, saves the settings typed before the run, and on a cluster writes
+extracts any, saves the settings typed before the run, and on a cluster submits
 one job per recording asking for 4 CPUs and running ``moseq2 run-job`` through
-the Python that wrote it. ``moseq2 standalone extract`` reads and writes no
-project file, takes recordings on the command line or in a list file, and
-writes each one's outputs into ``proc/`` beside it.
+the Python that submitted it (to the stand-ins in ``tests/fake_slurm``).
+``moseq2 standalone extract`` reads and writes no project file, takes
+recordings on the command line or in a list file, and writes each one's
+outputs into ``proc/`` beside it.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from moseq2_common.records import read_record
 from moseq2_common.yaml import read_yaml, write_config
 from extract_projects import dat_recording, small_project
 from layers import trap_project
+from slurm_fakes import fake_slurm, submitted_lines  # noqa: F401 -- the fixture
 
 TWO = ("saline_example_0", "saline_example_1")
 
@@ -134,7 +136,8 @@ def test_standalone_output_dir_with_several_recordings_is_refused(tmp_path):
                              "proc/ beside it, or extract one recording per command.\n")
 
 
-def _jobs(tmp_path, raw_sessions):
+def _jobs(tmp_path, raw_sessions, fake_slurm):
+    fake_slurm.hold()
     project = small_project(tmp_path / "project", raw_sessions, TWO, num_frames=30)
     _computing(project, cluster_type="slurm")
     result = _run(["extract"], project.folder)
@@ -142,28 +145,28 @@ def _jobs(tmp_path, raw_sessions):
     return project, result
 
 
-def test_cluster_jobs_ask_for_4_cpus_and_run_with_4_threads(tmp_path, raw_sessions):
-    project, result = _jobs(tmp_path, raw_sessions)
+def test_cluster_jobs_ask_for_4_cpus_and_run_with_4_threads(tmp_path, raw_sessions, fake_slurm):
+    project, result = _jobs(tmp_path, raw_sessions, fake_slurm)
 
-    lines = (Path(project.folder) / "extract_out.sh").read_text().splitlines()
+    lines = submitted_lines(project)
     assert len(lines) == 2
     for name, line in zip(TWO, lines):
         words = shlex.split(line)
-        assert words[:9] == ["sbatch", "-c", "4", "--mem=16GB", "-p", "short", "-t", "1:00:00", "--wrap"]
+        assert words[6:14] == ["-c", "4", "--mem=16GB", "-p", "short", "-t", "1:00:00", "--wrap"]
         job_file = Path(project.folder) / "aggregate_results" / name / "extract-job.yaml"
-        assert words[9] == shlex.join([sys.executable, "-m", "moseq2_app", "run-job", str(job_file)]) + "; "
+        assert words[14] == shlex.join([sys.executable, "-m", "moseq2_app", "run-job", str(job_file)]) + "; "
         job = read_yaml(str(job_file))
         assert "threads" not in job["extract"] and "compress_threads" not in job["extract"]
         assert job["job"] == {"project": str(Path(project.folder).absolute()), "session": f"{name}/depth.avi",
                               "uuid": load(project).sessions[f"{name}/depth.avi"].uuid,
                               "recording": f"{name}/depth.avi", "cpus": 4}
         assert job["extract"]["flip_classifier"] == str(Path(project.folder) / "flip_classifier_k2_c57_10to13weeks.npz")
-    assert "Listing extract commands..." in result.stderr
+    assert "Submitted 2 jobs (1001 to 1002)." in result.stderr
     assert not list(Path(project.folder).rglob("results.h5"))
 
 
-def test_a_job_runs_its_recording_from_its_settings_file(tmp_path, raw_sessions):
-    project, _ = _jobs(tmp_path, raw_sessions)
+def test_a_job_runs_its_recording_from_its_settings_file(tmp_path, raw_sessions, fake_slurm):
+    project, _ = _jobs(tmp_path, raw_sessions, fake_slurm)
     job_file = Path(project.folder) / "aggregate_results" / TWO[0] / "extract-job.yaml"
 
     result = _run(["run-job", job_file], tmp_path)

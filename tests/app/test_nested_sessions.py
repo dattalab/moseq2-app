@@ -33,6 +33,7 @@ from moseq2_app.roi.controller import InteractiveExtractionViewer
 from moseq2_common.yaml import read_yaml, write_config, write_yaml
 from moseq2_extract.gui import generate_config_command
 from moseq2_extract.project import extract
+from slurm_fakes import fake_slurm, submitted_lines  # noqa: F401 -- the fixture
 
 EXTRACT_NOTEBOOK = "MoSeq2-Pipeline.ipynb"
 
@@ -326,9 +327,10 @@ def test_a_local_extraction_reads_each_same_named_folders_parameters(grouped, mo
     assert received == {str(grouped / key / "depth.avi"): tolerance[key] for key in GROUPED}
 
 
-def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch):
+def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch, fake_slurm):
     """The SLURM path writes each session's parameters into its own job settings
     file in its session folder, and each job (``moseq2 run-job``) extracts with that file."""
+    fake_slurm.hold()
     received = {}
     monkeypatch.setattr(
         extract_steps,
@@ -345,8 +347,7 @@ def test_slurm_jobs_read_each_same_named_folders_parameters(grouped, monkeypatch
     assert received == {}, "a job ran before its sbatch line was"
     for key in GROUPED:
         assert read_yaml(str(job_settings_file(session_folder(grouped, key), "extract")))["extract"]["noise_tolerance"] == tolerance[key], key
-    script = (grouped / "extract_out.sh").read_text()
-    for line in filter(str.strip, script.splitlines()):
+    for line in submitted_lines(Project.at(grouped)):
         words = split_command(line)
         job = split_command(words[words.index("--wrap") + 1].split(";", 1)[0])
         from click.testing import CliRunner

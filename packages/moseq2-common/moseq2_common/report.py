@@ -25,20 +25,30 @@ A long loop calls ``checkpoint()`` once per chunk of work: it raises
 ``moseq2_common.errors.StepStopped`` when the current reporter says the person
 asked to stop (``stop_requested``). Python ``logging`` (loggers named
 ``moseq2.<package>``) carries debugging detail only.
+
+A step running where no one watches it, such as a cluster job, reports through
+a ``ProgressFileReporter``: a small JSON file replaced whole every couple of
+seconds (``{"state", "stage", "done", "total", "updated", "message", "fix",
+"job"}``), which whoever follows the step reads with ``read_progress``.
 """
 
 from __future__ import annotations
 
 import contextlib
 import contextvars
+import json
+import os
 import sys
+import threading
 from collections.abc import Iterable, Iterator
+from datetime import datetime
+from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
 
-from moseq2_common.errors import StepStopped
+from moseq2_common.errors import ExpectedError, StepStopped
 
-__all__ = ["Progress", "Reporter", "TerminalReporter", "checkpoint", "current", "default_reporter", "iterate",
-           "progress", "reporting"]
+__all__ = ["Progress", "ProgressFileReporter", "Reporter", "TerminalReporter", "checkpoint", "current",
+           "default_reporter", "iterate", "progress", "read_progress", "reporting"]
 
 
 @runtime_checkable
@@ -176,3 +186,133 @@ def iterate(items: Iterable, label: str, *, total: int | None = None, unit: str 
         for item in items:
             yield item
             bar.advance()
+
+
+# ------------------------------------------------------------------------------- a progress file
+
+
+def _now() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+class _FileBar:
+    """A bar of a ``ProgressFileReporter``: counted in the file when it is the bar the file follows, and passed on
+    to the reporter's ``also`` as it goes."""
+
+    def __init__(self, owner: ProgressFileReporter, label: str, total: int | None, unit: str):
+        self._owner = owner
+        self._counted = owner._follows(label)
+        self._also = owner._also.progress(label, total, unit=unit) if owner._also is not None else _NoProgress()
+        owner._set(stage=label, **({"done": 0, "total": total} if self._counted else {}))
+
+    def advance(self, n: int = 1) -> None:
+        if self._counted:
+            self._owner._advance(n)
+        self._also.advance(n)
+
+    def __enter__(self) -> _FileBar:
+        self._also.__enter__()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self._also.__exit__(*exc)
+
+
+class ProgressFileReporter:
+    """A reporter that keeps a step's progress in the JSON file ``path``, for whoever follows the step from elsewhere.
+
+    Used as a context manager around the step: on entering, the file says ``running``; while the step runs it is
+    rewritten whole (through a temporary name) every ``every`` seconds; on leaving it says ``finished``, or
+    ``failed`` with an expected error's text as ``message`` and its fix as ``fix``. ``stage`` is the last status
+    line or bar label; ``done`` and ``total`` count the bar labelled ``bar`` (every bar when None);
+    ``updated`` is when the file was written, with its UTC offset; ``job`` is the SLURM job running it
+    (``SLURM_JOB_ID``), or None. Every call is passed on to ``also`` as well, when given (a job's log).
+    """
+
+    def __init__(self, path: str | os.PathLike, *, every: float = 2.0, bar: str | None = None,
+                 also: Reporter | None = None):
+        self.path = Path(path)
+        self.every = every
+        self._bar = bar
+        self._also = also
+        self._lock = threading.Lock()
+        self._state = {"state": "running", "stage": "", "done": 0, "total": None, "updated": None, "message": None,
+                       "fix": None, "job": os.environ.get("SLURM_JOB_ID")}
+        self._stopped = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    # ---- the reporter
+    def status(self, text: str) -> None:
+        self._set(stage=text)
+        if self._also is not None:
+            self._also.status(text)
+
+    def warning(self, text: str) -> None:
+        if self._also is not None:
+            self._also.warning(text)
+
+    def progress(self, label: str, total: int | None = None, *, unit: str = "") -> Progress:
+        return _FileBar(self, label, total, unit)
+
+    def stop_requested(self) -> bool:
+        return self._also.stop_requested() if self._also is not None else False
+
+    # ---- the file
+    def _follows(self, label: str) -> bool:
+        return self._bar is None or label == self._bar
+
+    def _set(self, **values) -> None:
+        with self._lock:
+            self._state.update(values)
+
+    def _advance(self, n: int) -> None:
+        with self._lock:
+            self._state["done"] += n
+
+    def write(self) -> None:
+        """Write the file now, whole."""
+        with self._lock:
+            state = {**self._state, "updated": _now()}
+        partial = self.path.with_name(f".{self.path.name}.{os.getpid()}.partial")
+        partial.write_text(json.dumps(state))
+        os.replace(partial, self.path)
+
+    def _beat(self) -> None:
+        while not self._stopped.wait(self.every):
+            try:
+                self.write()
+            except OSError:
+                pass  # the next beat tries again; a step never fails for its progress file
+
+    def __enter__(self) -> ProgressFileReporter:
+        self.write()
+        self._stopped.clear()
+        self._thread = threading.Thread(target=self._beat, name="moseq2-progress-file", daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, kind, error, _traceback) -> None:
+        self._stopped.set()
+        if self._thread is not None:
+            self._thread.join()
+        if error is None:
+            with self._lock:
+                total = self._state["total"]
+                if total is not None:
+                    self._state["done"] = total
+            self._set(state="finished")
+        elif isinstance(error, ExpectedError):
+            self._set(state="failed", message=str(error), fix=error.fix)
+        else:
+            self._set(state="failed")
+        self.write()
+
+
+def read_progress(path: str | os.PathLike) -> dict | None:
+    """The progress file ``path`` as a ``ProgressFileReporter`` wrote it; None for a missing, empty, half-written
+    or otherwise unreadable file."""
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and "state" in data else None

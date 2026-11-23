@@ -20,7 +20,6 @@ it asks for.
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
 from pathlib import Path
 
@@ -29,8 +28,10 @@ from click.testing import CliRunner
 
 import moseq2_extract.steps as extract_steps
 from moseq2_app.cli import cli
+from moseq2_common.project import Project
 from moseq2_common.slurm import job_settings_file
 from moseq2_common.yaml import read_yaml, write_yaml
+from slurm_fakes import fake_slurm, job_file_of, submitted_lines  # noqa: F401 -- the fixture
 
 #: The fixture's head/tail classifier, so a project extraction downloads nothing.
 CLASSIFIER = "flip_classifier_k2_c57_10to13weeks.npz"
@@ -199,31 +200,25 @@ def test_batch_extract_typed_depth_range_is_manual(project, extracted):
 
 
 # ``moseq2 extract`` on SLURM (``computing.extract.cluster_type: slurm``) writes
-# each recording's job settings file in its session folder and one ``sbatch``
-# line per recording into ``extract_out.sh`` instead of extracting. The options
-# typed on its command line reach each of those extractions with the same
-# precedence as the local path (moseq2-extract#158). Each test runs the written
-# command, ``moseq2 run-job JOB_FILE``, with ``extract_wrapper`` recorded instead
-# of run, so what is checked is what the job would extract with.
+# each recording's job settings file in its session folder and submits one job
+# per recording instead of extracting (to the stand-ins in ``tests/fake_slurm``,
+# which hold it in the queue). The options typed on its command line reach each
+# of those extractions with the same precedence as the local path
+# (moseq2-extract#158). Each test runs the submitted command,
+# ``moseq2 run-job JOB_FILE``, with ``extract_wrapper`` recorded instead of run,
+# so what is checked is what the job would extract with.
 
 
-def jobs_in(script: Path) -> list[str]:
-    """The job settings file each ``sbatch`` line of ``script`` runs ``moseq2 run-job`` on."""
-    files = []
-    for line in script.read_text().splitlines():
-        if not line.strip():
-            continue
-        words = shlex.split(line)
-        wrapped = shlex.split(words[words.index("--wrap") + 1].rstrip().removesuffix(";"))
-        assert wrapped[1:4] == ["-m", "moseq2_app", "run-job"], line
-        files.append(wrapped[4])
-    return files
+def jobs_in(root: Path) -> list[str]:
+    """The job settings file each submitted job of the project in ``root`` runs ``moseq2 run-job`` on."""
+    return [job_file_of(line) for line in submitted_lines(Project.at(root))]
 
 
 @pytest.fixture
-def slurm_extracted(monkeypatch, received):
-    """Run ``moseq2 extract`` on SLURM, which submits nothing, then run each written job through
+def slurm_extracted(monkeypatch, received, fake_slurm):
+    """Run ``moseq2 extract`` on SLURM, which submits the jobs, then run each submitted job through
     ``moseq2 run-job`` and return what it received: one dict per recording, the config and ``num_frames``."""
+    fake_slurm.hold()
     nums = []
     monkeypatch.setattr(
         extract_steps,
@@ -239,7 +234,7 @@ def slurm_extracted(monkeypatch, received):
         write_yaml(data, str(root / "config.yaml"))
         batch(root, *typed)
         assert received == [], "moseq2 extract on SLURM extracted a recording itself"
-        for job_file in jobs_in(root / "extract_out.sh"):
+        for job_file in jobs_in(root):
             run("run-job", job_file)
         return [
             {"config": c, "num_frames": n} for c, n in zip(received, nums)

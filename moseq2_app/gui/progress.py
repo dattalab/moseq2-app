@@ -190,9 +190,8 @@ def incomplete_extraction_message(session, recording, partial):
 
     extract_wrapper writes the session's ``.h5`` under a temporary name and renames it to
     ``results.h5`` only at the end, so the temporary file left behind means the extraction was
-    stopped partway. The ``sbatch`` lines a cluster extraction writes (``extract_out.sh``) name no output
-    path, so a SLURM job's log is sbatch's default slurm-<job id>.out in the directory the jobs were
-    submitted from.
+    stopped partway. A cluster extraction's job writes its log, ``extract-job.log``, into the same
+    session folder.
 
     Args:
     session (str): the session's name
@@ -207,8 +206,8 @@ def incomplete_extraction_message(session, recording, partial):
         f"Extraction of {session} started but did not finish: {partial} is the unfinished extraction. "
         "An extraction stopped partway leaves this behind, most often because the job or notebook "
         "kernel running it was stopped, for example killed for running out of memory or for reaching "
-        f"its time limit. Look in {folder} for what it wrote and, if it ran on SLURM, in the job's log, "
-        "slurm-<job id>.out in the directory the extraction jobs were submitted from. "
+        f"its time limit. Look in {folder} for what it wrote and, if it ran on SLURM, at the job's log there, "
+        "extract-job.log. "
         f"Run the extraction again for {recording} to redo it."
     )
 

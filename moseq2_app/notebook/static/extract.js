@@ -1,6 +1,10 @@
 // Step 3, Extract: what this run will do (one row per recording), where it runs, more settings
 // folded away, and a footer with the button that starts it. While it runs, the rows show progress.
 // State from Python: `recordings` (each with its plan), `sections`, `saved`, `run` and `problem`.
+// While a run on the cluster is shown, the page asks Python every few seconds where the jobs stand.
+
+// How often, in milliseconds, the page asks where a cluster run's jobs stand.
+const POLL_EVERY = 3000;
 
 const PLAN = {
   new: { cls: "new", label: "New" },
@@ -14,6 +18,7 @@ function planSummary(recordings) {
   return h("div", { class: "m2-summary" },
     n("new") ? h("span", { class: "m2-chip new" }, `${n("new")} new`) : null,
     n("redo") ? h("span", { class: "m2-chip redo" }, `${n("redo")} to redo`) : null,
+    n("in progress") ? h("span", { class: "m2-chip muted" }, `${n("in progress")} in progress`) : null,
     h("span", { class: "m2-chip done" }, `${n("done")} up to date`));
 }
 
@@ -23,8 +28,10 @@ function runSummary(items) {
   return h("div", { class: "m2-summary" },
     n("done") ? h("span", { class: "m2-chip done" }, `${n("done")} extracted`) : null,
     n("running") ? h("span", { class: "m2-chip new" }, `${n("running")} extracting`) : null,
+    n("queued") ? h("span", { class: "m2-chip muted" }, `${n("queued")} in the queue`) : null,
     n("waiting") ? h("span", { class: "m2-chip muted" }, `${n("waiting")} waiting`) : null,
-    n("failed") ? h("span", { class: "m2-chip failed" }, `${n("failed")} failed`) : null);
+    n("failed") ? h("span", { class: "m2-chip failed" }, `${n("failed")} failed`) : null,
+    n("cancelled") ? h("span", { class: "m2-chip muted" }, `${n("cancelled")} cancelled`) : null);
 }
 
 function percent(item) {
@@ -36,11 +43,14 @@ function planRow(r, item) {
   if (item) {
     chip = item.state === "done" ? h("span", { class: "m2-chip done" }, "Extracted")
       : item.state === "failed" ? h("span", { class: "m2-chip failed" }, "Failed")
+      : item.state === "queued" ? h("span", { class: "m2-chip muted" }, "In the queue")
+      : item.state === "cancelled" ? h("span", { class: "m2-chip muted" }, "Cancelled")
       : item.state === "waiting" || item.state === "stopped" ? h("span", { class: "m2-chip muted" }, "Waiting")
       : h("span", { class: "m2-chip new" }, `Extracting, ${percent(item)}%`);
   } else {
     const p = PLAN[r.plan] || PLAN.new;
-    chip = h("span", { class: `m2-chip ${p.cls}`, title: r.changed && r.changed.length > 1 ? r.changed.join(", ") : null },
+    const tip = r.plan === "in progress" ? r.reason : r.changed && r.changed.length > 1 ? r.changed.join(", ") : null;
+    chip = h("span", { class: `m2-chip ${p.cls}`, title: tip },
       r.plan === "redo" ? `Redo: ${r.reason}` : p.label);
   }
   const running = item && (item.state === "running" || item.state === "done");
@@ -53,7 +63,8 @@ function planRow(r, item) {
 }
 
 // Sorting the list: by name, or by what happens to each recording (problems and work first).
-const STATE_ORDER = { failed: 0, running: 1, waiting: 2, stopped: 2, "in progress": 2, new: 3, redo: 4, done: 5 };
+const STATE_ORDER = { failed: 0, running: 1, queued: 2, waiting: 2, stopped: 2, cancelled: 2, "in progress": 2, new: 3,
+  redo: 4, done: 5 };
 
 function sortRows(rows, run, sort) {
   const key = (r) => {
@@ -99,11 +110,12 @@ function render({ model, el }) {
     const start = () => model.send({ action: "start", settings: draft });
     const label = (n) => (n === 1 ? "Extract 1 recording" : `Extract ${n} recordings`);
     if (run.state === "running") {
+      const cluster = run.where === "the cluster";
       return h("div", { class: "m2-footer dirty" },
         h("div", { class: "m2-footer-text" },
-          h("div", { class: "m2-footer-title" },
-            run.where === "the cluster" ? "Extracting on the cluster" : "Extracting on this computer"),
-          "You can keep using the notebook; this list keeps up."),
+          h("div", { class: "m2-footer-title" }, cluster ? "Extracting on the cluster" : "Extracting on this computer"),
+          cluster ? "The jobs keep running if you close the notebook; run this cell again to see where they stand."
+            : "You can keep using the notebook; this list keeps up."),
         h("div", { class: "m2-buttons" }, h("button", { class: "m2-button", type: "button",
           onclick: () => model.send({ action: "stop" }) }, "Stop")));
     }
@@ -117,9 +129,11 @@ function render({ model, el }) {
           failed.length ? h("button", { class: "m2-button primary", type: "button", onclick: start }, label(failed.length))
             : null));
     }
+    const busy = model.get("recordings").some((r) => r.plan === "in progress");
     return h("div", { class: "m2-footer" },
       h("div", { class: "m2-footer-text m2-saved" },
-        targets.length ? "The settings above are saved when extraction starts." : "Every recording is up to date."),
+        targets.length ? "The settings above are saved when extraction starts."
+          : busy ? "Every recording is up to date or being extracted on the cluster." : "Every recording is up to date."),
       h("div", { class: "m2-buttons" },
         h("button", { class: "m2-button primary", type: "button", disabled: targets.length === 0, onclick: start },
           targets.length ? label(targets.length) : "Nothing to extract")));
@@ -158,7 +172,12 @@ function render({ model, el }) {
   model.on("change:sections", paint);
   model.on("change:saved", () => { draft = structuredClone(model.get("saved")); paint(); });
   paint();
-  return () => { root.remove(); };
+  // Ask where a cluster run's jobs stand while this page shows the run going on.
+  const poll = setInterval(() => {
+    const run = model.get("run");
+    if (run.state === "running" && run.where === "the cluster") model.send({ action: "poll" });
+  }, POLL_EVERY);
+  return () => { clearInterval(poll); root.remove(); };
 }
 
 export default { render };

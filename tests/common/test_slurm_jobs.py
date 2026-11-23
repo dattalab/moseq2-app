@@ -1,11 +1,12 @@
 """What a SLURM job runs is fixed when it is submitted.
 
-``moseq2 extract`` with ``computing.extract.cluster_type: slurm`` and
-``kappa-scan`` with ``cluster_type: slurm`` write one ``sbatch`` line per job
-into a script, and each job runs its step from a settings file of its own
-(``moseq2_common.slurm.job_settings_file``): a session's in its folder in
-``aggregate_results/``, which ``moseq2 run-job`` reads, and a kappa-scan fit's
-beside its model, passed as ``--config-file``. The file holds the step's
+``moseq2 extract`` with ``computing.extract.cluster_type: slurm`` submits one
+job per recording and records its ``sbatch`` line beside the session's outputs
+(``extract-submitted.yaml``); ``kappa-scan`` with ``cluster_type: slurm`` writes
+one ``sbatch`` line per fit into a script. Each job runs its step from a
+settings file of its own (``moseq2_common.slurm.job_settings_file``): a
+session's in its folder in ``aggregate_results/``, which ``moseq2 run-job``
+reads, and a kappa-scan fit's beside its model, passed as ``--config-file``. The file holds the step's
 settings in ``config.yaml``'s shape and a ``job:`` block naming the project and
 the session (with the uuid the submitter gave it, its recording and the cores
 the job asks for) or the model, so a later edit to ``config.yaml`` does not
@@ -13,15 +14,15 @@ change a queued job. Every path in a ``--wrap`` command is quoted for the
 shell, so a project under ``C:\\Users\\Jane Doe\\OneDrive`` or
 ``/home/jane doe`` reaches the job whole.
 
-Nothing is submitted: the script is read, and each command is run in the test
-with the step's work function replaced.
+The jobs go to the stand-ins in ``tests/fake_slurm``, which hold them in the
+queue; each recorded command is then run in the test with the step's work
+function replaced.
 """
 
 from __future__ import annotations
 
 import os
 import shlex
-import subprocess
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ from moseq2_common.bookkeeping import load
 from moseq2_common.project import Project
 from moseq2_common.yaml import read_yaml, write_yaml
 from extract_projects import recorded_extraction
+from slurm_fakes import fake_slurm, submitted_lines  # noqa: F401 -- the fixture
 
 WINDOWS_PROJECT = r"C:\Users\Jane Doe\OneDrive\proj"
 WINDOWS_PYTHON = r"C:\Users\Jane Doe\miniconda3\envs\moseq2\python.exe"
@@ -88,32 +90,22 @@ def project(tmp_path):
 
 
 @pytest.fixture
-def received(monkeypatch):
-    """Each job run in the test: the settings and uuid its extraction was given."""
+def received(monkeypatch, fake_slurm):
+    """Each job run in the test: the settings and uuid its extraction was given. Submitted jobs stay queued."""
+    fake_slurm.hold()
     runs = []
     monkeypatch.setattr(
         extract_steps, "extract_wrapper",
         lambda f, out, config, num_frames=None, skip=False, uuid=None, record=None:
         runs.append({"recording": f, "folder": out, "config": config, "uuid": uuid}),
     )
-    popen, system = subprocess.Popen, os.system
-
-    class NoSbatch(popen):
-        def __init__(self, args, *rest, **kwargs):
-            if "sbatch" in str(args):
-                pytest.fail("moseq2 extract submitted a job")
-            super().__init__(args, *rest, **kwargs)
-
-    monkeypatch.setattr(subprocess, "Popen", NoSbatch)
-    monkeypatch.setattr(os, "system", lambda command: pytest.fail("moseq2 extract submitted a job")
-                        if "sbatch" in str(command) else system(command))
     return runs
 
 
 def _extract(project, *recordings):
-    """``moseq2 extract`` in ``project``; the lines of the script it wrote."""
+    """``moseq2 extract`` in ``project``; the ``sbatch`` line each recording's submission record holds."""
     _run(moseq2_cli, "extract", *recordings, cwd=project.folder)
-    return [line for line in (Path(project.folder) / "extract_out.sh").read_text().splitlines() if line.strip()]
+    return submitted_lines(project)
 
 
 def _run_job(line):
@@ -193,7 +185,7 @@ def test_a_queued_job_is_unaffected_by_a_later_config_edit(project, received):
     assert [tuple(run["config"]["crop_size"]) for run in received] == [(90, 90), (90, 90)]
 
 
-def test_a_submitted_session_has_its_uuid_before_the_job_runs(project, received):
+def test_a_submitted_session_has_its_uuid_before_the_job_runs(project, received, fake_slurm):
     """The submitter gives each session its uuid in moseq2-project.yaml and its job file; the job extracts with it."""
     lines = _extract(project)
 
@@ -210,8 +202,11 @@ def test_a_submitted_session_has_its_uuid_before_the_job_runs(project, received)
     assert by_recording == {"session 1": sessions["session 1/depth.avi"].uuid,
                             "session_2": sessions["session_2/depth.avi"].uuid}
 
-    # submitting again keeps each session's uuid
-    _extract(project)
+    # submitting again, once the jobs have failed, keeps each session's uuid
+    for job_id in fake_slurm.jobs():
+        fake_slurm.set(job_id, state="FAILED", exit_code="1:0")
+    assert len(_extract(project)) == 2
+    assert len(fake_slurm.calls("sbatch")) == 4
     assert {k: s.uuid for k, s in load(project).sessions.items()} == {k: s.uuid for k, s in sessions.items()}
 
 

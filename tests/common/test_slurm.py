@@ -1,16 +1,15 @@
 """The SLURM options and the sbatch line, in one place.
 
 ``SlurmOptions`` holds the seven SLURM options ``kappa-scan`` takes, with its
-``--get-cmd`` default, and ``sbatch_command`` writes the line both
-``kappa-scan`` and ``moseq2 extract`` write, the job's command quoted as
-``--wrap``'s one argument. Where extraction runs, on a cluster included, is its
-``computing.extract`` block, and on a cluster ``moseq2 extract`` always lists
-the commands it writes.
+``--get-cmd`` default, and ``sbatch_command`` writes the line ``kappa-scan``
+writes and ``moseq2 extract`` runs, the job's command quoted as ``--wrap``'s one
+argument. Where extraction runs, on a cluster included, is its
+``computing.extract`` block, and on a cluster ``moseq2 extract`` always says
+each job it submits.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
 
 from click.testing import CliRunner
 
@@ -18,6 +17,7 @@ import moseq2_extract.cli as extract_cli
 import moseq2_model.cli as model_cli
 from moseq2_common.slurm import SlurmOptions, sbatch_command
 from moseq2_common.yaml import read_yaml, write_yaml
+from slurm_fakes import fake_slurm  # noqa: F401 -- the fixture
 
 
 def test_sbatch_command_matches_batch_extracts_line():
@@ -105,10 +105,11 @@ def test_kappa_scan_lists_its_commands_by_default(tmp_path, monkeypatch):
     assert _kappa_scan(tmp_path, monkeypatch, ["--no-get-cmd"]) is False
 
 
-def test_moseq2_extract_always_lists_its_commands(tmp_path, monkeypatch):
-    """On a cluster, ``moseq2 extract`` prints every command it writes, and has no switch to stop it."""
+def test_moseq2_extract_always_says_each_job_it_submits(tmp_path, monkeypatch, fake_slurm):
+    """On a cluster, ``moseq2 extract`` says each job it submits, and has no switch to stop it."""
     from moseq2_app.cli import cli
 
+    fake_slurm.hold()
     (tmp_path / "session_1").mkdir()
     (tmp_path / "session_1" / "depth.avi").write_bytes(b"\0")  # a placeholder: nothing is extracted on a cluster
     (tmp_path / "flip.npz").write_bytes(b"\0")  # a placeholder head/tail classifier, so nothing is downloaded
@@ -125,9 +126,8 @@ def test_moseq2_extract_always_lists_its_commands(tmp_path, monkeypatch):
     result = CliRunner().invoke(cli, ["extract"], catch_exceptions=False)
 
     assert result.exit_code == 0, result.output
-    lines = [line for line in Path(tmp_path / "extract_out.sh").read_text().splitlines() if line.strip()]
-    assert len(lines) == 1
-    assert lines[0].startswith("sbatch ") and lines[0] in result.stderr, result.stderr
+    assert "session_1/depth.avi: submitted as job 1001." in result.stderr, result.stderr
+    assert len(fake_slurm.calls("sbatch")) == 1
     for switch in ("--get-cmd", "--no-get-cmd"):
         refused = CliRunner().invoke(cli, ["extract", switch])
         assert refused.exit_code == 2 and f"No such option '{switch}'" in refused.output, refused.output

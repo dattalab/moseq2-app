@@ -1,0 +1,36 @@
+"""Stands in for ``scancel`` in the tests: cancels jobs of ``$FAKE_SLURM_STATE``.
+
+    scancel ID [ID ...]
+
+A job still queued is marked cancelled; a running one's process group is sent
+SIGTERM first, as SLURM signals a job's processes. A job that has ended is left
+as it is, with the error the real one prints.
+"""
+
+import os
+import signal
+import sys
+
+import _cluster
+
+
+def main(args):
+    _cluster.log_call("scancel", args)
+    for job_id in [word for word in args if not word.startswith("-")]:
+        with _cluster.locked():
+            job = _cluster.load(job_id)
+        if job is None or job["state"] not in _cluster.ACTIVE:
+            print(f"scancel: error: Kill job error on job id {job_id}: Job/step already completing or completed",
+                  file=sys.stderr)
+            continue
+        if job.get("pid"):
+            try:
+                os.killpg(job["pid"], signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        _cluster.update(job_id, state="CANCELLED", reason="None", pid=None)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

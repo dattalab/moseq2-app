@@ -25,10 +25,23 @@ two compute the same thing.
 5. extracts what the plan says on this computer, one recording at a time with
    ``threads`` and ``compress_threads`` set to the cores it may use, a failure
    recorded and the rest extracted; or, on a SLURM cluster, writes each
-   recording's job settings file in its session folder and the script of
-   ``sbatch`` lines that runs them (``extract_out.sh``), each job asking for
-   ``JOB_CPUS`` cores and running ``moseq2 run-job`` (``run_job``) through the
-   Python that wrote it.
+   recording's job settings file in its session folder and submits one job per
+   recording (``moseq2_common.slurm.submit``), each asking for ``JOB_CPUS``
+   cores and running ``moseq2 run-job`` (``run_job``) through the Python that
+   submitted it, and records the submission beside the recording's outputs
+   (``SUBMITTED_FILE``: the job's id, when, the ``sbatch`` line run, the job's
+   settings file and its log, ``JOB_LOG``). It returns once the jobs are
+   submitted.
+
+On a cluster, each job reports through a ``ProgressFileReporter`` into its
+recording's ``PROGRESS_FILE``. ``cluster_runs`` reads the submission records,
+the progress files and one ``squeue`` (then one ``sacct``) into where each
+recording's job stands, and why one failed; a recording whose job is queued or
+running is ``in progress`` in the plan, so a rerun neither submits it again nor
+redoes it. ``stop`` cancels the jobs, and ``follow`` reports each job's changes
+until every one has ended. Nothing depends on the process that submitted the
+jobs staying alive: a notebook opened later, or ``moseq2 extract`` run again,
+reads the same records.
 
 Head/tail detection (``head_tail_detection``) is, in order: the classifier
 ``extract.flip_classifier`` names; the one trained in the project
@@ -50,9 +63,12 @@ from __future__ import annotations
 
 import math
 import os
+import shlex
+import time
 import urllib.request
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields, replace
+from datetime import datetime
 from os.path import abspath, basename, dirname, exists, join
 from pathlib import Path
 from uuid import uuid4
@@ -60,15 +76,16 @@ from uuid import uuid4
 import h5py
 
 from moseq2_common.bookkeeping import Session, load, relative_path, update
-from moseq2_common.computing import available_cores
+from moseq2_common.computing import available_cores, gigabytes, hours
 from moseq2_common.errors import ExpectedError, StepStopped
 from moseq2_common.options import arena_fields, check_top_level, read_config, read_settings, save_settings, \
     setting_fields
 from moseq2_common.project import Project, check_not_old, read_exclude, session_key, settings_files, step_lock
-from moseq2_common.records import read_record, start_record, unchanged, write_record
-from moseq2_common.report import Reporter, reporting
-from moseq2_common.slurm import job_command, job_settings_file, sbatch_command
-from moseq2_common.yaml import read_yaml, write_config
+from moseq2_common.records import read_record, start_record, unchanged
+from moseq2_common.report import ProgressFileReporter, Reporter, checkpoint, read_progress, reporting
+from moseq2_common.slurm import JobState, SubmitError, cancel, job_command, job_settings_file, job_states, \
+    sbatch_command, submit
+from moseq2_common.yaml import dump_block_yaml, read_yaml, write_config
 from moseq2_extract import steps
 from moseq2_extract.helpers.extract import EXTRACTION_BAR, extraction_summary
 from moseq2_extract.options import (
@@ -86,10 +103,11 @@ from moseq2_extract.session_config import extract_settings, read_entries, record
 from moseq2_extract.setup import project_camera
 from moseq2_extract.util import filter_warnings
 
-__all__ = ["EXTRACT_OUT_SCRIPT", "JOB_CPUS", "TRAINED_FLIP_CLASSIFIER", "ExtractRun", "HeadTail",
-           "HeadTailDownloadError", "PlannedRecording", "download_flip_file", "ensure_head_tail_detection",
-           "extract", "extract_recording", "find_roi", "generate_config", "head_tail_detection",
-           "included_recordings", "plan", "run_job"]
+__all__ = ["JOB_CPUS", "JOB_LOG", "JOB_NAME", "PROGRESS_FILE", "STALLED_AFTER", "SUBMITTED_FILE",
+           "TRAINED_FLIP_CLASSIFIER", "ExtractRun", "HeadTail", "HeadTailDownloadError", "PlannedRecording",
+           "RecordingRun", "cluster_runs", "download_flip_file", "ensure_head_tail_detection", "extract",
+           "extract_recording", "find_roi", "follow", "generate_config", "head_tail_detection",
+           "included_recordings", "plan", "run_job", "stop"]
 
 #: The head/tail classifier trained in a project (the flip-classifier notebook), in the project folder.
 TRAINED_FLIP_CLASSIFIER = "flip_classifier_trained.pkl"
@@ -97,8 +115,20 @@ TRAINED_FLIP_CLASSIFIER = "flip_classifier_trained.pkl"
 #: The CPU cores each extraction job on a cluster asks for; its reading and compressing threads follow.
 JOB_CPUS = 4
 
-#: The script of ``sbatch`` lines a SLURM extraction writes in the project folder.
-EXTRACT_OUT_SCRIPT = "extract_out.sh"
+#: A recording's submission record, in its session folder: its job's id, when and how it was submitted.
+SUBMITTED_FILE = "extract-submitted.yaml"
+
+#: A recording's progress file, in its session folder, which its cluster job rewrites as it goes.
+PROGRESS_FILE = "extract-progress.json"
+
+#: SLURM's log of a recording's job (the job's output), in its session folder.
+JOB_LOG = "extract-job.log"
+
+#: The name extraction jobs have in the cluster's queue.
+JOB_NAME = "moseq2-extract"
+
+#: Seconds after which the progress file of a job no longer in the queue, not rewritten since, counts as stopped.
+STALLED_AFTER = 600
 
 
 # ------------------------------------------------------------------------------- head/tail detection
@@ -316,13 +346,15 @@ def _redo_reason(changed: Sequence[str], entry: Mapping) -> str:
 def plan(project: Project, *, recordings: Sequence[str] | None = None) -> list[PlannedRecording]:
     """What a run of extraction in ``project`` would do with each included recording, by key.
 
-    ``new``: it has no ``results.h5``. ``redo`` (with its reason): its extraction carries no readable record
-    (``NO_RECORD``); the recording changed since it was extracted (a recording that is gone is not a
-    change); the head/tail detection now resolved differs from the one it used; or its options as resolved
-    now (``config.yaml``, its entry in ``session_config.yaml``) differ from the record's in a setting that is
-    not detected or a one-run switch. ``done`` otherwise. ``recordings`` (paths or session keys) are listed
-    too when they are not included, as recordings to extract. Nothing is written or downloaded.
+    ``in progress`` (its reason says how the job stands): its cluster job is queued or running
+    (``cluster_runs``). ``new``: it has no ``results.h5``. ``redo`` (with its reason): its extraction carries
+    no readable record (``NO_RECORD``); the recording changed since it was extracted (a recording that is gone
+    is not a change); the head/tail detection now resolved differs from the one it used; or its options as
+    resolved now (``config.yaml``, its entry in ``session_config.yaml``) differ from the record's in a setting
+    that is not detected or a one-run switch. ``done`` otherwise. ``recordings`` (paths or session keys) are
+    listed too when they are not included, as recordings to extract. Nothing is written or downloaded.
     """
+    runs = cluster_runs(project)
     detection = head_tail_detection(project)
     search = _search(project)
     excluded = set(read_exclude(project))
@@ -335,6 +367,9 @@ def plan(project: Project, *, recordings: Sequence[str] | None = None) -> list[P
     entries = read_entries(project)
     out = []
     for key, recording in sorted(listed.items()):
+        if key in runs and runs[key].live:
+            out.append(PlannedRecording(key, recording, "in progress", _how_it_stands(runs[key])))
+            continue
         h5 = session_outputs(project, key, keys=everything).h5
         if not h5.is_file():
             out.append(PlannedRecording(key, recording, "new"))
@@ -391,9 +426,10 @@ class ExtractRun:
     extracted: list
     #: The recordings whose extraction failed, and the error each raised.
     failed: dict
-    #: The recordings the plan left as they were.
+    #: The recordings the plan left as they were, up to date. One whose cluster job is queued or running is in
+    #: none of these lists.
     up_to_date: list
-    #: On a cluster: each recording's job settings file, by session key.
+    #: On a cluster: each recording submitted, its job settings file, by session key.
     jobs: dict
 
 
@@ -523,10 +559,12 @@ def extract(project: Project, *, recordings: Sequence[str] | None = None, settin
     """Run the Extract step in ``project`` (module docstring): save ``settings``, then extract what the plan
     says, or every recording in ``recordings`` (paths or session keys) whatever its plan.
 
-    Locally, a recording that fails is recorded in the run's ``failed`` and the rest are extracted, and the
-    last status line is the run's summary. A stop the reporter asks for raises ``StepStopped`` at the next
-    chunk, leaving the recording being extracted as it was. On a cluster, the jobs' settings files and the
-    script of ``sbatch`` lines are written, and nothing is submitted.
+    A recording whose cluster job is queued or running is left to its job, named or not. Locally, a recording
+    that fails is recorded in the run's ``failed`` and the rest are extracted, and the last status line is the
+    run's summary. A stop the reporter asks for raises ``StepStopped`` at the next chunk, leaving the recording
+    being extracted as it was. On a cluster, each recording's job is submitted and recorded, and the run
+    returns; a job ``sbatch`` refuses raises ``SubmitError`` (W16), the jobs submitted before it staying
+    submitted.
     """
     with reporting(reporter) as reporter:
         check_not_old(project.folder)
@@ -542,8 +580,12 @@ def extract(project: Project, *, recordings: Sequence[str] | None = None, settin
                     reporter.status(line)
             planned = plan(project, recordings=recordings)
             named = {_key(project, name) for name in recordings} if recordings is not None else None
-            targets = [p for p in planned if (p.key in named if named is not None else p.plan in ("new", "redo"))]
-            up_to_date = [p.key for p in planned if p not in targets]
+            targets = [p for p in planned if p.plan != "in progress"
+                       and (p.key in named if named is not None else p.plan in ("new", "redo"))]
+            up_to_date = [p.key for p in planned if p not in targets and p.plan != "in progress"]
+            for item in planned:
+                if item.plan == "in progress":
+                    reporter.status(f"{item.key}: in progress on the cluster, {item.reason}.")
             for item in targets:
                 if item.plan == "redo":
                     reporter.status(redo_line(item))
@@ -553,7 +595,7 @@ def extract(project: Project, *, recordings: Sequence[str] | None = None, settin
             uuids = _list_sessions(project, planned)
             computing = _computing(project)
             if computing.cluster_type == "slurm":
-                return _write_jobs(project, targets, detection, computing, uuids, up_to_date, reporter)
+                return _submit(project, targets, detection, computing, uuids, up_to_date, reporter)
             return _extract_here(project, targets, detection, computing, up_to_date, reporter)
 
 
@@ -621,36 +663,330 @@ def recording_seconds(recording: str | os.PathLike) -> float:
         return (stream.frames or 0) / float(stream.base_rate or _KINECT_FPS)
 
 
-def _write_jobs(project, targets, detection, computing, uuids, up_to_date, reporter) -> ExtractRun:
+def _now() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _write_submission(path: Path, record: Mapping) -> None:
+    """Write a submission record whole, one ``name: value`` line each, through a temporary name, so a reader never
+    sees half of one."""
+    partial = path.with_name(f".{path.name}.partial")
+    partial.write_text(dump_block_yaml(dict(record)))
+    os.replace(partial, path)
+
+
+def _refused(key: str, partition: str, answer: str) -> SubmitError:
+    """W16: sbatch refused ``key``'s job."""
+    check = (f"check that the partition {partition} exists and that this computer can submit jobs "
+             "(`sbatch --version`), then")
+    return SubmitError(f"The cluster refused the job for {key}. sbatch said: {answer}", answer=answer,
+                       fix=f"{check} press Extract again.", command_line_fix=f"{check} run `moseq2 extract` again.")
+
+
+def _submit(project, targets, detection, computing, uuids, up_to_date, reporter) -> ExtractRun:
+    """Submit one job per target and record it beside the recording's outputs (module docstring, step 5)."""
     options = _options(project, targets, detection, JOB_CPUS)
     folder = str(Path(project.folder).absolute())
-    commands = ""
     jobs = {}
     everything = {p.key for p in targets} | set(load(project).sessions)
+    submitted = _now()
     for item in targets:
         session_folder = session_outputs(project, item.key, keys=everything).folder
         session_folder.mkdir(parents=True, exist_ok=True)
+        # what an earlier job of this recording left would otherwise speak for the new one
+        for earlier in (PROGRESS_FILE, SUBMITTED_FILE):
+            (session_folder / earlier).unlink(missing_ok=True)
         job_file = options[item.key].to_yaml(job_settings_file(session_folder, "extract"), job={
             "project": folder, "session": item.key, "uuid": uuids[item.key], "recording": item.key,
             "cpus": JOB_CPUS})
-        jobs[item.key] = job_file
         wall_time = computing.wall_time
         if wall_time == "auto":
             wall_time = f"{job_hours(item.recording)}:00:00"
-        commands += sbatch_command(job_command("run-job", job_file) + "; ", ncpus=JOB_CPUS, memory=computing.memory,
-                                   partition=computing.partition, wall_time=wall_time,
-                                   prefix=computing.prefix) + "\n"
-    script = Path(project.folder) / EXTRACT_OUT_SCRIPT
-    script.write_text(commands)
-    record = start_record("extract", computing, [*settings_files(project), *(str(p.recording) for p in targets)],
-                          project=project)
-    write_record(script, record.finish({"files": {"script": str(script),
-                                                  "session_folders": sorted(str(Path(j).parent)
-                                                                            for j in jobs.values())}}))
-    reporter.status(f"Commands saved to: {script}")
-    reporter.status("Listing extract commands...\n")
-    reporter.status(commands)
+        command = job_command("run-job", job_file) + "; "
+        log = session_folder / JOB_LOG
+        resources = dict(memory=computing.memory, partition=computing.partition, wall_time=wall_time,
+                         prefix=computing.prefix)
+        try:
+            job_id = submit(command, cpus=JOB_CPUS, name=JOB_NAME, log=log, **resources)
+        except SubmitError as error:
+            raise _refused(item.key, computing.partition, error.answer) from error
+        _write_submission(session_folder / SUBMITTED_FILE, {
+            "job_id": job_id, "submitted": submitted,
+            "sbatch": sbatch_command(command, ncpus=JOB_CPUS, name=JOB_NAME, log=log, parsable=True, **resources),
+            "settings_file": Path(job_file).name, "log": JOB_LOG})
+        jobs[item.key] = job_file
+        reporter.status(f"{item.key}: submitted as job {job_id}.")
     return ExtractRun(extracted=[], failed={}, up_to_date=up_to_date, jobs=jobs)
+
+
+# ------------------------------------------------------------------------------- jobs on a cluster
+
+
+@dataclass(frozen=True)
+class RecordingRun:
+    """Where one recording's cluster job stands (``cluster_runs``)."""
+
+    key: str
+    job_id: str
+    #: ``queued``, ``running``, ``done``, ``failed`` or ``cancelled``.
+    state: str
+    #: Chunks extracted, and the recording's chunks, as its progress file last said; None before it says.
+    done: int | None = None
+    total: int | None = None
+    #: Why it failed: what happened and what to do, as an expected error.
+    problem: ExpectedError | None = None
+    #: When the progress file behind ``done`` was written.
+    updated: str | None = None
+    #: When the job was submitted, the same for every job one run submitted.
+    submitted: str | None = None
+
+    @property
+    def live(self) -> bool:
+        """Whether the job is queued or running."""
+        return self.state in ("queued", "running")
+
+
+def _submissions(project: Project) -> dict:
+    """Each listed session's folder and submission record, by session key, for those that have one."""
+    if not Path(project.bookkeeping_file).is_file():
+        return {}
+    listed = load(project).sessions
+    found = {}
+    for key in sorted(listed):
+        path = session_outputs(project, key, keys=set(listed)).folder / SUBMITTED_FILE
+        try:
+            record = read_yaml(str(path)) if path.is_file() else None
+        except Exception:  # noqa: BLE001 -- a record half written by hand is no record
+            record = None
+        if isinstance(record, Mapping) and record.get("job_id") is not None:
+            found[key] = (path.parent, dict(record))
+    return found
+
+
+def _when(text) -> datetime | None:
+    try:
+        when = datetime.fromisoformat(str(text))
+    except (TypeError, ValueError):
+        return None
+    return when if when.tzinfo is not None else when.astimezone()
+
+
+def _seconds_since(text) -> float | None:
+    when = _when(text)
+    return None if when is None else (datetime.now().astimezone() - when).total_seconds()
+
+
+def _sbatch_value(record: Mapping, flag: str) -> str | None:
+    """The value ``flag`` (``--mem``, ``-t``) has in the record's ``sbatch`` line."""
+    try:
+        words = shlex.split(str(record.get("sbatch") or ""))
+    except ValueError:
+        return None
+    words = words[:words.index("--wrap")] if "--wrap" in words else words
+    for number, word in enumerate(words):
+        if word.startswith(f"{flag}="):
+            return word.split("=", 1)[1]
+        if word == flag and number + 1 < len(words):
+            return words[number + 1]
+    return None
+
+
+def _hours_text(value: float) -> str:
+    return f"{value:g} hour" + ("" if value == 1 else "s")
+
+
+def _wall_time(value: float) -> str:
+    seconds = round(value * 3600)
+    return f"{seconds // 3600}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
+
+
+def _job_problem(folder: Path, record: Mapping, job: JobState | None) -> ExpectedError:
+    """Why a job failed, from SLURM's state for it: out of memory (W12), out of time (W13), anything else (W14)."""
+    if job is not None and job.slurm_state == "OUT_OF_MEMORY":
+        try:
+            memory = gigabytes(_sbatch_value(record, "--mem") or "")
+        except ValueError:
+            memory = None
+        if memory:
+            more = memory + 8
+            return ExpectedError(f"The job ran out of its {memory:g} GB of memory.",
+                                 fix=f"raise Memory per job to {more:g} GB and press Extract again.",
+                                 command_line_fix=f"run `moseq2 extract --memory {more:g}GB`.")
+    if job is not None and job.slurm_state == "TIMEOUT":
+        try:
+            allowed = hours(_sbatch_value(record, "-t") or "")
+        except ValueError:
+            allowed = None
+        if allowed:
+            return ExpectedError(f"The job ran out of its {_hours_text(allowed)}.",
+                                 fix=f"raise Time per job to {_hours_text(2 * allowed)} and press Extract again.",
+                                 command_line_fix=f"run `moseq2 extract --wall-time {_wall_time(2 * allowed)}`.")
+    log = folder / str(record.get("log") or JOB_LOG)
+    fix = f"read the job's log, {log}, then press Extract again (`moseq2 extract` on the command line)."
+    if job is not None and job.slurm_state:
+        reason = f" ({job.reason})" if job.reason else ""
+        return ExpectedError(f"The job stopped with SLURM state {job.slurm_state}{reason}.", fix=fix)
+    return ExpectedError("The job left the queue without finishing, and the cluster keeps no record of why.",
+                         fix=fix)
+
+
+def _own_problem(progress: Mapping) -> ExpectedError:
+    """The problem a job stopped on, as its progress file names it."""
+    return ExpectedError(str(progress["message"]), fix=progress.get("fix") or None)
+
+
+def _counts(progress: Mapping | None, before: RecordingRun | None, job_id: str) -> tuple:
+    """(done, total, updated) from ``progress``, unless the run seen before, of the same job, was read from a newer
+    file: a progress file read through a cache may be older than the last one seen, or missing."""
+    same = before is not None and before.job_id == job_id
+    if progress is None:
+        return (before.done, before.total, before.updated) if same else (None, None, None)
+    if same and before.updated:
+        newer, older = _when(before.updated), _when(progress.get("updated"))
+        if newer is not None and (older is None or older < newer):
+            return before.done, before.total, before.updated
+    return progress.get("done"), progress.get("total"), progress.get("updated")
+
+
+def cluster_runs(project: Project, *, previous: Mapping[str, RecordingRun] | None = None) -> dict:
+    """Where each of ``project``'s submitted recordings stands, by session key (``RecordingRun``).
+
+    Read from each recording's submission record and progress file, and from one ``squeue`` and one ``sacct``
+    (``moseq2_common.slurm.job_states``) for the jobs whose progress file has not said how they ended. A
+    progress file that says the job finished, or failed on a problem it names, decides; else SLURM's state does,
+    out of memory and out of time becoming problems that say what to raise (W12, W13), any other failure one that
+    names SLURM's state and the job's log (W14). Where SLURM no longer knows the job (no accounting), a job whose
+    progress file has not been rewritten for ``STALLED_AFTER`` seconds has stopped (W14), and one still writing
+    runs. ``previous``, the runs a call before returned, keeps every count from moving backwards when a
+    progress file reads older than one seen before, or not at all; a run that had ended stays as it ended.
+    No SLURM command runs when no recording has a submission record.
+    """
+    previous = previous or {}
+    submissions = _submissions(project)
+    progress, ask = {}, []
+    for key, (folder, record) in submissions.items():
+        read = read_progress(folder / PROGRESS_FILE)
+        progress[key] = read if read is not None and str(read.get("job")) == str(record["job_id"]) else None
+        before = previous.get(key)
+        settled = before is not None and before.job_id == str(record["job_id"]) and not before.live
+        ended = progress[key] is not None and (progress[key]["state"] == "finished"
+                                               or (progress[key]["state"] == "failed" and progress[key].get("message")))
+        if not (settled or ended or record.get("cancelled")):
+            ask.append(str(record["job_id"]))
+    states = job_states(ask) if ask else {}
+    runs = {}
+    for key, (folder, record) in submissions.items():
+        job_id = str(record["job_id"])
+        before = previous.get(key)
+        if before is not None and before.job_id == job_id and not before.live:
+            runs[key] = before
+            continue
+        read = progress[key]
+        done, total, updated = _counts(read, before, job_id)
+        stamp = dict(key=key, job_id=job_id, done=done, total=total, updated=updated,
+                     submitted=record.get("submitted"))
+        job = states.get(job_id)
+        if read is not None and read["state"] == "finished":
+            runs[key] = RecordingRun(state="done", **{**stamp, "done": total if total is not None else done})
+        elif read is not None and read["state"] == "failed" and read.get("message"):
+            runs[key] = RecordingRun(state="failed", problem=_own_problem(read), **stamp)
+        elif record.get("cancelled"):
+            runs[key] = RecordingRun(state="cancelled", **stamp)
+        elif job is None or job.state == "unknown":
+            since = _seconds_since(updated or record.get("submitted"))
+            if (read is not None and read["state"] == "failed") or (since is not None and since > STALLED_AFTER):
+                runs[key] = RecordingRun(state="failed", problem=_job_problem(folder, record, None), **stamp)
+            else:
+                runs[key] = RecordingRun(state="running", **stamp)
+        elif job.state == "failed" or (read is not None and read["state"] == "failed"):
+            runs[key] = RecordingRun(state="failed", problem=_job_problem(folder, record, job), **stamp)
+        elif job.state == "done":
+            runs[key] = RecordingRun(state="done", **{**stamp, "done": total if total is not None else done})
+        else:
+            runs[key] = RecordingRun(state=job.state, **stamp)
+    return runs
+
+
+def _how_it_stands(run: RecordingRun) -> str:
+    """A queued or running job, as the plan's reason says it."""
+    if run.state == "queued":
+        return f"waiting in the queue as job {run.job_id}"
+    if run.total:
+        return f"running as job {run.job_id} ({round(100 * (run.done or 0) / run.total)}% done)"
+    return f"running as job {run.job_id}"
+
+
+def stop(project: Project, keys: Sequence[str] | None = None) -> list[str]:
+    """Cancel ``project``'s cluster jobs that are queued or running (of the recordings ``keys`` only, when given)
+    with one ``scancel``; the ids of the jobs cancelled. Each cancelled recording's submission record notes when
+    (``cancelled``), so the next run extracts it again."""
+    runs = cluster_runs(project)
+    live = [run for key, run in sorted(runs.items()) if run.live and (keys is None or key in keys)]
+    ids = sorted((run.job_id for run in live), key=lambda job_id: (len(job_id), job_id))
+    if not ids:
+        return []
+    try:
+        cancel(ids)
+    except SubmitError as error:
+        check = "check that this computer can submit jobs (`sbatch --version`), then"
+        raise SubmitError(f"The jobs could not be cancelled: {error.answer}", answer=error.answer,
+                          fix=f"{check} press Stop again.",
+                          command_line_fix=f"{check} run `moseq2 extract --stop` again.") from error
+    when = _now()
+    submissions = _submissions(project)
+    for run in live:
+        folder, record = submissions[run.key]
+        _write_submission(folder / SUBMITTED_FILE, {**record, "cancelled": when})
+    return ids
+
+
+def state_line(run: RecordingRun) -> str:
+    """What the command line says when a recording's job reaches ``run``'s state."""
+    if run.state == "queued":
+        return f"{run.key}: waiting in the queue as job {run.job_id}."
+    if run.state == "running":
+        return f"{run.key}: running as job {run.job_id}."
+    if run.state == "done":
+        return f"{run.key}: extracted."
+    if run.state == "cancelled":
+        return f"{run.key}: its job was cancelled."
+    return f"{run.key}: {run.problem}"
+
+
+#: What a run says of a recording whose job was cancelled.
+CANCELLED = "Its job was cancelled before it finished."
+
+
+def follow(project: Project, keys: Sequence[str], *, reporter: Reporter | None = None,
+           every: float = 3.0) -> ExtractRun:
+    """Follow the cluster jobs of the recordings ``keys`` until every one has ended, checking every ``every``
+    seconds (``cluster_runs``), with a status line each time one changes state and the run's summary last.
+
+    What the jobs did, as a run: those done in ``extracted``, those that failed or were cancelled in ``failed``
+    with their problem. A recording with no submission record is left out.
+    """
+    with reporting(reporter) as reporter:
+        runs: dict = {}
+        said: dict = {}
+        while True:
+            runs = cluster_runs(project, previous=runs)
+            mine = {key: runs[key] for key in keys if key in runs}
+            for key, run in mine.items():
+                line = state_line(run)
+                if said.get(key) != line:
+                    reporter.status(line)
+                    if run.problem is not None and (run.problem.command_line_fix or run.problem.fix):
+                        reporter.status(f"  To fix it: {run.problem.command_line_fix or run.problem.fix}")
+                    said[key] = line
+            if not any(run.live for run in mine.values()):
+                break
+            checkpoint()
+            time.sleep(every)
+        failed = {key: run.problem or ExpectedError(CANCELLED) for key, run in mine.items()
+                  if run.state in ("failed", "cancelled")}
+        reporter.status(extraction_summary(len(mine), 0, [(key, failed[key]) for key in sorted(failed)]))
+        return ExtractRun(extracted=[key for key, run in mine.items() if run.state == "done"], failed=failed,
+                          up_to_date=[], jobs={})
 
 
 def run_job(job_file: str | os.PathLike, *, reporter: Reporter | None = None) -> steps.ExtractResult:
@@ -659,17 +995,25 @@ def run_job(job_file: str | os.PathLike, *, reporter: Reporter | None = None) ->
     The file's ``extract`` section and ``camera_type`` are the recording's settings; its ``job:`` block names
     the project, the recording (relative to the project) and the cores the job asked for, which reading and
     compressing use. The outputs go into the recording's session folder with the uuid
-    ``moseq2-project.yaml`` lists for it.
+    ``moseq2-project.yaml`` lists for it. What it does is reported to ``reporter`` (the job's log) and, through
+    a ``ProgressFileReporter``, into ``PROGRESS_FILE`` beside the settings file, its chunks counted and how it
+    ended said, an expected error's message and fix included.
     """
-    with reporting(reporter):
-        data = read_config(job_file)
-        check_top_level(job_file, data)
-        job = data.get("job") or {}
-        project = Project.at(job["project"])
-        cpus = int(job.get("cpus") or JOB_CPUS)
-        opts = ExtractOptions.resolve(config=read_settings(job_file, ExtractOptions, stage_classes=EXTRACT_STAGE),
-                                      explicit={"threads": cpus, "compress_threads": cpus})
-        return extract_recording(project, str(Path(job["project"]) / job["recording"]), opts)
+    with reporting(reporter) as reporter:
+        progress = ProgressFileReporter(Path(job_file).parent / PROGRESS_FILE, bar=EXTRACTION_BAR, also=reporter)
+        with progress, reporting(progress):
+            return _run_job(job_file)
+
+
+def _run_job(job_file):
+    data = read_config(job_file)
+    check_top_level(job_file, data)
+    job = data.get("job") or {}
+    project = Project.at(job["project"])
+    cpus = int(job.get("cpus") or JOB_CPUS)
+    opts = ExtractOptions.resolve(config=read_settings(job_file, ExtractOptions, stage_classes=EXTRACT_STAGE),
+                                  explicit={"threads": cpus, "compress_threads": cpus})
+    return extract_recording(project, str(Path(job["project"]) / job["recording"]), opts)
 
 
 # ------------------------------------------------------------------------------- one recording

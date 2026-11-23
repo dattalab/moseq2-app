@@ -22,7 +22,6 @@ is what the job would extract with.
 from __future__ import annotations
 
 import os
-import shlex
 from copy import deepcopy
 
 import pytest
@@ -35,6 +34,7 @@ from moseq2_common.slurm import job_settings_file
 from moseq2_common.yaml import read_yaml, write_yaml
 
 from configs import read_settings
+from slurm_fakes import fake_slurm, job_file_of, submitted_lines  # noqa: F401 -- the fixture
 from moseq2_extract import project as extraction
 from moseq2_extract.gui import generate_config_command
 from moseq2_extract.session_config import ARENA_TOOL_SETTINGS
@@ -109,25 +109,21 @@ def local(monkeypatch):
     return calls
 
 
-def job_files(script):
-    """The job settings file each ``sbatch`` line of ``script`` runs ``moseq2 run-job`` on."""
-    files = []
-    for line in filter(str.strip, script.read_text().splitlines()):
-        words = shlex.split(line)
-        wrapped = shlex.split(words[words.index("--wrap") + 1].rstrip().removesuffix(";"))
-        assert wrapped[1:4] == ["-m", "moseq2_app", "run-job"], line
-        files.append(wrapped[4])
-    return files
+def job_files(root):
+    """The job settings file each job submitted in the project in ``root`` runs ``moseq2 run-job`` on."""
+    return [job_file_of(line) for line in submitted_lines(Project.at(root))]
 
 
 @pytest.fixture
-def slurm(monkeypatch):
-    """Write the SLURM jobs, which submits nothing, run each through ``moseq2 run-job``
-    and return what each received, keyed by recording, plus each written
+def slurm(monkeypatch, request):
+    """Submit the SLURM jobs (to the stand-ins in ``tests/fake_slurm``, which hold them in the queue), run each
+    through ``moseq2 run-job`` and return what each received, keyed by recording, plus each written
     job settings file in its session folder."""
     calls = {}
 
     def go(root, write_commands):
+        # asked for only here, so a test that runs locally too needs no fake cluster
+        request.getfixturevalue("fake_slurm").hold()
         write_commands()
         # stood in for only now, so a local extraction in the same test reaches the local fixture's
         monkeypatch.setattr(
@@ -137,7 +133,7 @@ def slurm(monkeypatch):
                 {f: {"config": config, "num_frames": num_frames}}
             ),
         )
-        files = job_files(root / "extract_out.sh")
+        files = job_files(root)
         assert sorted(files) == sorted(str(job_settings_file(root / "aggregate_results" / name, "extract"))
                                        for name in SESSIONS)
         for job_file in files:
@@ -228,7 +224,7 @@ def test_slurm_batch_extract_writes_config_yaml_settings_into_each_job(project, 
         assert call["num_frames"] == 50
         assert_config_yaml_settings_with_tuned_arena(call["config"], root)
     # the settings travel in each job's settings file, not on its command line
-    assert "--num-frames" not in (root / "extract_out.sh").read_text()
+    assert not any("--num-frames" in line for line in submitted_lines(Project.at(root)))
 
 
 def test_notebook_slurm_path_takes_frame_trim_from_config_yaml(project, slurm):
@@ -245,7 +241,8 @@ def test_notebook_slurm_path_takes_frame_trim_from_config_yaml(project, slurm):
         try:
             widget = extract()
             widget.start()
-            assert widget.wait()["state"] == "finished", widget.problem
+            ran = widget.wait()
+            assert (ran["state"], ran["where"]) == ("running", "the cluster"), widget.problem
         finally:
             os.chdir(before)
 

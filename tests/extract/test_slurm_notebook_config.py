@@ -2,17 +2,19 @@
 
 With ``cluster_type: slurm`` in config.yaml's ``computing.extract`` block, the
 notebook's Extract step writes each recording's job settings file in its
-session folder and one ``sbatch`` line per recording, running ``moseq2 run-job``
-on that file, into ``extract_out.sh`` instead of extracting. Each job has to
+session folder and submits one job per recording, running ``moseq2 run-job``
+on that file, instead of extracting. Each job has to
 extract with the project's config file, and the arena tool's settings from the
 recording's entry when the session config has one. ``threads`` and
 ``compress_threads`` are the CPUs the job asks for, whatever either file holds.
 A config written by ``generate-config`` names no config file of its own, and
 no ``--config-file`` reaches the written lines.
 
-Nothing is submitted and nothing is extracted while the lines are written: each
-written job is then run through ``moseq2 run-job`` with ``extract_wrapper``
-recorded, so what is checked is what the job would extract with.
+The jobs go to the stand-ins in ``tests/fake_slurm``, which hold them in the
+queue, and nothing is extracted while they are submitted: each submitted job's
+command, from its submission record, is then run through ``moseq2 run-job``
+with ``extract_wrapper`` recorded, so what is checked is what the job would
+extract with.
 
 ``split_command`` (``tests/commands.py``) splits a command line written with a
 platform's paths back into its arguments.
@@ -21,7 +23,6 @@ platform's paths back into its arguments.
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
 from pathlib import Path
 
@@ -32,7 +33,9 @@ import moseq2_extract.cli as extract_cli
 import moseq2_extract.steps as extract_steps
 from commands import split_command
 from moseq2_app.cli import cli
+from moseq2_common.project import Project
 from moseq2_common.yaml import read_yaml, write_yaml
+from slurm_fakes import fake_slurm, job_file_of, submitted_lines  # noqa: F401 -- the fixture
 
 SESSION = "session_1"
 #: The fixture's head/tail classifier, so the project's extraction downloads nothing.
@@ -70,9 +73,10 @@ def project(tmp_path, raw_sessions):
 
 
 @pytest.fixture
-def jobs(monkeypatch):
-    """Run the notebook's Extract step on SLURM, which writes the jobs and extracts nothing, then run each
-    written job through ``moseq2 run-job``; the written lines and the config each job received."""
+def jobs(monkeypatch, fake_slurm):
+    """Run the notebook's Extract step on SLURM, which submits the jobs and extracts nothing, then run each
+    submitted job through ``moseq2 run-job``; the submitted lines and the config each job received."""
+    fake_slurm.hold()
     received = []
     monkeypatch.setattr(
         extract_steps,
@@ -88,17 +92,14 @@ def jobs(monkeypatch):
         try:
             widget = extract()
             widget.start()
-            state = widget.wait()["state"]
+            ran = widget.wait()
         finally:
             os.chdir(before)
-        assert state == "finished", widget.problem
+        assert (ran["state"], ran["where"]) == ("running", "the cluster"), widget.problem
         assert received == [], "the Extract step extracted a recording itself on SLURM"
-        lines = [line for line in (root / "extract_out.sh").read_text().splitlines() if line.strip()]
+        lines = submitted_lines(Project.at(root))
         for line in lines:
-            words = shlex.split(line)
-            wrapped = shlex.split(words[words.index("--wrap") + 1].rstrip().removesuffix(";"))
-            assert wrapped[1:4] == ["-m", "moseq2_app", "run-job"], line
-            run(cli, "run-job", wrapped[4])
+            run(cli, "run-job", job_file_of(line))
         return lines, received
 
     return go

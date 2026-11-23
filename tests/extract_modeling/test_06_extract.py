@@ -10,8 +10,7 @@ the project for depth recordings of the types ``config.yaml``'s ``extensions``
 names, plans each one (new, to redo, or up to date), lists every planned
 recording as a session in ``moseq2-project.yaml``, and extracts what the plan
 says on this computer or, with ``computing.extract.cluster_type`` set to
-``slurm``, writes one job per recording and the script of ``sbatch`` lines that
-runs them. What it leaves behind is a folder for each recording in
+``slurm``, submits one job per recording. What it leaves behind is a folder for each recording in
 ``aggregate_results/``, named from the recording's path in the project, holding
 the cropped frames, the scalars computed from them, a preview movie and a
 record of the parameters used. Nothing is written beside the recordings.
@@ -45,6 +44,7 @@ from moseq2_common.yaml import read_yaml, write_config
 
 from test_03_config import plain
 from test_05_arena_mask import RECORDINGS, SESSIONS
+from slurm_fakes import fake_slurm  # noqa: F401 -- the fixture
 
 #: An ``extensions`` setting that leaves out ``.mkv``.
 EXTENSIONS = [".avi", ".dat", ".tar.gz"]
@@ -241,40 +241,28 @@ def test_naming_recordings_extracts_only_those(tmp_path, chosen, named):
     assert chosen == [str(root / name / "depth.avi") for name in named]
 
 
-def test_the_slurm_branch_writes_a_script_and_submits_nothing(tmp_path, chosen, monkeypatch):
+def test_the_slurm_branch_submits_one_job_per_recording(tmp_path, chosen, fake_slurm):
     """6. The other half of the dispatch.
 
     With ``computing.extract.cluster_type`` set to ``slurm``, the step writes
-    each recording's job settings file into its session folder and one
-    ``sbatch`` line per recording, running ``moseq2 run-job`` on that file, into
-    ``extract_out.sh``, and stops. Nothing reaches the scheduler.
+    each recording's job settings file into its session folder, submits one job
+    per recording running ``moseq2 run-job`` on that file, records the
+    submission beside it (``extract-submitted.yaml``), and stops. The jobs go to
+    the stand-ins in ``tests/fake_slurm``, which hold them in the queue.
     """
-    import subprocess
-
+    fake_slurm.hold()
     root = build_fake_project(tmp_path / "project", extension=".dat")
     set_settings(root, "computing", cluster_type="slurm")
-    real_system, real_popen = os.system, subprocess.Popen
-
-    def refuse_sbatch(run):
-        def guarded(command, *args, **kwargs):
-            words = command if isinstance(command, (list, tuple)) else [command]
-            if any("sbatch" in str(word) for word in words):
-                pytest.fail(f"the slurm branch submitted a job: {command}")
-            return run(command, *args, **kwargs)
-        return guarded
-
-    monkeypatch.setattr(os, "system", refuse_sbatch(real_system))
-    monkeypatch.setattr(subprocess, "Popen", refuse_sbatch(real_popen))
 
     run = run_extraction(root)
 
-    script = (root / "extract_out.sh").read_text()
-    assert script.count("sbatch") == len(RECORDINGS)
-    assert script.count("run-job") == len(RECORDINGS)
+    calls = fake_slurm.calls("sbatch")
+    assert len(calls) == len(RECORDINGS)
     assert sorted(run.jobs) == [f"{name}/depth.dat" for name in RECORDINGS]
     for key, job_file in run.jobs.items():
         assert Path(job_file).parent == proc(root, key.split("/")[0])
-        assert str(job_file) in script
+        submitted = read_yaml(str(Path(job_file).parent / "extract-submitted.yaml"))
+        assert str(job_file) in submitted["sbatch"] and "run-job" in submitted["sbatch"]
         assert read_yaml(str(job_file))["job"]["recording"] == key
     assert chosen == [], "the local extractor ran on the slurm branch"
 

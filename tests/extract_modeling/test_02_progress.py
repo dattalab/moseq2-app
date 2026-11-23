@@ -132,8 +132,8 @@ def test_an_incomplete_extraction_is_named(tmp_path, capsys):
         "is the unfinished extraction. An extraction stopped partway leaves this behind, most "
         "often because the job or notebook kernel running it was stopped, for example "
         "killed for running out of memory or for reaching its time limit. Look in "
-        f"{proc} for what it wrote and, if it ran on SLURM, in the job's log, "
-        "slurm-<job id>.out in the directory the extraction jobs were submitted from. "
+        f"{proc} for what it wrote and, if it ran on SLURM, at the job's log there, "
+        "extract-job.log. "
         f"Run the extraction again for {session / 'depth.avi'} to redo it.\n"
     ) in capsys.readouterr().out
 

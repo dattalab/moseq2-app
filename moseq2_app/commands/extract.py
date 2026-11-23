@@ -4,7 +4,11 @@
 working folder (``moseq2_extract.project.extract``): every recording that needs
 it, or the recordings named whatever their plan. Settings typed as flags are
 saved to the project before the run, as the notebook's Extract step saves its
-own. ``moseq2 standalone extract RECORDING ...`` extracts the recordings named
+own. On a SLURM cluster it submits the jobs and says how to follow them (W17);
+run again, it says where each job stands and submits only what is neither done
+nor in progress; ``--wait`` follows the jobs until they end
+(``moseq2_extract.project.follow``) and ``--stop`` cancels them
+(``moseq2_extract.project.stop``). ``moseq2 standalone extract RECORDING ...`` extracts the recordings named
 (on the command line, or listed one per line in ``--files-from``) with one set
 of settings (``--config-file``'s, then the flags), each into ``proc/`` beside
 it, reading and writing no project file (``moseq2_extract.steps.extract``).
@@ -23,6 +27,8 @@ from moseq2_app.cli import BUG_LINE, EXIT_BUG, EXIT_EXPECTED, common_options, pr
 from moseq2_common import capture
 from moseq2_common.errors import ExpectedError
 from moseq2_common.options import described_argument, read_settings
+from moseq2_common.project import session_key
+from moseq2_common.yaml import read_yaml
 from moseq2_extract.options import EXTRACT_STAGE, ConvertOptions, CopySliceOptions, ExtractComputing, \
     ExtractOptions, RecordingsOptions
 
@@ -55,8 +61,43 @@ STOPPED_LINE = ("Stopped. Recordings that hadn't finished keep what they had bef
                 "finish them.")
 
 
+#: What ``moseq2 extract --wait`` says when Ctrl-C stops it following the jobs (W17).
+STOPPED_FOLLOWING = "Stopped following; the jobs keep running. Run `moseq2 extract` to see where they stand."
+
+#: What ``moseq2 extract --stop`` says when no job is queued or running.
+NOTHING_TO_STOP = "No cluster jobs of this project are queued or running."
+
 #: The classes whose settings ``moseq2 extract`` takes.
 _CLASSES = (ExtractOptions, RecordingsOptions, ExtractComputing)
+
+
+def submitted_line(ids, *, follow: bool = True) -> str:
+    """What ``moseq2 extract`` says after submitting the jobs ``ids`` (W17); with ``follow`` False, only that it
+    submitted them (``--wait`` follows them next)."""
+    one = len(ids) == 1
+    head = f"Submitted 1 job ({ids[0]})." if one else f"Submitted {len(ids)} jobs ({ids[0]} to {ids[-1]})."
+    if not follow:
+        return head
+    them, stand = ("it", "it stands") if one else ("them", "they stand")
+    return (f"{head} Run `moseq2 extract` again to see where {stand}, `moseq2 extract --wait` to follow {them}, "
+            f"or `moseq2 extract --stop` to cancel {them}.")
+
+
+def cancelled_line(ids) -> str:
+    """What ``moseq2 extract --stop`` says after cancelling the jobs ``ids`` (W15)."""
+    return f"Cancelled {len(ids)} cluster job{'' if len(ids) == 1 else 's'} ({', '.join(ids)})."
+
+
+def _by_number(ids):
+    return sorted(ids, key=lambda job_id: (len(job_id), job_id))
+
+
+def _job_ids(run) -> list[str]:
+    """The ids of the jobs ``run`` submitted, from each recording's submission record."""
+    from moseq2_extract.project import SUBMITTED_FILE
+
+    return _by_number(str(read_yaml(str(Path(job_file).parent / SUBMITTED_FILE))["job_id"])
+                      for job_file in run.jobs.values())
 
 
 def _end(failed: dict) -> None:
@@ -78,15 +119,24 @@ def _end(failed: dict) -> None:
 @click.command("extract", short_help="Extract the recordings that need it: new ones, and ones whose settings changed.")
 @click.argument("recordings", nargs=-1, type=click.Path(exists=True), metavar="[RECORDING]...")
 @settings_flags(*_CLASSES, names=(*_ARENA, *_EXTRACTION, *_RECORDINGS, *_COMPUTING))
+@click.option("--wait", is_flag=True, default=False,
+              help="On a cluster, follow the jobs until every one has ended, saying as each starts and ends.")
+@click.option("--stop", "stop_jobs", is_flag=True, default=False,
+              help="Cancel the project's cluster jobs that are queued or running (the named recordings' only, "
+                   "when any are named), instead of extracting.")
 @common_options
 @click.pass_context
-def extract(ctx, recordings, quiet, debug, **_):
+def extract(ctx, recordings, wait, stop_jobs, quiet, debug, **_):
     """Extract the project's recordings: the mouse in every frame, centered and facing the same way.
 
     Run it in the project folder. Every included recording that is new, or whose settings or arena changed
     since it was extracted, is extracted; one named as RECORDING is extracted whatever its state. Settings
     typed as options are saved to the project first: arena settings typed with recordings named go to those
     recordings, everything else to the project's settings.
+
+    On a cluster each recording is a job, and the command returns once the jobs are submitted. Run it again to
+    see where they stand: a recording whose job is queued or running is left to it, and one whose job failed
+    is submitted again.
     """
     from moseq2_extract import project as extraction
 
@@ -94,11 +144,28 @@ def extract(ctx, recordings, quiet, debug, **_):
 
     def work(reporter):
         project = project_here("extract")
+        if stop_jobs:
+            keys = [session_key(project, recording) for recording in recordings] or None
+            ids = extraction.stop(project, keys)
+            reporter.status(cancelled_line(ids) if ids else NOTHING_TO_STOP)
+            return extraction.ExtractRun(extracted=[], failed={}, up_to_date=[], jobs={})
         try:
-            return extraction.extract(project, recordings=list(recordings) or None, settings=settings,
-                                      reporter=reporter)
+            run = extraction.extract(project, recordings=list(recordings) or None, settings=settings,
+                                     reporter=reporter)
         except KeyboardInterrupt:
             click.echo(STOPPED_LINE, file=capture.terminal())
+            raise click.exceptions.Exit(EXIT_EXPECTED) from None
+        if run.jobs:
+            reporter.status(submitted_line(_job_ids(run), follow=not wait))
+        if not wait:
+            return run
+        keys = sorted(set(run.jobs) | {key for key, job in extraction.cluster_runs(project).items() if job.live})
+        if not keys:
+            return run
+        try:
+            return extraction.follow(project, keys, reporter=reporter)
+        except KeyboardInterrupt:
+            click.echo(STOPPED_FOLLOWING, file=capture.terminal())
             raise click.exceptions.Exit(EXIT_EXPECTED) from None
 
     run = run_step(work, quiet=quiet, debug=debug)

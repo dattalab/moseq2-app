@@ -10,6 +10,15 @@ the options typed. While it runs, each recording's row follows its extraction;
 a recording that fails shows what happened and the fix in its row, and the rest
 are extracted.
 
+On a SLURM cluster the button submits one job per recording and the rows follow
+the jobs: while the page shows them, it asks every few seconds (``poll``), and
+each row reads its job's state and progress from
+``moseq2_extract.project.cluster_runs``: in the queue, extracting with its
+percentage, extracted, failed with what happened and the fix, or cancelled.
+Stop cancels the jobs (``moseq2_extract.project.stop``). The jobs do not depend
+on the notebook: a GUI opened while any job of the latest submission is queued
+or running, or after one failed, shows that submission's rows again.
+
 Each setting shown is declared once, with its control, in the options classes
 (``moseq2_extract.options``): the computing block's ``cluster_type``, ``cores``,
 ``partition``, ``memory`` and ``wall_time``, and extraction's ``crop_size``,
@@ -21,10 +30,11 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
+from datetime import datetime
 
 import traitlets
 
-from moseq2_app.notebook._widget import RunningStep, session_labels, static_text
+from moseq2_app.notebook._widget import RunningStep, problem_of, session_labels, static_text
 from moseq2_common import capture
 from moseq2_common.computing import available_cores
 from moseq2_common.options import from_gui, gui_fields, read_settings, to_gui
@@ -41,6 +51,25 @@ def _length(seconds: float) -> str:
     return f"{round(seconds / 60)} min" if seconds >= 60 else f"{round(seconds)} s"
 
 
+#: Where a cluster run happens, as the ``run`` trait says it.
+CLUSTER = "the cluster"
+
+
+def _item(run) -> dict:
+    """A recording's row, from where its job stands (``moseq2_extract.project.RecordingRun``)."""
+    done = run.total if run.state == "done" and run.total is not None else run.done
+    return {"state": run.state, "done": done or 0, "total": run.total,
+            "problem": problem_of(run.problem) if run.problem is not None else {}}
+
+
+def _clock(text: str | None) -> str:
+    """An ISO time as the GUI shows it, ``HH:MM``; empty when there is none."""
+    try:
+        return datetime.fromisoformat(str(text)).astimezone().strftime("%H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
 class ExtractWidget(RunningStep):
     """The Extract step's GUI (module docstring)."""
 
@@ -51,6 +80,8 @@ class ExtractWidget(RunningStep):
     _esm = static_text("kit.js", "steps.js", "extract.js")
 
     def __init__(self, project: Project | None = None):
+        #: Where each recorded job stood when last read, so a progress file read from a cache never moves a row back.
+        self._runs: dict = {}
         super().__init__(project)
         self.refresh()
 
@@ -98,6 +129,99 @@ class ExtractWidget(RunningStep):
             {"title": "More settings", "fold": True, "fields": gui_fields(ExtractOptions, MORE_SETTINGS, saved)},
         ]
         self.saved = saved
+        self._pick_up(planned)
+
+    def _pick_up(self, planned) -> None:
+        """When nothing has run in this GUI yet, show the latest cluster submission's rows: while any of its jobs is
+        queued or running, as a run going on; when one failed and its recording is still to extract, as a run
+        that finished."""
+        from moseq2_extract import project as extraction_steps
+
+        with self._lock:
+            if self.run.get("state") != "idle" or not self._finished.is_set():
+                return
+        if not any(p.plan in ("in progress", "new", "redo") for p in planned):
+            return
+        runs = extraction_steps.cluster_runs(self.project, previous=self._runs)
+        if not runs:
+            return
+        self._runs = runs
+        latest = max((run.submitted or "" for run in runs.values()), default="")
+        batch = {key: run for key, run in runs.items() if run.submitted == latest or run.live}
+        to_extract = {p.key for p in planned if p.plan in ("new", "redo")}
+        live = any(run.live for run in batch.values())
+        if not live and not any(run.state == "failed" and key in to_extract for key, run in batch.items()):
+            return
+        run = {"state": "running" if live else "finished", "where": CLUSTER,
+               "items": {key: _item(job) for key, job in sorted(batch.items())}}
+        if not live:
+            run["finished_at"] = max((_clock(job.updated or job.submitted) for job in batch.values()), default="")
+        with self._lock:
+            if self.run.get("state") == "idle":
+                self.run = run
+
+    # ---- following a cluster run
+    def _cluster_running(self) -> bool:
+        with self._lock:
+            return self.run.get("where") == CLUSTER and self.run.get("state") == "running"
+
+    def poll(self) -> None:
+        """Read where the cluster jobs of the run shown stand, and update their rows; the page asks every few
+        seconds while it shows them running. Nothing happens for a run on this computer, or while the jobs are
+        being submitted."""
+        if not self._cluster_running() or not self._finished.is_set():
+            return
+        from moseq2_extract import project as extraction_steps
+
+        runs = extraction_steps.cluster_runs(self.project, previous=self._runs)
+        self._runs = runs
+        with self._lock:
+            items = {key: dict(item) for key, item in self.run.get("items", {}).items()}
+            for key in items:
+                if key in runs:
+                    items[key] = _item(runs[key])
+            ended = not any(key in runs and runs[key].live for key in items)
+            run = {**self.run, "items": items}
+            if ended:
+                run.update(state="finished", finished_at=time.strftime("%H:%M"))
+            self.run = run
+        if ended:
+            from moseq2_app.notebook import _state
+
+            _state.changed(self.project)
+
+    def _on_poll(self, _content: Mapping) -> None:
+        self.poll()
+
+    def stop(self) -> None:
+        """Stop the run: on this computer, at its next chunk; on a cluster, by cancelling its jobs that are queued
+        or running (W15). Jobs still being submitted are cancelled as soon as they are."""
+        if not self._cluster_running() or not self._finished.is_set():
+            super().stop()
+            return
+        self._cancel()
+
+    def _cancel(self) -> None:
+        from moseq2_common.errors import ExpectedError
+        from moseq2_extract import project as extraction_steps
+
+        with self._lock:
+            keys = list(self.run.get("items", {}))
+        ids = extraction_steps.stop(self.project, keys)
+        runs = extraction_steps.cluster_runs(self.project, previous=self._runs)
+        self._runs = runs
+        with self._lock:
+            items = {key: (_item(runs[key]) if key in runs else dict(item))
+                     for key, item in self.run.get("items", {}).items()}
+            self.run = {**self.run, "items": items, "state": "stopped", "finished_at": time.strftime("%H:%M")}
+        if ids:
+            n = len(ids)
+            self.report_problem(ExpectedError(
+                f"Cancelled {n} cluster job{'' if n == 1 else 's'} at {time.strftime('%H:%M')}.",
+                fix="press Extract to submit the recordings that hadn't finished."))
+        from moseq2_app.notebook import _state
+
+        _state.changed(self.project)
 
     # ---- running
     def _items(self) -> list[str]:
@@ -121,7 +245,6 @@ class ExtractWidget(RunningStep):
         return extraction_steps.extract(self.project, settings=self._typed(settings), reporter=reporter)
 
     def _finish(self, outcome: capture.Outcome) -> dict:
-        from moseq2_app.notebook._widget import problem_of
         from moseq2_common.errors import ExpectedError, StepStopped
 
         run = super()._finish(outcome)
@@ -137,6 +260,29 @@ class ExtractWidget(RunningStep):
             for key, error in result.failed.items():
                 items.setdefault(key, {}).update(state="failed", problem=problem_of(error))
         run["items"] = items
+        if result is not None and result.jobs:
+            return self._submitted(run, result)
+        return run
+
+    def _submitted(self, run: dict, result) -> dict:
+        """The run once its jobs are submitted: going on, on the cluster, each row from its job. A Stop pressed
+        while they were being submitted cancels them now."""
+        from moseq2_extract import project as extraction_steps
+
+        runs = extraction_steps.cluster_runs(self.project, previous=self._runs)
+        self._runs = runs
+        items = {key: _item(runs[key]) if key in runs else item for key, item in run["items"].items()}
+        for key in result.jobs:
+            if key in runs:
+                items[key] = _item(runs[key])
+        run = {key: value for key, value in run.items() if key != "finished_at"}
+        run.update(state="running", where=CLUSTER, items=items)
+        if self._stopping.is_set():
+            with self._lock:
+                self.run = run
+            self._cancel()
+            with self._lock:
+                return dict(self.run)
         return run
 
 
